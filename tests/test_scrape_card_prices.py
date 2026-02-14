@@ -1,13 +1,24 @@
 import unittest
 import sys
 import os
+from unittest.mock import MagicMock
 from datetime import datetime
+
+# Mock selenium modules to prevent installation attempt
+sys.modules['selenium'] = MagicMock()
+sys.modules['selenium.webdriver'] = MagicMock()
+sys.modules['selenium.webdriver.chrome.options'] = MagicMock()
+sys.modules['selenium.webdriver.common.by'] = MagicMock()
+sys.modules['selenium.webdriver.support.ui'] = MagicMock()
+sys.modules['selenium.webdriver.support'] = MagicMock()
+sys.modules['selenium.webdriver.support.expected_conditions'] = MagicMock()
 
 # Add root directory to path so we can import modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from scrape_card_prices import (
     clean_card_name_for_search,
+    is_graded_card,
     get_grade_info,
     title_matches_grade,
     build_simplified_query,
@@ -15,6 +26,26 @@ from scrape_card_prices import (
 )
 
 class TestScrapeCardPrices(unittest.TestCase):
+
+    def test_is_graded_card(self):
+        # Happy path - PSA graded
+        self.assertTrue(is_graded_card("Connor McDavid [PSA 10]"))
+        self.assertTrue(is_graded_card("Connor McDavid [PSA 9]"))
+
+        # Case insensitivity
+        self.assertTrue(is_graded_card("Connor McDavid [psa 10]"))
+        self.assertTrue(is_graded_card("Connor McDavid [Psa 8]"))
+
+        # Other grades/raw - should be False based on current regex
+        self.assertFalse(is_graded_card("Connor McDavid [BGS 9.5]"))
+        self.assertFalse(is_graded_card("Connor McDavid [SGC 10]"))
+        self.assertFalse(is_graded_card("Connor McDavid"))
+        self.assertFalse(is_graded_card("Connor McDavid [Base]"))
+        self.assertFalse(is_graded_card("Connor McDavid [Young Guns]"))
+
+        # Edge cases
+        self.assertFalse(is_graded_card(""))
+        self.assertFalse(is_graded_card("PSA 10")) # No brackets
 
     def test_get_grade_info(self):
         self.assertEqual(get_grade_info("Connor McDavid [PSA 10]"), ("PSA 10", 10))
