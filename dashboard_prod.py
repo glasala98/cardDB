@@ -578,53 +578,6 @@ elif page == "Card Inspect":
             else:
                 st.warning("No sales found for this card.")
 
-        # eBay Sales History
-        st.markdown("---")
-        st.subheader("eBay Sales History")
-        sales = load_sales_history(selected_card)
-
-        if sales:
-            # Build dataframe from raw sales
-            sales_df = pd.DataFrame(sales)
-            sales_df['sold_date'] = pd.to_datetime(sales_df['sold_date'], errors='coerce')
-            dated_sales = sales_df.dropna(subset=['sold_date']).sort_values('sold_date')
-
-            if len(dated_sales) > 0:
-                fig_sales = px.scatter(
-                    dated_sales,
-                    x='sold_date', y='price_val',
-                    hover_data={'title': True, 'item_price': True, 'shipping': True},
-                    title="Sold Prices Over Time",
-                    labels={'sold_date': 'Date Sold', 'price_val': 'Total Price ($)'}
-                )
-                # Add fair value reference line
-                fig_sales.add_hline(
-                    y=card_row['Fair Value'],
-                    line_dash="dash", line_color="green",
-                    annotation_text=f"Fair Value: ${card_row['Fair Value']:.2f}",
-                    annotation_position="top left"
-                )
-                fig_sales.update_layout(template="plotly_dark", height=400)
-                st.plotly_chart(fig_sales, use_container_width=True)
-
-            # Sales table
-            display_sales = sales_df[['sold_date', 'title', 'item_price', 'shipping', 'price_val']].copy()
-            display_sales.columns = ['Date', 'Listing Title', 'Item Price', 'Shipping', 'Total']
-            display_sales['Date'] = display_sales['Date'].dt.strftime('%Y-%m-%d').fillna('Unknown')
-            display_sales['Listing Title'] = display_sales['Listing Title'].str.replace(
-                r'\nOpens in a new window or tab', '', regex=True
-            ).str[:80]
-            st.dataframe(
-                display_sales,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "Total": st.column_config.NumberColumn("Total ($)", format="$%.2f"),
-                }
-            )
-        else:
-            st.info("No eBay sales history available for this card. Rescrape from the Card Ledger to populate data.")
-
         # Fair Value Over Time (from price_history.json)
         st.markdown("---")
         st.subheader("Fair Value Tracking")
@@ -646,3 +599,45 @@ elif page == "Card Inspect":
             st.plotly_chart(fig_hist, use_container_width=True)
         else:
             st.caption("No price history yet. Fair value tracking begins when you rescrape a card.")
+
+        # eBay Sales History
+        st.markdown("---")
+        st.subheader("eBay Sales History")
+        sales = load_sales_history(selected_card)
+
+        if sales:
+            # Build dataframe from raw sales
+            sales_df = pd.DataFrame(sales)
+            sales_df['sold_date'] = pd.to_datetime(sales_df['sold_date'], errors='coerce')
+
+            # Prepare display table
+            display_sales = sales_df[['sold_date', 'title', 'item_price', 'shipping', 'price_val']].copy()
+            display_sales.columns = ['Date', 'Listing Title', 'Item Price', 'Shipping', 'Total']
+            display_sales = display_sales.sort_values('Date', ascending=False).reset_index(drop=True)
+            display_sales['Date'] = display_sales['Date'].dt.strftime('%Y-%m-%d').fillna('Unknown')
+            display_sales['Listing Title'] = display_sales['Listing Title'].str.replace(
+                r'\nOpens in a new window or tab', '', regex=True
+            ).str[:80]
+
+            sale_config = {"Total": st.column_config.NumberColumn("Total ($)", format="$%.2f")}
+
+            # Show last 5 sales
+            st.caption(f"Last 5 of {len(display_sales)} sales")
+            st.dataframe(
+                display_sales.head(5),
+                use_container_width=True,
+                hide_index=True,
+                column_config=sale_config,
+            )
+
+            # Full history in expander
+            if len(display_sales) > 5:
+                with st.expander(f"View all {len(display_sales)} sales"):
+                    st.dataframe(
+                        display_sales,
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config=sale_config,
+                    )
+        else:
+            st.info("No eBay sales history available. Rescrape to populate data.")

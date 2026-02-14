@@ -194,6 +194,22 @@ def scrape_single_card(card_name):
 
         if sales:
             fair_price, stats = calculate_fair_price(sales)
+            # Save raw sales to card_prices_results.json
+            results = {}
+            if os.path.exists(RESULTS_JSON_PATH):
+                try:
+                    with open(RESULTS_JSON_PATH, 'r', encoding='utf-8') as f:
+                        results = json.load(f)
+                except Exception:
+                    results = {}
+            results[card_name] = {
+                'raw_sales': sales,
+                'fair_price': stats.get('fair_price'),
+                'num_sales': stats.get('num_sales'),
+                'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+            with open(RESULTS_JSON_PATH, 'w', encoding='utf-8') as f:
+                json.dump(results, f, indent=2, ensure_ascii=False)
             return stats
         return None
     finally:
