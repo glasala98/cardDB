@@ -305,6 +305,9 @@ def search_ebay_sold(driver, card_name, max_results=50):
                         listing_url = link_elem.get_attribute('href') or ''
                     except Exception:
                         pass
+                # Strip epid param — it causes eBay to redirect to product catalog page
+                if listing_url and 'epid=' in listing_url:
+                    listing_url = re.sub(r'[&?]epid=[^&]*', '', listing_url)
 
                 price_elem = item.find_element(By.CSS_SELECTOR, '.s-card__price')
                 price_text = price_elem.text.strip()
@@ -534,6 +537,8 @@ def process_card(card):
                             listing_url = link_elem.get_attribute('href') or ''
                         except Exception:
                             pass
+                    if listing_url and 'epid=' in listing_url:
+                        listing_url = re.sub(r'[&?]epid=[^&]*', '', listing_url)
 
                     price_elem = item.find_element(By.CSS_SELECTOR, '.s-card__price')
                     price_text = price_elem.text.strip().replace('Opens in a new window', '')
