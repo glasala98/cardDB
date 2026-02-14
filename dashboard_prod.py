@@ -10,7 +10,8 @@ from datetime import datetime
 try:
     from dashboard_utils import (
         analyze_card_images, scrape_single_card, load_data, save_data,
-        parse_card_name, CSV_PATH, MONEY_COLS, PARSED_COLS
+        parse_card_name, load_sales_history, append_price_history, load_price_history,
+        CSV_PATH, MONEY_COLS, PARSED_COLS
     )
 except ImportError:
     st.error("dashboard_utils.py not found. Please ensure it exists in the same directory.")
@@ -64,7 +65,7 @@ df = st.session_state.df
 # ============================================================
 # SIDEBAR - Navigation + Conditional Scan/Add Card
 # ============================================================
-page = st.sidebar.radio("Navigate", ["Charts", "Card Ledger"])
+page = st.sidebar.radio("Navigate", ["Charts", "Card Ledger", "Card Inspect"])
 
 # Show Scan Card and Add New Card only on Card Ledger page
 if page == "Card Ledger":
@@ -158,6 +159,7 @@ if page == "Card Ledger":
                         'Max': stats['max'],
                         'Num Sales': stats['num_sales']
                     }])
+                    append_price_history(card_name, stats['fair_price'], stats['num_sales'])
                     st.sidebar.success(f"Found {stats['num_sales']} sales! Fair value: ${stats['fair_price']:.2f}")
                 else:
                     new_row = pd.DataFrame([{
@@ -447,6 +449,7 @@ elif page == "Card Ledger":
                         st.session_state.df.at[i, 'Num Sales'] = stats['num_sales']
                         st.session_state.df.at[i, 'Top 3 Prices'] = ' | '.join(stats.get('top_3_prices', []))
                         save_data(st.session_state.df)
+                        append_price_history(rescrape_card, stats['fair_price'], stats['num_sales'])
                         st.success(f"Updated! Fair value: ${stats['fair_price']:.2f} ({stats['num_sales']} sales)")
                         st.rerun()
                 else:
@@ -495,3 +498,125 @@ elif page == "Card Ledger":
             st.rerun()
     else:
         st.info("All cards have sales data!")
+
+# ============================================================
+# CARD INSPECT PAGE
+# ============================================================
+elif page == "Card Inspect":
+    st.subheader("Card Inspect")
+
+    # Card selector
+    all_card_names = df['Card Name'].tolist()
+    all_player_labels = df['Player'].tolist()
+    label_map = dict(zip(all_card_names, all_player_labels))
+
+    # Pre-select from session state if navigated from ledger
+    default_idx = 0
+    preselected = st.session_state.get('inspect_card', '')
+    if preselected and preselected in all_card_names:
+        default_idx = all_card_names.index(preselected) + 1
+
+    selected_card = st.selectbox(
+        "Select a card to inspect",
+        options=[""] + all_card_names,
+        index=default_idx,
+        format_func=lambda x: "Choose a card..." if x == "" else label_map.get(x, x[:60]),
+    )
+
+    if not selected_card:
+        st.info("Select a card from the dropdown above to see detailed information and sales history.")
+    else:
+        card_row = df[df['Card Name'] == selected_card].iloc[0]
+
+        # Card details
+        st.markdown("---")
+        dc1, dc2, dc3, dc4 = st.columns(4)
+        with dc1:
+            st.metric("Player", card_row['Player'])
+        with dc2:
+            st.metric("Set", card_row['Set'][:40] if card_row['Set'] else "N/A")
+        with dc3:
+            st.metric("Card #", card_row['Card #'] if card_row['Card #'] else "N/A")
+        with dc4:
+            st.metric("Grade", card_row['Grade'] if card_row['Grade'] else "Raw")
+
+        vc1, vc2, vc3, vc4, vc5 = st.columns(5)
+        with vc1:
+            st.metric("Fair Value", f"${card_row['Fair Value']:.2f}")
+        with vc2:
+            st.metric("Trend", card_row['Trend'])
+        with vc3:
+            st.metric("Sales Found", int(card_row['Num Sales']))
+        with vc4:
+            st.metric("Min", f"${card_row['Min']:.2f}")
+        with vc5:
+            st.metric("Max", f"${card_row['Max']:.2f}")
+
+        # eBay Sales History
+        st.markdown("---")
+        st.subheader("eBay Sales History")
+        sales = load_sales_history(selected_card)
+
+        if sales:
+            # Build dataframe from raw sales
+            sales_df = pd.DataFrame(sales)
+            sales_df['sold_date'] = pd.to_datetime(sales_df['sold_date'], errors='coerce')
+            dated_sales = sales_df.dropna(subset=['sold_date']).sort_values('sold_date')
+
+            if len(dated_sales) > 0:
+                fig_sales = px.scatter(
+                    dated_sales,
+                    x='sold_date', y='price_val',
+                    hover_data={'title': True, 'item_price': True, 'shipping': True},
+                    title="Sold Prices Over Time",
+                    labels={'sold_date': 'Date Sold', 'price_val': 'Total Price ($)'}
+                )
+                # Add fair value reference line
+                fig_sales.add_hline(
+                    y=card_row['Fair Value'],
+                    line_dash="dash", line_color="green",
+                    annotation_text=f"Fair Value: ${card_row['Fair Value']:.2f}",
+                    annotation_position="top left"
+                )
+                fig_sales.update_layout(template="plotly_dark", height=400)
+                st.plotly_chart(fig_sales, use_container_width=True)
+
+            # Sales table
+            display_sales = sales_df[['sold_date', 'title', 'item_price', 'shipping', 'price_val']].copy()
+            display_sales.columns = ['Date', 'Listing Title', 'Item Price', 'Shipping', 'Total']
+            display_sales['Date'] = display_sales['Date'].dt.strftime('%Y-%m-%d').fillna('Unknown')
+            display_sales['Listing Title'] = display_sales['Listing Title'].str.replace(
+                r'\nOpens in a new window or tab', '', regex=True
+            ).str[:80]
+            st.dataframe(
+                display_sales,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Total": st.column_config.NumberColumn("Total ($)", format="$%.2f"),
+                }
+            )
+        else:
+            st.info("No eBay sales history available for this card. Rescrape from the Card Ledger to populate data.")
+
+        # Fair Value Over Time (from price_history.json)
+        st.markdown("---")
+        st.subheader("Fair Value Tracking")
+        history = load_price_history(selected_card)
+
+        if history:
+            hist_df = pd.DataFrame(history)
+            hist_df['date'] = pd.to_datetime(hist_df['date'])
+            hist_df = hist_df.sort_values('date')
+
+            fig_hist = px.line(
+                hist_df,
+                x='date', y='fair_value',
+                markers=True,
+                title="Fair Value Over Time",
+                labels={'date': 'Scrape Date', 'fair_value': 'Fair Value ($)'}
+            )
+            fig_hist.update_layout(template="plotly_dark", height=350)
+            st.plotly_chart(fig_hist, use_container_width=True)
+        else:
+            st.caption("No price history yet. Fair value tracking begins when you rescrape a card.")

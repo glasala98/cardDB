@@ -37,6 +37,8 @@ cp dashboard_prod.py $APP_DIR/
 cp dashboard_utils.py $APP_DIR/
 cp scrape_card_prices.py $APP_DIR/
 cp card_prices_summary.csv $APP_DIR/
+cp -f card_prices_results.json $APP_DIR/ 2>/dev/null || true
+cp -f price_history.json $APP_DIR/ 2>/dev/null || true
 cp requirements.txt $APP_DIR/
 chown -R $APP_USER:$APP_USER $APP_DIR
 

@@ -28,6 +28,8 @@ except ImportError:
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_PATH = os.path.join(SCRIPT_DIR, "card_prices_summary.csv")
+RESULTS_JSON_PATH = os.path.join(SCRIPT_DIR, "card_prices_results.json")
+HISTORY_PATH = os.path.join(SCRIPT_DIR, "price_history.json")
 MONEY_COLS = ['Fair Value', 'Median (All)', 'Min', 'Max']
 
 def analyze_card_images(front_image_bytes, back_image_bytes=None):
@@ -289,3 +291,51 @@ def save_data(df, csv_path=CSV_PATH):
     for col in MONEY_COLS:
         save_df[col] = save_df[col].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "$0.00")
     save_df.to_csv(csv_path, index=False)
+
+
+def load_sales_history(card_name):
+    """Load raw eBay sales for a card from card_prices_results.json."""
+    if not os.path.exists(RESULTS_JSON_PATH):
+        return []
+    try:
+        with open(RESULTS_JSON_PATH, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        card_data = data.get(card_name, {})
+        return card_data.get('raw_sales', [])
+    except Exception:
+        return []
+
+
+def append_price_history(card_name, fair_value, num_sales):
+    """Append a price snapshot to the history log."""
+    history = {}
+    if os.path.exists(HISTORY_PATH):
+        try:
+            with open(HISTORY_PATH, 'r', encoding='utf-8') as f:
+                history = json.load(f)
+        except Exception:
+            history = {}
+
+    if card_name not in history:
+        history[card_name] = []
+
+    history[card_name].append({
+        'date': datetime.now().strftime('%Y-%m-%d'),
+        'fair_value': round(fair_value, 2),
+        'num_sales': num_sales
+    })
+
+    with open(HISTORY_PATH, 'w', encoding='utf-8') as f:
+        json.dump(history, f, indent=2, ensure_ascii=False)
+
+
+def load_price_history(card_name):
+    """Load fair value history for a card from price_history.json."""
+    if not os.path.exists(HISTORY_PATH):
+        return []
+    try:
+        with open(HISTORY_PATH, 'r', encoding='utf-8') as f:
+            history = json.load(f)
+        return history.get(card_name, [])
+    except Exception:
+        return []
