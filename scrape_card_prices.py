@@ -84,6 +84,10 @@ def clean_card_name_for_search(card_name):
     # Shorten verbose brand names for better eBay matching
     brand = parts[0] if parts else ""
     brand = re.sub(r'^\d{4}(?:-\d{2})?\s*', '', brand).strip()
+
+    # Clean card number from brand for mapping check
+    brand_clean = re.sub(r'#\S+', '', brand).strip()
+
     # Common abbreviations sellers use
     brand_map = {
         'O-Pee-Chee Platinum': 'OPC Platinum',
@@ -94,7 +98,7 @@ def clean_card_name_for_search(card_name):
         'Upper Deck UD Rookie Debut': 'UD Rookie Debut',
     }
     for full, short in brand_map.items():
-        if brand == full:
+        if brand_clean == full:
             brand = short
             break
 
