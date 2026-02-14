@@ -294,14 +294,20 @@ def search_ebay_sold(driver, card_name, max_results=50):
                 if not title_matches_grade(title, grade_str, grade_num):
                     continue
 
-                # Get listing URL from the anchor tag
+                # Get listing URL — try the title's own anchor first
                 listing_url = ''
                 try:
-                    link_elem = item.find_element(By.CSS_SELECTOR, 'a[href*="ebay.com/itm/"]')
-                    listing_url = link_elem.get_attribute('href') or ''
+                    # Title element itself may be an <a> or contain one
+                    if title_elem.tag_name == 'a':
+                        listing_url = title_elem.get_attribute('href') or ''
+                    else:
+                        link_elem = title_elem.find_element(By.CSS_SELECTOR, 'a')
+                        listing_url = link_elem.get_attribute('href') or ''
                 except Exception:
+                    pass
+                if not listing_url:
                     try:
-                        link_elem = item.find_element(By.CSS_SELECTOR, 'a')
+                        link_elem = item.find_element(By.CSS_SELECTOR, 'a[href*="/itm/"]')
                         listing_url = link_elem.get_attribute('href') or ''
                     except Exception:
                         pass
@@ -526,11 +532,16 @@ def process_card(card):
 
                     listing_url = ''
                     try:
-                        link_elem = item.find_element(By.CSS_SELECTOR, 'a[href*="ebay.com/itm/"]')
-                        listing_url = link_elem.get_attribute('href') or ''
+                        if title_elem.tag_name == 'a':
+                            listing_url = title_elem.get_attribute('href') or ''
+                        else:
+                            link_elem = title_elem.find_element(By.CSS_SELECTOR, 'a')
+                            listing_url = link_elem.get_attribute('href') or ''
                     except Exception:
+                        pass
+                    if not listing_url:
                         try:
-                            link_elem = item.find_element(By.CSS_SELECTOR, 'a')
+                            link_elem = item.find_element(By.CSS_SELECTOR, 'a[href*="/itm/"]')
                             listing_url = link_elem.get_attribute('href') or ''
                         except Exception:
                             pass
