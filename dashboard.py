@@ -104,6 +104,7 @@ If you can't determine a field, use your best guess based on card design, logos,
         return None, str(e)
 
 
+@st.cache_data
 def scrape_single_card(card_name):
     """Scrape eBay for a single card and return result dict."""
     driver = create_driver()
