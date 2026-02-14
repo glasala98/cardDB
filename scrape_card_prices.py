@@ -294,24 +294,17 @@ def search_ebay_sold(driver, card_name, max_results=50):
                 if not title_matches_grade(title, grade_str, grade_num):
                     continue
 
-                # Get listing URL from the item's /itm/ link
+                # Get listing URL — use the title's parent anchor (s-card__link)
                 listing_url = ''
                 try:
-                    # Try /itm/ link within this card first
-                    link_elem = item.find_element(By.CSS_SELECTOR, 'a[href*="/itm/"]')
+                    link_elem = title_elem.find_element(By.XPATH, './ancestor::a[@class="s-card__link"]')
                     listing_url = link_elem.get_attribute('href') or ''
                 except Exception:
                     try:
-                        # Try parent anchor of the title element
-                        link_elem = title_elem.find_element(By.XPATH, './ancestor::a')
+                        link_elem = item.find_element(By.CSS_SELECTOR, 'a.s-card__link[href*="/itm/"]')
                         listing_url = link_elem.get_attribute('href') or ''
                     except Exception:
                         pass
-                # Clean tracking params — keep just the item URL
-                if '/itm/' in listing_url:
-                    itm_match = re.search(r'(https?://[^/]+/itm/\d+)', listing_url)
-                    if itm_match:
-                        listing_url = itm_match.group(1)
 
                 price_elem = item.find_element(By.CSS_SELECTOR, '.s-card__price')
                 price_text = price_elem.text.strip()
@@ -533,18 +526,14 @@ def process_card(card):
 
                     listing_url = ''
                     try:
-                        link_elem = item.find_element(By.CSS_SELECTOR, 'a[href*="/itm/"]')
+                        link_elem = title_elem.find_element(By.XPATH, './ancestor::a[@class="s-card__link"]')
                         listing_url = link_elem.get_attribute('href') or ''
                     except Exception:
                         try:
-                            link_elem = title_elem.find_element(By.XPATH, './ancestor::a')
+                            link_elem = item.find_element(By.CSS_SELECTOR, 'a.s-card__link[href*="/itm/"]')
                             listing_url = link_elem.get_attribute('href') or ''
                         except Exception:
                             pass
-                    if '/itm/' in listing_url:
-                        itm_match = re.search(r'(https?://[^/]+/itm/\d+)', listing_url)
-                        if itm_match:
-                            listing_url = itm_match.group(1)
 
                     price_elem = item.find_element(By.CSS_SELECTOR, '.s-card__price')
                     price_text = price_elem.text.strip().replace('Opens in a new window', '')
