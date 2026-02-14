@@ -806,9 +806,26 @@ elif page == "Card Inspect":
             ).str[:80]
             display_sales['Listing URL'] = display_sales['Listing URL'].fillna('')
 
+            # Mark expired links (eBay removes sold listings after ~90 days)
+            from datetime import datetime, timedelta
+            cutoff = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
+            display_sales['Listing'] = display_sales.apply(
+                lambda r: r['Listing URL'] if r['Listing URL'] and r['Date'] >= cutoff
+                else '' if not r['Listing URL']
+                else r['Listing URL'],
+                axis=1
+            )
+            display_sales['Status'] = display_sales.apply(
+                lambda r: '' if not r['Listing URL']
+                else 'Expired' if r['Date'] < cutoff and r['Date'] != 'Unknown'
+                else '',
+                axis=1
+            )
+            display_sales = display_sales.drop(columns=['Listing URL'])
+
             sale_config = {
                 "Total": st.column_config.NumberColumn("Total ($)", format="$%.2f"),
-                "Listing URL": st.column_config.LinkColumn("Listing", display_text="View"),
+                "Listing": st.column_config.LinkColumn("Listing", display_text="View"),
             }
 
             # Show last 5 sales
