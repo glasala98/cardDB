@@ -67,12 +67,11 @@ df = st.session_state.df
 # ============================================================
 # Check for programmatic navigation (e.g. from View Card button)
 nav_pages = ["Charts", "Card Ledger", "Card Inspect"]
-nav_index = 0
 if 'nav_page' in st.session_state and st.session_state.nav_page in nav_pages:
-    nav_index = nav_pages.index(st.session_state.nav_page)
+    st.session_state['_nav_radio'] = st.session_state.nav_page
     del st.session_state.nav_page
 
-page = st.sidebar.radio("Navigate", nav_pages, index=nav_index)
+page = st.sidebar.radio("Navigate", nav_pages, key="_nav_radio")
 
 # Show Scan Card and Add New Card only on Card Ledger page
 if page == "Card Ledger":
