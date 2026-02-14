@@ -312,25 +312,19 @@ elif page == "Card Ledger":
     search_query = st.text_input("Search cards", placeholder="Search by player, set, year, card number...")
 
     # Filter row
-    fcol1, fcol2, fcol3, fcol4 = st.columns(4)
+    fcol1, fcol2, fcol3 = st.columns(3)
     with fcol1:
-        years = sorted(df['Year'].dropna().unique().tolist(), reverse=True)
-        years = [y for y in years if y]
-        year_filter = st.selectbox("Year", ["All Years"] + years)
-    with fcol2:
         sets = sorted(df['Set'].dropna().unique().tolist())
         sets = [s for s in sets if s]
         set_filter = st.selectbox("Set", ["All Sets"] + sets)
-    with fcol3:
+    with fcol2:
         trend_options = sorted(df['Trend'].unique().tolist())
         trend_filter = st.multiselect("Trend", options=trend_options, default=trend_options)
-    with fcol4:
+    with fcol3:
         grade_filter = st.selectbox("Grade", ["All", "Raw", "Graded"])
 
     # Apply filters
     mask = df['Trend'].isin(trend_filter)
-    if year_filter != "All Years":
-        mask &= df['Year'] == year_filter
     if set_filter != "All Sets":
         mask &= df['Set'] == set_filter
     if grade_filter == "Raw":
@@ -339,7 +333,7 @@ elif page == "Card Ledger":
         mask &= df['Grade'] != ''
     filtered_df = df[mask].copy()
 
-    display_cols = ['Player', 'Year', 'Set', 'Card #', 'Grade', 'Fair Value', 'Trend', 'Num Sales', 'Min', 'Max']
+    display_cols = ['Player', 'Set', 'Card #', 'Grade', 'Fair Value', 'Trend', 'Num Sales', 'Min', 'Max']
     edit_df = filtered_df[display_cols].copy()
 
     if search_query.strip():
@@ -357,7 +351,6 @@ elif page == "Card Ledger":
         num_rows="dynamic",
         column_config={
             "Player": st.column_config.TextColumn("Player", width="medium"),
-            "Year": st.column_config.TextColumn("Year", width="small", disabled=True),
             "Set": st.column_config.TextColumn("Set", width="medium", disabled=True),
             "Card #": st.column_config.TextColumn("#", width="small", disabled=True),
             "Grade": st.column_config.TextColumn("Grade", width="small", disabled=True),
@@ -474,14 +467,13 @@ elif page == "Card Ledger":
     st.divider()
     st.subheader(f"Cards Not Found ({len(not_found_df)} cards, defaulted to $5.00)")
     if len(not_found_df) > 0:
-        nf_display = not_found_df[['Player', 'Year', 'Set', 'Card #', 'Fair Value']].reset_index(drop=True)
+        nf_display = not_found_df[['Player', 'Set', 'Card #', 'Fair Value']].reset_index(drop=True)
         edited_nf = st.data_editor(
             nf_display,
             use_container_width=True,
             hide_index=True,
             column_config={
                 "Player": st.column_config.TextColumn("Player", width="medium", disabled=True),
-                "Year": st.column_config.TextColumn("Year", width="small", disabled=True),
                 "Set": st.column_config.TextColumn("Set", width="medium", disabled=True),
                 "Card #": st.column_config.TextColumn("#", width="small", disabled=True),
                 "Fair Value": st.column_config.NumberColumn("Manual Price ($)", format="$%.2f", min_value=0),

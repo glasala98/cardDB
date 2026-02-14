@@ -221,10 +221,8 @@ def parse_card_name(card_name):
         if year_match:
             result['Year'] = year_match.group(1)
 
-        # Set: first segment minus year, cleaned up
+        # Set: keep year with set name for clarity
         set_name = parts[0]
-        if result['Year']:
-            set_name = set_name.replace(result['Year'], '').strip()
         # Add subset keywords from middle segments
         subsets = []
         for part in parts[1:-1]:
