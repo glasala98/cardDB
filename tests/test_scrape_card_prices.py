@@ -6,7 +6,7 @@ from datetime import datetime
 # Add root directory to path so we can import modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scrape_card_prices import (
+from card_scraper import (
     clean_card_name_for_search,
     get_grade_info,
     title_matches_grade,
@@ -14,7 +14,7 @@ from scrape_card_prices import (
     calculate_fair_price
 )
 
-class TestScrapeCardPrices(unittest.TestCase):
+class TestCardScraper(unittest.TestCase):
 
     def test_get_grade_info(self):
         self.assertEqual(get_grade_info("Connor McDavid [PSA 10]"), ("PSA 10", 10))

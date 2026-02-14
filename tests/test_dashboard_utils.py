@@ -48,43 +48,38 @@ class TestDashboardUtils(unittest.TestCase):
         self.assertIsNone(result)
         self.assertIn("ANTHROPIC_API_KEY not set", error)
 
-    @patch('dashboard_utils.create_driver')
-    @patch('dashboard_utils.search_ebay_sold')
-    @patch('dashboard_utils.calculate_fair_price')
-    def test_scrape_single_card_success(self, mock_calc_fair, mock_search, mock_create_driver):
-        # Mock Driver
-        mock_driver = MagicMock()
-        mock_create_driver.return_value = mock_driver
+    @patch('dashboard_utils.CardScraper')
+    def test_scrape_single_card_success(self, MockCardScraper):
+        # Mock instance
+        mock_instance = MockCardScraper.return_value
 
-        # Mock Search Results
-        mock_search.return_value = [{'title': 'Card', 'price_val': 100}]
-
-        # Mock Calculate Fair Price
-        mock_calc_fair.return_value = (100, {'fair_price': 100, 'num_sales': 1})
+        # Mock scrape_card return value
+        mock_instance.scrape_card.return_value = ("Test Card", {
+            'stats': {'fair_price': 100, 'num_sales': 1},
+            'raw_sales': [{'title': 'Card', 'price_val': 100}],
+            'estimated_value': '$100'
+        })
 
         stats = scrape_single_card("Test Card")
 
         self.assertIsNotNone(stats)
         self.assertEqual(stats['fair_price'], 100)
-        mock_driver.quit.assert_called_once()
+        mock_instance.quit.assert_called_once()
 
-    @patch('dashboard_utils.create_driver')
-    @patch('dashboard_utils.search_ebay_sold')
-    def test_scrape_single_card_no_sales(self, mock_search, mock_create_driver):
-        mock_driver = MagicMock()
-        mock_create_driver.return_value = mock_driver
-        mock_search.return_value = [] # No sales initially
+    @patch('dashboard_utils.CardScraper')
+    def test_scrape_single_card_no_sales(self, MockCardScraper):
+        mock_instance = MockCardScraper.return_value
 
-        # Mock retry logic failing (or returning None)
-        # scrape_single_card has complex retry logic inside that uses Selenium directly if search returns nothing.
-        # We need to mock driver.get/find_elements for the retry block OR just test it returns None if everything fails.
-
-        # If retry fails (find_elements returns empty), it returns None
-        mock_driver.find_elements.return_value = []
+        # Mock scrape_card returning no sales
+        mock_instance.scrape_card.return_value = ("Test Card", {
+            'stats': {'num_sales': 0},
+            'raw_sales': [],
+            'estimated_value': '$5.00'
+        })
 
         stats = scrape_single_card("Test Card")
         self.assertIsNone(stats)
-        mock_driver.quit.assert_called_once()
+        mock_instance.quit.assert_called_once()
 
     def test_load_save_data(self):
         # Test with a temporary CSV file

@@ -12,12 +12,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# Import scraper functions
+# Import scraper class
 try:
-    from scrape_card_prices import (
-        create_driver, search_ebay_sold, calculate_fair_price,
-        build_simplified_query, get_grade_info, title_matches_grade
-    )
+    from card_scraper import CardScraper
 except ImportError:
     pass
 
@@ -174,80 +171,16 @@ def scrape_single_card(card_name, results_json_path=None):
     """Scrape eBay for a single card and return result dict."""
     if results_json_path is None:
         results_json_path = RESULTS_JSON_PATH
-    driver = create_driver()
+
+    scraper = CardScraper(headless=True)
     try:
-        sales = search_ebay_sold(driver, card_name, max_results=50)
+        # CardScraper combines searching, retrying, and calculating price
+        _, result = scraper.scrape_card(card_name, max_results=50)
 
-        # Retry with simplified query if no results
-        if not sales:
-            simplified = build_simplified_query(card_name)
-            grade_str, grade_num = get_grade_info(card_name)
-            encoded = urllib.parse.quote(simplified)
-            url = f"https://www.ebay.com/sch/i.html?_nkw={encoded}&_sacat=0&LH_Complete=1&LH_Sold=1&_sop=13&_ipg=240"
-            try:
-                driver.get(url)
-                WebDriverWait(driver, 15).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, '.s-card'))
-                )
-                items = driver.find_elements(By.CSS_SELECTOR, '.s-card')
-                for item in items:
-                    try:
-                        title_elem = item.find_element(By.CSS_SELECTOR, '.s-card__title')
-                        title = title_elem.text.strip()
-                        if not title or not title_matches_grade(title, grade_str, grade_num):
-                            continue
-                        price_elem = item.find_element(By.CSS_SELECTOR, '.s-card__price')
-                        price_text = price_elem.text.strip().replace('Opens in a new window', '')
-                        price_match = re.search(r'\$([\d,]+\.?\d*)', price_text)
-                        if not price_match:
-                            continue
-                        price_val = float(price_match.group(1).replace(',', ''))
-                        shipping_val = 0.0
-                        try:
-                            ship_elems = item.find_elements(By.XPATH,
-                                './/*[contains(text(),"delivery") or contains(text(),"shipping")]')
-                            for se in ship_elems:
-                                se_text = se.text.strip().lower()
-                                if 'free' in se_text:
-                                    break
-                                sm = re.search(r'\$([\d,]+\.?\d*)', se_text)
-                                if sm:
-                                    shipping_val = float(sm.group(1).replace(',', ''))
-                                    break
-                        except Exception:
-                            pass
-                        sold_date = None
-                        try:
-                            caption = item.find_element(By.CSS_SELECTOR, '.s-card__caption')
-                            dm = re.search(r'Sold\s+(\w+\s+\d+,?\s*\d*)', caption.text.strip())
-                            if dm:
-                                try:
-                                    sold_date = datetime.strptime(dm.group(1), '%b %d, %Y')
-                                except ValueError:
-                                    try:
-                                        sold_date = datetime.strptime(dm.group(1) + f', {datetime.now().year}', '%b %d, %Y')
-                                    except ValueError:
-                                        pass
-                        except Exception:
-                            pass
-                        sales.append({
-                            'title': title,
-                            'item_price': price_match.group(0),
-                            'shipping': f"${shipping_val}" if shipping_val > 0 else 'Free',
-                            'price_val': round(price_val + shipping_val, 2),
-                            'sold_date': sold_date.strftime('%Y-%m-%d') if sold_date else None,
-                            'days_ago': (datetime.now() - sold_date).days if sold_date else None,
-                            'search_url': url
-                        })
-                        if len(sales) >= 50:
-                            break
-                    except Exception:
-                        continue
-            except Exception:
-                pass
+        stats = result.get('stats', {})
+        sales = result.get('raw_sales', [])
 
-        if sales:
-            fair_price, stats = calculate_fair_price(sales)
+        if stats.get('num_sales', 0) > 0:
             # Save raw sales to results JSON
             results = {}
             if os.path.exists(results_json_path):
@@ -265,9 +198,10 @@ def scrape_single_card(card_name, results_json_path=None):
             with open(results_json_path, 'w', encoding='utf-8') as f:
                 json.dump(results, f, indent=2, ensure_ascii=False)
             return stats
+
         return None
     finally:
-        driver.quit()
+        scraper.quit()
 
 def parse_card_name(card_name):
     """Parse a card name string into Player, Year, Set, Card #, Grade components."""
