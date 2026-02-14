@@ -41,23 +41,34 @@ def analyze_card_images(front_image_bytes, back_image_bytes=None):
 
     client = anthropic.Anthropic(api_key=api_key)
 
+    def _detect_media_type(image_bytes):
+        if image_bytes[:8] == b'\x89PNG\r\n\x1a\n':
+            return "image/png"
+        if image_bytes[:2] == b'\xff\xd8':
+            return "image/jpeg"
+        if image_bytes[:4] == b'RIFF' and image_bytes[8:12] == b'WEBP':
+            return "image/webp"
+        return "image/jpeg"
+
     content = []
 
     # Add front image
     front_b64 = base64.standard_b64encode(front_image_bytes).decode("utf-8")
+    front_media = _detect_media_type(front_image_bytes)
     content.append({"type": "text", "text": "FRONT OF CARD:"})
     content.append({
         "type": "image",
-        "source": {"type": "base64", "media_type": "image/jpeg", "data": front_b64}
+        "source": {"type": "base64", "media_type": front_media, "data": front_b64}
     })
 
     # Add back image if provided
     if back_image_bytes:
         back_b64 = base64.standard_b64encode(back_image_bytes).decode("utf-8")
+        back_media = _detect_media_type(back_image_bytes)
         content.append({"type": "text", "text": "BACK OF CARD:"})
         content.append({
             "type": "image",
-            "source": {"type": "base64", "media_type": "image/jpeg", "data": back_b64}
+            "source": {"type": "base64", "media_type": back_media, "data": back_b64}
         })
 
     content.append({
