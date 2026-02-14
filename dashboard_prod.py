@@ -445,14 +445,27 @@ elif page == "Card Ledger":
     st.divider()
     st.subheader(f"Cards Not Found ({len(not_found_df)} cards, defaulted to $5.00)")
     if len(not_found_df) > 0:
-        st.dataframe(
-            not_found_df[['Card Name', 'Fair Value']],
+        nf_edit = not_found_df[['Card Name', 'Fair Value']].reset_index(drop=True)
+        edited_nf = st.data_editor(
+            nf_edit,
             use_container_width=True,
             hide_index=True,
             column_config={
                 "Card Name": st.column_config.TextColumn("Card Name", width="large"),
-                "Fair Value": st.column_config.NumberColumn("Default Value", format="$%.2f"),
-            }
+                "Fair Value": st.column_config.NumberColumn("Manual Price ($)", format="$%.2f", min_value=0),
+            },
+            key="not_found_editor"
         )
+        if st.button("Save Not Found Prices", type="primary"):
+            for i, row in edited_nf.iterrows():
+                mask = st.session_state.df['Card Name'] == nf_edit.iloc[i]['Card Name']
+                if mask.any():
+                    st.session_state.df.loc[mask, 'Fair Value'] = row['Fair Value']
+                    st.session_state.df.loc[mask, 'Median (All)'] = row['Fair Value']
+                    st.session_state.df.loc[mask, 'Min'] = row['Fair Value']
+                    st.session_state.df.loc[mask, 'Max'] = row['Fair Value']
+            save_data(st.session_state.df)
+            st.success("Not Found prices saved!")
+            st.rerun()
     else:
         st.info("All cards have sales data!")
