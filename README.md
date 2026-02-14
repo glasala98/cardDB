@@ -85,3 +85,34 @@ This will open the dashboard in your default web browser (usually at `http://loc
 -   `card_scraper.py`: Helper class for Selenium scraping (used by `scrape_card_prices.py`).
 -   `hockey_cards.csv`: Input file containing the list of cards to scrape.
 -   `card_prices_summary.csv`: The "database" file storing scraped prices and collection data.
+
+## Deployment to Production
+
+To host this project at **https://southwestsportscards.ca/** (IP: `104.236.65.233`), follow these steps.
+
+### 1. Copy Files to the Server
+
+From your local machine (where this repository is located), run the following command to copy the necessary files to the server:
+
+```bash
+scp -r dashboard_prod.py card_prices_summary.csv requirements.txt deploy/ root@104.236.65.233:/root/
+```
+
+### 2. Run the Setup Script
+
+SSH into the server and run the automated setup script. This will install Python, Nginx, configure the firewall, and set up the SSL certificate.
+
+```bash
+ssh root@104.236.65.233
+cd /root
+sudo bash deploy/setup.sh southwestsportscards.ca
+```
+
+### 3. Updating Data
+
+To update the card prices on the server after running the scraper locally:
+
+```bash
+scp card_prices_summary.csv root@104.236.65.233:/opt/card-dashboard/
+ssh root@104.236.65.233 "chown cardapp:cardapp /opt/card-dashboard/card_prices_summary.csv && sudo systemctl restart card-dashboard"
+```
