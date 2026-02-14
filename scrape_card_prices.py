@@ -9,6 +9,30 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
+# Pre-compiled regex patterns for better performance
+RE_PSA_GRADE_SEARCH = re.compile(r'\[PSA \d+', re.IGNORECASE)
+RE_PSA_GRADE_EXTRACT = re.compile(r'\[PSA (\d+)', re.IGNORECASE)
+RE_PSA_TAG_SUB = re.compile(r'\[PSA [^\]]*\]')
+RE_PASSED_PRE_SUB = re.compile(r'\[Passed Pre[^\]]*\]')
+RE_POOR_TO_FAIR_SUB = re.compile(r'\[Poor to Fair\]')
+RE_FRACTION_SUB = re.compile(r'#\d+/\d+')
+RE_PARENTHESES_SUB = re.compile(r'\(.*?\)')
+RE_CARD_NUM_SEARCH = re.compile(r'#(\S+)')
+RE_YEAR_SEARCH = re.compile(r'(\d{4}(?:-\d{2})?)')
+RE_YEAR_START_SUB = re.compile(r'^\d{4}(?:-\d{2})?\s*')
+RE_BASE_TAG_SUB = re.compile(r'\[Base\]')
+RE_HASHTAG_SUB = re.compile(r'#\S+')
+RE_PSA_FINDALL = re.compile(r'PSA\s*(\d+)')
+RE_GRADING_SERVICE_SEARCH = re.compile(r'\bPSA\b|\bBGS\b|\bSGC\b|\bGRADED\b', re.IGNORECASE)
+RE_BRACKET_SUB = re.compile(r'\[.*?\]')
+RE_PRICE_SEARCH = re.compile(r'\$([\d,]+\.?\d*)')
+RE_SOLD_DATE_SEARCH = re.compile(r'Sold\s+(\w+\s+\d+,?\s*\d*)')
+
+# Cache for PSA grade specific patterns (PSA 1 to 10)
+RE_PSA_SPECIFIC_GRADES = {
+    g: re.compile(rf'PSA\s*{g}(?:\s|$|[^0-9])') for g in range(1, 11)
+}
+
 try:
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
@@ -28,12 +52,12 @@ except ImportError:
 
 def is_graded_card(card_name):
     """Check if the card name indicates it's a graded card."""
-    return bool(re.search(r'\[PSA \d+', card_name, re.IGNORECASE))
+    return bool(RE_PSA_GRADE_SEARCH.search(card_name))
 
 
 def get_grade_info(card_name):
     """Extract grading details from card name. Returns (grade_str, grade_num) or (None, None)."""
-    psa_match = re.search(r'\[PSA (\d+)', card_name, re.IGNORECASE)
+    psa_match = RE_PSA_GRADE_EXTRACT.search(card_name)
     if psa_match:
         grade_num = int(psa_match.group(1))
         return f"PSA {grade_num}", grade_num
@@ -50,9 +74,9 @@ def clean_card_name_for_search(card_name):
     grade_str, grade_num = get_grade_info(card_name)
 
     # Work on a copy without grade/condition brackets
-    clean = re.sub(r'\[PSA [^\]]*\]', '', card_name)
-    clean = re.sub(r'\[Passed Pre[^\]]*\]', '', clean)
-    clean = re.sub(r'\[Poor to Fair\]', '', clean)
+    clean = RE_PSA_TAG_SUB.sub('', card_name)
+    clean = RE_PASSED_PRE_SUB.sub('', clean)
+    clean = RE_POOR_TO_FAIR_SUB.sub('', clean)
 
     # Split on " - " to get the segments
     parts = [p.strip() for p in clean.split(' - ')]
@@ -61,14 +85,14 @@ def clean_card_name_for_search(card_name):
     player = ""
     if parts:
         last = parts[-1]
-        last = re.sub(r'#\d+/\d+', '', last).strip()
-        last = re.sub(r'\(.*?\)', '', last).strip()
+        last = RE_FRACTION_SUB.sub('', last).strip()
+        last = RE_PARENTHESES_SUB.sub('', last).strip()
         if last and not last.startswith('['):
             player = last
 
     # --- Extract card number - HIGH PRIORITY ---
     card_num = ""
-    num_match = re.search(r'#(\S+)', clean)
+    num_match = RE_CARD_NUM_SEARCH.search(clean)
     if num_match:
         card_num_raw = num_match.group(1)
         if '/' not in card_num_raw:
@@ -76,14 +100,14 @@ def clean_card_name_for_search(card_name):
 
     # --- Extract year ---
     year = ""
-    year_match = re.search(r'(\d{4}(?:-\d{2})?)', parts[0] if parts else '')
+    year_match = RE_YEAR_SEARCH.search(parts[0] if parts else '')
     if year_match:
         year = year_match.group(1)
 
     # --- Extract short brand/set name ---
     # Shorten verbose brand names for better eBay matching
     brand = parts[0] if parts else ""
-    brand = re.sub(r'^\d{4}(?:-\d{2})?\s*', '', brand).strip()
+    brand = RE_YEAR_START_SUB.sub('', brand).strip()
     # Common abbreviations sellers use
     brand_map = {
         'O-Pee-Chee Platinum': 'OPC Platinum',
@@ -101,8 +125,8 @@ def clean_card_name_for_search(card_name):
     # --- Extract variant/parallel that affects value ---
     variant = ""
     for part in parts[1:]:
-        part_clean = re.sub(r'\[Base\]', '', part).strip()
-        part_clean = re.sub(r'#\S+', '', part_clean).strip()
+        part_clean = RE_BASE_TAG_SUB.sub('', part).strip()
+        part_clean = RE_HASHTAG_SUB.sub('', part_clean).strip()
         if part_clean.lower() in ['', 'rookies', 'marquee rookies']:
             continue
         # Keep value-relevant variants
@@ -189,18 +213,24 @@ def title_matches_grade(title, grade_str, grade_num):
     if grade_str:
         # Graded card - title must mention the exact grade
         # Check for "PSA 10" but NOT "PSA 10" matching inside "PSA 100" etc.
-        pattern = rf'PSA\s*{grade_num}(?:\s|$|[^0-9])'
-        if not re.search(pattern, title_upper):
-            return False
+        pattern = RE_PSA_SPECIFIC_GRADES.get(grade_num)
+        if pattern:
+            if not pattern.search(title_upper):
+                return False
+        else:
+            # Fallback for unexpected grade numbers
+            dynamic_pattern = rf'PSA\s*{grade_num}(?:\s|$|[^0-9])'
+            if not re.search(dynamic_pattern, title_upper):
+                return False
         # Also reject if title mentions a different PSA grade
-        other_psa = re.findall(r'PSA\s*(\d+)', title_upper)
+        other_psa = RE_PSA_FINDALL.findall(title_upper)
         for g in other_psa:
             if int(g) != grade_num:
                 return False
         return True
     else:
         # Raw card - reject if title mentions any grading service
-        if re.search(r'\bPSA\b|\bBGS\b|\bSGC\b|\bGRADED\b', title_upper):
+        if RE_GRADING_SERVICE_SEARCH.search(title_upper):
             return False
         return True
 
@@ -209,18 +239,18 @@ def build_simplified_query(card_name):
     """Build a simpler fallback query: just player + card number + year."""
     grade_str, grade_num = get_grade_info(card_name)
 
-    clean = re.sub(r'\[.*?\]', '', card_name)
+    clean = RE_BRACKET_SUB.sub('', card_name)
     parts = [p.strip() for p in clean.split(' - ')]
 
     # Year
     year = ""
-    year_match = re.search(r'(\d{4}(?:-\d{2})?)', parts[0] if parts else '')
+    year_match = RE_YEAR_SEARCH.search(parts[0] if parts else '')
     if year_match:
         year = year_match.group(1)
 
     # Card number
     card_num = ""
-    num_match = re.search(r'#(\S+)', clean)
+    num_match = RE_CARD_NUM_SEARCH.search(clean)
     if num_match:
         raw = num_match.group(1)
         if '/' not in raw:
@@ -230,8 +260,8 @@ def build_simplified_query(card_name):
     player = ""
     if parts:
         last = parts[-1]
-        last = re.sub(r'#\d+/\d+', '', last).strip()
-        last = re.sub(r'\(.*?\)', '', last).strip()
+        last = RE_FRACTION_SUB.sub('', last).strip()
+        last = RE_PARENTHESES_SUB.sub('', last).strip()
         if last:
             player = last
 
@@ -286,7 +316,7 @@ def search_ebay_sold(driver, card_name, max_results=50):
 
                 # Clean price - keep just the dollar amount
                 price_text = price_text.replace('Opens in a new window', '').strip()
-                price_match = re.search(r'\$([\d,]+\.?\d*)', price_text)
+                price_match = RE_PRICE_SEARCH.search(price_text)
                 if not price_match:
                     continue
 
@@ -303,7 +333,7 @@ def search_ebay_sold(driver, card_name, max_results=50):
                         if 'free' in se_text:
                             shipping_val = 0.0
                             break
-                        ship_match = re.search(r'\$([\d,]+\.?\d*)', se_text)
+                        ship_match = RE_PRICE_SEARCH.search(se_text)
                         if ship_match:
                             shipping_val = float(ship_match.group(1).replace(',', ''))
                             break
@@ -317,7 +347,7 @@ def search_ebay_sold(driver, card_name, max_results=50):
                 try:
                     caption = item.find_element(By.CSS_SELECTOR, '.s-card__caption')
                     caption_text = caption.text.strip()
-                    date_match = re.search(r'Sold\s+(\w+\s+\d+,?\s*\d*)', caption_text)
+                    date_match = RE_SOLD_DATE_SEARCH.search(caption_text)
                     if date_match:
                         date_str = date_match.group(1)
                         # Try parsing with year
@@ -499,7 +529,7 @@ def process_card(card):
                         continue
                     price_elem = item.find_element(By.CSS_SELECTOR, '.s-card__price')
                     price_text = price_elem.text.strip().replace('Opens in a new window', '')
-                    price_match = re.search(r'\$([\d,]+\.?\d*)', price_text)
+                    price_match = RE_PRICE_SEARCH.search(price_text)
                     if not price_match:
                         continue
 
@@ -512,7 +542,7 @@ def process_card(card):
                             se_text = se.text.strip().lower()
                             if 'free' in se_text:
                                 break
-                            sm = re.search(r'\$([\d,]+\.?\d*)', se_text)
+                            sm = RE_PRICE_SEARCH.search(se_text)
                             if sm:
                                 shipping_val = float(sm.group(1).replace(',', ''))
                                 break
@@ -522,7 +552,7 @@ def process_card(card):
                     sold_date = None
                     try:
                         caption = item.find_element(By.CSS_SELECTOR, '.s-card__caption')
-                        dm = re.search(r'Sold\s+(\w+\s+\d+,?\s*\d*)', caption.text.strip())
+                        dm = RE_SOLD_DATE_SEARCH.search(caption.text.strip())
                         if dm:
                             try:
                                 sold_date = datetime.strptime(dm.group(1), '%b %d, %Y')
