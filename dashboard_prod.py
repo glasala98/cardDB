@@ -383,7 +383,6 @@ elif page == "Card Ledger":
             "Min": st.column_config.NumberColumn("Min ($)", format="$%.2f", disabled=True),
             "Max": st.column_config.NumberColumn("Max ($)", format="$%.2f", disabled=True),
         },
-        key="card_editor"
     )
 
     # Auto-navigate to Card Inspect when a View checkbox is checked
