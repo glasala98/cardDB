@@ -16,7 +16,7 @@ echo "=== Setting up Card Dashboard for ${DOMAIN} ==="
 # 1. System packages
 echo "--- Installing system packages ---"
 apt-get update
-apt-get install -y python3 python3-venv python3-pip nginx certbot python3-certbot-nginx ufw wget gnupg
+apt-get install -y python3 python3-venv python3-pip nginx certbot python3-certbot-nginx ufw wget gnupg apache2-utils
 
 # 1b. Install Chrome for Selenium (eBay scraping)
 if ! command -v google-chrome &>/dev/null; then
@@ -85,6 +85,17 @@ systemctl start card-dashboard
 
 # 6. Nginx config
 echo "--- Configuring Nginx ---"
+
+# 6b. Nginx Basic Auth
+if [ ! -f /etc/nginx/.htpasswd ]; then
+    echo "--- Setting up Nginx Basic Auth ---"
+    # Generate a random password
+    NGINX_PASS=$(openssl rand -base64 12)
+    htpasswd -cb /etc/nginx/.htpasswd admin "$NGINX_PASS"
+    echo "IMPORTANT: Nginx Basic Auth set up with user 'admin' and password: $NGINX_PASS"
+    echo "Save this password! You will need it to access the site."
+fi
+
 sed "s/YOUR_DOMAIN/${DOMAIN}/g" deploy/nginx.conf > /etc/nginx/sites-available/card-dashboard
 ln -sf /etc/nginx/sites-available/card-dashboard /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
