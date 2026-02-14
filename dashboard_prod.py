@@ -455,9 +455,9 @@ elif page == "Card Ledger":
     edit_df['Trend'] = edit_df['Trend'].map(trend_map).fillna('⚫ no data')
 
     # Reorder: card description → sales/value → actions
-    col_order = ['Player', 'Set', 'Subset', 'Card #', 'Serial', 'Grade',
+    col_order = ['View', 'Player', 'Set', 'Subset', 'Card #', 'Serial', 'Grade',
                  'Num Sales', 'Fair Value', 'Min', 'Max', 'Trend',
-                 'Top 3 Prices', 'Last Scraped', 'View', 'Remove']
+                 'Top 3 Prices', 'Last Scraped', 'Remove']
     col_order = [c for c in col_order if c in edit_df.columns]
     edit_df = edit_df[col_order]
 
