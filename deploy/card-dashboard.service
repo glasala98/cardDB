@@ -13,6 +13,7 @@ ExecStart=/opt/card-dashboard/venv/bin/streamlit run dashboard_prod.py \
 Restart=on-failure
 RestartSec=5
 Environment="PATH=/opt/card-dashboard/venv/bin:/usr/bin"
+EnvironmentFile=-/opt/card-dashboard/.env
 
 [Install]
 WantedBy=multi-user.target
