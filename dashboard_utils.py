@@ -54,6 +54,7 @@ def get_user_paths(username):
         'csv': os.path.join(user_dir, "card_prices_summary.csv"),
         'results': os.path.join(user_dir, "card_prices_results.json"),
         'history': os.path.join(user_dir, "price_history.json"),
+        'portfolio': os.path.join(user_dir, "portfolio_history.json"),
         'archive': os.path.join(user_dir, "card_archive.csv"),
         'backup_dir': os.path.join(user_dir, "backups"),
     }
@@ -461,6 +462,77 @@ def load_price_history(card_name, history_path=None):
         return history.get(card_name, [])
     except Exception:
         return []
+
+
+def append_portfolio_snapshot(total_value, total_cards, avg_value, portfolio_path=None):
+    """Append a daily portfolio value snapshot. Deduplicates by date."""
+    portfolio_path = portfolio_path or os.path.join(SCRIPT_DIR, "portfolio_history.json")
+    snapshots = []
+    if os.path.exists(portfolio_path):
+        try:
+            with open(portfolio_path, 'r', encoding='utf-8') as f:
+                snapshots = json.load(f)
+        except Exception:
+            snapshots = []
+
+    today = datetime.now().strftime('%Y-%m-%d')
+    snapshots = [s for s in snapshots if s['date'] != today]
+    snapshots.append({
+        'date': today,
+        'total_value': round(total_value, 2),
+        'total_cards': total_cards,
+        'avg_value': round(avg_value, 2),
+    })
+
+    with open(portfolio_path, 'w', encoding='utf-8') as f:
+        json.dump(snapshots, f, indent=2, ensure_ascii=False)
+
+
+def load_portfolio_history(portfolio_path=None):
+    """Load portfolio snapshots list."""
+    portfolio_path = portfolio_path or os.path.join(SCRIPT_DIR, "portfolio_history.json")
+    if not os.path.exists(portfolio_path):
+        return []
+    try:
+        with open(portfolio_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+
+def scrape_graded_comparison(card_name):
+    """Scrape raw and graded (PSA 9, PSA 10) prices for ROI comparison."""
+    import time as _time
+    import random as _random
+
+    # Strip any existing grade from the card name
+    raw_name = re.sub(r'\s*-?\s*\[PSA\s+\d+\]', '', card_name).strip()
+    raw_name = re.sub(r'\s*-?\s*\bPSA\s+\d+\b', '', raw_name, flags=re.IGNORECASE).strip()
+    raw_name = raw_name.rstrip(' -').strip()
+
+    driver = create_driver()
+    try:
+        results = {}
+        for label, search_name in [
+            ('raw', raw_name),
+            ('psa_9', f"{raw_name} PSA 9"),
+            ('psa_10', f"{raw_name} PSA 10"),
+        ]:
+            sales = search_ebay_sold(driver, search_name, max_results=30)
+            if sales:
+                fair_price, stats = calculate_fair_price(sales)
+                results[label] = {
+                    'fair_price': stats.get('fair_price', 0),
+                    'num_sales': stats.get('num_sales', 0),
+                    'min': stats.get('min', 0),
+                    'max': stats.get('max', 0),
+                }
+            else:
+                results[label] = None
+            _time.sleep(_random.uniform(1.0, 2.0))
+        return results
+    finally:
+        driver.quit()
 
 
 def archive_card(df, card_name, archive_path=None):

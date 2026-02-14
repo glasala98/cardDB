@@ -23,7 +23,7 @@ os.chdir(SCRIPT_DIR)
 
 from scrape_card_prices import process_card
 from dashboard_utils import (
-    load_data, save_data, backup_data, append_price_history,
+    load_data, save_data, backup_data, append_price_history, append_portfolio_snapshot,
     get_user_paths, load_users,
     CSV_PATH, RESULTS_JSON_PATH
 )
@@ -108,6 +108,15 @@ def daily_scrape_user(csv_path, results_path, history_path, backup_dir, max_work
     # Save updated results JSON
     with open(results_path, 'w', encoding='utf-8') as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
+
+    # Append portfolio snapshot
+    found = df[df['Num Sales'] > 0]
+    total_value = found['Fair Value'].sum()
+    total_cards = len(df)
+    avg_value = total_value / total_cards if total_cards > 0 else 0
+    portfolio_path = os.path.join(os.path.dirname(history_path), "portfolio_history.json")
+    append_portfolio_snapshot(total_value, total_cards, avg_value, portfolio_path=portfolio_path)
+    print(f"  Portfolio snapshot: ${total_value:,.2f} ({total_cards} cards)")
 
     elapsed = (datetime.now() - start).total_seconds()
     print(f"Scrape complete in {elapsed:.0f}s")

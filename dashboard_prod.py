@@ -11,6 +11,7 @@ try:
     from dashboard_utils import (
         analyze_card_images, scrape_single_card, load_data, save_data, backup_data,
         parse_card_name, load_sales_history, append_price_history, load_price_history,
+        append_portfolio_snapshot, load_portfolio_history, scrape_graded_comparison,
         archive_card, load_archive, restore_card,
         get_user_paths, load_users, verify_password, init_user_data,
         CSV_PATH, MONEY_COLS, PARSED_COLS
@@ -102,6 +103,7 @@ if username and load_users():
     _csv_path = user_paths['csv']
     _results_path = user_paths['results']
     _history_path = user_paths['history']
+    _portfolio_path = user_paths['portfolio']
     _archive_path = user_paths['archive']
     _backup_dir = user_paths['backup_dir']
 else:
@@ -109,6 +111,7 @@ else:
     _csv_path = CSV_PATH
     _results_path = None  # use defaults
     _history_path = None
+    _portfolio_path = None
     _archive_path = None
     _backup_dir = None
 
@@ -387,6 +390,46 @@ if page == "Charts":
     fig_bar.update_xaxes(title="Fair Value ($)")
     fig_bar.update_yaxes(title="")
     st.plotly_chart(fig_bar, use_container_width=True)
+
+    # Portfolio Value Over Time
+    st.divider()
+    st.subheader("Portfolio Value Over Time")
+    portfolio_history = load_portfolio_history(_portfolio_path)
+
+    if portfolio_history and len(portfolio_history) >= 2:
+        port_df = pd.DataFrame(portfolio_history)
+        port_df['date'] = pd.to_datetime(port_df['date'])
+        port_df = port_df.sort_values('date')
+
+        latest = port_df.iloc[-1]
+        previous = port_df.iloc[-2]
+        value_change = latest['total_value'] - previous['total_value']
+
+        # Find 7-day-ago snapshot
+        seven_ago = port_df[port_df['date'] <= (pd.Timestamp.now() - pd.Timedelta(days=7))]
+        weekly_change = (latest['total_value'] - seven_ago.iloc[-1]['total_value']) if len(seven_ago) > 0 else None
+
+        pc1, pc2, pc3, pc4 = st.columns(4)
+        pc1.metric("Current Value", f"${latest['total_value']:,.2f}",
+                    delta=f"${value_change:+,.2f}")
+        pc2.metric("Total Cards", int(latest['total_cards']))
+        pc3.metric("Avg Card Value", f"${latest['avg_value']:,.2f}")
+        if weekly_change is not None:
+            pc4.metric("7-Day Change", f"${weekly_change:+,.2f}")
+        else:
+            pc4.metric("7-Day Change", "N/A")
+
+        fig_port = px.line(
+            port_df, x='date', y='total_value',
+            markers=True, title="Collection Value Over Time",
+            labels={'date': 'Date', 'total_value': 'Total Value ($)'}
+        )
+        fig_port.update_layout(template="plotly_dark", height=400)
+        st.plotly_chart(fig_port, use_container_width=True)
+    elif portfolio_history and len(portfolio_history) == 1:
+        st.info("Portfolio tracking started. Chart appears after the next daily scrape.")
+    else:
+        st.caption("No portfolio history yet. Snapshots are recorded during the daily scrape.")
 
 # ============================================================
 # CARD LEDGER PAGE
@@ -772,17 +815,119 @@ elif page == "Card Inspect":
             hist_df['date'] = pd.to_datetime(hist_df['date'])
             hist_df = hist_df.sort_values('date')
 
-            fig_hist = px.line(
-                hist_df,
-                x='date', y='fair_value',
-                markers=True,
+            # Delta metrics when 2+ data points
+            if len(hist_df) >= 2:
+                latest_val = hist_df.iloc[-1]['fair_value']
+                prev_val = hist_df.iloc[-2]['fair_value']
+                change = latest_val - prev_val
+                pct = (change / prev_val * 100) if prev_val > 0 else 0
+                hc1, hc2, hc3 = st.columns(3)
+                hc1.metric("Current", f"${latest_val:.2f}", delta=f"${change:+.2f}")
+                hc2.metric("Change", f"{pct:+.1f}%")
+                hc3.metric("Data Points", len(hist_df))
+
+            # Dual-axis chart: fair value line + sales count bars
+            fig_hist = go.Figure()
+            fig_hist.add_trace(go.Scatter(
+                x=hist_df['date'], y=hist_df['fair_value'],
+                mode='lines+markers', name='Fair Value',
+                line=dict(color='#636EFA', width=2),
+                hovertemplate='$%{y:.2f}<extra>Fair Value</extra>'
+            ))
+            if 'num_sales' in hist_df.columns:
+                fig_hist.add_trace(go.Bar(
+                    x=hist_df['date'], y=hist_df['num_sales'],
+                    name='Sales Count', yaxis='y2',
+                    marker_color='rgba(99, 110, 250, 0.3)',
+                    hovertemplate='%{y} sales<extra>Sales Count</extra>'
+                ))
+            fig_hist.update_layout(
+                template="plotly_dark", height=350,
                 title="Fair Value Over Time",
-                labels={'date': 'Scrape Date', 'fair_value': 'Fair Value ($)'}
+                xaxis_title="Scrape Date",
+                yaxis=dict(title="Fair Value ($)", side="left"),
+                yaxis2=dict(title="Sales Count", side="right", overlaying="y", showgrid=False),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02),
             )
-            fig_hist.update_layout(template="plotly_dark", height=350)
             st.plotly_chart(fig_hist, use_container_width=True)
         else:
             st.caption("No price history yet. Fair value tracking begins when you rescrape a card.")
+
+        # Grading ROI Calculator
+        if not public_view:
+            st.markdown("---")
+            st.subheader("Grading ROI Calculator")
+            if not card_row['Grade']:
+                gc1, gc2 = st.columns(2)
+                with gc1:
+                    grading_cost = st.number_input(
+                        "Grading Cost ($)", min_value=10.0, max_value=200.0,
+                        value=30.0, step=5.0, key="grading_cost"
+                    )
+                with gc2:
+                    shipping_cost = st.number_input(
+                        "Shipping Cost ($)", min_value=0.0, max_value=50.0,
+                        value=10.0, step=2.5, key="shipping_cost"
+                    )
+                total_grading_cost = grading_cost + shipping_cost
+
+                if st.button("Calculate Grading ROI", type="secondary"):
+                    with st.spinner("Scraping raw & graded prices from eBay (~30s)..."):
+                        comparison = scrape_graded_comparison(selected_card)
+
+                    if comparison:
+                        raw = comparison.get('raw')
+                        psa9 = comparison.get('psa_9')
+                        psa10 = comparison.get('psa_10')
+
+                        rc1, rc2, rc3 = st.columns(3)
+                        with rc1:
+                            if raw:
+                                st.metric("Raw Price", f"${raw['fair_price']:.2f}",
+                                         help=f"{raw['num_sales']} sales found")
+                            else:
+                                st.metric("Raw Price", "No data")
+
+                        with rc2:
+                            if psa9 and raw:
+                                roi_9 = psa9['fair_price'] - raw['fair_price'] - total_grading_cost
+                                st.metric("PSA 9 Price", f"${psa9['fair_price']:.2f}",
+                                         delta=f"ROI: ${roi_9:+,.2f}",
+                                         help=f"{psa9['num_sales']} sales found")
+                            elif psa9:
+                                st.metric("PSA 9 Price", f"${psa9['fair_price']:.2f}")
+                            else:
+                                st.metric("PSA 9 Price", "No data")
+
+                        with rc3:
+                            if psa10 and raw:
+                                roi_10 = psa10['fair_price'] - raw['fair_price'] - total_grading_cost
+                                st.metric("PSA 10 Price", f"${psa10['fair_price']:.2f}",
+                                         delta=f"ROI: ${roi_10:+,.2f}",
+                                         help=f"{psa10['num_sales']} sales found")
+                            elif psa10:
+                                st.metric("PSA 10 Price", f"${psa10['fair_price']:.2f}")
+                            else:
+                                st.metric("PSA 10 Price", "No data")
+
+                        # Summary recommendation
+                        best_roi = None
+                        if psa10 and raw:
+                            best_roi = psa10['fair_price'] - raw['fair_price'] - total_grading_cost
+                        elif psa9 and raw:
+                            best_roi = psa9['fair_price'] - raw['fair_price'] - total_grading_cost
+
+                        if best_roi is not None:
+                            if best_roi > 20:
+                                st.success(f"Worth grading! Best ROI is ${best_roi:,.2f} after ${total_grading_cost:.0f} grading costs.")
+                            elif best_roi > 0:
+                                st.info(f"Marginal gain. Best ROI is ${best_roi:,.2f} -- may be worth it for high-grade candidates.")
+                            else:
+                                st.warning(f"Not profitable. Best ROI is ${best_roi:,.2f} after ${total_grading_cost:.0f} grading costs.")
+                    else:
+                        st.error("Could not retrieve comparison data.")
+            else:
+                st.caption(f"This card is already graded: **{card_row['Grade']}**")
 
         # eBay Sales History
         st.markdown("---")
