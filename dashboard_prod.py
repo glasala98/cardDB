@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
+from config import DEFAULT_PRICE
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_PATH = os.path.join(SCRIPT_DIR, "card_prices_summary.csv")
@@ -59,7 +60,7 @@ st.sidebar.header("Add New Card")
 
 with st.sidebar.form("add_card_form", clear_on_submit=True):
     new_name = st.text_input("Card Name")
-    new_value = st.number_input("Estimated Value ($)", min_value=0.0, value=5.0, step=0.50)
+    new_value = st.number_input("Estimated Value ($)", min_value=0.0, value=DEFAULT_PRICE, step=0.50)
     add_submitted = st.form_submit_button("Add Card")
 
 if add_submitted and new_name.strip():
@@ -252,7 +253,7 @@ with tab_table:
 # NOT FOUND LIST
 # ============================================================
 with tab_not_found:
-    st.subheader(f"Cards Not Found ({len(not_found_df)} cards, defaulted to $5.00)")
+    st.subheader(f"Cards Not Found ({len(not_found_df)} cards, defaulted to ${DEFAULT_PRICE:.2f})")
     if len(not_found_df) > 0:
         st.dataframe(
             not_found_df[['Card Name', 'Fair Value']],

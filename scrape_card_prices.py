@@ -8,6 +8,7 @@ import statistics
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+from config import DEFAULT_PRICE, NUM_WORKERS, EBAY_MAX_RESULTS
 
 try:
     from selenium import webdriver
@@ -247,7 +248,7 @@ def build_simplified_query(card_name):
     return search_term.strip()
 
 
-def search_ebay_sold(driver, card_name, max_results=50):
+def search_ebay_sold(driver, card_name, max_results=EBAY_MAX_RESULTS):
     """Search eBay sold listings for a card and return recent sale prices with dates."""
 
     search_query = clean_card_name_for_search(card_name)
@@ -450,7 +451,7 @@ def calculate_fair_price(sales):
     return fair_price, stats
 
 
-NUM_WORKERS = 10  # Number of parallel Chrome instances
+
 
 # Thread-local storage for Chrome drivers
 _thread_local = threading.local()
@@ -463,7 +464,7 @@ def get_driver():
     return _thread_local.driver
 
 
-DEFAULT_PRICE = 5.00
+
 
 
 def process_card(card):
@@ -473,7 +474,7 @@ def process_card(card):
     # Small random delay to stagger requests across workers
     time.sleep(random.uniform(0.5, 1.5))
 
-    sales = search_ebay_sold(driver, card, max_results=50)
+    sales = search_ebay_sold(driver, card, max_results=EBAY_MAX_RESULTS)
 
     # Retry with simplified query if no results
     if not sales:
@@ -543,7 +544,7 @@ def process_card(card):
                         'days_ago': (datetime.now() - sold_date).days if sold_date else None,
                         'search_url': url
                     })
-                    if len(sales) >= 50:
+                    if len(sales) >= EBAY_MAX_RESULTS:
                         break
                 except Exception:
                     continue

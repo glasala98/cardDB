@@ -22,6 +22,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import re
 from datetime import datetime
+from config import DEFAULT_PRICE
 
 try:
     import anthropic
@@ -488,14 +489,14 @@ if add_submitted:
                 st.sidebar.success(f"Found {stats['num_sales']} sales! Fair value: ${stats['fair_price']:.2f}")
             else:
                 new_row = pd.DataFrame([{
-                    'Card Name': card_name, 'Fair Value': 5.0, 'Trend': 'no data',
-                    'Top 3 Prices': '', 'Median (All)': 5.0, 'Min': 5.0, 'Max': 5.0, 'Num Sales': 0
+                    'Card Name': card_name, 'Fair Value': DEFAULT_PRICE, 'Trend': 'no data',
+                    'Top 3 Prices': '', 'Median (All)': DEFAULT_PRICE, 'Min': DEFAULT_PRICE, 'Max': DEFAULT_PRICE, 'Num Sales': 0
                 }])
-                st.sidebar.warning("No sales found. Defaulted to $5.00.")
+                st.sidebar.warning(f"No sales found. Defaulted to ${DEFAULT_PRICE:.2f}.")
         else:
             new_row = pd.DataFrame([{
-                'Card Name': card_name, 'Fair Value': 5.0, 'Trend': 'no data',
-                'Top 3 Prices': '', 'Median (All)': 5.0, 'Min': 5.0, 'Max': 5.0, 'Num Sales': 0
+                'Card Name': card_name, 'Fair Value': DEFAULT_PRICE, 'Trend': 'no data',
+                'Top 3 Prices': '', 'Median (All)': DEFAULT_PRICE, 'Min': DEFAULT_PRICE, 'Max': DEFAULT_PRICE, 'Num Sales': 0
             }])
 
         st.session_state.df = pd.concat([st.session_state.df, new_row], ignore_index=True)
@@ -766,7 +767,7 @@ with tab_table:
 # NOT FOUND
 # ============================================================
 with tab_not_found:
-    st.markdown(f'<div class="section-header">Cards Not Found ({len(not_found_df)} cards, defaulted to $5.00)</div>',
+    st.markdown(f'<div class="section-header">Cards Not Found ({len(not_found_df)} cards, defaulted to ${DEFAULT_PRICE:.2f})</div>',
                 unsafe_allow_html=True)
     if len(not_found_df) > 0:
         st.dataframe(
