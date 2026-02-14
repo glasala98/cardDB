@@ -217,10 +217,15 @@ def scrape_single_card(card_name):
 
 def parse_card_name(card_name):
     """Parse a card name string into Player, Year, Set, Card #, Grade components."""
-    result = {'Player': '', 'Year': '', 'Set': '', 'Card #': '', 'Grade': ''}
+    result = {'Player': '', 'Year': '', 'Set': '', 'Card #': '', 'Serial': '', 'Grade': ''}
 
     if not card_name or not isinstance(card_name, str):
         return result
+
+    # Extract serial number (e.g. #70/99, /250, #1/250)
+    serial_match = re.search(r'#?(\d+)\s*/\s*(\d+)', card_name)
+    if serial_match:
+        result['Serial'] = f"{serial_match.group(1)}/{serial_match.group(2)}"
 
     # Extract grade (bracketed or unbracketed)
     grade_match = re.search(r'\[([^\]]*PSA[^\]]*)\]', card_name, re.IGNORECASE)
@@ -261,9 +266,10 @@ def parse_card_name(card_name):
         last = re.sub(r'\bPSA\s+\d+\b', '', last, flags=re.IGNORECASE).strip()
         result['Player'] = last
     else:
-        # Freeform format - put the whole name as Player, stripping grade
+        # Freeform format - put the whole name as Player, stripping grade and serial
         player = card_name
         player = re.sub(r'\[.*?\]', '', player).strip()
+        player = re.sub(r'#?\d+\s*/\s*\d+', '', player).strip()
         player = re.sub(r'\bPSA\s+\d+\b', '', player, flags=re.IGNORECASE).strip()
         result['Player'] = player
         # Try to extract year
@@ -284,12 +290,12 @@ def load_data(csv_path=CSV_PATH):
 
     # Parse Card Name into display columns
     parsed = df['Card Name'].apply(parse_card_name).apply(pd.Series)
-    for col in ['Player', 'Year', 'Set', 'Card #', 'Grade']:
+    for col in ['Player', 'Year', 'Set', 'Card #', 'Serial', 'Grade']:
         df[col] = parsed[col]
 
     return df
 
-PARSED_COLS = ['Player', 'Year', 'Set', 'Card #', 'Grade']
+PARSED_COLS = ['Player', 'Year', 'Set', 'Card #', 'Serial', 'Grade']
 
 def save_data(df, csv_path=CSV_PATH):
     save_df = df.copy()

@@ -120,6 +120,7 @@ if page == "Card Ledger":
             card_set = st.text_input("Card Set *", value=scanned.get('card_set', ''), placeholder="e.g. Upper Deck Series 1 Young Guns")
             card_year = st.text_input("Year *", value=scanned.get('year', ''), placeholder="e.g. 2023-24")
             variant = st.text_input("Variant / Parallel", value=scanned.get('variant', ''), placeholder="e.g. Red Prism, Arctic Freeze (optional)")
+            serial = st.text_input("Serial #", placeholder="e.g. 70/99, 1/250 (optional)")
             grade = st.text_input("Grade", value=scanned.get('grade', ''), placeholder="e.g. PSA 10 (optional)")
             scrape_prices = st.checkbox("Scrape eBay for prices", value=True)
             add_submitted = st.form_submit_button("Add Card")
@@ -141,7 +142,10 @@ if page == "Card Ledger":
             card_name_parts = [f"{card_year.strip()} {card_set.strip()}"]
             if variant.strip():
                 card_name_parts.append(variant.strip())
-            card_name_parts.append(f"#{card_number.strip()} - {player_name.strip()}")
+            player_part = f"#{card_number.strip()} - {player_name.strip()}"
+            if serial.strip():
+                player_part += f" #{serial.strip()}"
+            card_name_parts.append(player_part)
             if grade.strip():
                 card_name_parts.append(f"[{grade.strip()}]")
             card_name = ' - '.join(card_name_parts)
@@ -341,7 +345,7 @@ elif page == "Card Ledger":
         mask &= df['Grade'] != ''
     filtered_df = df[mask].copy()
 
-    display_cols = ['Player', 'Set', 'Card #', 'Grade', 'Fair Value', 'Trend', 'Num Sales', 'Min', 'Max']
+    display_cols = ['Player', 'Set', 'Card #', 'Serial', 'Grade', 'Fair Value', 'Trend', 'Num Sales', 'Min', 'Max']
     edit_df = filtered_df[display_cols].copy()
 
     if search_query.strip():
@@ -365,6 +369,7 @@ elif page == "Card Ledger":
             "Player": st.column_config.TextColumn("Player", width="medium"),
             "Set": st.column_config.TextColumn("Set", width="medium", disabled=True),
             "Card #": st.column_config.TextColumn("#", width="small", disabled=True),
+            "Serial": st.column_config.TextColumn("Serial", width="small", disabled=True),
             "Grade": st.column_config.TextColumn("Grade", width="small", disabled=True),
             "Fair Value": st.column_config.NumberColumn("Fair Value ($)", format="$%.2f", min_value=0),
             "Trend": st.column_config.SelectboxColumn("Trend", options=["up", "down", "stable", "no data"]),
@@ -455,7 +460,7 @@ elif page == "Card Ledger":
     st.divider()
     st.subheader(f"Cards Not Found ({len(not_found_df)} cards, defaulted to $5.00)")
     if len(not_found_df) > 0:
-        nf_display = not_found_df[['Player', 'Set', 'Card #', 'Fair Value']].reset_index(drop=True)
+        nf_display = not_found_df[['Player', 'Set', 'Card #', 'Serial', 'Fair Value']].reset_index(drop=True)
         edited_nf = st.data_editor(
             nf_display,
             use_container_width=True,
@@ -529,7 +534,7 @@ elif page == "Card Inspect":
 
         # Card details
         st.markdown("---")
-        dc1, dc2, dc3, dc4 = st.columns(4)
+        dc1, dc2, dc3, dc4, dc5 = st.columns(5)
         with dc1:
             st.metric("Player", card_row['Player'])
         with dc2:
@@ -537,6 +542,8 @@ elif page == "Card Inspect":
         with dc3:
             st.metric("Card #", card_row['Card #'] if card_row['Card #'] else "N/A")
         with dc4:
+            st.metric("Serial", card_row['Serial'] if card_row['Serial'] else "N/A")
+        with dc5:
             st.metric("Grade", card_row['Grade'] if card_row['Grade'] else "Raw")
 
         vc1, vc2, vc3, vc4, vc5 = st.columns(5)
