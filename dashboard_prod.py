@@ -28,6 +28,29 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ============================================================
+# PASSWORD GATE
+# ============================================================
+def check_password():
+    correct_pw = os.environ.get("DASHBOARD_PASSWORD", "")
+    if not correct_pw:
+        return True  # No password configured, allow access
+
+    if st.session_state.get("authenticated"):
+        return True
+
+    st.title("Hockey Card Collection Dashboard")
+    password = st.text_input("Enter password to access the dashboard", type="password")
+    if st.button("Login", type="primary"):
+        if password == correct_pw:
+            st.session_state.authenticated = True
+            st.rerun()
+        else:
+            st.error("Incorrect password")
+    st.stop()
+
+check_password()
+
 # --- Load or initialize data in session state ---
 if 'df' not in st.session_state:
     st.session_state.df = load_data()
