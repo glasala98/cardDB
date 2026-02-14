@@ -28,12 +28,18 @@ except ImportError:
 
 def is_graded_card(card_name):
     """Check if the card name indicates it's a graded card."""
-    return bool(re.search(r'\[PSA \d+', card_name, re.IGNORECASE))
+    return bool(re.search(r'\bPSA\s+\d+', card_name, re.IGNORECASE))
 
 
 def get_grade_info(card_name):
     """Extract grading details from card name. Returns (grade_str, grade_num) or (None, None)."""
+    # Check for bracketed format first: [PSA 10]
     psa_match = re.search(r'\[PSA (\d+)', card_name, re.IGNORECASE)
+    if psa_match:
+        grade_num = int(psa_match.group(1))
+        return f"PSA {grade_num}", grade_num
+    # Also check for unbracketed format: PSA 10 (from manual entry)
+    psa_match = re.search(r'\bPSA\s+(\d+)\b', card_name, re.IGNORECASE)
     if psa_match:
         grade_num = int(psa_match.group(1))
         return f"PSA {grade_num}", grade_num
@@ -53,6 +59,8 @@ def clean_card_name_for_search(card_name):
     clean = re.sub(r'\[PSA [^\]]*\]', '', card_name)
     clean = re.sub(r'\[Passed Pre[^\]]*\]', '', clean)
     clean = re.sub(r'\[Poor to Fair\]', '', clean)
+    # Also strip unbracketed PSA grades (from manual entry)
+    clean = re.sub(r'\bPSA\s+\d+\b', '', clean, flags=re.IGNORECASE)
 
     # Split on " - " to get the segments
     parts = [p.strip() for p in clean.split(' - ')]
@@ -214,6 +222,7 @@ def build_simplified_query(card_name):
     grade_str, grade_num = get_grade_info(card_name)
 
     clean = re.sub(r'\[.*?\]', '', card_name)
+    clean = re.sub(r'\bPSA\s+\d+\b', '', clean, flags=re.IGNORECASE)
     parts = [p.strip() for p in clean.split(' - ')]
 
     # Year
