@@ -31,6 +31,7 @@ CSV_PATH = os.path.join(SCRIPT_DIR, "card_prices_summary.csv")
 RESULTS_JSON_PATH = os.path.join(SCRIPT_DIR, "card_prices_results.json")
 HISTORY_PATH = os.path.join(SCRIPT_DIR, "price_history.json")
 BACKUP_DIR = os.path.join(SCRIPT_DIR, "backups")
+ARCHIVE_PATH = os.path.join(SCRIPT_DIR, "card_archive.csv")
 MONEY_COLS = ['Fair Value', 'Median (All)', 'Min', 'Max']
 
 def analyze_card_images(front_image_bytes, back_image_bytes=None):
@@ -217,7 +218,7 @@ def scrape_single_card(card_name):
 
 def parse_card_name(card_name):
     """Parse a card name string into Player, Year, Set, Card #, Grade components."""
-    result = {'Player': '', 'Year': '', 'Set': '', 'Card #': '', 'Serial': '', 'Grade': ''}
+    result = {'Player': '', 'Year': '', 'Set': '', 'Subset': '', 'Card #': '', 'Serial': '', 'Grade': ''}
 
     if not card_name or not isinstance(card_name, str):
         return result
@@ -247,6 +248,15 @@ def parse_card_name(card_name):
 
         # Set: just the base set name (first segment)
         result['Set'] = ' '.join(parts[0].split()).strip()
+
+        # Subset: middle segments (e.g. Young Guns, Marquee Rookie, Base)
+        subsets = []
+        for part in parts[1:-1]:
+            clean_part = re.sub(r'\[.*?\]', '', part).strip()
+            clean_part = re.sub(r'#\S+', '', clean_part).strip()
+            if clean_part:
+                subsets.append(clean_part)
+        result['Subset'] = ' '.join(subsets)
 
         # Card #: find #NNN or #CU-SC pattern (not serial numbered #70/99)
         num_match = re.search(r'#([\w-]+)(?!\s*/)', card_name)
@@ -290,12 +300,12 @@ def load_data(csv_path=CSV_PATH):
 
     # Parse Card Name into display columns
     parsed = df['Card Name'].apply(parse_card_name).apply(pd.Series)
-    for col in ['Player', 'Year', 'Set', 'Card #', 'Serial', 'Grade']:
+    for col in ['Player', 'Year', 'Set', 'Subset', 'Card #', 'Serial', 'Grade']:
         df[col] = parsed[col]
 
     return df
 
-PARSED_COLS = ['Player', 'Year', 'Set', 'Card #', 'Serial', 'Grade']
+PARSED_COLS = ['Player', 'Year', 'Set', 'Subset', 'Card #', 'Serial', 'Grade']
 
 def save_data(df, csv_path=CSV_PATH):
     save_df = df.copy()
@@ -370,3 +380,62 @@ def load_price_history(card_name):
         return history.get(card_name, [])
     except Exception:
         return []
+
+
+def archive_card(df, card_name):
+    """Move a card from the main CSV to the archive CSV. Returns updated df."""
+    card_rows = df[df['Card Name'] == card_name]
+    if len(card_rows) == 0:
+        return df
+
+    # Prepare archive row (drop parsed cols, add archived date)
+    archive_row = card_rows.copy()
+    archive_row = archive_row.drop(columns=[c for c in PARSED_COLS if c in archive_row.columns], errors='ignore')
+    archive_row['Archived Date'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    for col in MONEY_COLS:
+        archive_row[col] = archive_row[col].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "$0.00")
+
+    # Append to archive CSV
+    if os.path.exists(ARCHIVE_PATH):
+        archive_row.to_csv(ARCHIVE_PATH, mode='a', header=False, index=False)
+    else:
+        archive_row.to_csv(ARCHIVE_PATH, index=False)
+
+    # Remove from main df
+    df = df[df['Card Name'] != card_name].reset_index(drop=True)
+    return df
+
+
+def load_archive():
+    """Load archived cards."""
+    if not os.path.exists(ARCHIVE_PATH):
+        return pd.DataFrame()
+    try:
+        archive_df = pd.read_csv(ARCHIVE_PATH)
+        for col in MONEY_COLS:
+            if col in archive_df.columns:
+                archive_df[col] = archive_df[col].astype(str).str.replace('$', '', regex=False).str.replace(',', '', regex=False)
+                archive_df[col] = pd.to_numeric(archive_df[col], errors='coerce').fillna(0)
+        return archive_df
+    except Exception:
+        return pd.DataFrame()
+
+
+def restore_card(card_name):
+    """Remove a card from the archive and return its row data for re-adding."""
+    if not os.path.exists(ARCHIVE_PATH):
+        return None
+    try:
+        archive_df = pd.read_csv(ARCHIVE_PATH)
+        card_rows = archive_df[archive_df['Card Name'] == card_name]
+        if len(card_rows) == 0:
+            return None
+        # Remove from archive
+        archive_df = archive_df[archive_df['Card Name'] != card_name]
+        if len(archive_df) > 0:
+            archive_df.to_csv(ARCHIVE_PATH, index=False)
+        else:
+            os.remove(ARCHIVE_PATH)
+        return card_rows.iloc[0].to_dict()
+    except Exception:
+        return None

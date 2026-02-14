@@ -11,6 +11,7 @@ try:
     from dashboard_utils import (
         analyze_card_images, scrape_single_card, load_data, save_data, backup_data,
         parse_card_name, load_sales_history, append_price_history, load_price_history,
+        archive_card, load_archive, restore_card,
         CSV_PATH, MONEY_COLS, PARSED_COLS
     )
 except ImportError:
@@ -119,7 +120,7 @@ if page == "Card Ledger":
             card_number = st.text_input("Card Number *", value=scanned.get('card_number', ''), placeholder="e.g. 201")
             card_set = st.text_input("Card Set *", value=scanned.get('card_set', ''), placeholder="e.g. Upper Deck Series 1 Young Guns")
             card_year = st.text_input("Year *", value=scanned.get('year', ''), placeholder="e.g. 2023-24")
-            variant = st.text_input("Variant / Parallel", value=scanned.get('variant', ''), placeholder="e.g. Red Prism, Arctic Freeze (optional)")
+            variant = st.text_input("Subset / Variant", value=scanned.get('variant', ''), placeholder="e.g. Young Guns, Marquee Rookie, Violet Pixel")
             serial = st.text_input("Serial #", placeholder="e.g. 70/99, 1/250 (optional)")
             grade = st.text_input("Grade", value=scanned.get('grade', ''), placeholder="e.g. PSA 10 (optional)")
             scrape_prices = st.checkbox("Scrape eBay for prices", value=True)
@@ -345,7 +346,7 @@ elif page == "Card Ledger":
         mask &= df['Grade'] != ''
     filtered_df = df[mask].copy()
 
-    display_cols = ['Player', 'Set', 'Card #', 'Serial', 'Grade', 'Fair Value', 'Trend', 'Num Sales', 'Min', 'Max']
+    display_cols = ['Player', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Fair Value', 'Trend', 'Num Sales', 'Min', 'Max']
     edit_df = filtered_df[display_cols].copy()
 
     if search_query.strip():
@@ -354,8 +355,9 @@ elif page == "Card Ledger":
         mask = searchable.apply(lambda name: all(t in name for t in terms))
         edit_df = edit_df[mask].copy()
 
-    # Add View checkbox column for navigation
+    # Add View and Remove checkbox columns
     edit_df.insert(0, 'View', False)
+    edit_df.insert(1, 'Remove', False)
 
     st.caption(f"Showing {len(edit_df)} of {len(df)} cards")
 
@@ -366,8 +368,10 @@ elif page == "Card Ledger":
         num_rows="dynamic",
         column_config={
             "View": st.column_config.CheckboxColumn("View", width="small", default=False),
+            "Remove": st.column_config.CheckboxColumn("Remove", width="small", default=False),
             "Player": st.column_config.TextColumn("Player", width="medium"),
             "Set": st.column_config.TextColumn("Set", width="medium", disabled=True),
+            "Subset": st.column_config.TextColumn("Subset", width="medium", disabled=True),
             "Card #": st.column_config.TextColumn("#", width="small", disabled=True),
             "Serial": st.column_config.TextColumn("Serial", width="small", disabled=True),
             "Grade": st.column_config.TextColumn("Grade", width="small", disabled=True),
@@ -389,6 +393,32 @@ elif page == "Card Ledger":
             st.session_state.inspect_card = card_name
             st.session_state.nav_page = "Card Inspect"
             st.rerun()
+
+    # Handle Remove checkbox — stage card for deletion confirmation
+    removed_rows = edited[edited['Remove'] == True]
+    if len(removed_rows) > 0:
+        removed_idx = removed_rows.index[0]
+        if removed_idx in edit_df.index and removed_idx in filtered_df.index:
+            st.session_state.pending_remove = filtered_df.at[removed_idx, 'Card Name']
+
+    # Confirmation dialog for pending removal
+    if st.session_state.get('pending_remove'):
+        card_to_remove = st.session_state.pending_remove
+        parsed = parse_card_name(card_to_remove)
+        st.warning(f"Are you sure you want to archive **{parsed['Player']}** ({parsed['Set']} {parsed['Subset']})? This card will be moved to the archive.")
+        rc1, rc2, rc3 = st.columns([1, 1, 4])
+        with rc1:
+            if st.button("Yes, Archive", type="primary"):
+                st.session_state.df = archive_card(st.session_state.df, card_to_remove)
+                save_data(st.session_state.df)
+                st.session_state.df = load_data()
+                del st.session_state.pending_remove
+                st.success(f"Card archived.")
+                st.rerun()
+        with rc2:
+            if st.button("Cancel"):
+                del st.session_state.pending_remove
+                st.rerun()
 
     bcol1, bcol2 = st.columns([1, 1])
     with bcol1:
@@ -460,7 +490,7 @@ elif page == "Card Ledger":
     st.divider()
     st.subheader(f"Cards Not Found ({len(not_found_df)} cards, defaulted to $5.00)")
     if len(not_found_df) > 0:
-        nf_display = not_found_df[['Player', 'Set', 'Card #', 'Serial', 'Fair Value']].reset_index(drop=True)
+        nf_display = not_found_df[['Player', 'Set', 'Subset', 'Card #', 'Serial', 'Fair Value']].reset_index(drop=True)
         edited_nf = st.data_editor(
             nf_display,
             use_container_width=True,
@@ -489,6 +519,40 @@ elif page == "Card Ledger":
     else:
         st.info("All cards have sales data!")
 
+    # Archived Cards section
+    st.divider()
+    archive_df = load_archive()
+    with st.expander(f"Archived Cards ({len(archive_df)})", expanded=False):
+        if len(archive_df) > 0:
+            st.dataframe(
+                archive_df[['Card Name', 'Fair Value', 'Num Sales', 'Archived Date']].reset_index(drop=True)
+                if 'Archived Date' in archive_df.columns
+                else archive_df[['Card Name', 'Fair Value', 'Num Sales']].reset_index(drop=True),
+                use_container_width=True,
+                hide_index=True,
+            )
+            restore_options = archive_df['Card Name'].tolist()
+            restore_pick = st.selectbox("Select card to restore", [""] + restore_options,
+                                        format_func=lambda x: "Choose a card..." if x == "" else x[:60],
+                                        key="restore_pick")
+            if st.button("Restore Card", disabled=restore_pick == ""):
+                card_data = restore_card(restore_pick)
+                if card_data:
+                    # Remove archive-only columns
+                    card_data.pop('Archived Date', None)
+                    for col in MONEY_COLS:
+                        if col in card_data:
+                            val = str(card_data[col]).replace('$', '').replace(',', '')
+                            card_data[col] = float(val) if val else 0.0
+                    new_row = pd.DataFrame([card_data])
+                    st.session_state.df = pd.concat([st.session_state.df, new_row], ignore_index=True)
+                    save_data(st.session_state.df)
+                    st.session_state.df = load_data()
+                    st.success(f"Restored: {restore_pick[:60]}")
+                    st.rerun()
+        else:
+            st.caption("No archived cards.")
+
 # ============================================================
 # CARD INSPECT PAGE
 # ============================================================
@@ -515,6 +579,8 @@ elif page == "Card Inspect":
             st.caption(f"{len(matches)} match{'es' if len(matches) != 1 else ''} found")
             for _, row in matches.head(10).iterrows():
                 label = f"{row['Player']} — {row['Set']}"
+                if row['Subset']:
+                    label += f" {row['Subset']}"
                 if row['Card #']:
                     label += f" #{row['Card #']}"
                 if row['Grade']:
@@ -534,16 +600,20 @@ elif page == "Card Inspect":
 
         # Card details
         st.markdown("---")
-        dc1, dc2, dc3, dc4, dc5 = st.columns(5)
+        dc1, dc2, dc3 = st.columns(3)
         with dc1:
             st.metric("Player", card_row['Player'])
         with dc2:
             st.metric("Set", card_row['Set'] if card_row['Set'] else "N/A")
         with dc3:
-            st.metric("Card #", card_row['Card #'] if card_row['Card #'] else "N/A")
+            st.metric("Subset", card_row['Subset'] if card_row['Subset'] else "Base")
+
+        dc4, dc5, dc6, dc7 = st.columns(4)
         with dc4:
-            st.metric("Serial", card_row['Serial'] if card_row['Serial'] else "N/A")
+            st.metric("Card #", card_row['Card #'] if card_row['Card #'] else "N/A")
         with dc5:
+            st.metric("Serial", card_row['Serial'] if card_row['Serial'] else "N/A")
+        with dc6:
             st.metric("Grade", card_row['Grade'] if card_row['Grade'] else "Raw")
 
         vc1, vc2, vc3, vc4, vc5 = st.columns(5)
