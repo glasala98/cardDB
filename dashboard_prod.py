@@ -2,9 +2,31 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
+import sys
+import base64
+import json
+import re
+from datetime import datetime
+import urllib.parse
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_PATH = os.path.join(SCRIPT_DIR, "card_prices_summary.csv")
+
+# Import scraper functions
+sys.path.insert(0, SCRIPT_DIR)
+from scrape_card_prices import (
+    create_driver, search_ebay_sold, calculate_fair_price,
+    build_simplified_query, get_grade_info, title_matches_grade
+)
+
+try:
+    import anthropic
+    HAS_ANTHROPIC = True
+except ImportError:
+    HAS_ANTHROPIC = False
 
 st.set_page_config(
     page_title="Card Collection Dashboard",
@@ -21,6 +43,161 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 MONEY_COLS = ['Fair Value', 'Median (All)', 'Min', 'Max']
+
+def analyze_card_images(front_image_bytes, back_image_bytes=None):
+    """Use Claude vision to extract card details from front/back photos."""
+    if not HAS_ANTHROPIC:
+        return None, "anthropic package not installed. Run: pip install anthropic"
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return None, "ANTHROPIC_API_KEY not set. Add it to your environment."
+
+    client = anthropic.Anthropic(api_key=api_key)
+
+    content = []
+
+    # Add front image
+    front_b64 = base64.standard_b64encode(front_image_bytes).decode("utf-8")
+    content.append({"type": "text", "text": "FRONT OF CARD:"})
+    content.append({
+        "type": "image",
+        "source": {"type": "base64", "media_type": "image/jpeg", "data": front_b64}
+    })
+
+    # Add back image if provided
+    if back_image_bytes:
+        back_b64 = base64.standard_b64encode(back_image_bytes).decode("utf-8")
+        content.append({"type": "text", "text": "BACK OF CARD:"})
+        content.append({
+            "type": "image",
+            "source": {"type": "base64", "media_type": "image/jpeg", "data": back_b64}
+        })
+
+    content.append({
+        "type": "text",
+        "text": """Analyze this hockey/sports card and extract the following details.
+Look at BOTH the front and back of the card carefully.
+
+The back typically has: card number, set name, year, manufacturer info.
+The front typically has: player name, team, photo.
+
+Return ONLY valid JSON with these exact keys:
+{
+    "player_name": "Full player name",
+    "card_number": "Just the number (e.g. 201, not #201)",
+    "card_set": "Set name with subset (e.g. Upper Deck Series 1 Young Guns)",
+    "year": "Card year or season (e.g. 2023-24)",
+    "variant": "Parallel or variant name if any, empty string if base card",
+    "grade": "Grade if in a graded slab (e.g. PSA 10), empty string if raw",
+    "confidence": "high, medium, or low",
+    "is_sports_card": true,
+    "validation_reason": "Explain why this is or isn't a valid sports card"
+}
+
+Be precise. If the image is not a sports card, set "is_sports_card" to false and explain why in "validation_reason".
+If you can't determine a field, use your best guess based on card design, logos, and text visible."""
+    })
+
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=500,
+            messages=[{"role": "user", "content": content}]
+        )
+
+        response_text = response.content[0].text.strip()
+        # Extract JSON from response (handle markdown code blocks)
+        json_match = re.search(r'\{[^{}]*\}', response_text, re.DOTALL)
+        if json_match:
+            card_info = json.loads(json_match.group())
+            return card_info, None
+        else:
+            return None, f"Could not parse response: {response_text[:200]}"
+    except Exception as e:
+        return None, str(e)
+
+
+def scrape_single_card(card_name):
+    """Scrape eBay for a single card and return result dict."""
+    driver = create_driver()
+    try:
+        sales = search_ebay_sold(driver, card_name, max_results=50)
+
+        # Retry with simplified query if no results
+        if not sales:
+            simplified = build_simplified_query(card_name)
+            grade_str, grade_num = get_grade_info(card_name)
+            encoded = urllib.parse.quote(simplified)
+            url = f"https://www.ebay.com/sch/i.html?_nkw={encoded}&_sacat=0&LH_Complete=1&LH_Sold=1&_sop=13&_ipg=240"
+            try:
+                driver.get(url)
+                WebDriverWait(driver, 15).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, '.s-card'))
+                )
+                items = driver.find_elements(By.CSS_SELECTOR, '.s-card')
+                for item in items:
+                    try:
+                        title_elem = item.find_element(By.CSS_SELECTOR, '.s-card__title')
+                        title = title_elem.text.strip()
+                        if not title or not title_matches_grade(title, grade_str, grade_num):
+                            continue
+                        price_elem = item.find_element(By.CSS_SELECTOR, '.s-card__price')
+                        price_text = price_elem.text.strip().replace('Opens in a new window', '')
+                        price_match = re.search(r'\$([\d,]+\.?\d*)', price_text)
+                        if not price_match:
+                            continue
+                        price_val = float(price_match.group(1).replace(',', ''))
+                        shipping_val = 0.0
+                        try:
+                            ship_elems = item.find_elements(By.XPATH,
+                                './/*[contains(text(),"delivery") or contains(text(),"shipping")]')
+                            for se in ship_elems:
+                                se_text = se.text.strip().lower()
+                                if 'free' in se_text:
+                                    break
+                                sm = re.search(r'\$([\d,]+\.?\d*)', se_text)
+                                if sm:
+                                    shipping_val = float(sm.group(1).replace(',', ''))
+                                    break
+                        except Exception:
+                            pass
+                        sold_date = None
+                        try:
+                            caption = item.find_element(By.CSS_SELECTOR, '.s-card__caption')
+                            dm = re.search(r'Sold\s+(\w+\s+\d+,?\s*\d*)', caption.text.strip())
+                            if dm:
+                                try:
+                                    sold_date = datetime.strptime(dm.group(1), '%b %d, %Y')
+                                except ValueError:
+                                    try:
+                                        sold_date = datetime.strptime(dm.group(1) + f', {datetime.now().year}', '%b %d, %Y')
+                                    except ValueError:
+                                        pass
+                        except Exception:
+                            pass
+                        sales.append({
+                            'title': title,
+                            'item_price': price_match.group(0),
+                            'shipping': f"${shipping_val}" if shipping_val > 0 else 'Free',
+                            'price_val': round(price_val + shipping_val, 2),
+                            'sold_date': sold_date.strftime('%Y-%m-%d') if sold_date else None,
+                            'days_ago': (datetime.now() - sold_date).days if sold_date else None,
+                            'search_url': url
+                        })
+                        if len(sales) >= 50:
+                            break
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+
+        if sales:
+            fair_price, stats = calculate_fair_price(sales)
+            return stats
+        return None
+    finally:
+        driver.quit()
 
 def load_data():
     df = pd.read_csv(CSV_PATH)
@@ -55,29 +232,112 @@ trend_options = sorted(df['Trend'].unique().tolist())
 trend_filter = st.sidebar.multiselect("Trend Direction", options=trend_options, default=trend_options)
 
 st.sidebar.divider()
+st.sidebar.header("Scan Card")
+
+front_img = st.sidebar.file_uploader("Front of card", type=["jpg", "jpeg", "png", "webp"], key="front_img")
+back_img = st.sidebar.file_uploader("Back of card (optional)", type=["jpg", "jpeg", "png", "webp"], key="back_img")
+
+if st.sidebar.button("Analyze Card", disabled=front_img is None):
+    with st.sidebar:
+        with st.spinner("Analyzing card with AI..."):
+            front_bytes = front_img.getvalue()
+            back_bytes = back_img.getvalue() if back_img else None
+            card_info, error = analyze_card_images(front_bytes, back_bytes)
+
+    if error:
+        st.sidebar.error(f"Analysis failed: {error}")
+    elif card_info:
+        is_valid = card_info.get("is_sports_card", True)
+        validation_reason = card_info.get("validation_reason", "Image does not appear to be a valid sports card.")
+
+        if not is_valid:
+            st.sidebar.error(f"Invalid Card: {validation_reason}")
+        else:
+            st.session_state.scanned_card = card_info
+            confidence = card_info.get('confidence', 'unknown')
+            if confidence == 'high':
+                st.sidebar.success("Card identified with high confidence!")
+            elif confidence == 'medium':
+                st.sidebar.warning("Card identified - please verify the details below.")
+            else:
+                st.sidebar.warning("Low confidence - review and correct the fields below.")
+            st.rerun()
+
+# Pre-fill from scan if available
+scanned = st.session_state.get('scanned_card', {})
+
+st.sidebar.divider()
 st.sidebar.header("Add New Card")
 
 with st.sidebar.form("add_card_form", clear_on_submit=True):
-    new_name = st.text_input("Card Name")
-    new_value = st.number_input("Estimated Value ($)", min_value=0.0, value=5.0, step=0.50)
+    player_name = st.text_input("Player Name *", value=scanned.get('player_name', ''), placeholder="e.g. Connor McDavid")
+    card_number = st.text_input("Card Number *", value=scanned.get('card_number', ''), placeholder="e.g. 201")
+    card_set = st.text_input("Card Set *", value=scanned.get('card_set', ''), placeholder="e.g. Upper Deck Series 1 Young Guns")
+    card_year = st.text_input("Year *", value=scanned.get('year', ''), placeholder="e.g. 2023-24")
+    variant = st.text_input("Variant / Parallel", value=scanned.get('variant', ''), placeholder="e.g. Red Prism, Arctic Freeze (optional)")
+    grade = st.text_input("Grade", value=scanned.get('grade', ''), placeholder="e.g. PSA 10 (optional)")
+    scrape_prices = st.checkbox("Scrape eBay for prices", value=True)
     add_submitted = st.form_submit_button("Add Card")
 
-if add_submitted and new_name.strip():
-    card_name = new_name.strip()
-    new_row = pd.DataFrame([{
-        'Card Name': card_name,
-        'Fair Value': new_value,
-        'Trend': 'no data',
-        'Top 3 Prices': '',
-        'Median (All)': new_value,
-        'Min': new_value,
-        'Max': new_value,
-        'Num Sales': 0
-    }])
-    st.session_state.df = pd.concat([st.session_state.df, new_row], ignore_index=True)
-    save_data(st.session_state.df)
-    st.session_state.df = load_data()
-    st.rerun()
+if add_submitted:
+    missing = []
+    if not player_name.strip():
+        missing.append("Player Name")
+    if not card_number.strip():
+        missing.append("Card Number")
+    if not card_set.strip():
+        missing.append("Card Set")
+    if not card_year.strip():
+        missing.append("Year")
+
+    if missing:
+        st.sidebar.error(f"Missing required fields: {', '.join(missing)}")
+    else:
+        card_name_parts = [f"{card_year.strip()} {card_set.strip()}"]
+        if variant.strip():
+            card_name_parts.append(variant.strip())
+        card_name_parts.append(f"#{card_number.strip()} - {player_name.strip()}")
+        if grade.strip():
+            card_name_parts.append(f"[{grade.strip()}]")
+        card_name = ' - '.join(card_name_parts)
+
+        if scrape_prices:
+            with st.sidebar:
+                with st.spinner(f"Scraping eBay for {player_name.strip()}..."):
+                    stats = scrape_single_card(card_name)
+
+            if stats and stats.get('num_sales', 0) > 0:
+                trend = stats['trend']
+                if trend in ('insufficient data', 'unknown'):
+                    trend = 'no data'
+                new_row = pd.DataFrame([{
+                    'Card Name': card_name,
+                    'Fair Value': stats['fair_price'],
+                    'Trend': trend,
+                    'Top 3 Prices': ' | '.join(stats.get('top_3_prices', [])),
+                    'Median (All)': stats['median_all'],
+                    'Min': stats['min'],
+                    'Max': stats['max'],
+                    'Num Sales': stats['num_sales']
+                }])
+                st.sidebar.success(f"Found {stats['num_sales']} sales! Fair value: ${stats['fair_price']:.2f}")
+            else:
+                new_row = pd.DataFrame([{
+                    'Card Name': card_name, 'Fair Value': 5.0, 'Trend': 'no data',
+                    'Top 3 Prices': '', 'Median (All)': 5.0, 'Min': 5.0, 'Max': 5.0, 'Num Sales': 0
+                }])
+                st.sidebar.warning("No sales found. Defaulted to $5.00.")
+        else:
+            new_row = pd.DataFrame([{
+                'Card Name': card_name, 'Fair Value': 5.0, 'Trend': 'no data',
+                'Top 3 Prices': '', 'Median (All)': 5.0, 'Min': 5.0, 'Max': 5.0, 'Num Sales': 0
+            }])
+
+        st.session_state.df = pd.concat([st.session_state.df, new_row], ignore_index=True)
+        save_data(st.session_state.df)
+        st.session_state.df = load_data()
+        st.session_state.pop('scanned_card', None)
+        st.rerun()
 
 # ============================================================
 # Apply filters
