@@ -196,6 +196,77 @@ def scrape_single_card(card_name):
     finally:
         driver.quit()
 
+def parse_card_name(card_name):
+    """Parse a card name string into Player, Year, Set, Card #, Grade components."""
+    result = {'Player': '', 'Year': '', 'Set': '', 'Card #': '', 'Grade': ''}
+
+    if not card_name or not isinstance(card_name, str):
+        return result
+
+    # Extract grade (bracketed or unbracketed)
+    grade_match = re.search(r'\[([^\]]*PSA[^\]]*)\]', card_name, re.IGNORECASE)
+    if grade_match:
+        result['Grade'] = grade_match.group(1).strip()
+    else:
+        grade_match = re.search(r'\b(PSA\s+\d+)\b', card_name, re.IGNORECASE)
+        if grade_match:
+            result['Grade'] = grade_match.group(1).strip()
+
+    # Check if structured format (has " - " delimiters)
+    if ' - ' in card_name:
+        parts = [p.strip() for p in card_name.split(' - ')]
+
+        # Year: from first segment
+        year_match = re.search(r'(\d{4}(?:-\d{2,4})?)', parts[0])
+        if year_match:
+            result['Year'] = year_match.group(1)
+
+        # Set: first segment minus year, cleaned up
+        set_name = parts[0]
+        if result['Year']:
+            set_name = set_name.replace(result['Year'], '').strip()
+        # Add subset keywords from middle segments
+        subsets = []
+        for part in parts[1:-1]:
+            clean_part = re.sub(r'\[.*?\]', '', part).strip()
+            clean_part = re.sub(r'#\S+', '', clean_part).strip()
+            if clean_part:
+                subsets.append(clean_part)
+        if subsets:
+            set_name = set_name + ' ' + ' '.join(subsets)
+        result['Set'] = ' '.join(set_name.split()).strip()
+
+        # Card #: find #NNN or #CU-SC pattern (not serial numbered #70/99)
+        num_match = re.search(r'#([\w-]+)(?!\s*/)', card_name)
+        if num_match:
+            raw_num = num_match.group(1)
+            # Skip serial numbers like 70/99, 1/250
+            if not re.search(r'#' + re.escape(raw_num) + r'\s*/\s*\d+', card_name):
+                result['Card #'] = raw_num
+
+        # Player: last segment, cleaned
+        last = parts[-1]
+        # Remove grade brackets
+        last = re.sub(r'\[.*?\]', '', last).strip()
+        # Remove serial numbers like #70/99
+        last = re.sub(r'#\d+/\d+', '', last).strip()
+        # Remove unbracketed PSA grades
+        last = re.sub(r'\bPSA\s+\d+\b', '', last, flags=re.IGNORECASE).strip()
+        result['Player'] = last
+    else:
+        # Freeform format - put the whole name as Player, stripping grade
+        player = card_name
+        player = re.sub(r'\[.*?\]', '', player).strip()
+        player = re.sub(r'\bPSA\s+\d+\b', '', player, flags=re.IGNORECASE).strip()
+        result['Player'] = player
+        # Try to extract year
+        year_match = re.search(r'(\d{4}(?:-\d{2,4})?)', card_name)
+        if year_match:
+            result['Year'] = year_match.group(1)
+
+    return result
+
+
 def load_data(csv_path=CSV_PATH):
     df = pd.read_csv(csv_path)
     for col in MONEY_COLS:
@@ -203,10 +274,20 @@ def load_data(csv_path=CSV_PATH):
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     df['Num Sales'] = pd.to_numeric(df['Num Sales'], errors='coerce').fillna(0).astype(int)
     df['Trend'] = df['Trend'].replace({'insufficient data': 'no data', 'unknown': 'no data'})
+
+    # Parse Card Name into display columns
+    parsed = df['Card Name'].apply(parse_card_name).apply(pd.Series)
+    for col in ['Player', 'Year', 'Set', 'Card #', 'Grade']:
+        df[col] = parsed[col]
+
     return df
+
+PARSED_COLS = ['Player', 'Year', 'Set', 'Card #', 'Grade']
 
 def save_data(df, csv_path=CSV_PATH):
     save_df = df.copy()
+    # Drop display-only parsed columns before saving
+    save_df = save_df.drop(columns=[c for c in PARSED_COLS if c in save_df.columns], errors='ignore')
     for col in MONEY_COLS:
         save_df[col] = save_df[col].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "$0.00")
     save_df.to_csv(csv_path, index=False)

@@ -10,7 +10,7 @@ from datetime import datetime
 try:
     from dashboard_utils import (
         analyze_card_images, scrape_single_card, load_data, save_data,
-        CSV_PATH, MONEY_COLS
+        parse_card_name, CSV_PATH, MONEY_COLS, PARSED_COLS
     )
 except ImportError:
     st.error("dashboard_utils.py not found. Please ensure it exists in the same directory.")
@@ -308,34 +308,47 @@ if page == "Charts":
 elif page == "Card Ledger":
     st.subheader("Edit Card Values")
 
-    # Inline filters
-    fcol1, fcol2 = st.columns(2)
+    # Search bar (full width)
+    search_query = st.text_input("Search cards", placeholder="Search by player, set, year, card number...")
+
+    # Filter row
+    fcol1, fcol2, fcol3, fcol4 = st.columns(4)
     with fcol1:
-        min_sales = st.slider("Minimum Sales Count", 0, max(int(df['Num Sales'].max()), 1), 0)
+        years = sorted(df['Year'].dropna().unique().tolist(), reverse=True)
+        years = [y for y in years if y]
+        year_filter = st.selectbox("Year", ["All Years"] + years)
     with fcol2:
+        sets = sorted(df['Set'].dropna().unique().tolist())
+        sets = [s for s in sets if s]
+        set_filter = st.selectbox("Set", ["All Sets"] + sets)
+    with fcol3:
         trend_options = sorted(df['Trend'].unique().tolist())
-        trend_filter = st.multiselect("Trend Direction", options=trend_options, default=trend_options)
+        trend_filter = st.multiselect("Trend", options=trend_options, default=trend_options)
+    with fcol4:
+        grade_filter = st.selectbox("Grade", ["All", "Raw", "Graded"])
 
     # Apply filters
-    mask = (df['Num Sales'] >= min_sales) & (df['Trend'].isin(trend_filter))
+    mask = df['Trend'].isin(trend_filter)
+    if year_filter != "All Years":
+        mask &= df['Year'] == year_filter
+    if set_filter != "All Sets":
+        mask &= df['Set'] == set_filter
+    if grade_filter == "Raw":
+        mask &= df['Grade'] == ''
+    elif grade_filter == "Graded":
+        mask &= df['Grade'] != ''
     filtered_df = df[mask].copy()
 
-    search_query = st.text_input("Search cards", placeholder="Type to filter by card name (e.g. Bedard, PSA 10, Young Guns)...")
-
-    display_cols = ['Card Name', 'Fair Value', 'Trend', 'Num Sales', 'Min', 'Max', 'Top 3 Prices']
+    display_cols = ['Player', 'Year', 'Set', 'Card #', 'Grade', 'Fair Value', 'Trend', 'Num Sales', 'Min', 'Max']
     edit_df = filtered_df[display_cols].copy()
 
     if search_query.strip():
         terms = search_query.strip().lower().split()
-        mask = edit_df['Card Name'].apply(
-            lambda name: all(t in name.lower() for t in terms)
-        )
+        searchable = filtered_df['Card Name'].str.lower()
+        mask = searchable.apply(lambda name: all(t in name for t in terms))
         edit_df = edit_df[mask].copy()
 
-    st.caption(f"Showing {len(edit_df)} cards. Edit Fair Value or Trend directly in the table.")
-
-    # Trend color mapping for display
-    trend_color_map = {"up": "#00CC96", "down": "#EF553B", "stable": "#636EFA", "no data": "#888888"}
+    st.caption(f"Showing {len(edit_df)} of {len(df)} cards")
 
     edited = st.data_editor(
         edit_df,
@@ -343,13 +356,16 @@ elif page == "Card Ledger":
         hide_index=True,
         num_rows="dynamic",
         column_config={
-            "Card Name": st.column_config.TextColumn("Card Name", width="large"),
+            "Player": st.column_config.TextColumn("Player", width="medium"),
+            "Year": st.column_config.TextColumn("Year", width="small", disabled=True),
+            "Set": st.column_config.TextColumn("Set", width="medium", disabled=True),
+            "Card #": st.column_config.TextColumn("#", width="small", disabled=True),
+            "Grade": st.column_config.TextColumn("Grade", width="small", disabled=True),
             "Fair Value": st.column_config.NumberColumn("Fair Value ($)", format="$%.2f", min_value=0),
             "Trend": st.column_config.SelectboxColumn("Trend", options=["up", "down", "stable", "no data"]),
             "Num Sales": st.column_config.NumberColumn("Sales", disabled=True),
             "Min": st.column_config.NumberColumn("Min ($)", format="$%.2f", disabled=True),
             "Max": st.column_config.NumberColumn("Max ($)", format="$%.2f", disabled=True),
-            "Top 3 Prices": st.column_config.TextColumn("Top 3 Prices", disabled=True),
         },
         key="card_editor"
     )
@@ -362,29 +378,40 @@ elif page == "Card Ledger":
                 if idx is not None and idx in st.session_state.df.index:
                     st.session_state.df.at[idx, 'Fair Value'] = row['Fair Value']
                     st.session_state.df.at[idx, 'Trend'] = row['Trend']
-                    st.session_state.df.at[idx, 'Card Name'] = row['Card Name']
+                    # Update Player in parsed col and rebuild Card Name
+                    if row['Player'] != edit_df.at[idx, 'Player']:
+                        old_player = edit_df.at[idx, 'Player']
+                        new_player = row['Player']
+                        old_card_name = st.session_state.df.at[idx, 'Card Name']
+                        if old_player and old_player in old_card_name:
+                            st.session_state.df.at[idx, 'Card Name'] = old_card_name.replace(old_player, new_player)
+                        st.session_state.df.at[idx, 'Player'] = new_player
             if len(edited) > len(edit_df):
                 for i in range(len(edit_df), len(edited)):
+                    r = edited.iloc[i]
+                    card_name = r.get('Player', 'Unknown')
                     new_row = {
-                        'Card Name': edited.iloc[i]['Card Name'],
-                        'Fair Value': edited.iloc[i]['Fair Value'],
-                        'Trend': edited.iloc[i]['Trend'],
+                        'Card Name': card_name,
+                        'Fair Value': r['Fair Value'],
+                        'Trend': r['Trend'],
                         'Top 3 Prices': '',
-                        'Median (All)': edited.iloc[i]['Fair Value'],
-                        'Min': edited.iloc[i]['Fair Value'],
-                        'Max': edited.iloc[i]['Fair Value'],
+                        'Median (All)': r['Fair Value'],
+                        'Min': r['Fair Value'],
+                        'Max': r['Fair Value'],
                         'Num Sales': 0
                     }
+                    parsed = parse_card_name(card_name)
+                    new_row.update(parsed)
                     st.session_state.df = pd.concat(
                         [st.session_state.df, pd.DataFrame([new_row])], ignore_index=True
                     )
             if len(edited) < len(edit_df):
-                edited_names = set(edited['Card Name'].tolist())
-                filtered_names = set(edit_df['Card Name'].tolist())
-                removed = filtered_names - edited_names
+                edited_players = set(edited['Player'].tolist())
+                filtered_players = set(edit_df['Player'].tolist())
+                removed = filtered_players - edited_players
                 if removed:
                     st.session_state.df = st.session_state.df[
-                        ~st.session_state.df['Card Name'].isin(removed)
+                        ~st.session_state.df['Player'].isin(removed)
                     ].reset_index(drop=True)
 
             save_data(st.session_state.df)
@@ -397,11 +424,13 @@ elif page == "Card Ledger":
             st.rerun()
 
     with bcol3:
-        # Rescrape selected card
+        # Build rescrape options from filtered_df (which still has Card Name)
+        rescrape_options = filtered_df.loc[edit_df.index, 'Card Name'].tolist() if len(edit_df) > 0 else []
+        rescrape_labels = {cn: filtered_df.loc[filtered_df['Card Name'] == cn, 'Player'].iloc[0] if len(filtered_df[filtered_df['Card Name'] == cn]) > 0 else cn[:50] for cn in rescrape_options}
         rescrape_card = st.selectbox(
             "Rescrape card",
-            options=[""] + edit_df['Card Name'].tolist(),
-            format_func=lambda x: "Select a card..." if x == "" else (x[:50] + "..." if len(x) > 50 else x),
+            options=[""] + rescrape_options,
+            format_func=lambda x: "Select a card..." if x == "" else rescrape_labels.get(x, x[:50]),
             label_visibility="collapsed"
         )
 
@@ -445,25 +474,30 @@ elif page == "Card Ledger":
     st.divider()
     st.subheader(f"Cards Not Found ({len(not_found_df)} cards, defaulted to $5.00)")
     if len(not_found_df) > 0:
-        nf_edit = not_found_df[['Card Name', 'Fair Value']].reset_index(drop=True)
+        nf_display = not_found_df[['Player', 'Year', 'Set', 'Card #', 'Fair Value']].reset_index(drop=True)
         edited_nf = st.data_editor(
-            nf_edit,
+            nf_display,
             use_container_width=True,
             hide_index=True,
             column_config={
-                "Card Name": st.column_config.TextColumn("Card Name", width="large"),
+                "Player": st.column_config.TextColumn("Player", width="medium", disabled=True),
+                "Year": st.column_config.TextColumn("Year", width="small", disabled=True),
+                "Set": st.column_config.TextColumn("Set", width="medium", disabled=True),
+                "Card #": st.column_config.TextColumn("#", width="small", disabled=True),
                 "Fair Value": st.column_config.NumberColumn("Manual Price ($)", format="$%.2f", min_value=0),
             },
             key="not_found_editor"
         )
         if st.button("Save Not Found Prices", type="primary"):
+            nf_card_names = not_found_df['Card Name'].tolist()
             for i, row in edited_nf.iterrows():
-                mask = st.session_state.df['Card Name'] == nf_edit.iloc[i]['Card Name']
-                if mask.any():
-                    st.session_state.df.loc[mask, 'Fair Value'] = row['Fair Value']
-                    st.session_state.df.loc[mask, 'Median (All)'] = row['Fair Value']
-                    st.session_state.df.loc[mask, 'Min'] = row['Fair Value']
-                    st.session_state.df.loc[mask, 'Max'] = row['Fair Value']
+                if i < len(nf_card_names):
+                    mask = st.session_state.df['Card Name'] == nf_card_names[i]
+                    if mask.any():
+                        st.session_state.df.loc[mask, 'Fair Value'] = row['Fair Value']
+                        st.session_state.df.loc[mask, 'Median (All)'] = row['Fair Value']
+                        st.session_state.df.loc[mask, 'Min'] = row['Fair Value']
+                        st.session_state.df.loc[mask, 'Max'] = row['Fair Value']
             save_data(st.session_state.df)
             st.success("Not Found prices saved!")
             st.rerun()
