@@ -303,9 +303,26 @@ def load_data(csv_path=CSV_PATH):
     for col in ['Player', 'Year', 'Set', 'Subset', 'Card #', 'Serial', 'Grade']:
         df[col] = parsed[col]
 
+    # Add Last Scraped from results JSON
+    if os.path.exists(RESULTS_JSON_PATH):
+        try:
+            with open(RESULTS_JSON_PATH, 'r', encoding='utf-8') as f:
+                results = json.load(f)
+            df['Last Scraped'] = df['Card Name'].apply(
+                lambda name: results.get(name, {}).get('scraped_at', '')
+            )
+            # Show date only (strip time)
+            df['Last Scraped'] = df['Last Scraped'].apply(
+                lambda x: x.split(' ')[0] if isinstance(x, str) and x else ''
+            )
+        except Exception:
+            df['Last Scraped'] = ''
+    else:
+        df['Last Scraped'] = ''
+
     return df
 
-PARSED_COLS = ['Player', 'Year', 'Set', 'Subset', 'Card #', 'Serial', 'Grade']
+PARSED_COLS = ['Player', 'Year', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Last Scraped']
 
 def save_data(df, csv_path=CSV_PATH):
     save_df = df.copy()

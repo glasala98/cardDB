@@ -321,6 +321,22 @@ if page == "Charts":
 elif page == "Card Ledger":
     st.subheader("Edit Card Values")
 
+    # Collection summary metrics
+    total_cards = len(df)
+    total_value = df['Fair Value'].sum()
+    avg_value = df['Fair Value'].mean() if total_cards > 0 else 0
+    top_card_idx = df['Fair Value'].idxmax() if total_cards > 0 else None
+    top_card_name = parse_card_name(df.at[top_card_idx, 'Card Name'])['Player'] if top_card_idx is not None else "N/A"
+    top_card_val = df.at[top_card_idx, 'Fair Value'] if top_card_idx is not None else 0
+
+    mcol1, mcol2, mcol3, mcol4 = st.columns(4)
+    mcol1.metric("Total Cards", total_cards)
+    mcol2.metric("Collection Value", f"${total_value:,.2f}")
+    mcol3.metric("Avg Card Value", f"${avg_value:,.2f}")
+    mcol4.metric("Most Valuable", f"{top_card_name}", delta=f"${top_card_val:,.2f}")
+
+    st.markdown("---")
+
     # Search bar (full width)
     search_query = st.text_input("Search cards", placeholder="Search by player, set, year, card number...")
 
@@ -346,8 +362,10 @@ elif page == "Card Ledger":
         mask &= df['Grade'] != ''
     filtered_df = df[mask].copy()
 
-    display_cols = ['Player', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Fair Value', 'Trend', 'Num Sales', 'Min', 'Max']
+    display_cols = ['Player', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Fair Value', 'Trend', 'Num Sales', 'Min', 'Max', 'Top 3 Prices', 'Last Scraped']
     edit_df = filtered_df[display_cols].copy()
+    edit_df['Top 3 Prices'] = edit_df['Top 3 Prices'].fillna('')
+    edit_df['Last Scraped'] = edit_df['Last Scraped'].fillna('')
 
     if search_query.strip():
         terms = search_query.strip().lower().split()
@@ -356,8 +374,19 @@ elif page == "Card Ledger":
         edit_df = edit_df[mask].copy()
 
     # Add View and Remove checkbox columns
-    edit_df.insert(0, 'View', False)
-    edit_df.insert(1, 'Remove', False)
+    edit_df['View'] = False
+    edit_df['Remove'] = False
+
+    # Color-code the Trend column
+    trend_map = {'up': '🟢 up', 'down': '🔴 down', 'stable': '⚪ stable', 'no data': '⚫ no data'}
+    edit_df['Trend'] = edit_df['Trend'].map(trend_map).fillna('⚫ no data')
+
+    # Reorder: card description → sales/value → actions
+    col_order = ['Player', 'Set', 'Subset', 'Card #', 'Serial', 'Grade',
+                 'Num Sales', 'Fair Value', 'Min', 'Max', 'Trend',
+                 'Top 3 Prices', 'Last Scraped', 'View', 'Remove']
+    col_order = [c for c in col_order if c in edit_df.columns]
+    edit_df = edit_df[col_order]
 
     st.caption(f"Showing {len(edit_df)} of {len(df)} cards")
 
@@ -369,19 +398,21 @@ elif page == "Card Ledger":
         hide_index=True,
         num_rows="dynamic",
         column_config={
-            "View": st.column_config.CheckboxColumn("View", width="small", default=False),
-            "Remove": st.column_config.CheckboxColumn("Remove", width="small", default=False),
             "Player": st.column_config.TextColumn("Player", width="medium"),
             "Set": st.column_config.TextColumn("Set", width="medium", disabled=True),
             "Subset": st.column_config.TextColumn("Subset", width="medium", disabled=True),
             "Card #": st.column_config.TextColumn("#", width="small", disabled=True),
             "Serial": st.column_config.TextColumn("Serial", width="small", disabled=True),
             "Grade": st.column_config.TextColumn("Grade", width="small", disabled=True),
-            "Fair Value": st.column_config.NumberColumn("Fair Value ($)", format="$%.2f", min_value=0),
-            "Trend": st.column_config.SelectboxColumn("Trend", options=["up", "down", "stable", "no data"]),
             "Num Sales": st.column_config.NumberColumn("Sales", disabled=True),
+            "Fair Value": st.column_config.NumberColumn("Fair Value ($)", format="$%.2f", min_value=0),
             "Min": st.column_config.NumberColumn("Min ($)", format="$%.2f", disabled=True),
             "Max": st.column_config.NumberColumn("Max ($)", format="$%.2f", disabled=True),
+            "Trend": st.column_config.TextColumn("Trend", disabled=True),
+            "Top 3 Prices": st.column_config.TextColumn("Top 3 Prices", disabled=True),
+            "Last Scraped": st.column_config.TextColumn("Last Scraped", disabled=True),
+            "View": st.column_config.CheckboxColumn("View", width="small", default=False),
+            "Remove": st.column_config.CheckboxColumn("Remove", width="small", default=False),
         },
     )
 
@@ -429,7 +460,9 @@ elif page == "Card Ledger":
                 idx = edit_df.index[i] if i < len(edit_df.index) else None
                 if idx is not None and idx in st.session_state.df.index:
                     st.session_state.df.at[idx, 'Fair Value'] = row['Fair Value']
-                    st.session_state.df.at[idx, 'Trend'] = row['Trend']
+                    # Strip emoji prefix from trend before saving
+                    raw_trend = row['Trend'].split(' ', 1)[-1] if isinstance(row['Trend'], str) else row['Trend']
+                    st.session_state.df.at[idx, 'Trend'] = raw_trend
                     if row['Player'] != edit_df.at[idx, 'Player']:
                         old_player = edit_df.at[idx, 'Player']
                         new_player = row['Player']
@@ -441,10 +474,11 @@ elif page == "Card Ledger":
                 for i in range(len(edit_df), len(edited)):
                     r = edited.iloc[i]
                     card_name = r.get('Player', 'Unknown')
+                    raw_t = r['Trend'].split(' ', 1)[-1] if isinstance(r.get('Trend'), str) else 'no data'
                     new_row = {
                         'Card Name': card_name,
                         'Fair Value': r['Fair Value'],
-                        'Trend': r['Trend'],
+                        'Trend': raw_t,
                         'Top 3 Prices': '',
                         'Median (All)': r['Fair Value'],
                         'Min': r['Fair Value'],
