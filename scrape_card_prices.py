@@ -593,6 +593,14 @@ def process_card(card):
 
 
 def main():
+    # Backup existing data before full scrape
+    try:
+        from dashboard_utils import backup_data
+        ts = backup_data(label="full-scrape")
+        print(f"Backup saved: {ts}")
+    except Exception:
+        pass
+
     # Read cards from CSV
     cards = []
     with open('hockey_cards.csv', 'r', encoding='utf-8') as f:

@@ -30,6 +30,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_PATH = os.path.join(SCRIPT_DIR, "card_prices_summary.csv")
 RESULTS_JSON_PATH = os.path.join(SCRIPT_DIR, "card_prices_results.json")
 HISTORY_PATH = os.path.join(SCRIPT_DIR, "price_history.json")
+BACKUP_DIR = os.path.join(SCRIPT_DIR, "backups")
 MONEY_COLS = ['Fair Value', 'Median (All)', 'Min', 'Max']
 
 def analyze_card_images(front_image_bytes, back_image_bytes=None):
@@ -291,6 +292,24 @@ def save_data(df, csv_path=CSV_PATH):
     for col in MONEY_COLS:
         save_df[col] = save_df[col].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "$0.00")
     save_df.to_csv(csv_path, index=False)
+
+
+import shutil
+
+def backup_data(label="scrape"):
+    """Save a timestamped backup of the CSV and results JSON to backups/."""
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+
+    if os.path.exists(CSV_PATH):
+        backup_csv = os.path.join(BACKUP_DIR, f"card_prices_summary_{timestamp}_{label}.csv")
+        shutil.copy2(CSV_PATH, backup_csv)
+
+    if os.path.exists(RESULTS_JSON_PATH):
+        backup_json = os.path.join(BACKUP_DIR, f"card_prices_results_{timestamp}_{label}.json")
+        shutil.copy2(RESULTS_JSON_PATH, backup_json)
+
+    return timestamp
 
 
 def load_sales_history(card_name):

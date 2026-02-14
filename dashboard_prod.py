@@ -9,7 +9,7 @@ from datetime import datetime
 # Import utils
 try:
     from dashboard_utils import (
-        analyze_card_images, scrape_single_card, load_data, save_data,
+        analyze_card_images, scrape_single_card, load_data, save_data, backup_data,
         parse_card_name, load_sales_history, append_price_history, load_price_history,
         CSV_PATH, MONEY_COLS, PARSED_COLS
     )
@@ -445,6 +445,7 @@ elif page == "Card Ledger":
     with act3:
         if st.button("Rescrape Price", disabled=selected_action_card == ""):
             if selected_action_card:
+                backup_data(label="rescrape")
                 with st.spinner(f"Scraping eBay for updated price..."):
                     stats = scrape_single_card(selected_action_card)
                 if stats and stats.get('num_sales', 0) > 0:
