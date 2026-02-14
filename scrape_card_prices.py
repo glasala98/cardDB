@@ -294,6 +294,18 @@ def search_ebay_sold(driver, card_name, max_results=50):
                 if not title_matches_grade(title, grade_str, grade_num):
                     continue
 
+                # Get listing URL from the anchor tag
+                listing_url = ''
+                try:
+                    link_elem = item.find_element(By.CSS_SELECTOR, 'a[href*="ebay.com/itm/"]')
+                    listing_url = link_elem.get_attribute('href') or ''
+                except Exception:
+                    try:
+                        link_elem = item.find_element(By.CSS_SELECTOR, 'a')
+                        listing_url = link_elem.get_attribute('href') or ''
+                    except Exception:
+                        pass
+
                 price_elem = item.find_element(By.CSS_SELECTOR, '.s-card__price')
                 price_text = price_elem.text.strip()
 
@@ -352,6 +364,7 @@ def search_ebay_sold(driver, card_name, max_results=50):
                     'price_val': total_val,  # item + shipping
                     'sold_date': sold_date.strftime('%Y-%m-%d') if sold_date else None,
                     'days_ago': (datetime.now() - sold_date).days if sold_date else None,
+                    'listing_url': listing_url,
                     'search_url': url
                 })
 
@@ -510,6 +523,18 @@ def process_card(card):
                         continue
                     if not title_matches_grade(title, grade_str, grade_num):
                         continue
+
+                    listing_url = ''
+                    try:
+                        link_elem = item.find_element(By.CSS_SELECTOR, 'a[href*="ebay.com/itm/"]')
+                        listing_url = link_elem.get_attribute('href') or ''
+                    except Exception:
+                        try:
+                            link_elem = item.find_element(By.CSS_SELECTOR, 'a')
+                            listing_url = link_elem.get_attribute('href') or ''
+                        except Exception:
+                            pass
+
                     price_elem = item.find_element(By.CSS_SELECTOR, '.s-card__price')
                     price_text = price_elem.text.strip().replace('Opens in a new window', '')
                     price_match = re.search(r'\$([\d,]+\.?\d*)', price_text)
@@ -554,6 +579,7 @@ def process_card(card):
                         'price_val': round(price_val + shipping_val, 2),
                         'sold_date': sold_date.strftime('%Y-%m-%d') if sold_date else None,
                         'days_ago': (datetime.now() - sold_date).days if sold_date else None,
+                        'listing_url': listing_url,
                         'search_url': url
                     })
                     if len(sales) >= 50:

@@ -794,16 +794,22 @@ elif page == "Card Inspect":
             sales_df = pd.DataFrame(sales)
             sales_df['sold_date'] = pd.to_datetime(sales_df['sold_date'], errors='coerce')
 
-            # Prepare display table
-            display_sales = sales_df[['sold_date', 'title', 'item_price', 'shipping', 'price_val']].copy()
-            display_sales.columns = ['Date', 'Listing Title', 'Item Price', 'Shipping', 'Total']
+            # Prepare display table — make listing title a clickable link
+            if 'listing_url' not in sales_df.columns:
+                sales_df['listing_url'] = ''
+            display_sales = sales_df[['sold_date', 'title', 'listing_url', 'item_price', 'shipping', 'price_val']].copy()
+            display_sales.columns = ['Date', 'Listing Title', 'Listing URL', 'Item Price', 'Shipping', 'Total']
             display_sales = display_sales.sort_values('Date', ascending=False).reset_index(drop=True)
             display_sales['Date'] = display_sales['Date'].dt.strftime('%Y-%m-%d').fillna('Unknown')
             display_sales['Listing Title'] = display_sales['Listing Title'].str.replace(
                 r'\nOpens in a new window or tab', '', regex=True
             ).str[:80]
+            display_sales['Listing URL'] = display_sales['Listing URL'].fillna('')
 
-            sale_config = {"Total": st.column_config.NumberColumn("Total ($)", format="$%.2f")}
+            sale_config = {
+                "Total": st.column_config.NumberColumn("Total ($)", format="$%.2f"),
+                "Listing URL": st.column_config.LinkColumn("Listing", display_text="View"),
+            }
 
             # Show last 5 sales
             st.caption(f"Last 5 of {len(display_sales)} sales")
