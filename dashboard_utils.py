@@ -302,15 +302,6 @@ def parse_card_name(card_name):
         # Set: just the base set name (first segment)
         result['Set'] = ' '.join(parts[0].split()).strip()
 
-        # Subset: middle segments (e.g. Young Guns, Marquee Rookie, Base)
-        subsets = []
-        for part in parts[1:-1]:
-            clean_part = re.sub(r'\[.*?\]', '', part).strip()
-            clean_part = re.sub(r'#\S+', '', clean_part).strip()
-            if clean_part:
-                subsets.append(clean_part)
-        result['Subset'] = ' '.join(subsets)
-
         # Card #: find #NNN or #CU-SC pattern (not serial numbered #70/99)
         num_match = re.search(r'#([\w-]+)(?!\s*/)', card_name)
         if num_match:
@@ -319,15 +310,25 @@ def parse_card_name(card_name):
             if not re.search(r'#' + re.escape(raw_num) + r'\s*/\s*\d+', card_name):
                 result['Card #'] = raw_num
 
-        # Player: last segment, cleaned
-        last = parts[-1]
-        # Remove grade brackets
-        last = re.sub(r'\[.*?\]', '', last).strip()
-        # Remove serial numbers like #70/99
-        last = re.sub(r'#\d+/\d+', '', last).strip()
-        # Remove unbracketed PSA grades
-        last = re.sub(r'\bPSA\s+\d+\b', '', last, flags=re.IGNORECASE).strip()
-        result['Player'] = last
+        # Separate middle segments into subset vs player.
+        # A segment is "metadata" if it's just a card #, grade, or serial.
+        # The last non-metadata middle segment is the Player; the rest are Subset.
+        middle_parts = parts[1:]  # everything after Set
+        cleaned_middle = []
+        for part in middle_parts:
+            clean = re.sub(r'\[.*?\]', '', part).strip()
+            clean = re.sub(r'#\d+/\d+', '', clean).strip()
+            clean = re.sub(r'\bPSA\s+\d+\b', '', clean, flags=re.IGNORECASE).strip()
+            # Skip segments that are only a card number like "#12" or empty
+            clean = re.sub(r'^#\S+$', '', clean).strip()
+            if clean:
+                cleaned_middle.append(clean)
+
+        if cleaned_middle:
+            result['Player'] = cleaned_middle[-1]
+            result['Subset'] = ' '.join(cleaned_middle[:-1])
+        else:
+            result['Player'] = ''
     else:
         # Freeform format - put the whole name as Player, stripping grade and serial
         player = card_name
