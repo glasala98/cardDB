@@ -12,6 +12,7 @@ try:
         analyze_card_images, scrape_single_card, load_data, save_data, backup_data,
         parse_card_name, load_sales_history, append_price_history, load_price_history,
         archive_card, load_archive, restore_card,
+        get_user_paths, load_users, verify_password, init_user_data,
         CSV_PATH, MONEY_COLS, PARSED_COLS
     )
 except ImportError:
@@ -33,31 +34,87 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ============================================================
-# PASSWORD GATE
+# PUBLIC PROFILE CHECK (before auth)
 # ============================================================
-def check_password():
-    correct_pw = os.environ.get("DASHBOARD_PASSWORD", "")
-    if not correct_pw:
-        return True
+public_view = False
+query_params = st.query_params
+if 'user' in query_params:
+    pub_username = query_params['user']
+    users_config = load_users()
+    if pub_username not in users_config:
+        st.error("User not found.")
+        st.stop()
+    if not users_config[pub_username].get('public', False):
+        st.error("This profile is private.")
+        st.stop()
+    public_view = True
+    st.session_state.public_view = True
+    st.session_state.username = pub_username
+    st.session_state.display_name = users_config[pub_username].get('display_name', pub_username)
+    user_paths = get_user_paths(pub_username)
+    st.session_state.user_paths = user_paths
 
-    if st.session_state.get("authenticated"):
-        return True
+# ============================================================
+# LOGIN GATE
+# ============================================================
+if not public_view:
+    users_config = load_users()
 
-    st.title("Hockey Card Collection Dashboard")
-    password = st.text_input("Enter password to access the dashboard", type="password")
-    if st.button("Login", type="primary"):
-        if password == correct_pw:
-            st.session_state.authenticated = True
-            st.rerun()
-        else:
-            st.error("Incorrect password")
-    st.stop()
+    # If no users.yaml exists or is empty, fall back to env var password (backward compat)
+    if not users_config:
+        correct_pw = os.environ.get("DASHBOARD_PASSWORD", "")
+        if correct_pw and not st.session_state.get("authenticated"):
+            st.title("Hockey Card Collection Dashboard")
+            password = st.text_input("Enter password to access the dashboard", type="password")
+            if st.button("Login", type="primary"):
+                if password == correct_pw:
+                    st.session_state.authenticated = True
+                    st.rerun()
+                else:
+                    st.error("Incorrect password")
+            st.stop()
+    else:
+        # Multi-user login
+        if not st.session_state.get("authenticated"):
+            st.title("Hockey Card Collection Dashboard")
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            if st.button("Login", type="primary"):
+                if verify_password(username, password):
+                    st.session_state.authenticated = True
+                    st.session_state.username = username
+                    st.session_state.display_name = users_config[username].get('display_name', username)
+                    # Clear any stale data from previous user
+                    st.session_state.pop('df', None)
+                    st.rerun()
+                else:
+                    st.error("Invalid username or password")
+            st.stop()
 
-check_password()
+# ============================================================
+# USER PATHS SETUP
+# ============================================================
+username = st.session_state.get('username', '')
+if username and load_users():
+    user_paths = get_user_paths(username)
+    st.session_state.user_paths = user_paths
+    init_user_data(user_paths['csv'])
+    _csv_path = user_paths['csv']
+    _results_path = user_paths['results']
+    _history_path = user_paths['history']
+    _archive_path = user_paths['archive']
+    _backup_dir = user_paths['backup_dir']
+else:
+    # Legacy single-user mode (no users.yaml)
+    _csv_path = CSV_PATH
+    _results_path = None  # use defaults
+    _history_path = None
+    _archive_path = None
+    _backup_dir = None
 
 # --- Load or initialize data in session state ---
 if 'df' not in st.session_state:
-    st.session_state.df = load_data()
+    st.session_state.df = load_data(_csv_path, _results_path)
 if 'unsaved_changes' not in st.session_state:
     st.session_state.unsaved_changes = False
 
@@ -66,16 +123,30 @@ df = st.session_state.df
 # ============================================================
 # SIDEBAR - Navigation + Conditional Scan/Add Card
 # ============================================================
+# Show user info and logout in sidebar
+display_name = st.session_state.get('display_name', '')
+if display_name:
+    st.sidebar.caption(f"Logged in as **{display_name}**")
+if not public_view and st.session_state.get('authenticated') and load_users():
+    if st.sidebar.button("Logout"):
+        for key in ['authenticated', 'username', 'display_name', 'df', 'user_paths',
+                     'inspect_card', 'pending_remove', 'scanned_card', 'public_view']:
+            st.session_state.pop(key, None)
+        st.rerun()
+
 # Check for programmatic navigation (e.g. from View Card button)
-nav_pages = ["Charts", "Card Ledger", "Card Inspect"]
+if public_view:
+    nav_pages = ["Charts", "Card Inspect"]
+else:
+    nav_pages = ["Charts", "Card Ledger", "Card Inspect"]
 if 'nav_page' in st.session_state and st.session_state.nav_page in nav_pages:
     st.session_state['_nav_radio'] = st.session_state.nav_page
     del st.session_state.nav_page
 
 page = st.sidebar.radio("Navigate", nav_pages, key="_nav_radio")
 
-# Show Scan Card and Add New Card only on Card Ledger page
-if page == "Card Ledger":
+# Show Scan Card and Add New Card only on Card Ledger page (not in public view)
+if page == "Card Ledger" and not public_view:
     st.sidebar.divider()
     st.sidebar.header("Scan Card")
 
@@ -154,7 +225,7 @@ if page == "Card Ledger":
             if scrape_prices:
                 with st.sidebar:
                     with st.spinner(f"Scraping eBay for {player_name.strip()}..."):
-                        stats = scrape_single_card(card_name)
+                        stats = scrape_single_card(card_name, results_json_path=_results_path)
 
                 if stats and stats.get('num_sales', 0) > 0:
                     trend = stats['trend']
@@ -170,7 +241,7 @@ if page == "Card Ledger":
                         'Max': stats['max'],
                         'Num Sales': stats['num_sales']
                     }])
-                    append_price_history(card_name, stats['fair_price'], stats['num_sales'])
+                    append_price_history(card_name, stats['fair_price'], stats['num_sales'], history_path=_history_path)
                     st.sidebar.success(f"Found {stats['num_sales']} sales! Fair value: ${stats['fair_price']:.2f}")
                 else:
                     new_row = pd.DataFrame([{
@@ -185,8 +256,8 @@ if page == "Card Ledger":
                 }])
 
             st.session_state.df = pd.concat([st.session_state.df, new_row], ignore_index=True)
-            save_data(st.session_state.df)
-            st.session_state.df = load_data()
+            save_data(st.session_state.df, _csv_path)
+            st.session_state.df = load_data(_csv_path, _results_path)
             st.session_state.pop('scanned_card', None)
             st.rerun()
 
@@ -216,8 +287,8 @@ if page == "Card Ledger":
                         if 'Top 3 Prices' not in import_df.columns:
                             import_df['Top 3 Prices'] = ''
                         st.session_state.df = pd.concat([st.session_state.df, import_df], ignore_index=True)
-                        save_data(st.session_state.df)
-                        st.session_state.df = load_data()
+                        save_data(st.session_state.df, _csv_path)
+                        st.session_state.df = load_data(_csv_path, _results_path)
                         st.sidebar.success(f"Imported {len(import_df)} cards!")
                         st.rerun()
                 except Exception as e:
@@ -226,7 +297,10 @@ if page == "Card Ledger":
 # ============================================================
 # HEADER & METRICS
 # ============================================================
-st.title("Hockey Card Collection Dashboard")
+title = display_name if display_name else "Hockey Card Collection Dashboard"
+if public_view:
+    title = f"{display_name}'s Collection" if display_name else "Public Collection"
+st.title(title)
 
 found_df = df[df['Num Sales'] > 0]
 not_found_df = df[df['Num Sales'] == 0]
@@ -234,10 +308,9 @@ total_value = found_df['Fair Value'].sum()
 total_all = df['Fair Value'].sum()
 
 # Last Updated timestamp
-csv_path = CSV_PATH
 last_modified = ""
 try:
-    mtime = os.path.getmtime(csv_path)
+    mtime = os.path.getmtime(_csv_path)
     last_modified = datetime.fromtimestamp(mtime).strftime('%b %d, %Y %I:%M %p')
 except OSError:
     last_modified = "Unknown"
@@ -441,9 +514,9 @@ elif page == "Card Ledger":
         rc1, rc2, rc3 = st.columns([1, 1, 4])
         with rc1:
             if st.button("Yes, Archive", type="primary"):
-                st.session_state.df = archive_card(st.session_state.df, card_to_remove)
-                save_data(st.session_state.df)
-                st.session_state.df = load_data()
+                st.session_state.df = archive_card(st.session_state.df, card_to_remove, archive_path=_archive_path)
+                save_data(st.session_state.df, _csv_path)
+                st.session_state.df = load_data(_csv_path, _results_path)
                 del st.session_state.pending_remove
                 st.success(f"Card archived.")
                 st.rerun()
@@ -499,13 +572,13 @@ elif page == "Card Ledger":
                         ~st.session_state.df['Player'].isin(removed)
                     ].reset_index(drop=True)
 
-            save_data(st.session_state.df)
+            save_data(st.session_state.df, _csv_path)
             st.success("Saved to CSV!")
             st.rerun()
 
     with bcol2:
         if st.button("Reload from File"):
-            st.session_state.df = load_data()
+            st.session_state.df = load_data(_csv_path, _results_path)
             st.rerun()
 
     # Rescrape action (uses the View checkbox to identify selected card)
@@ -549,7 +622,7 @@ elif page == "Card Ledger":
                         st.session_state.df.loc[mask, 'Median (All)'] = row['Fair Value']
                         st.session_state.df.loc[mask, 'Min'] = row['Fair Value']
                         st.session_state.df.loc[mask, 'Max'] = row['Fair Value']
-            save_data(st.session_state.df)
+            save_data(st.session_state.df, _csv_path)
             st.success("Not Found prices saved!")
             st.rerun()
     else:
@@ -557,7 +630,7 @@ elif page == "Card Ledger":
 
     # Archived Cards section
     st.divider()
-    archive_df = load_archive()
+    archive_df = load_archive(archive_path=_archive_path)
     with st.expander(f"Archived Cards ({len(archive_df)})", expanded=False):
         if len(archive_df) > 0:
             st.dataframe(
@@ -572,9 +645,8 @@ elif page == "Card Ledger":
                                         format_func=lambda x: "Choose a card..." if x == "" else x[:60],
                                         key="restore_pick")
             if st.button("Restore Card", disabled=restore_pick == ""):
-                card_data = restore_card(restore_pick)
+                card_data = restore_card(restore_pick, archive_path=_archive_path)
                 if card_data:
-                    # Remove archive-only columns
                     card_data.pop('Archived Date', None)
                     for col in MONEY_COLS:
                         if col in card_data:
@@ -582,8 +654,8 @@ elif page == "Card Ledger":
                             card_data[col] = float(val) if val else 0.0
                     new_row = pd.DataFrame([card_data])
                     st.session_state.df = pd.concat([st.session_state.df, new_row], ignore_index=True)
-                    save_data(st.session_state.df)
-                    st.session_state.df = load_data()
+                    save_data(st.session_state.df, _csv_path)
+                    st.session_state.df = load_data(_csv_path, _results_path)
                     st.success(f"Restored: {restore_pick[:60]}")
                     st.rerun()
         else:
@@ -664,11 +736,11 @@ elif page == "Card Inspect":
         with vc5:
             st.metric("Max", f"${card_row['Max']:.2f}")
 
-        # Rescrape button
-        if st.button("Rescrape Price", type="primary"):
-            backup_data(label="rescrape")
+        # Rescrape button (hidden in public view)
+        if not public_view and st.button("Rescrape Price", type="primary"):
+            backup_data(label="rescrape", csv_path=_csv_path, results_path=_results_path, backup_dir=_backup_dir)
             with st.spinner(f"Scraping eBay for updated price..."):
-                stats = scrape_single_card(selected_card)
+                stats = scrape_single_card(selected_card, results_json_path=_results_path)
             if stats and stats.get('num_sales', 0) > 0:
                 idx = st.session_state.df[st.session_state.df['Card Name'] == selected_card].index
                 if len(idx) > 0:
@@ -683,8 +755,8 @@ elif page == "Card Inspect":
                     st.session_state.df.at[i, 'Max'] = stats['max']
                     st.session_state.df.at[i, 'Num Sales'] = stats['num_sales']
                     st.session_state.df.at[i, 'Top 3 Prices'] = ' | '.join(stats.get('top_3_prices', []))
-                    save_data(st.session_state.df)
-                    append_price_history(selected_card, stats['fair_price'], stats['num_sales'])
+                    save_data(st.session_state.df, _csv_path)
+                    append_price_history(selected_card, stats['fair_price'], stats['num_sales'], history_path=_history_path)
                     st.success(f"Updated! Fair value: ${stats['fair_price']:.2f} ({stats['num_sales']} sales)")
                     st.rerun()
             else:
@@ -693,7 +765,7 @@ elif page == "Card Inspect":
         # Fair Value Over Time (from price_history.json)
         st.markdown("---")
         st.subheader("Fair Value Tracking")
-        history = load_price_history(selected_card)
+        history = load_price_history(selected_card, history_path=_history_path)
 
         if history:
             hist_df = pd.DataFrame(history)
@@ -715,7 +787,7 @@ elif page == "Card Inspect":
         # eBay Sales History
         st.markdown("---")
         st.subheader("eBay Sales History")
-        sales = load_sales_history(selected_card)
+        sales = load_sales_history(selected_card, results_json_path=_results_path)
 
         if sales:
             # Build dataframe from raw sales

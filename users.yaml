@@ -1,0 +1,10 @@
+# Multi-user configuration for the Hockey Card Dashboard
+# To add a new user, generate a bcrypt hash of their password:
+#   python -c "import bcrypt; print(bcrypt.hashpw(b'mypassword', bcrypt.gensalt()).decode())"
+# Then add an entry below.
+
+users:
+  admin:
+    password_hash: "$2b$12$ZxfWzqq5YOYfvfeidd8KyepQduhTUjzW1lrLZlQi162/.m3HxBozG"  # changeme
+    display_name: "My Hockey Cards"
+    public: true

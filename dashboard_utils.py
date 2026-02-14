@@ -2,22 +2,23 @@ import os
 import base64
 import json
 import re
+import shutil
 from datetime import datetime
 import urllib.parse
 import pandas as pd
+import yaml
+import bcrypt
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 # Import scraper functions
-# Assuming scrape_card_prices is in the same directory
 try:
     from scrape_card_prices import (
         create_driver, search_ebay_sold, calculate_fair_price,
         build_simplified_query, get_grade_info, title_matches_grade
     )
 except ImportError:
-    # Handle case where it might be imported from a different context
     pass
 
 try:
@@ -27,12 +28,62 @@ except ImportError:
     HAS_ANTHROPIC = False
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_ROOT = os.path.join(SCRIPT_DIR, "data")
+USERS_YAML = os.path.join(SCRIPT_DIR, "users.yaml")
+
+# Legacy global paths (used by daily_scrape.py as defaults)
 CSV_PATH = os.path.join(SCRIPT_DIR, "card_prices_summary.csv")
 RESULTS_JSON_PATH = os.path.join(SCRIPT_DIR, "card_prices_results.json")
 HISTORY_PATH = os.path.join(SCRIPT_DIR, "price_history.json")
 BACKUP_DIR = os.path.join(SCRIPT_DIR, "backups")
 ARCHIVE_PATH = os.path.join(SCRIPT_DIR, "card_archive.csv")
 MONEY_COLS = ['Fair Value', 'Median (All)', 'Min', 'Max']
+
+# Empty CSV columns for new users
+EMPTY_CSV_COLS = ['Card Name', 'Fair Value', 'Trend', 'Top 3 Prices', 'Median (All)', 'Min', 'Max', 'Num Sales']
+
+
+# ── User management ──────────────────────────────────────────────
+
+def get_user_paths(username):
+    """Return file paths for a specific user's data directory."""
+    user_dir = os.path.join(DATA_ROOT, username)
+    os.makedirs(user_dir, exist_ok=True)
+    os.makedirs(os.path.join(user_dir, "backups"), exist_ok=True)
+    return {
+        'csv': os.path.join(user_dir, "card_prices_summary.csv"),
+        'results': os.path.join(user_dir, "card_prices_results.json"),
+        'history': os.path.join(user_dir, "price_history.json"),
+        'archive': os.path.join(user_dir, "card_archive.csv"),
+        'backup_dir': os.path.join(user_dir, "backups"),
+    }
+
+
+def load_users():
+    """Load user config from users.yaml."""
+    if not os.path.exists(USERS_YAML):
+        return {}
+    with open(USERS_YAML, 'r', encoding='utf-8') as f:
+        config = yaml.safe_load(f) or {}
+    return config.get('users', {})
+
+
+def verify_password(username, password):
+    """Verify a username/password against users.yaml. Returns True if valid."""
+    users = load_users()
+    if username not in users:
+        return False
+    pw_hash = users[username].get('password_hash', '')
+    try:
+        return bcrypt.checkpw(password.encode('utf-8'), pw_hash.encode('utf-8'))
+    except Exception:
+        return False
+
+
+def init_user_data(csv_path):
+    """Create an empty CSV for a new user if it doesn't exist."""
+    if not os.path.exists(csv_path):
+        pd.DataFrame(columns=EMPTY_CSV_COLS).to_csv(csv_path, index=False)
 
 def analyze_card_images(front_image_bytes, back_image_bytes=None):
     """Use Claude vision to extract card details from front/back photos."""
@@ -119,8 +170,10 @@ If you can't determine a field, use your best guess based on card design, logos,
         return None, str(e)
 
 
-def scrape_single_card(card_name):
+def scrape_single_card(card_name, results_json_path=None):
     """Scrape eBay for a single card and return result dict."""
+    if results_json_path is None:
+        results_json_path = RESULTS_JSON_PATH
     driver = create_driver()
     try:
         sales = search_ebay_sold(driver, card_name, max_results=50)
@@ -195,11 +248,11 @@ def scrape_single_card(card_name):
 
         if sales:
             fair_price, stats = calculate_fair_price(sales)
-            # Save raw sales to card_prices_results.json
+            # Save raw sales to results JSON
             results = {}
-            if os.path.exists(RESULTS_JSON_PATH):
+            if os.path.exists(results_json_path):
                 try:
-                    with open(RESULTS_JSON_PATH, 'r', encoding='utf-8') as f:
+                    with open(results_json_path, 'r', encoding='utf-8') as f:
                         results = json.load(f)
                 except Exception:
                     results = {}
@@ -209,7 +262,7 @@ def scrape_single_card(card_name):
                 'num_sales': stats.get('num_sales'),
                 'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
-            with open(RESULTS_JSON_PATH, 'w', encoding='utf-8') as f:
+            with open(results_json_path, 'w', encoding='utf-8') as f:
                 json.dump(results, f, indent=2, ensure_ascii=False)
             return stats
         return None
@@ -290,7 +343,9 @@ def parse_card_name(card_name):
     return result
 
 
-def load_data(csv_path=CSV_PATH):
+def load_data(csv_path=CSV_PATH, results_json_path=None):
+    if results_json_path is None:
+        results_json_path = RESULTS_JSON_PATH
     df = pd.read_csv(csv_path)
     for col in MONEY_COLS:
         df[col] = df[col].astype(str).str.replace('$', '', regex=False).str.replace(',', '', regex=False)
@@ -304,14 +359,13 @@ def load_data(csv_path=CSV_PATH):
         df[col] = parsed[col]
 
     # Add Last Scraped from results JSON
-    if os.path.exists(RESULTS_JSON_PATH):
+    if os.path.exists(results_json_path):
         try:
-            with open(RESULTS_JSON_PATH, 'r', encoding='utf-8') as f:
+            with open(results_json_path, 'r', encoding='utf-8') as f:
                 results = json.load(f)
             df['Last Scraped'] = df['Card Name'].apply(
                 lambda name: results.get(name, {}).get('scraped_at', '')
             )
-            # Show date only (strip time)
             df['Last Scraped'] = df['Last Scraped'].apply(
                 lambda x: x.split(' ')[0] if isinstance(x, str) and x else ''
             )
@@ -333,30 +387,32 @@ def save_data(df, csv_path=CSV_PATH):
     save_df.to_csv(csv_path, index=False)
 
 
-import shutil
-
-def backup_data(label="scrape"):
+def backup_data(label="scrape", csv_path=None, results_path=None, backup_dir=None):
     """Save a timestamped backup of the CSV and results JSON to backups/."""
-    os.makedirs(BACKUP_DIR, exist_ok=True)
+    csv_path = csv_path or CSV_PATH
+    results_path = results_path or RESULTS_JSON_PATH
+    backup_dir = backup_dir or BACKUP_DIR
+    os.makedirs(backup_dir, exist_ok=True)
     timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
 
-    if os.path.exists(CSV_PATH):
-        backup_csv = os.path.join(BACKUP_DIR, f"card_prices_summary_{timestamp}_{label}.csv")
-        shutil.copy2(CSV_PATH, backup_csv)
+    if os.path.exists(csv_path):
+        backup_csv = os.path.join(backup_dir, f"card_prices_summary_{timestamp}_{label}.csv")
+        shutil.copy2(csv_path, backup_csv)
 
-    if os.path.exists(RESULTS_JSON_PATH):
-        backup_json = os.path.join(BACKUP_DIR, f"card_prices_results_{timestamp}_{label}.json")
-        shutil.copy2(RESULTS_JSON_PATH, backup_json)
+    if os.path.exists(results_path):
+        backup_json = os.path.join(backup_dir, f"card_prices_results_{timestamp}_{label}.json")
+        shutil.copy2(results_path, backup_json)
 
     return timestamp
 
 
-def load_sales_history(card_name):
+def load_sales_history(card_name, results_json_path=None):
     """Load raw eBay sales for a card from card_prices_results.json."""
-    if not os.path.exists(RESULTS_JSON_PATH):
+    results_json_path = results_json_path or RESULTS_JSON_PATH
+    if not os.path.exists(results_json_path):
         return []
     try:
-        with open(RESULTS_JSON_PATH, 'r', encoding='utf-8') as f:
+        with open(results_json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
         card_data = data.get(card_name, {})
         return card_data.get('raw_sales', [])
@@ -364,12 +420,13 @@ def load_sales_history(card_name):
         return []
 
 
-def append_price_history(card_name, fair_value, num_sales):
+def append_price_history(card_name, fair_value, num_sales, history_path=None):
     """Append a price snapshot to the history log."""
+    history_path = history_path or HISTORY_PATH
     history = {}
-    if os.path.exists(HISTORY_PATH):
+    if os.path.exists(history_path):
         try:
-            with open(HISTORY_PATH, 'r', encoding='utf-8') as f:
+            with open(history_path, 'r', encoding='utf-8') as f:
                 history = json.load(f)
         except Exception:
             history = {}
@@ -383,52 +440,52 @@ def append_price_history(card_name, fair_value, num_sales):
         'num_sales': num_sales
     })
 
-    with open(HISTORY_PATH, 'w', encoding='utf-8') as f:
+    with open(history_path, 'w', encoding='utf-8') as f:
         json.dump(history, f, indent=2, ensure_ascii=False)
 
 
-def load_price_history(card_name):
+def load_price_history(card_name, history_path=None):
     """Load fair value history for a card from price_history.json."""
-    if not os.path.exists(HISTORY_PATH):
+    history_path = history_path or HISTORY_PATH
+    if not os.path.exists(history_path):
         return []
     try:
-        with open(HISTORY_PATH, 'r', encoding='utf-8') as f:
+        with open(history_path, 'r', encoding='utf-8') as f:
             history = json.load(f)
         return history.get(card_name, [])
     except Exception:
         return []
 
 
-def archive_card(df, card_name):
+def archive_card(df, card_name, archive_path=None):
     """Move a card from the main CSV to the archive CSV. Returns updated df."""
+    archive_path = archive_path or ARCHIVE_PATH
     card_rows = df[df['Card Name'] == card_name]
     if len(card_rows) == 0:
         return df
 
-    # Prepare archive row (drop parsed cols, add archived date)
     archive_row = card_rows.copy()
     archive_row = archive_row.drop(columns=[c for c in PARSED_COLS if c in archive_row.columns], errors='ignore')
     archive_row['Archived Date'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     for col in MONEY_COLS:
         archive_row[col] = archive_row[col].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "$0.00")
 
-    # Append to archive CSV
-    if os.path.exists(ARCHIVE_PATH):
-        archive_row.to_csv(ARCHIVE_PATH, mode='a', header=False, index=False)
+    if os.path.exists(archive_path):
+        archive_row.to_csv(archive_path, mode='a', header=False, index=False)
     else:
-        archive_row.to_csv(ARCHIVE_PATH, index=False)
+        archive_row.to_csv(archive_path, index=False)
 
-    # Remove from main df
     df = df[df['Card Name'] != card_name].reset_index(drop=True)
     return df
 
 
-def load_archive():
+def load_archive(archive_path=None):
     """Load archived cards."""
-    if not os.path.exists(ARCHIVE_PATH):
+    archive_path = archive_path or ARCHIVE_PATH
+    if not os.path.exists(archive_path):
         return pd.DataFrame()
     try:
-        archive_df = pd.read_csv(ARCHIVE_PATH)
+        archive_df = pd.read_csv(archive_path)
         for col in MONEY_COLS:
             if col in archive_df.columns:
                 archive_df[col] = archive_df[col].astype(str).str.replace('$', '', regex=False).str.replace(',', '', regex=False)
@@ -438,21 +495,21 @@ def load_archive():
         return pd.DataFrame()
 
 
-def restore_card(card_name):
+def restore_card(card_name, archive_path=None):
     """Remove a card from the archive and return its row data for re-adding."""
-    if not os.path.exists(ARCHIVE_PATH):
+    archive_path = archive_path or ARCHIVE_PATH
+    if not os.path.exists(archive_path):
         return None
     try:
-        archive_df = pd.read_csv(ARCHIVE_PATH)
+        archive_df = pd.read_csv(archive_path)
         card_rows = archive_df[archive_df['Card Name'] == card_name]
         if len(card_rows) == 0:
             return None
-        # Remove from archive
         archive_df = archive_df[archive_df['Card Name'] != card_name]
         if len(archive_df) > 0:
-            archive_df.to_csv(ARCHIVE_PATH, index=False)
+            archive_df.to_csv(archive_path, index=False)
         else:
-            os.remove(ARCHIVE_PATH)
+            os.remove(archive_path)
         return card_rows.iloc[0].to_dict()
     except Exception:
         return None

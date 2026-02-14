@@ -33,14 +33,32 @@ id -u $APP_USER &>/dev/null || useradd --system --no-create-home --shell /bin/fa
 # 3. Set up app directory
 echo "--- Setting up app directory ---"
 mkdir -p $APP_DIR
-mkdir -p $APP_DIR/backups
+mkdir -p $APP_DIR/data
 cp dashboard_prod.py $APP_DIR/
 cp dashboard_utils.py $APP_DIR/
 cp scrape_card_prices.py $APP_DIR/
-cp card_prices_summary.csv $APP_DIR/
-cp -f card_prices_results.json $APP_DIR/ 2>/dev/null || true
-cp -f price_history.json $APP_DIR/ 2>/dev/null || true
+cp card_scraper.py $APP_DIR/
+cp daily_scrape.py $APP_DIR/
+cp users.yaml $APP_DIR/
 cp requirements.txt $APP_DIR/
+
+# Migrate existing data to admin user directory if not already migrated
+if [ -f "$APP_DIR/card_prices_summary.csv" ] && [ ! -d "$APP_DIR/data/admin" ]; then
+    echo "--- Migrating existing data to data/admin/ ---"
+    mkdir -p $APP_DIR/data/admin/backups
+    mv $APP_DIR/card_prices_summary.csv $APP_DIR/data/admin/ 2>/dev/null || true
+    mv $APP_DIR/card_prices_results.json $APP_DIR/data/admin/ 2>/dev/null || true
+    mv $APP_DIR/price_history.json $APP_DIR/data/admin/ 2>/dev/null || true
+    mv $APP_DIR/card_archive.csv $APP_DIR/data/admin/ 2>/dev/null || true
+    mv $APP_DIR/backups/* $APP_DIR/data/admin/backups/ 2>/dev/null || true
+elif [ ! -d "$APP_DIR/data/admin" ]; then
+    # Fresh install — copy seed data into admin
+    mkdir -p $APP_DIR/data/admin/backups
+    cp -f card_prices_summary.csv $APP_DIR/data/admin/ 2>/dev/null || true
+    cp -f card_prices_results.json $APP_DIR/data/admin/ 2>/dev/null || true
+    cp -f price_history.json $APP_DIR/data/admin/ 2>/dev/null || true
+fi
+
 chown -R $APP_USER:$APP_USER $APP_DIR
 
 # 4. Python virtual environment

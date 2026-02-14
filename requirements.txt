@@ -3,3 +3,5 @@ pandas
 plotly
 anthropic
 selenium
+bcrypt
+PyYAML
