@@ -2,6 +2,16 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import os
+import sys
+import json
+import base64
+import re
+
+try:
+    import anthropic
+    HAS_ANTHROPIC = True
+except ImportError:
+    HAS_ANTHROPIC = False
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_PATH = os.path.join(SCRIPT_DIR, "card_prices_summary.csv")
@@ -31,6 +41,80 @@ def load_data():
     df['Trend'] = df['Trend'].replace({'insufficient data': 'no data', 'unknown': 'no data'})
     return df
 
+
+def analyze_card_images(front_image_bytes, back_image_bytes=None):
+    """Use Claude vision to extract card details from front/back photos."""
+    if not HAS_ANTHROPIC:
+        return None, "anthropic package not installed. Run: pip install anthropic"
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return None, "ANTHROPIC_API_KEY not set. Add it to your environment."
+
+    client = anthropic.Anthropic(api_key=api_key)
+
+    content = []
+
+    # Add front image
+    front_b64 = base64.standard_b64encode(front_image_bytes).decode("utf-8")
+    content.append({"type": "text", "text": "FRONT OF CARD:"})
+    content.append({
+        "type": "image",
+        "source": {"type": "base64", "media_type": "image/jpeg", "data": front_b64}
+    })
+
+    # Add back image if provided
+    if back_image_bytes:
+        back_b64 = base64.standard_b64encode(back_image_bytes).decode("utf-8")
+        content.append({"type": "text", "text": "BACK OF CARD:"})
+        content.append({
+            "type": "image",
+            "source": {"type": "base64", "media_type": "image/jpeg", "data": back_b64}
+        })
+
+    content.append({
+        "type": "text",
+        "text": """Analyze this hockey/sports card and extract the following details.
+Look at BOTH the front and back of the card carefully.
+
+The back typically has: card number, set name, year, manufacturer info.
+The front typically has: player name, team, photo.
+
+Return ONLY valid JSON with these exact keys:
+{
+    "player_name": "Full player name",
+    "card_number": "Just the number (e.g. 201, not #201)",
+    "card_set": "Set name with subset (e.g. Upper Deck Series 1 Young Guns)",
+    "year": "Card year or season (e.g. 2023-24)",
+    "variant": "Parallel or variant name if any, empty string if base card",
+    "grade": "Grade if in a graded slab (e.g. PSA 10), empty string if raw",
+    "confidence": "high, medium, or low",
+    "is_sports_card": true,
+    "validation_reason": "Explain why this is or isn't a valid sports card"
+}
+
+Be precise. If the image is not a sports card, set "is_sports_card" to false and explain why in "validation_reason".
+If you can't determine a field, use your best guess based on card design, logos, and text visible."""
+    })
+
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            max_tokens=500,
+            messages=[{"role": "user", "content": content}]
+        )
+
+        response_text = response.content[0].text.strip()
+        # Extract JSON from response (handle markdown code blocks)
+        json_match = re.search(r'\{[^{}]*\}', response_text, re.DOTALL)
+        if json_match:
+            card_info = json.loads(json_match.group())
+            return card_info, None
+        else:
+            return None, f"Could not parse response: {response_text[:200]}"
+    except Exception as e:
+        return None, str(e)
+
 def save_data(df):
     save_df = df.copy()
     for col in MONEY_COLS:
@@ -55,10 +139,58 @@ trend_options = sorted(df['Trend'].unique().tolist())
 trend_filter = st.sidebar.multiselect("Trend Direction", options=trend_options, default=trend_options)
 
 st.sidebar.divider()
+st.sidebar.header("Scan Card")
+
+front_img = st.sidebar.file_uploader("Front of card", type=["jpg", "jpeg", "png", "webp"], key="front_img")
+back_img = st.sidebar.file_uploader("Back of card (optional)", type=["jpg", "jpeg", "png", "webp"], key="back_img")
+
+if st.sidebar.button("Analyze Card", disabled=front_img is None):
+    with st.sidebar:
+        with st.spinner("Analyzing card with AI..."):
+            front_bytes = front_img.getvalue()
+            back_bytes = back_img.getvalue() if back_img else None
+            card_info, error = analyze_card_images(front_bytes, back_bytes)
+
+    if error:
+        st.sidebar.error(f"Analysis failed: {error}")
+    elif card_info:
+        is_valid = card_info.get("is_sports_card", True)
+        validation_reason = card_info.get("validation_reason", "Image does not appear to be a valid sports card.")
+
+        if not is_valid:
+            st.sidebar.error(f"Invalid Card: {validation_reason}")
+        else:
+            st.session_state.scanned_card = card_info
+            confidence = card_info.get('confidence', 'unknown')
+            if confidence == 'high':
+                st.sidebar.success("Card identified with high confidence!")
+            elif confidence == 'medium':
+                st.sidebar.warning("Card identified - please verify the details below.")
+            else:
+                st.sidebar.warning("Low confidence - review and correct the fields below.")
+            st.session_state.pop('scanned_card', None)
+    st.rerun()
+
+# Pre-fill from scan if available
+scanned = st.session_state.get('scanned_card', {})
+
+st.sidebar.divider()
 st.sidebar.header("Add New Card")
 
 with st.sidebar.form("add_card_form", clear_on_submit=True):
-    new_name = st.text_input("Card Name")
+
+    # Construct name from scanned data or empty
+    default_name = ""
+    if scanned:
+        parts = [f"{scanned.get('year', '')} {scanned.get('card_set', '')}"]
+        if scanned.get('variant'):
+            parts.append(scanned.get('variant'))
+        parts.append(f"#{scanned.get('card_number', '')} - {scanned.get('player_name', '')}")
+        if scanned.get('grade'):
+            parts.append(f"[{scanned.get('grade')}]")
+        default_name = ' - '.join([p for p in parts if p.strip()]).strip()
+
+    new_name = st.text_input("Card Name", value=default_name)
     new_value = st.number_input("Estimated Value ($)", min_value=0.0, value=5.0, step=0.50)
     add_submitted = st.form_submit_button("Add Card")
 
@@ -77,6 +209,7 @@ if add_submitted and new_name.strip():
     st.session_state.df = pd.concat([st.session_state.df, new_row], ignore_index=True)
     save_data(st.session_state.df)
     st.session_state.df = load_data()
+    st.session_state.pop('scanned_card', None)
     st.rerun()
 
 # ============================================================
@@ -230,12 +363,14 @@ with tab_table:
 
             save_data(st.session_state.df)
             st.success("Saved to CSV!")
-            st.rerun()
+            st.session_state.pop('scanned_card', None)
+    st.rerun()
 
     with bcol2:
         if st.button("Reload from File"):
             st.session_state.df = load_data()
-            st.rerun()
+            st.session_state.pop('scanned_card', None)
+    st.rerun()
 
     st.divider()
     edited_total = edited['Fair Value'].sum()
