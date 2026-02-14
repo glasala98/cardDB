@@ -11,8 +11,6 @@ try:
         CSV_PATH, MONEY_COLS
     )
 except ImportError:
-    # Fallback if dashboard_utils not found (e.g. not in path)
-    # But since we are creating it, it should be there.
     st.error("dashboard_utils.py not found. Please ensure it exists in the same directory.")
     st.stop()
 
@@ -39,127 +37,119 @@ if 'unsaved_changes' not in st.session_state:
 df = st.session_state.df
 
 # ============================================================
-# SIDEBAR - Filters & Add Card
+# SIDEBAR - Navigation + Conditional Scan/Add Card
 # ============================================================
-st.sidebar.header("Filters")
+page = st.sidebar.radio("Navigate", ["Charts", "Card Ledger", "Not Found"])
 
-min_sales = st.sidebar.slider("Minimum Sales Count", 0, max(int(df['Num Sales'].max()), 1), 0)
-trend_options = sorted(df['Trend'].unique().tolist())
-trend_filter = st.sidebar.multiselect("Trend Direction", options=trend_options, default=trend_options)
+# Show Scan Card and Add New Card only on Card Ledger page
+if page == "Card Ledger":
+    st.sidebar.divider()
+    st.sidebar.header("Scan Card")
 
-st.sidebar.divider()
-st.sidebar.header("Scan Card")
+    front_img = st.sidebar.file_uploader("Front of card", type=["jpg", "jpeg", "png", "webp"], key="front_img")
+    back_img = st.sidebar.file_uploader("Back of card (optional)", type=["jpg", "jpeg", "png", "webp"], key="back_img")
 
-front_img = st.sidebar.file_uploader("Front of card", type=["jpg", "jpeg", "png", "webp"], key="front_img")
-back_img = st.sidebar.file_uploader("Back of card (optional)", type=["jpg", "jpeg", "png", "webp"], key="back_img")
+    if st.sidebar.button("Analyze Card", disabled=front_img is None):
+        with st.sidebar:
+            with st.spinner("Analyzing card with AI..."):
+                front_bytes = front_img.getvalue()
+                back_bytes = back_img.getvalue() if back_img else None
+                card_info, error = analyze_card_images(front_bytes, back_bytes)
 
-if st.sidebar.button("Analyze Card", disabled=front_img is None):
-    with st.sidebar:
-        with st.spinner("Analyzing card with AI..."):
-            front_bytes = front_img.getvalue()
-            back_bytes = back_img.getvalue() if back_img else None
-            card_info, error = analyze_card_images(front_bytes, back_bytes)
+        if error:
+            st.sidebar.error(f"Analysis failed: {error}")
+        elif card_info:
+            is_valid = card_info.get("is_sports_card", True)
+            validation_reason = card_info.get("validation_reason", "Image does not appear to be a valid sports card.")
 
-    if error:
-        st.sidebar.error(f"Analysis failed: {error}")
-    elif card_info:
-        is_valid = card_info.get("is_sports_card", True)
-        validation_reason = card_info.get("validation_reason", "Image does not appear to be a valid sports card.")
-
-        if not is_valid:
-            st.sidebar.error(f"Invalid Card: {validation_reason}")
-        else:
-            st.session_state.scanned_card = card_info
-            confidence = card_info.get('confidence', 'unknown')
-            if confidence == 'high':
-                st.sidebar.success("Card identified with high confidence!")
-            elif confidence == 'medium':
-                st.sidebar.warning("Card identified - please verify the details below.")
+            if not is_valid:
+                st.sidebar.error(f"Invalid Card: {validation_reason}")
             else:
-                st.sidebar.warning("Low confidence - review and correct the fields below.")
-            st.rerun()
+                st.session_state.scanned_card = card_info
+                confidence = card_info.get('confidence', 'unknown')
+                if confidence == 'high':
+                    st.sidebar.success("Card identified with high confidence!")
+                elif confidence == 'medium':
+                    st.sidebar.warning("Card identified - please verify the details below.")
+                else:
+                    st.sidebar.warning("Low confidence - review and correct the fields below.")
+                st.rerun()
 
-# Pre-fill from scan if available
-scanned = st.session_state.get('scanned_card', {})
+    # Pre-fill from scan if available
+    scanned = st.session_state.get('scanned_card', {})
 
-st.sidebar.divider()
-st.sidebar.header("Add New Card")
+    st.sidebar.divider()
+    st.sidebar.header("Add New Card")
 
-with st.sidebar.form("add_card_form", clear_on_submit=True):
-    player_name = st.text_input("Player Name *", value=scanned.get('player_name', ''), placeholder="e.g. Connor McDavid")
-    card_number = st.text_input("Card Number *", value=scanned.get('card_number', ''), placeholder="e.g. 201")
-    card_set = st.text_input("Card Set *", value=scanned.get('card_set', ''), placeholder="e.g. Upper Deck Series 1 Young Guns")
-    card_year = st.text_input("Year *", value=scanned.get('year', ''), placeholder="e.g. 2023-24")
-    variant = st.text_input("Variant / Parallel", value=scanned.get('variant', ''), placeholder="e.g. Red Prism, Arctic Freeze (optional)")
-    grade = st.text_input("Grade", value=scanned.get('grade', ''), placeholder="e.g. PSA 10 (optional)")
-    scrape_prices = st.checkbox("Scrape eBay for prices", value=True)
-    add_submitted = st.form_submit_button("Add Card")
+    with st.sidebar.form("add_card_form", clear_on_submit=True):
+        player_name = st.text_input("Player Name *", value=scanned.get('player_name', ''), placeholder="e.g. Connor McDavid")
+        card_number = st.text_input("Card Number *", value=scanned.get('card_number', ''), placeholder="e.g. 201")
+        card_set = st.text_input("Card Set *", value=scanned.get('card_set', ''), placeholder="e.g. Upper Deck Series 1 Young Guns")
+        card_year = st.text_input("Year *", value=scanned.get('year', ''), placeholder="e.g. 2023-24")
+        variant = st.text_input("Variant / Parallel", value=scanned.get('variant', ''), placeholder="e.g. Red Prism, Arctic Freeze (optional)")
+        grade = st.text_input("Grade", value=scanned.get('grade', ''), placeholder="e.g. PSA 10 (optional)")
+        scrape_prices = st.checkbox("Scrape eBay for prices", value=True)
+        add_submitted = st.form_submit_button("Add Card")
 
-if add_submitted:
-    missing = []
-    if not player_name.strip():
-        missing.append("Player Name")
-    if not card_number.strip():
-        missing.append("Card Number")
-    if not card_set.strip():
-        missing.append("Card Set")
-    if not card_year.strip():
-        missing.append("Year")
+    if add_submitted:
+        missing = []
+        if not player_name.strip():
+            missing.append("Player Name")
+        if not card_number.strip():
+            missing.append("Card Number")
+        if not card_set.strip():
+            missing.append("Card Set")
+        if not card_year.strip():
+            missing.append("Year")
 
-    if missing:
-        st.sidebar.error(f"Missing required fields: {', '.join(missing)}")
-    else:
-        card_name_parts = [f"{card_year.strip()} {card_set.strip()}"]
-        if variant.strip():
-            card_name_parts.append(variant.strip())
-        card_name_parts.append(f"#{card_number.strip()} - {player_name.strip()}")
-        if grade.strip():
-            card_name_parts.append(f"[{grade.strip()}]")
-        card_name = ' - '.join(card_name_parts)
+        if missing:
+            st.sidebar.error(f"Missing required fields: {', '.join(missing)}")
+        else:
+            card_name_parts = [f"{card_year.strip()} {card_set.strip()}"]
+            if variant.strip():
+                card_name_parts.append(variant.strip())
+            card_name_parts.append(f"#{card_number.strip()} - {player_name.strip()}")
+            if grade.strip():
+                card_name_parts.append(f"[{grade.strip()}]")
+            card_name = ' - '.join(card_name_parts)
 
-        if scrape_prices:
-            with st.sidebar:
-                with st.spinner(f"Scraping eBay for {player_name.strip()}..."):
-                    stats = scrape_single_card(card_name)
+            if scrape_prices:
+                with st.sidebar:
+                    with st.spinner(f"Scraping eBay for {player_name.strip()}..."):
+                        stats = scrape_single_card(card_name)
 
-            if stats and stats.get('num_sales', 0) > 0:
-                trend = stats['trend']
-                if trend in ('insufficient data', 'unknown'):
-                    trend = 'no data'
-                new_row = pd.DataFrame([{
-                    'Card Name': card_name,
-                    'Fair Value': stats['fair_price'],
-                    'Trend': trend,
-                    'Top 3 Prices': ' | '.join(stats.get('top_3_prices', [])),
-                    'Median (All)': stats['median_all'],
-                    'Min': stats['min'],
-                    'Max': stats['max'],
-                    'Num Sales': stats['num_sales']
-                }])
-                st.sidebar.success(f"Found {stats['num_sales']} sales! Fair value: ${stats['fair_price']:.2f}")
+                if stats and stats.get('num_sales', 0) > 0:
+                    trend = stats['trend']
+                    if trend in ('insufficient data', 'unknown'):
+                        trend = 'no data'
+                    new_row = pd.DataFrame([{
+                        'Card Name': card_name,
+                        'Fair Value': stats['fair_price'],
+                        'Trend': trend,
+                        'Top 3 Prices': ' | '.join(stats.get('top_3_prices', [])),
+                        'Median (All)': stats['median_all'],
+                        'Min': stats['min'],
+                        'Max': stats['max'],
+                        'Num Sales': stats['num_sales']
+                    }])
+                    st.sidebar.success(f"Found {stats['num_sales']} sales! Fair value: ${stats['fair_price']:.2f}")
+                else:
+                    new_row = pd.DataFrame([{
+                        'Card Name': card_name, 'Fair Value': 5.0, 'Trend': 'no data',
+                        'Top 3 Prices': '', 'Median (All)': 5.0, 'Min': 5.0, 'Max': 5.0, 'Num Sales': 0
+                    }])
+                    st.sidebar.warning("No sales found. Defaulted to $5.00.")
             else:
                 new_row = pd.DataFrame([{
                     'Card Name': card_name, 'Fair Value': 5.0, 'Trend': 'no data',
                     'Top 3 Prices': '', 'Median (All)': 5.0, 'Min': 5.0, 'Max': 5.0, 'Num Sales': 0
                 }])
-                st.sidebar.warning("No sales found. Defaulted to $5.00.")
-        else:
-            new_row = pd.DataFrame([{
-                'Card Name': card_name, 'Fair Value': 5.0, 'Trend': 'no data',
-                'Top 3 Prices': '', 'Median (All)': 5.0, 'Min': 5.0, 'Max': 5.0, 'Num Sales': 0
-            }])
 
-        st.session_state.df = pd.concat([st.session_state.df, new_row], ignore_index=True)
-        save_data(st.session_state.df)
-        st.session_state.df = load_data()
-        st.session_state.pop('scanned_card', None)
-        st.rerun()
-
-# ============================================================
-# Apply filters
-# ============================================================
-mask = (df['Num Sales'] >= min_sales) & (df['Trend'].isin(trend_filter))
-filtered_df = df[mask].copy()
+            st.session_state.df = pd.concat([st.session_state.df, new_row], ignore_index=True)
+            save_data(st.session_state.df)
+            st.session_state.df = load_data()
+            st.session_state.pop('scanned_card', None)
+            st.rerun()
 
 # ============================================================
 # HEADER & METRICS
@@ -186,17 +176,15 @@ with col5:
 st.divider()
 
 # ============================================================
-# CHARTS
+# CHARTS PAGE
 # ============================================================
-tab_charts, tab_table, tab_not_found = st.tabs(["Charts", "Card Ledger (Editable)", "Not Found Cards"])
-
-with tab_charts:
+if page == "Charts":
     c1, c2 = st.columns((2, 1))
 
     with c1:
         st.subheader("Price vs. Volume")
         fig_scatter = px.scatter(
-            filtered_df,
+            df,
             x="Num Sales", y="Fair Value", color="Trend",
             hover_name="Card Name", size="Fair Value",
             color_discrete_map={"up": "#00CC96", "down": "#EF553B", "stable": "#636EFA",
@@ -209,7 +197,7 @@ with tab_charts:
     with c2:
         st.subheader("Trend Breakdown")
         fig_pie = px.pie(
-            filtered_df, names='Trend', title="Trend Share", color='Trend',
+            df, names='Trend', title="Trend Share", color='Trend',
             color_discrete_map={"up": "#00CC96", "down": "#EF553B", "stable": "#636EFA",
                                 "no data": "gray"},
             hole=0.4
@@ -219,7 +207,7 @@ with tab_charts:
 
     # Top 20 bar chart
     st.subheader("Top 20 Most Valuable Cards")
-    top20 = filtered_df.nlargest(20, 'Fair Value').copy()
+    top20 = df.nlargest(20, 'Fair Value').copy()
     top20['Short Name'] = top20['Card Name'].apply(
         lambda x: x[:60] + '...' if len(x) > 60 else x
     )
@@ -235,10 +223,22 @@ with tab_charts:
     st.plotly_chart(fig_bar, use_container_width=True)
 
 # ============================================================
-# EDITABLE TABLE
+# CARD LEDGER PAGE
 # ============================================================
-with tab_table:
+elif page == "Card Ledger":
     st.subheader("Edit Card Values")
+
+    # Inline filters
+    fcol1, fcol2 = st.columns(2)
+    with fcol1:
+        min_sales = st.slider("Minimum Sales Count", 0, max(int(df['Num Sales'].max()), 1), 0)
+    with fcol2:
+        trend_options = sorted(df['Trend'].unique().tolist())
+        trend_filter = st.multiselect("Trend Direction", options=trend_options, default=trend_options)
+
+    # Apply filters
+    mask = (df['Num Sales'] >= min_sales) & (df['Trend'].isin(trend_filter))
+    filtered_df = df[mask].copy()
 
     search_query = st.text_input("Search cards", placeholder="Type to filter by card name (e.g. Bedard, PSA 10, Young Guns)...")
 
@@ -325,9 +325,9 @@ with tab_table:
         st.metric("Cards Shown", len(edited))
 
 # ============================================================
-# NOT FOUND LIST
+# NOT FOUND PAGE
 # ============================================================
-with tab_not_found:
+elif page == "Not Found":
     st.subheader(f"Cards Not Found ({len(not_found_df)} cards, defaulted to $5.00)")
     if len(not_found_df) > 0:
         st.dataframe(
