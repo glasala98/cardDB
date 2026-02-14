@@ -224,18 +224,8 @@ def parse_card_name(card_name):
         if year_match:
             result['Year'] = year_match.group(1)
 
-        # Set: keep year with set name for clarity
-        set_name = parts[0]
-        # Add subset keywords from middle segments
-        subsets = []
-        for part in parts[1:-1]:
-            clean_part = re.sub(r'\[.*?\]', '', part).strip()
-            clean_part = re.sub(r'#\S+', '', clean_part).strip()
-            if clean_part:
-                subsets.append(clean_part)
-        if subsets:
-            set_name = set_name + ' ' + ' '.join(subsets)
-        result['Set'] = ' '.join(set_name.split()).strip()
+        # Set: just the base set name (first segment)
+        result['Set'] = ' '.join(parts[0].split()).strip()
 
         # Card #: find #NNN or #CU-SC pattern (not serial numbered #70/99)
         num_match = re.search(r'#([\w-]+)(?!\s*/)', card_name)

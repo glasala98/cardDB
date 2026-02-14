@@ -534,7 +534,7 @@ elif page == "Card Inspect":
         with dc1:
             st.metric("Player", card_row['Player'])
         with dc2:
-            st.metric("Set", card_row['Set'][:40] if card_row['Set'] else "N/A")
+            st.metric("Set", card_row['Set'] if card_row['Set'] else "N/A")
         with dc3:
             st.metric("Card #", card_row['Card #'] if card_row['Card #'] else "N/A")
         with dc4:
