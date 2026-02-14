@@ -354,9 +354,14 @@ def load_data(csv_path=CSV_PATH, results_json_path=None):
     df['Trend'] = df['Trend'].replace({'insufficient data': 'no data', 'unknown': 'no data'})
 
     # Parse Card Name into display columns
-    parsed = df['Card Name'].apply(parse_card_name).apply(pd.Series)
-    for col in ['Player', 'Year', 'Set', 'Subset', 'Card #', 'Serial', 'Grade']:
-        df[col] = parsed[col]
+    parse_cols = ['Player', 'Year', 'Set', 'Subset', 'Card #', 'Serial', 'Grade']
+    if len(df) > 0:
+        parsed = df['Card Name'].apply(parse_card_name).apply(pd.Series)
+        for col in parse_cols:
+            df[col] = parsed[col] if col in parsed.columns else ''
+    else:
+        for col in parse_cols:
+            df[col] = pd.Series(dtype='object')
 
     # Add Last Scraped from results JSON
     if os.path.exists(results_json_path):
