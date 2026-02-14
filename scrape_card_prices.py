@@ -500,9 +500,6 @@ def process_card(card):
     """Search and price a single card. Retries with simplified query if needed."""
     driver = get_driver()
 
-    # Small random delay to stagger requests across workers
-    time.sleep(random.uniform(0.5, 1.5))
-
     sales = search_ebay_sold(driver, card, max_results=50)
 
     # Retry with simplified query if no results
