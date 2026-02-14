@@ -30,6 +30,7 @@ except ImportError:
     HAS_ANTHROPIC = False
 
 
+@st.cache_data
 def analyze_card_images(front_image_bytes, back_image_bytes=None):
     """Use Claude vision to extract card details from front/back photos."""
     if not HAS_ANTHROPIC:
