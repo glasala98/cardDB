@@ -18,7 +18,7 @@ st.set_page_config(
     page_title="Card Collection Dashboard",
     page_icon="hockey",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 st.markdown("""
@@ -62,7 +62,7 @@ df = st.session_state.df
 # ============================================================
 # SIDEBAR - Navigation + Conditional Scan/Add Card
 # ============================================================
-page = st.sidebar.radio("Navigate", ["Charts", "Card Ledger", "Not Found"])
+page = st.sidebar.radio("Navigate", ["Charts", "Card Ledger"])
 
 # Show Scan Card and Add New Card only on Card Ledger page
 if page == "Card Ledger":
@@ -347,10 +347,8 @@ elif page == "Card Ledger":
     with tc3:
         st.metric("Cards Shown", len(edited))
 
-# ============================================================
-# NOT FOUND PAGE
-# ============================================================
-elif page == "Not Found":
+    # Not Found section
+    st.divider()
     st.subheader(f"Cards Not Found ({len(not_found_df)} cards, defaulted to $5.00)")
     if len(not_found_df) > 0:
         st.dataframe(
