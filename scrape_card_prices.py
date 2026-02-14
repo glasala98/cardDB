@@ -148,6 +148,10 @@ def clean_card_name_for_search(card_name):
     if card_num:
         query_parts.append(card_num)
 
+    # Note: serial number (/99, /10 etc.) is intentionally NOT added to the search
+    # query. We want all serializations so we can use them as comps when exact
+    # matches are scarce. The calculate_fair_price function handles serial adjustment.
+
     # Variant is critical for parallels (Red Prism vs base are very different values)
     if variant:
         query_parts.append(variant)
@@ -384,11 +388,92 @@ def search_ebay_sold(driver, card_name, max_results=50):
         return []
 
 
-def calculate_fair_price(sales):
+def extract_serial_run(text):
+    """Extract the print run from a title, e.g. '/99' from '#70/99'. Returns int or None."""
+    m = re.search(r'/(\d+)', text)
+    return int(m.group(1)) if m else None
+
+
+# Relative value multipliers: how much more/less a serial is worth vs baseline.
+# Lower print runs = higher value. These are approximate market ratios.
+SERIAL_VALUE = {
+    1: 50.0, 5: 12.0, 10: 6.0, 15: 4.0, 25: 2.8,
+    35: 2.2, 49: 1.8, 50: 1.7, 75: 1.3, 99: 1.0,
+    100: 0.95, 149: 0.75, 150: 0.72, 199: 0.6, 200: 0.58,
+    249: 0.5, 250: 0.48, 299: 0.42, 399: 0.35, 499: 0.3,
+    599: 0.25, 799: 0.2, 999: 0.15,
+}
+
+
+def serial_multiplier(from_serial, to_serial):
+    """Get price multiplier to convert a from_serial price to a to_serial estimate.
+    E.g. serial_multiplier(10, 99) returns ~0.17 (a /10 is worth ~6x a /99, so divide)."""
+    if from_serial == to_serial:
+        return 1.0
+
+    def get_value(s):
+        if s in SERIAL_VALUE:
+            return SERIAL_VALUE[s]
+        # Interpolate from nearest known values
+        keys = sorted(SERIAL_VALUE.keys())
+        if s < keys[0]:
+            return SERIAL_VALUE[keys[0]]
+        if s > keys[-1]:
+            return SERIAL_VALUE[keys[-1]] * (keys[-1] / s)
+        for i in range(len(keys) - 1):
+            if keys[i] <= s <= keys[i + 1]:
+                lo, hi = keys[i], keys[i + 1]
+                ratio = (s - lo) / (hi - lo)
+                return SERIAL_VALUE[lo] + ratio * (SERIAL_VALUE[hi] - SERIAL_VALUE[lo])
+        return 1.0
+
+    return get_value(to_serial) / get_value(from_serial)
+
+
+def adjust_sales_for_serial(sales, target_serial):
+    """Filter or adjust sales to match target serial number.
+    If exact matches exist, use only those. Otherwise adjust nearby serials."""
+    if not target_serial:
+        return sales
+
+    # Separate exact matches from others
+    exact = []
+    others = []
+    for s in sales:
+        sale_serial = extract_serial_run(s.get('title', ''))
+        if sale_serial == target_serial:
+            exact.append(s)
+        elif sale_serial:
+            # Adjust this sale's price to estimate the target serial value
+            mult = serial_multiplier(sale_serial, target_serial)
+            adjusted = dict(s)
+            adjusted['price_val'] = round(s['price_val'] * mult, 2)
+            adjusted['_serial_adjusted'] = True
+            adjusted['_original_serial'] = sale_serial
+            others.append(adjusted)
+        else:
+            # No serial in title — could be base/non-numbered, include as-is
+            others.append(s)
+
+    # If we have exact matches, use only those
+    if exact:
+        return exact
+
+    # Otherwise use the adjusted others
+    return others
+
+
+def calculate_fair_price(sales, target_serial=None):
     """Pick the most representative price from the 3 most recent sales, considering trend."""
 
     if not sales:
         return None, {}
+
+    # Adjust sales for serial number if card is numbered
+    if target_serial:
+        sales = adjust_sales_for_serial(sales, target_serial)
+        if not sales:
+            return None, {}
 
     all_prices = [s['price_val'] for s in sales]
 
@@ -597,7 +682,9 @@ def process_card(card):
             pass
 
     if sales:
-        fair_price, stats = calculate_fair_price(sales)
+        # Extract target serial for price adjustment (e.g. /99 from "#70/99")
+        target_serial = extract_serial_run(card)
+        fair_price, stats = calculate_fair_price(sales, target_serial=target_serial)
         return card, {
             'estimated_value': f"${fair_price}",
             'stats': stats,
