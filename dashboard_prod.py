@@ -351,6 +351,9 @@ elif page == "Card Ledger":
         mask = searchable.apply(lambda name: all(t in name for t in terms))
         edit_df = edit_df[mask].copy()
 
+    # Add View checkbox column for navigation
+    edit_df.insert(0, 'View', False)
+
     st.caption(f"Showing {len(edit_df)} of {len(df)} cards")
 
     edited = st.data_editor(
@@ -359,6 +362,7 @@ elif page == "Card Ledger":
         hide_index=True,
         num_rows="dynamic",
         column_config={
+            "View": st.column_config.CheckboxColumn("View", width="small", default=False),
             "Player": st.column_config.TextColumn("Player", width="medium"),
             "Set": st.column_config.TextColumn("Set", width="medium", disabled=True),
             "Card #": st.column_config.TextColumn("#", width="small", disabled=True),
@@ -371,6 +375,16 @@ elif page == "Card Ledger":
         },
         key="card_editor"
     )
+
+    # Auto-navigate to Card Inspect when a View checkbox is checked
+    viewed_rows = edited[edited['View'] == True]
+    if len(viewed_rows) > 0:
+        viewed_idx = viewed_rows.index[0]
+        if viewed_idx in edit_df.index and viewed_idx in filtered_df.index:
+            card_name = filtered_df.at[viewed_idx, 'Card Name']
+            st.session_state.inspect_card = card_name
+            st.session_state.nav_page = "Card Inspect"
+            st.rerun()
 
     bcol1, bcol2 = st.columns([1, 1])
     with bcol1:
@@ -424,50 +438,8 @@ elif page == "Card Ledger":
             st.session_state.df = load_data()
             st.rerun()
 
-    # Card actions row: select a card, then View or Rescrape
-    act1, act2, act3 = st.columns([3, 1, 1])
-    with act1:
-        action_options = filtered_df.loc[edit_df.index, 'Card Name'].tolist() if len(edit_df) > 0 else []
-        action_labels = {cn: filtered_df.loc[filtered_df['Card Name'] == cn, 'Player'].iloc[0] if len(filtered_df[filtered_df['Card Name'] == cn]) > 0 else cn[:50] for cn in action_options}
-        selected_action_card = st.selectbox(
-            "Select card",
-            options=[""] + action_options,
-            format_func=lambda x: "Select a card..." if x == "" else action_labels.get(x, x[:50]),
-            label_visibility="collapsed"
-        )
-
-    with act2:
-        if st.button("View Card", disabled=selected_action_card == ""):
-            st.session_state.inspect_card = selected_action_card
-            st.session_state.nav_page = "Card Inspect"
-            st.rerun()
-
-    with act3:
-        if st.button("Rescrape Price", disabled=selected_action_card == ""):
-            if selected_action_card:
-                backup_data(label="rescrape")
-                with st.spinner(f"Scraping eBay for updated price..."):
-                    stats = scrape_single_card(selected_action_card)
-                if stats and stats.get('num_sales', 0) > 0:
-                    idx = st.session_state.df[st.session_state.df['Card Name'] == selected_action_card].index
-                    if len(idx) > 0:
-                        i = idx[0]
-                        trend = stats['trend']
-                        if trend in ('insufficient data', 'unknown'):
-                            trend = 'no data'
-                        st.session_state.df.at[i, 'Fair Value'] = stats['fair_price']
-                        st.session_state.df.at[i, 'Trend'] = trend
-                        st.session_state.df.at[i, 'Median (All)'] = stats['median_all']
-                        st.session_state.df.at[i, 'Min'] = stats['min']
-                        st.session_state.df.at[i, 'Max'] = stats['max']
-                        st.session_state.df.at[i, 'Num Sales'] = stats['num_sales']
-                        st.session_state.df.at[i, 'Top 3 Prices'] = ' | '.join(stats.get('top_3_prices', []))
-                        save_data(st.session_state.df)
-                        append_price_history(selected_action_card, stats['fair_price'], stats['num_sales'])
-                        st.success(f"Updated! Fair value: ${stats['fair_price']:.2f} ({stats['num_sales']} sales)")
-                        st.rerun()
-                else:
-                    st.warning("No sales found for this card.")
+    # Rescrape action (uses the View checkbox to identify selected card)
+    st.caption("Check the **View** box on a row to inspect it. Use Rescrape on the Card Inspect page.")
 
     st.divider()
     edited_total = edited['Fair Value'].sum()
@@ -519,26 +491,40 @@ elif page == "Card Ledger":
 elif page == "Card Inspect":
     st.subheader("Card Inspect")
 
-    # Card selector
-    all_card_names = df['Card Name'].tolist()
-    all_player_labels = df['Player'].tolist()
-    label_map = dict(zip(all_card_names, all_player_labels))
-
     # Pre-select from session state if navigated from ledger
-    default_idx = 0
     preselected = st.session_state.get('inspect_card', '')
-    if preselected and preselected in all_card_names:
-        default_idx = all_card_names.index(preselected) + 1
 
-    selected_card = st.selectbox(
-        "Select a card to inspect",
-        options=[""] + all_card_names,
-        index=default_idx,
-        format_func=lambda x: "Choose a card..." if x == "" else label_map.get(x, x[:60]),
+    # Search bar to find a card
+    inspect_search = st.text_input(
+        "Search for a card",
+        placeholder="Type player name, set, year...",
+        key="inspect_search"
     )
 
+    selected_card = preselected  # default to pre-selected card
+
+    if inspect_search.strip():
+        terms = inspect_search.strip().lower().split()
+        matches = df[df['Card Name'].str.lower().apply(lambda name: all(t in name for t in terms))]
+        if len(matches) > 0:
+            # Show compact results list as buttons
+            st.caption(f"{len(matches)} match{'es' if len(matches) != 1 else ''} found")
+            for _, row in matches.head(10).iterrows():
+                label = f"{row['Player']} — {row['Set']}"
+                if row['Card #']:
+                    label += f" #{row['Card #']}"
+                if row['Grade']:
+                    label += f" [{row['Grade']}]"
+                if st.button(label, key=f"pick_{row['Card Name']}"):
+                    st.session_state.inspect_card = row['Card Name']
+                    st.rerun()
+            if len(matches) > 10:
+                st.caption(f"...and {len(matches) - 10} more. Narrow your search.")
+        else:
+            st.warning("No cards match your search.")
+
     if not selected_card:
-        st.info("Select a card from the dropdown above to see detailed information and sales history.")
+        st.info("Use the **View** checkbox on the Card Ledger, or search above to find a card.")
     else:
         card_row = df[df['Card Name'] == selected_card].iloc[0]
 
@@ -565,6 +551,32 @@ elif page == "Card Inspect":
             st.metric("Min", f"${card_row['Min']:.2f}")
         with vc5:
             st.metric("Max", f"${card_row['Max']:.2f}")
+
+        # Rescrape button
+        if st.button("Rescrape Price", type="primary"):
+            backup_data(label="rescrape")
+            with st.spinner(f"Scraping eBay for updated price..."):
+                stats = scrape_single_card(selected_card)
+            if stats and stats.get('num_sales', 0) > 0:
+                idx = st.session_state.df[st.session_state.df['Card Name'] == selected_card].index
+                if len(idx) > 0:
+                    i = idx[0]
+                    trend = stats['trend']
+                    if trend in ('insufficient data', 'unknown'):
+                        trend = 'no data'
+                    st.session_state.df.at[i, 'Fair Value'] = stats['fair_price']
+                    st.session_state.df.at[i, 'Trend'] = trend
+                    st.session_state.df.at[i, 'Median (All)'] = stats['median_all']
+                    st.session_state.df.at[i, 'Min'] = stats['min']
+                    st.session_state.df.at[i, 'Max'] = stats['max']
+                    st.session_state.df.at[i, 'Num Sales'] = stats['num_sales']
+                    st.session_state.df.at[i, 'Top 3 Prices'] = ' | '.join(stats.get('top_3_prices', []))
+                    save_data(st.session_state.df)
+                    append_price_history(selected_card, stats['fair_price'], stats['num_sales'])
+                    st.success(f"Updated! Fair value: ${stats['fair_price']:.2f} ({stats['num_sales']} sales)")
+                    st.rerun()
+            else:
+                st.warning("No sales found for this card.")
 
         # eBay Sales History
         st.markdown("---")
