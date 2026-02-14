@@ -5,6 +5,10 @@
 
 users:
   admin:
-    password_hash: "$2b$12$ZxfWzqq5YOYfvfeidd8KyepQduhTUjzW1lrLZlQi162/.m3HxBozG"  # changeme
+    password_hash: "$2b$12$UsR4loCCLakpIiczGpoGKO.fQSERrTjcGhQApBPimHpU5D6qD9Pbm"
     display_name: "My Hockey Cards"
+    public: true
+  josh:
+    password_hash: "$2b$12$o51s9PDI9V71174PMHHDsu7uAybjyajGM7UrpNPitcNfSfvaNh23C"
+    display_name: "Josh's Collection"
     public: true
