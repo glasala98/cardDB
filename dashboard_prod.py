@@ -65,7 +65,14 @@ df = st.session_state.df
 # ============================================================
 # SIDEBAR - Navigation + Conditional Scan/Add Card
 # ============================================================
-page = st.sidebar.radio("Navigate", ["Charts", "Card Ledger", "Card Inspect"])
+# Check for programmatic navigation (e.g. from View Card button)
+nav_pages = ["Charts", "Card Ledger", "Card Inspect"]
+nav_index = 0
+if 'nav_page' in st.session_state and st.session_state.nav_page in nav_pages:
+    nav_index = nav_pages.index(st.session_state.nav_page)
+    del st.session_state.nav_page
+
+page = st.sidebar.radio("Navigate", nav_pages, index=nav_index)
 
 # Show Scan Card and Add New Card only on Card Ledger page
 if page == "Card Ledger":
@@ -365,7 +372,7 @@ elif page == "Card Ledger":
         key="card_editor"
     )
 
-    bcol1, bcol2, bcol3, bcol4 = st.columns([1, 1, 1, 3])
+    bcol1, bcol2 = st.columns([1, 1])
     with bcol1:
         if st.button("Save Changes", type="primary"):
             for i, row in edited.iterrows():
@@ -373,7 +380,6 @@ elif page == "Card Ledger":
                 if idx is not None and idx in st.session_state.df.index:
                     st.session_state.df.at[idx, 'Fair Value'] = row['Fair Value']
                     st.session_state.df.at[idx, 'Trend'] = row['Trend']
-                    # Update Player in parsed col and rebuild Card Name
                     if row['Player'] != edit_df.at[idx, 'Player']:
                         old_player = edit_df.at[idx, 'Player']
                         new_player = row['Player']
@@ -418,24 +424,31 @@ elif page == "Card Ledger":
             st.session_state.df = load_data()
             st.rerun()
 
-    with bcol3:
-        # Build rescrape options from filtered_df (which still has Card Name)
-        rescrape_options = filtered_df.loc[edit_df.index, 'Card Name'].tolist() if len(edit_df) > 0 else []
-        rescrape_labels = {cn: filtered_df.loc[filtered_df['Card Name'] == cn, 'Player'].iloc[0] if len(filtered_df[filtered_df['Card Name'] == cn]) > 0 else cn[:50] for cn in rescrape_options}
-        rescrape_card = st.selectbox(
-            "Rescrape card",
-            options=[""] + rescrape_options,
-            format_func=lambda x: "Select a card..." if x == "" else rescrape_labels.get(x, x[:50]),
+    # Card actions row: select a card, then View or Rescrape
+    act1, act2, act3 = st.columns([3, 1, 1])
+    with act1:
+        action_options = filtered_df.loc[edit_df.index, 'Card Name'].tolist() if len(edit_df) > 0 else []
+        action_labels = {cn: filtered_df.loc[filtered_df['Card Name'] == cn, 'Player'].iloc[0] if len(filtered_df[filtered_df['Card Name'] == cn]) > 0 else cn[:50] for cn in action_options}
+        selected_action_card = st.selectbox(
+            "Select card",
+            options=[""] + action_options,
+            format_func=lambda x: "Select a card..." if x == "" else action_labels.get(x, x[:50]),
             label_visibility="collapsed"
         )
 
-    with bcol4:
-        if st.button("Rescrape Price", disabled=rescrape_card == ""):
-            if rescrape_card:
+    with act2:
+        if st.button("View Card", disabled=selected_action_card == ""):
+            st.session_state.inspect_card = selected_action_card
+            st.session_state.nav_page = "Card Inspect"
+            st.rerun()
+
+    with act3:
+        if st.button("Rescrape Price", disabled=selected_action_card == ""):
+            if selected_action_card:
                 with st.spinner(f"Scraping eBay for updated price..."):
-                    stats = scrape_single_card(rescrape_card)
+                    stats = scrape_single_card(selected_action_card)
                 if stats and stats.get('num_sales', 0) > 0:
-                    idx = st.session_state.df[st.session_state.df['Card Name'] == rescrape_card].index
+                    idx = st.session_state.df[st.session_state.df['Card Name'] == selected_action_card].index
                     if len(idx) > 0:
                         i = idx[0]
                         trend = stats['trend']
@@ -449,7 +462,7 @@ elif page == "Card Ledger":
                         st.session_state.df.at[i, 'Num Sales'] = stats['num_sales']
                         st.session_state.df.at[i, 'Top 3 Prices'] = ' | '.join(stats.get('top_3_prices', []))
                         save_data(st.session_state.df)
-                        append_price_history(rescrape_card, stats['fair_price'], stats['num_sales'])
+                        append_price_history(selected_action_card, stats['fair_price'], stats['num_sales'])
                         st.success(f"Updated! Fair value: ${stats['fair_price']:.2f} ({stats['num_sales']} sales)")
                         st.rerun()
                 else:
