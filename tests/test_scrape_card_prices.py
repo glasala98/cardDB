@@ -96,5 +96,17 @@ class TestScrapeCardPrices(unittest.TestCase):
         # Sorted by price: 100, 190, 200. Highest is 200.
         self.assertEqual(fair_price_t, 200.0)
 
+    def test_calculate_fair_price_empty(self):
+        """Test that calculate_fair_price returns (None, {}) for empty input."""
+        # Empty list
+        fair_price, stats = calculate_fair_price([])
+        self.assertIsNone(fair_price)
+        self.assertEqual(stats, {})
+
+        # None input
+        fair_price, stats = calculate_fair_price(None)
+        self.assertIsNone(fair_price)
+        self.assertEqual(stats, {})
+
 if __name__ == '__main__':
     unittest.main()
