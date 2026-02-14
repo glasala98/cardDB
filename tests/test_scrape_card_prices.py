@@ -96,5 +96,77 @@ class TestScrapeCardPrices(unittest.TestCase):
         # Sorted by price: 100, 190, 200. Highest is 200.
         self.assertEqual(fair_price_t, 200.0)
 
+    def create_sales(self, prices):
+        """Helper to create sales data with minimal required fields."""
+        sales = []
+        for i, p in enumerate(prices):
+            sales.append({
+                'price_val': float(p),
+                'days_ago': i, # Different days to allow sorting/trending logic to work if needed
+                'title': f'Sale {i}',
+                'sold_date': '2023-01-01'
+            })
+        return sales
+
+    def test_calculate_fair_price_low_outlier(self):
+        # Median of [10, 100, 100, 100] is 100.
+        # Cutoffs: 33.33 to 300.
+        # 10 is < 33.33, should be removed.
+        prices = [10, 100, 100, 100]
+        sales = self.create_sales(prices)
+        fair_price, stats = calculate_fair_price(sales)
+
+        self.assertEqual(stats['outliers_removed'], 1)
+        self.assertEqual(stats['num_sales'], 3)
+        self.assertEqual(stats['median_all'], 100.0)
+        # Remaining: 100, 100, 100. Fair price should be 100.
+        self.assertEqual(fair_price, 100.0)
+
+    def test_calculate_fair_price_high_outlier(self):
+        # Median of [100, 100, 100, 1000] is 100.
+        # Cutoffs: 33.33 to 300.
+        # 1000 is > 300, should be removed.
+        prices = [100, 100, 100, 1000]
+        sales = self.create_sales(prices)
+        fair_price, stats = calculate_fair_price(sales)
+
+        self.assertEqual(stats['outliers_removed'], 1)
+        self.assertEqual(stats['num_sales'], 3)
+        # Remaining: 100, 100, 100.
+        self.assertEqual(fair_price, 100.0)
+
+    def test_calculate_fair_price_mixed_outliers(self):
+        # Median of [10, 100, 100, 1000] is 100.
+        # Cutoffs: 33.33 to 300.
+        # 10 and 1000 should be removed.
+        prices = [10, 100, 100, 1000]
+        sales = self.create_sales(prices)
+        fair_price, stats = calculate_fair_price(sales)
+
+        self.assertEqual(stats['outliers_removed'], 2)
+        self.assertEqual(stats['num_sales'], 2)
+        # Remaining: 100, 100.
+        self.assertEqual(fair_price, 100.0)
+
+    def test_calculate_fair_price_small_sample(self):
+        # Less than 3 sales -> No outlier removal
+        # Even if one is huge
+        prices = [10, 1000]
+        sales = self.create_sales(prices)
+        fair_price, stats = calculate_fair_price(sales)
+
+        self.assertEqual(stats['outliers_removed'], 0)
+        self.assertEqual(stats['num_sales'], 2)
+
+    def test_calculate_fair_price_zero_median(self):
+        # Median is 0 -> No outlier removal (avoids division by zero or weird logic)
+        prices = [0, 0, 0, 100]
+        sales = self.create_sales(prices)
+        # Median of [0, 0, 0, 100] is 0.
+        fair_price, stats = calculate_fair_price(sales)
+
+        self.assertEqual(stats['outliers_removed'], 0)
+        self.assertEqual(stats['num_sales'], 4)
+
 if __name__ == '__main__':
     unittest.main()
