@@ -26,6 +26,7 @@ id -u $APP_USER &>/dev/null || useradd --system --no-create-home --shell /bin/fa
 echo "--- Setting up app directory ---"
 mkdir -p $APP_DIR
 cp dashboard_prod.py $APP_DIR/
+cp dashboard_utils.py $APP_DIR/
 cp card_prices_summary.csv $APP_DIR/
 cp requirements.txt $APP_DIR/
 chown -R $APP_USER:$APP_USER $APP_DIR
