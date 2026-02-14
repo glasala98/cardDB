@@ -361,8 +361,10 @@ elif page == "Card Ledger":
 
     st.caption(f"Showing {len(edit_df)} of {len(df)} cards")
 
+    editor_key = f"ledger_editor_{st.session_state.get('editor_reset', 0)}"
     edited = st.data_editor(
         edit_df,
+        key=editor_key,
         use_container_width=True,
         hide_index=True,
         num_rows="dynamic",
@@ -418,6 +420,7 @@ elif page == "Card Ledger":
         with rc2:
             if st.button("Cancel"):
                 del st.session_state.pending_remove
+                st.session_state.editor_reset = st.session_state.get('editor_reset', 0) + 1
                 st.rerun()
 
     bcol1, bcol2 = st.columns([1, 1])
