@@ -348,6 +348,14 @@ def load_data(csv_path=CSV_PATH, results_json_path=None):
     if results_json_path is None:
         results_json_path = RESULTS_JSON_PATH
     df = pd.read_csv(csv_path)
+
+    # De-sanitize string columns
+    object_cols = df.select_dtypes(include=['object']).columns
+    for col in object_cols:
+        df[col] = df[col].apply(
+            lambda x: str(x)[1:] if isinstance(x, str) and str(x).startswith("'") and len(str(x)) > 1 and str(x)[1] in ['=', '+', '-', '@'] else x
+        )
+
     for col in MONEY_COLS:
         df[col] = df[col].astype(str).str.replace('$', '', regex=False).str.replace(',', '', regex=False)
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
@@ -390,6 +398,14 @@ def save_data(df, csv_path=CSV_PATH):
     save_df = save_df.drop(columns=[c for c in PARSED_COLS if c in save_df.columns], errors='ignore')
     for col in MONEY_COLS:
         save_df[col] = save_df[col].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "$0.00")
+
+    # Sanitize string columns to prevent CSV injection
+    object_cols = save_df.select_dtypes(include=['object']).columns
+    for col in object_cols:
+        save_df[col] = save_df[col].apply(
+            lambda x: "'" + str(x) if isinstance(x, str) and str(x).startswith(('=', '+', '-', '@')) else x
+        )
+
     save_df.to_csv(csv_path, index=False)
 
 
@@ -476,6 +492,13 @@ def archive_card(df, card_name, archive_path=None):
     for col in MONEY_COLS:
         archive_row[col] = archive_row[col].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "$0.00")
 
+    # Sanitize string columns
+    object_cols = archive_row.select_dtypes(include=['object']).columns
+    for col in object_cols:
+        archive_row[col] = archive_row[col].apply(
+            lambda x: "'" + str(x) if isinstance(x, str) and str(x).startswith(('=', '+', '-', '@')) else x
+        )
+
     if os.path.exists(archive_path):
         archive_row.to_csv(archive_path, mode='a', header=False, index=False)
     else:
@@ -492,6 +515,14 @@ def load_archive(archive_path=None):
         return pd.DataFrame()
     try:
         archive_df = pd.read_csv(archive_path)
+
+        # De-sanitize string columns
+        object_cols = archive_df.select_dtypes(include=['object']).columns
+        for col in object_cols:
+            archive_df[col] = archive_df[col].apply(
+                lambda x: str(x)[1:] if isinstance(x, str) and str(x).startswith("'") and len(str(x)) > 1 and str(x)[1] in ['=', '+', '-', '@'] else x
+            )
+
         for col in MONEY_COLS:
             if col in archive_df.columns:
                 archive_df[col] = archive_df[col].astype(str).str.replace('$', '', regex=False).str.replace(',', '', regex=False)
