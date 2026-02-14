@@ -112,23 +112,20 @@ For frontend changes, we use Playwright to verify the UI.
     ```
 
 3.  **Run Verification Script**:
-    Create a script (e.g., `verify_dashboard.py`) to test your changes. Example:
+    We have included a comprehensive verification script `verify_dashboard.py` that tests key functionalities:
+    - Navigation to the dashboard.
+    - "Add New Card" workflow (including eBay scraping simulation).
+    - "Scan Card" workflow (including image upload and analysis).
 
-    ```python
-    from playwright.sync_api import sync_playwright
+    Run the script:
 
-    def run(playwright):
-        browser = playwright.chromium.launch(headless=True)
-        page = browser.new_page()
-        page.goto("http://localhost:8501")
-        page.screenshot(path="dashboard_verification.png")
-        browser.close()
-
-    with sync_playwright() as playwright:
-        run(playwright)
+    ```bash
+    python verify_dashboard.py
     ```
 
-    Run it with `python verify_dashboard.py` and check the screenshot.
+    The script will output the test results to the console and save a screenshot of the final state to `tests/dashboard_verification_result.png`.
+
+    **Note:** The script automatically uses `tests/mcdavid1.jpg` or `tests/mcdavid2.jpg` if present; otherwise, it requires `tests/test_card.jpg` (which you can create or download).
 
 ## Deployment to Production
 
