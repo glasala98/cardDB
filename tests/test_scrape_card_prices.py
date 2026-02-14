@@ -43,15 +43,27 @@ class TestScrapeCardPrices(unittest.TestCase):
         self.assertIn("Red Prism", query_variant)
 
     def test_title_matches_grade(self):
-        # PSA 10
+        # PSA 10 - Standard cases
         self.assertTrue(title_matches_grade("2015 Connor McDavid PSA 10 Gem Mint", "PSA 10", 10))
         self.assertFalse(title_matches_grade("2015 Connor McDavid PSA 9 Mint", "PSA 10", 10))
         self.assertFalse(title_matches_grade("2015 Connor McDavid Raw", "PSA 10", 10))
 
-        # Raw
+        # PSA 10 - Edge cases
+        self.assertFalse(title_matches_grade("2015 Connor McDavid PSA 100 Gem Mint", "PSA 10", 10)) # Partial match inside larger number
+        self.assertFalse(title_matches_grade("2015 Connor McDavid PSA 10? No PSA 9", "PSA 10", 10)) # Conflicting grades present
+        self.assertTrue(title_matches_grade("2015 Connor McDavid psa 10 Gem Mint", "PSA 10", 10)) # Case insensitive
+        self.assertTrue(title_matches_grade("2015 Connor McDavid PSA10 Gem Mint", "PSA 10", 10)) # No space
+        self.assertTrue(title_matches_grade("2015 Connor McDavid PSA  10 Gem Mint", "PSA 10", 10)) # Extra space
+
+        # Raw - Standard cases
         self.assertTrue(title_matches_grade("2015 Connor McDavid Young Guns", None, None))
         self.assertFalse(title_matches_grade("2015 Connor McDavid PSA 10", None, None))
         self.assertFalse(title_matches_grade("2015 Connor McDavid BGS 9.5", None, None))
+
+        # Raw - Edge cases
+        self.assertFalse(title_matches_grade("2015 Connor McDavid SGC 10", None, None)) # SGC check
+        self.assertFalse(title_matches_grade("2015 Connor McDavid GRADED", None, None)) # GRADED keyword
+        self.assertTrue(title_matches_grade("2015 Connor McDavid UNGRADED", None, None)) # UNGRADED should be safe
 
     def test_build_simplified_query(self):
         name = "2015-16 Upper Deck Series 1 #201 - Connor McDavid"
