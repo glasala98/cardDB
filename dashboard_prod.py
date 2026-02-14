@@ -1,8 +1,10 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import os
 import sys
+from datetime import datetime
 
 # Import utils
 try:
@@ -34,7 +36,7 @@ st.markdown("""
 def check_password():
     correct_pw = os.environ.get("DASHBOARD_PASSWORD", "")
     if not correct_pw:
-        return True  # No password configured, allow access
+        return True
 
     if st.session_state.get("authenticated"):
         return True
@@ -102,19 +104,20 @@ if page == "Card Ledger":
     scanned = st.session_state.get('scanned_card', {})
 
     st.sidebar.divider()
-    st.sidebar.header("Add New Card")
 
-    with st.sidebar.form("add_card_form", clear_on_submit=True):
-        player_name = st.text_input("Player Name *", value=scanned.get('player_name', ''), placeholder="e.g. Connor McDavid")
-        card_number = st.text_input("Card Number *", value=scanned.get('card_number', ''), placeholder="e.g. 201")
-        card_set = st.text_input("Card Set *", value=scanned.get('card_set', ''), placeholder="e.g. Upper Deck Series 1 Young Guns")
-        card_year = st.text_input("Year *", value=scanned.get('year', ''), placeholder="e.g. 2023-24")
-        variant = st.text_input("Variant / Parallel", value=scanned.get('variant', ''), placeholder="e.g. Red Prism, Arctic Freeze (optional)")
-        grade = st.text_input("Grade", value=scanned.get('grade', ''), placeholder="e.g. PSA 10 (optional)")
-        scrape_prices = st.checkbox("Scrape eBay for prices", value=True)
-        add_submitted = st.form_submit_button("Add Card")
+    # Accordion for Add New Card (progressive disclosure)
+    with st.sidebar.expander("Add New Card", expanded=bool(scanned)):
+        with st.form("add_card_form", clear_on_submit=True):
+            player_name = st.text_input("Player Name *", value=scanned.get('player_name', ''), placeholder="e.g. Connor McDavid")
+            card_number = st.text_input("Card Number *", value=scanned.get('card_number', ''), placeholder="e.g. 201")
+            card_set = st.text_input("Card Set *", value=scanned.get('card_set', ''), placeholder="e.g. Upper Deck Series 1 Young Guns")
+            card_year = st.text_input("Year *", value=scanned.get('year', ''), placeholder="e.g. 2023-24")
+            variant = st.text_input("Variant / Parallel", value=scanned.get('variant', ''), placeholder="e.g. Red Prism, Arctic Freeze (optional)")
+            grade = st.text_input("Grade", value=scanned.get('grade', ''), placeholder="e.g. PSA 10 (optional)")
+            scrape_prices = st.checkbox("Scrape eBay for prices", value=True)
+            add_submitted = st.form_submit_button("Add Card")
 
-    if add_submitted:
+    if page == "Card Ledger" and add_submitted:
         missing = []
         if not player_name.strip():
             missing.append("Player Name")
@@ -174,6 +177,39 @@ if page == "Card Ledger":
             st.session_state.pop('scanned_card', None)
             st.rerun()
 
+    # Batch Upload CSV
+    st.sidebar.divider()
+    with st.sidebar.expander("Bulk Upload CSV"):
+        st.caption("Upload a CSV with columns: Card Name, Fair Value, Trend, Num Sales, Min, Max, Top 3 Prices, Median (All)")
+        bulk_file = st.file_uploader("Choose CSV file", type=["csv"], key="bulk_csv")
+        if bulk_file is not None:
+            if st.button("Import Cards"):
+                try:
+                    import_df = pd.read_csv(bulk_file)
+                    required_cols = ['Card Name']
+                    if not all(c in import_df.columns for c in required_cols):
+                        st.sidebar.error("CSV must have at least a 'Card Name' column")
+                    else:
+                        for col in ['Fair Value', 'Median (All)', 'Min', 'Max']:
+                            if col in import_df.columns:
+                                import_df[col] = import_df[col].astype(str).str.replace('$', '', regex=False).str.replace(',', '', regex=False)
+                                import_df[col] = pd.to_numeric(import_df[col], errors='coerce').fillna(5.0)
+                            else:
+                                import_df[col] = 5.0
+                        if 'Num Sales' not in import_df.columns:
+                            import_df['Num Sales'] = 0
+                        if 'Trend' not in import_df.columns:
+                            import_df['Trend'] = 'no data'
+                        if 'Top 3 Prices' not in import_df.columns:
+                            import_df['Top 3 Prices'] = ''
+                        st.session_state.df = pd.concat([st.session_state.df, import_df], ignore_index=True)
+                        save_data(st.session_state.df)
+                        st.session_state.df = load_data()
+                        st.sidebar.success(f"Imported {len(import_df)} cards!")
+                        st.rerun()
+                except Exception as e:
+                    st.sidebar.error(f"Import failed: {e}")
+
 # ============================================================
 # HEADER & METRICS
 # ============================================================
@@ -183,6 +219,15 @@ found_df = df[df['Num Sales'] > 0]
 not_found_df = df[df['Num Sales'] == 0]
 total_value = found_df['Fair Value'].sum()
 total_all = df['Fair Value'].sum()
+
+# Last Updated timestamp
+csv_path = CSV_PATH
+last_modified = ""
+try:
+    mtime = os.path.getmtime(csv_path)
+    last_modified = datetime.fromtimestamp(mtime).strftime('%b %d, %Y %I:%M %p')
+except OSError:
+    last_modified = "Unknown"
 
 col1, col2, col3, col4, col5 = st.columns(5)
 with col1:
@@ -196,6 +241,7 @@ with col4:
 with col5:
     st.metric("Total (incl. defaults)", f"${total_all:,.2f}")
 
+st.caption(f"Data last updated: {last_modified}")
 st.divider()
 
 # ============================================================
@@ -214,6 +260,17 @@ if page == "Charts":
                                 "no data": "gray"},
             title="Fair Value by Sales Volume"
         )
+        # Annotate the highest value card
+        if len(df) > 0:
+            top_card = df.loc[df['Fair Value'].idxmax()]
+            fig_scatter.add_annotation(
+                x=top_card['Num Sales'], y=top_card['Fair Value'],
+                text=top_card['Card Name'][:40],
+                showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=1,
+                ax=40, ay=-40,
+                font=dict(size=10, color="white"),
+                bgcolor="rgba(0,0,0,0.6)", borderpad=4
+            )
         fig_scatter.update_layout(template="plotly_dark", height=420)
         st.plotly_chart(fig_scatter, use_container_width=True)
 
@@ -277,6 +334,9 @@ elif page == "Card Ledger":
 
     st.caption(f"Showing {len(edit_df)} cards. Edit Fair Value or Trend directly in the table.")
 
+    # Trend color mapping for display
+    trend_color_map = {"up": "#00CC96", "down": "#EF553B", "stable": "#636EFA", "no data": "#888888"}
+
     edited = st.data_editor(
         edit_df,
         use_container_width=True,
@@ -294,7 +354,7 @@ elif page == "Card Ledger":
         key="card_editor"
     )
 
-    bcol1, bcol2, bcol3 = st.columns([1, 1, 4])
+    bcol1, bcol2, bcol3, bcol4 = st.columns([1, 1, 1, 3])
     with bcol1:
         if st.button("Save Changes", type="primary"):
             for i, row in edited.iterrows():
@@ -335,6 +395,40 @@ elif page == "Card Ledger":
         if st.button("Reload from File"):
             st.session_state.df = load_data()
             st.rerun()
+
+    with bcol3:
+        # Rescrape selected card
+        rescrape_card = st.selectbox(
+            "Rescrape card",
+            options=[""] + edit_df['Card Name'].tolist(),
+            format_func=lambda x: "Select a card..." if x == "" else (x[:50] + "..." if len(x) > 50 else x),
+            label_visibility="collapsed"
+        )
+
+    with bcol4:
+        if st.button("Rescrape Price", disabled=rescrape_card == ""):
+            if rescrape_card:
+                with st.spinner(f"Scraping eBay for updated price..."):
+                    stats = scrape_single_card(rescrape_card)
+                if stats and stats.get('num_sales', 0) > 0:
+                    idx = st.session_state.df[st.session_state.df['Card Name'] == rescrape_card].index
+                    if len(idx) > 0:
+                        i = idx[0]
+                        trend = stats['trend']
+                        if trend in ('insufficient data', 'unknown'):
+                            trend = 'no data'
+                        st.session_state.df.at[i, 'Fair Value'] = stats['fair_price']
+                        st.session_state.df.at[i, 'Trend'] = trend
+                        st.session_state.df.at[i, 'Median (All)'] = stats['median_all']
+                        st.session_state.df.at[i, 'Min'] = stats['min']
+                        st.session_state.df.at[i, 'Max'] = stats['max']
+                        st.session_state.df.at[i, 'Num Sales'] = stats['num_sales']
+                        st.session_state.df.at[i, 'Top 3 Prices'] = ' | '.join(stats.get('top_3_prices', []))
+                        save_data(st.session_state.df)
+                        st.success(f"Updated! Fair value: ${stats['fair_price']:.2f} ({stats['num_sales']} sales)")
+                        st.rerun()
+                else:
+                    st.warning("No sales found for this card.")
 
     st.divider()
     edited_total = edited['Fair Value'].sum()
