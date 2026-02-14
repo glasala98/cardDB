@@ -76,10 +76,13 @@ Return ONLY valid JSON with these exact keys:
     "year": "Card year or season (e.g. 2023-24)",
     "variant": "Parallel or variant name if any, empty string if base card",
     "grade": "Grade if in a graded slab (e.g. PSA 10), empty string if raw",
-    "confidence": "high, medium, or low"
+    "confidence": "high, medium, or low",
+    "is_sports_card": true,
+    "validation_reason": "Explain why this is or isn't a valid sports card"
 }
 
-Be precise. If you can't determine a field, use your best guess based on card design, logos, and text visible."""
+Be precise. If the image is not a sports card, set "is_sports_card" to false and explain why in "validation_reason".
+If you can't determine a field, use your best guess based on card design, logos, and text visible."""
     })
 
     try:
@@ -418,15 +421,21 @@ if st.sidebar.button("Analyze Card", disabled=front_img is None):
     if error:
         st.sidebar.error(f"Analysis failed: {error}")
     elif card_info:
-        st.session_state.scanned_card = card_info
-        confidence = card_info.get('confidence', 'unknown')
-        if confidence == 'high':
-            st.sidebar.success("Card identified with high confidence!")
-        elif confidence == 'medium':
-            st.sidebar.warning("Card identified - please verify the details below.")
+        is_valid = card_info.get("is_sports_card", True)
+        validation_reason = card_info.get("validation_reason", "Image does not appear to be a valid sports card.")
+
+        if not is_valid:
+            st.sidebar.error(f"Invalid Card: {validation_reason}")
         else:
-            st.sidebar.warning("Low confidence - review and correct the fields below.")
-        st.rerun()
+            st.session_state.scanned_card = card_info
+            confidence = card_info.get('confidence', 'unknown')
+            if confidence == 'high':
+                st.sidebar.success("Card identified with high confidence!")
+            elif confidence == 'medium':
+                st.sidebar.warning("Card identified - please verify the details below.")
+            else:
+                st.sidebar.warning("Low confidence - review and correct the fields below.")
+            st.rerun()
 
 # Pre-fill from scan if available
 scanned = st.session_state.get('scanned_card', {})
