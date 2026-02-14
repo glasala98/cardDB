@@ -86,6 +86,16 @@ This will open the dashboard in your default web browser (usually at `http://loc
 -   `hockey_cards.csv`: Input file containing the list of cards to scrape.
 -   `card_prices_summary.csv`: The "database" file storing scraped prices and collection data.
 
+## Running Tests
+
+To run the unit tests for the project:
+
+```bash
+python run_tests.py
+```
+
+This will execute all tests located in the `tests/` directory.
+
 ## Deployment to Production
 
 To host this project at **https://southwestsportscards.ca/** (IP: `104.236.65.233`), follow these steps.
