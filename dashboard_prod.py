@@ -1764,9 +1764,18 @@ elif page == "Young Guns DB":
                 if market_timeline and len(market_timeline) >= 2:
                     mt_df = pd.DataFrame(market_timeline)
                     mt_df['date'] = pd.to_datetime(mt_df['date'])
-                    # Filter out outlier dates beyond 90 days from most recent sale
-                    _cutoff = mt_df['date'].max() - pd.Timedelta(days=90)
-                    mt_df = mt_df[mt_df['date'] >= _cutoff].sort_values('date')
+                    mt_df = mt_df.sort_values('date')
+                    # Filter outlier dates: find where consistent daily data starts
+                    # (first date in a run of 3+ consecutive days with 5+ total sales)
+                    if len(mt_df) > 10:
+                        _vol = mt_df['total_volume'].values
+                        _dates = mt_df['date'].values
+                        for i in range(len(mt_df) - 2):
+                            window_vol = _vol[i] + _vol[i+1] + _vol[i+2]
+                            day_gap = (pd.Timestamp(_dates[i+2]) - pd.Timestamp(_dates[i])).days
+                            if window_vol >= 15 and day_gap <= 5:
+                                mt_df = mt_df.iloc[i:]
+                                break
                     _days_span = (mt_df['date'].max() - mt_df['date'].min()).days
                     with st.expander(f"Market History ({_days_span} Days)", expanded=True):
                         st.caption("Individual eBay sold listings aggregated by date")
