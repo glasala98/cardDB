@@ -630,8 +630,18 @@ YG_PRICE_HISTORY_PATH = os.path.join(MASTER_DB_DIR, "yg_price_history.json")
 YG_PORTFOLIO_HISTORY_PATH = os.path.join(MASTER_DB_DIR, "yg_portfolio_history.json")
 
 
-def append_yg_price_history(card_name, fair_value, num_sales, history_path=None):
-    """Append a price snapshot for a Young Guns card to the YG history log."""
+def append_yg_price_history(card_name, fair_value, num_sales, history_path=None,
+                            graded_prices=None):
+    """Append a price snapshot for a Young Guns card to the YG history log.
+
+    Args:
+        card_name: Card identifier
+        fair_value: Raw/ungraded fair value
+        num_sales: Number of raw sales found
+        history_path: Override path for history JSON
+        graded_prices: Optional dict of graded price data, e.g.
+            {'PSA 10': {'fair_value': 150.0, 'num_sales': 5}, 'BGS 9.5': {...}}
+    """
     history_path = history_path or YG_PRICE_HISTORY_PATH
     os.makedirs(os.path.dirname(history_path), exist_ok=True)
     history = {}
@@ -647,12 +657,25 @@ def append_yg_price_history(card_name, fair_value, num_sales, history_path=None)
 
     today = datetime.now().strftime('%Y-%m-%d')
     # Deduplicate: replace today's entry if it exists
+    existing = [h for h in history[card_name] if h.get('date') == today]
     history[card_name] = [h for h in history[card_name] if h.get('date') != today]
-    history[card_name].append({
+
+    entry = {
         'date': today,
         'fair_value': round(fair_value, 2),
         'num_sales': num_sales,
-    })
+    }
+
+    # Merge graded prices: if we have existing graded data from today, keep it
+    if existing and existing[0].get('graded') and not graded_prices:
+        entry['graded'] = existing[0]['graded']
+    elif graded_prices:
+        # Merge with any existing graded data from today
+        merged_graded = existing[0].get('graded', {}) if existing else {}
+        merged_graded.update(graded_prices)
+        entry['graded'] = merged_graded
+
+    history[card_name].append(entry)
 
     with open(history_path, 'w', encoding='utf-8') as f:
         json.dump(history, f, indent=2, ensure_ascii=False)

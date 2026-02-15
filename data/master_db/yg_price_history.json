@@ -3,7 +3,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 19.97,
-      "num_sales": 36
+      "num_sales": 36,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 161.55,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 58.75,
+          "num_sales": 5
+        },
+        "PSA 8": {
+          "fair_value": 15.41,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2025-26 Upper Deck - Young Guns #210 - Karsen Dorwart": [
@@ -24,7 +38,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 120.0,
-      "num_sales": 44
+      "num_sales": 44,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 785.0,
+          "num_sales": 14
+        },
+        "PSA 9": {
+          "fair_value": 298.87,
+          "num_sales": 12
+        },
+        "PSA 8": {
+          "fair_value": 447.23,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2025-26 Upper Deck - Young Guns #203 - Olivier Rodrigue": [
@@ -66,7 +94,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 16.82,
-      "num_sales": 38
+      "num_sales": 38,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 164.99,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 26.43,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2025-26 Upper Deck - Young Guns #214 - Ryan Suzuki": [
@@ -94,7 +132,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 22.6,
-      "num_sales": 38
+      "num_sales": 38,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 200.0,
+          "num_sales": 2
+        },
+        "PSA 9": {
+          "fair_value": 56.53,
+          "num_sales": 3
+        },
+        "PSA 8": {
+          "fair_value": 52.73,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2025-26 Upper Deck - Young Guns #208 - Jack Finley": [
@@ -122,7 +174,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 13.06,
-      "num_sales": 28
+      "num_sales": 28,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 59.95,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2025-26 Upper Deck - Young Guns #222 - Michael Callahan": [
@@ -157,7 +215,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 19.97,
-      "num_sales": 39
+      "num_sales": 39,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 200.02,
+          "num_sales": 3
+        },
+        "PSA 8": {
+          "fair_value": 13.21,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2025-26 Upper Deck - Young Guns #229 - Donovan Sebrango": [
@@ -227,7 +295,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 11.26,
-      "num_sales": 34
+      "num_sales": 34,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 225.44,
+          "num_sales": 6
+        },
+        "PSA 9": {
+          "fair_value": 40.0,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2025-26 Upper Deck - Young Guns #242 - Cam Lund": [
@@ -276,7 +354,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 27.15,
-      "num_sales": 37
+      "num_sales": 37,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 250.0,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 31.57,
+          "num_sales": 5
+        }
+      }
     }
   ],
   "2025-26 Upper Deck - Young Guns #234 - Dominik Shine": [
@@ -339,7 +427,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 13.06,
-      "num_sales": 34
+      "num_sales": 34,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 99.99,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 39.4,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2025-26 Upper Deck - Young Guns #249 - Dylan Duke": [
@@ -367,7 +465,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 17.14,
-      "num_sales": 34
+      "num_sales": 34,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 219.95,
+          "num_sales": 11
+        },
+        "PSA 9": {
+          "fair_value": 172.58,
+          "num_sales": 20
+        },
+        "PSA 8": {
+          "fair_value": 38.19,
+          "num_sales": 5
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #204 - Kyle MacLean": [
@@ -430,7 +542,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 17.5,
-      "num_sales": 37
+      "num_sales": 37,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 239.99,
+          "num_sales": 14
+        },
+        "PSA 9": {
+          "fair_value": 67.55,
+          "num_sales": 23
+        },
+        "PSA 8": {
+          "fair_value": 11.97,
+          "num_sales": 6
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #213 - Zach Dean": [
@@ -451,7 +577,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 11.67,
-      "num_sales": 38
+      "num_sales": 38,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 39.95,
+          "num_sales": 2
+        },
+        "PSA 9": {
+          "fair_value": 33.04,
+          "num_sales": 3
+        },
+        "PSA 8": {
+          "fair_value": 17.99,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #216 - Matt Rempe": [
@@ -486,7 +626,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 10.1,
-      "num_sales": 33
+      "num_sales": 33,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 26.0,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 10.0,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #221 - Ethan Del Mastro": [
@@ -542,14 +692,42 @@
     {
       "date": "2026-02-15",
       "fair_value": 24.95,
-      "num_sales": 35
+      "num_sales": 35,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 209.09,
+          "num_sales": 11
+        },
+        "PSA 9": {
+          "fair_value": 43.0,
+          "num_sales": 12
+        },
+        "PSA 8": {
+          "fair_value": 12.5,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #229 - Lane Hutson": [
     {
       "date": "2026-02-15",
       "fair_value": 129.06,
-      "num_sales": 40
+      "num_sales": 40,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 669.75,
+          "num_sales": 35
+        },
+        "PSA 9": {
+          "fair_value": 185.86,
+          "num_sales": 50
+        },
+        "PSA 8": {
+          "fair_value": 82.65,
+          "num_sales": 29
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #230 - Pierrick Dube": [
@@ -584,7 +762,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 6.24,
-      "num_sales": 35
+      "num_sales": 35,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 74.99,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 49.44,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #235 - Yan Kuznetsov": [
@@ -612,7 +800,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 7.35,
-      "num_sales": 32
+      "num_sales": 32,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 105.63,
+          "num_sales": 2
+        },
+        "PSA 9": {
+          "fair_value": 24.19,
+          "num_sales": 6
+        },
+        "PSA 8": {
+          "fair_value": 8.08,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #240 - Sam Colangelo": [
@@ -654,7 +856,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 14.07,
-      "num_sales": 42
+      "num_sales": 42,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 81.89,
+          "num_sales": 10
+        },
+        "PSA 9": {
+          "fair_value": 22.56,
+          "num_sales": 13
+        },
+        "PSA 8": {
+          "fair_value": 10.65,
+          "num_sales": 5
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #245 - Nikita Chibrikov": [
@@ -703,7 +919,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 475.0,
-      "num_sales": 41
+      "num_sales": 41,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 1949.0,
+          "num_sales": 49
+        },
+        "PSA 9": {
+          "fair_value": 503.28,
+          "num_sales": 48
+        },
+        "PSA 8": {
+          "fair_value": 375.0,
+          "num_sales": 50
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #452 - Brian Halonen": [
@@ -780,7 +1010,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 21.57,
-      "num_sales": 39
+      "num_sales": 39,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 49.44,
+          "num_sales": 7
+        },
+        "PSA 9": {
+          "fair_value": 194.6,
+          "num_sales": 6
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #463 - Maxim Tsyplakov": [
@@ -808,7 +1048,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 11.2,
-      "num_sales": 34
+      "num_sales": 34,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 37.33,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #467 - Declan Carlile": [
@@ -836,7 +1082,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 18.91,
-      "num_sales": 31
+      "num_sales": 31,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 45.44,
+          "num_sales": 4
+        },
+        "PSA 9": {
+          "fair_value": 24.4,
+          "num_sales": 7
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #471 - Phil Kemp": [
@@ -857,14 +1113,34 @@
     {
       "date": "2026-02-15",
       "fair_value": 19.75,
-      "num_sales": 38
+      "num_sales": 38,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 61.95,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #474 - Rutger McGroarty": [
     {
       "date": "2026-02-15",
       "fair_value": 14.03,
-      "num_sales": 39
+      "num_sales": 39,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 70.0,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 20.0,
+          "num_sales": 13
+        },
+        "PSA 8": {
+          "fair_value": 15.19,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #475 - Albert Johansson": [
@@ -927,7 +1203,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 10.99,
-      "num_sales": 36
+      "num_sales": 36,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 30.84,
+          "num_sales": 5
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #485 - Samuel Honzek": [
@@ -990,7 +1272,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 38.0,
-      "num_sales": 41
+      "num_sales": 41,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 321.99,
+          "num_sales": 48
+        },
+        "PSA 9": {
+          "fair_value": 119.49,
+          "num_sales": 49
+        },
+        "PSA 8": {
+          "fair_value": 36.32,
+          "num_sales": 26
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #494 - Isaac Poulter": [
@@ -1004,7 +1300,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 25.73,
-      "num_sales": 36
+      "num_sales": 36,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 105.0,
+          "num_sales": 2
+        },
+        "PSA 9": {
+          "fair_value": 81.77,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #495 - Noah Philp": [
@@ -1032,7 +1338,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 65.07,
-      "num_sales": 43
+      "num_sales": 43,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 324.59,
+          "num_sales": 29
+        },
+        "PSA 9": {
+          "fair_value": 94.36,
+          "num_sales": 33
+        },
+        "PSA 8": {
+          "fair_value": 65.51,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #703 - Owen Pickering": [
@@ -1060,7 +1380,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 13.21,
-      "num_sales": 43
+      "num_sales": 43,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 64.99,
+          "num_sales": 4
+        },
+        "PSA 9": {
+          "fair_value": 64.99,
+          "num_sales": 6
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #707 - Tye Felhaber": [
@@ -1074,7 +1404,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 20.0,
-      "num_sales": 36
+      "num_sales": 36,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 102.0,
+          "num_sales": 8
+        },
+        "PSA 9": {
+          "fair_value": 36.72,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #709 - Trent Miner": [
@@ -1088,7 +1428,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 15.98,
-      "num_sales": 39
+      "num_sales": 39,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 81.94,
+          "num_sales": 4
+        },
+        "PSA 9": {
+          "fair_value": 39.62,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #711 - Isaiah George": [
@@ -1123,7 +1473,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 12.83,
-      "num_sales": 44
+      "num_sales": 44,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 93.25,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #716 - Max Sasson": [
@@ -1179,7 +1535,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 15.98,
-      "num_sales": 37
+      "num_sales": 37,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 89.99,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #724 - Fedor Svechkov": [
@@ -1207,7 +1569,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 21.3,
-      "num_sales": 44
+      "num_sales": 44,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 134.02,
+          "num_sales": 20
+        },
+        "PSA 9": {
+          "fair_value": 48.47,
+          "num_sales": 9
+        },
+        "PSA 8": {
+          "fair_value": 12.5,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2024-25 Upper Deck - Young Guns #730 - Jonathan Lekkerimaki/Will Smith CL": [
@@ -1270,7 +1646,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 13.0,
-      "num_sales": 44
+      "num_sales": 44,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 156.0,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 22.5,
+          "num_sales": 10
+        },
+        "PSA 8": {
+          "fair_value": 17.0,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #207 - Jaxson Stauber": [
@@ -1284,7 +1674,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 42
+      "num_sales": 42,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 42.86,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 26.07,
+          "num_sales": 3
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #209 - Samuel Bolduc": [
@@ -1305,7 +1705,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 10.5,
-      "num_sales": 40
+      "num_sales": 40,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 149.78,
+          "num_sales": 18
+        },
+        "PSA 9": {
+          "fair_value": 29.99,
+          "num_sales": 16
+        },
+        "PSA 8": {
+          "fair_value": 29.32,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #212 - Ridly Greig": [
@@ -1340,7 +1754,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 39
+      "num_sales": 39,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 307.69,
+          "num_sales": 13
+        },
+        "PSA 9": {
+          "fair_value": 33.01,
+          "num_sales": 12
+        },
+        "PSA 8": {
+          "fair_value": 40.39,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #217 - Arnaud Durandeau": [
@@ -1382,7 +1810,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 28.07,
-      "num_sales": 42
+      "num_sales": 42,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 180.5,
+          "num_sales": 6
+        },
+        "PSA 9": {
+          "fair_value": 38.0,
+          "num_sales": 26
+        },
+        "PSA 8": {
+          "fair_value": 25.0,
+          "num_sales": 6
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #223 - Tristen Robins": [
@@ -1522,7 +1964,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 41
+      "num_sales": 41,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 269.4,
+          "num_sales": 2
+        },
+        "PSA 9": {
+          "fair_value": 32.28,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #243 - Adam Ginning": [
@@ -1550,7 +2002,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 12.85,
-      "num_sales": 42
+      "num_sales": 42,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 124.47,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 59.99,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #247 - Leevi Merilainen": [
@@ -1564,7 +2026,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 14.68,
-      "num_sales": 40
+      "num_sales": 40,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 141.36,
+          "num_sales": 21
+        },
+        "PSA 9": {
+          "fair_value": 24.95,
+          "num_sales": 21
+        },
+        "PSA 8": {
+          "fair_value": 46.26,
+          "num_sales": 6
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #249 - Olle Eriksson Ek": [
@@ -1599,7 +2075,33 @@
     {
       "date": "2026-02-15",
       "fair_value": 236.47,
-      "num_sales": 47
+      "num_sales": 47,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 713.59,
+          "num_sales": 45
+        },
+        "PSA 9": {
+          "fair_value": 309.9,
+          "num_sales": 50
+        },
+        "PSA 8": {
+          "fair_value": 274.5,
+          "num_sales": 29
+        },
+        "BGS 10": {
+          "fair_value": 4003.98,
+          "num_sales": 1
+        },
+        "BGS 9.5": {
+          "fair_value": 749.05,
+          "num_sales": 14
+        },
+        "BGS 9": {
+          "fair_value": 517.46,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #454 - Waltteri Merela": [
@@ -1634,7 +2136,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 35
+      "num_sales": 35,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 15.1,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #459 - Joel Teasdale": [
@@ -1697,7 +2205,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 32
+      "num_sales": 32,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 154.21,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #469 - Hugh McGing": [
@@ -1718,7 +2232,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 30.75,
-      "num_sales": 40
+      "num_sales": 40,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 209.14,
+          "num_sales": 50
+        },
+        "PSA 9": {
+          "fair_value": 52.12,
+          "num_sales": 42
+        },
+        "PSA 8": {
+          "fair_value": 31.57,
+          "num_sales": 3
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #473 - Hardy Haman Aktell": [
@@ -1753,7 +2281,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 32
+      "num_sales": 32,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 15.0,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #474 - Zach Benson": [
@@ -1774,7 +2308,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 12.14,
-      "num_sales": 31
+      "num_sales": 31,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 107.22,
+          "num_sales": 11
+        },
+        "PSA 9": {
+          "fair_value": 10.0,
+          "num_sales": 10
+        },
+        "PSA 8": {
+          "fair_value": 18.5,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #479 - Bobby McMann": [
@@ -1809,14 +2357,34 @@
     {
       "date": "2026-02-15",
       "fair_value": 20.06,
-      "num_sales": 44
+      "num_sales": 44,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 85.0,
+          "num_sales": 13
+        },
+        "PSA 9": {
+          "fair_value": 58.47,
+          "num_sales": 18
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #484 - Lucas Condotta": [
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 39
+      "num_sales": 39,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 54.94,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 54.94,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #485 - Arturs Silovs": [
@@ -1837,7 +2405,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 17
+      "num_sales": 17,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 12.61,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #488 - Pavel Mintyukov": [
@@ -1949,7 +2523,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 20.93,
-      "num_sales": 42
+      "num_sales": 42,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 157.5,
+          "num_sales": 16
+        },
+        "PSA 9": {
+          "fair_value": 31.0,
+          "num_sales": 15
+        },
+        "PSA 8": {
+          "fair_value": 15.5,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #705 - Roby Jarventie": [
@@ -2012,7 +2600,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 23.5,
-      "num_sales": 43
+      "num_sales": 43,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 121.18,
+          "num_sales": 28
+        },
+        "PSA 9": {
+          "fair_value": 35.43,
+          "num_sales": 13
+        },
+        "PSA 8": {
+          "fair_value": 17.0,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #714 - Yaniv Perets": [
@@ -2040,14 +2642,34 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 35
+      "num_sales": 35,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 39.99,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 79.3,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #716 - Sam Malinski": [
     {
       "date": "2026-02-15",
       "fair_value": 12.11,
-      "num_sales": 35
+      "num_sales": 35,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 45.45,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 15.79,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #718 - Linus Karlsson": [
@@ -2068,7 +2690,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 42
+      "num_sales": 42,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 99.99,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 30.5,
+          "num_sales": 2
+        },
+        "PSA 8": {
+          "fair_value": 22.75,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #721 - Louis Crevier": [
@@ -2096,7 +2732,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 40
+      "num_sales": 40,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 154.18,
+          "num_sales": 8
+        },
+        "PSA 9": {
+          "fair_value": 47.64,
+          "num_sales": 7
+        },
+        "PSA 8": {
+          "fair_value": 9.99,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2023-24 Upper Deck - Young Guns #725 - Jayden Struble": [
@@ -2131,7 +2781,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 44
+      "num_sales": 44,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 79.66,
+          "num_sales": 5
+        },
+        "PSA 9": {
+          "fair_value": 43.51,
+          "num_sales": 3
+        },
+        "PSA 8": {
+          "fair_value": 12.3,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #202 - Nick Blankenburg": [
@@ -2145,14 +2809,42 @@
     {
       "date": "2026-02-15",
       "fair_value": 20.21,
-      "num_sales": 48
+      "num_sales": 48,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 60.0,
+          "num_sales": 4
+        },
+        "PSA 9": {
+          "fair_value": 35.18,
+          "num_sales": 4
+        },
+        "PSA 8": {
+          "fair_value": 15.0,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #201 - Matt Boldy": [
     {
       "date": "2026-02-15",
       "fair_value": 16.9,
-      "num_sales": 43
+      "num_sales": 43,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 299.99,
+          "num_sales": 12
+        },
+        "PSA 9": {
+          "fair_value": 59.99,
+          "num_sales": 26
+        },
+        "PSA 8": {
+          "fair_value": 29.98,
+          "num_sales": 5
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #206 - Nathan Smith": [
@@ -2166,14 +2858,38 @@
     {
       "date": "2026-02-15",
       "fair_value": 8.08,
-      "num_sales": 39
+      "num_sales": 39,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 59.95,
+          "num_sales": 2
+        },
+        "PSA 9": {
+          "fair_value": 21.94,
+          "num_sales": 5
+        },
+        "PSA 8": {
+          "fair_value": 7.5,
+          "num_sales": 3
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #205 - Jordan Harris": [
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 19
+      "num_sales": 19,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 82.76,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 20.19,
+          "num_sales": 5
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #207 - Hayden Hodgson": [
@@ -2222,7 +2938,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 12.85,
-      "num_sales": 45
+      "num_sales": 45,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 110.16,
+          "num_sales": 9
+        },
+        "PSA 9": {
+          "fair_value": 12.6,
+          "num_sales": 18
+        },
+        "PSA 8": {
+          "fair_value": 9.61,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #214 - Braden Schneider": [
@@ -2334,7 +3064,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 15.05,
-      "num_sales": 45
+      "num_sales": 45,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 49.99,
+          "num_sales": 11
+        },
+        "PSA 9": {
+          "fair_value": 11.79,
+          "num_sales": 9
+        },
+        "PSA 8": {
+          "fair_value": 5.5,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #231 - Carson Meyer": [
@@ -2376,7 +3120,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 11.74,
-      "num_sales": 37
+      "num_sales": 37,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 30.08,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 21.06,
+          "num_sales": 8
+        },
+        "PSA 8": {
+          "fair_value": 16.69,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #236 - Jack LaFontaine": [
@@ -2411,7 +3169,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 10.6,
-      "num_sales": 17
+      "num_sales": 17,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 59.95,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #241 - Trey Fix-Wolansky": [
@@ -2439,7 +3203,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 11.2,
-      "num_sales": 43
+      "num_sales": 43,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 41.53,
+          "num_sales": 10
+        },
+        "PSA 9": {
+          "fair_value": 33.41,
+          "num_sales": 8
+        },
+        "PSA 8": {
+          "fair_value": 10.0,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #245 - Mads Sogaard": [
@@ -2502,7 +3280,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 58.75,
-      "num_sales": 46
+      "num_sales": 46,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 376.22,
+          "num_sales": 14
+        },
+        "PSA 9": {
+          "fair_value": 99.0,
+          "num_sales": 49
+        },
+        "PSA 8": {
+          "fair_value": 54.55,
+          "num_sales": 9
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #455 - Brandon Biro": [
@@ -2537,14 +3329,38 @@
     {
       "date": "2026-02-15",
       "fair_value": 10.6,
-      "num_sales": 19
+      "num_sales": 19,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 33.54,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 3.0,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #459 - Wyatt Johnston": [
     {
       "date": "2026-02-15",
       "fair_value": 26.07,
-      "num_sales": 44
+      "num_sales": 44,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 146.88,
+          "num_sales": 12
+        },
+        "PSA 9": {
+          "fair_value": 38.19,
+          "num_sales": 21
+        },
+        "PSA 8": {
+          "fair_value": 12.5,
+          "num_sales": 7
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #460 - Brandon Baddock": [
@@ -2586,7 +3402,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 12.85,
-      "num_sales": 34
+      "num_sales": 34,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 24.6,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 14.94,
+          "num_sales": 2
+        },
+        "PSA 8": {
+          "fair_value": 17.26,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #467 - Ben Jones": [
@@ -2600,7 +3430,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 12.99,
-      "num_sales": 46
+      "num_sales": 46,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 97.3,
+          "num_sales": 9
+        },
+        "PSA 9": {
+          "fair_value": 34.25,
+          "num_sales": 9
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #468 - Jakub Lauko": [
@@ -2621,7 +3461,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 22.42,
-      "num_sales": 43
+      "num_sales": 43,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 70.3,
+          "num_sales": 5
+        },
+        "PSA 9": {
+          "fair_value": 26.8,
+          "num_sales": 15
+        },
+        "PSA 8": {
+          "fair_value": 13.47,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #471 - Viktor Lodin": [
@@ -2663,7 +3517,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 12.85,
-      "num_sales": 46
+      "num_sales": 46,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 79.99,
+          "num_sales": 5
+        },
+        "PSA 9": {
+          "fair_value": 14.0,
+          "num_sales": 13
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #477 - Filip Hallander": [
@@ -2691,7 +3555,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 15.79,
-      "num_sales": 42
+      "num_sales": 42,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 150.0,
+          "num_sales": 7
+        },
+        "PSA 9": {
+          "fair_value": 30.24,
+          "num_sales": 16
+        },
+        "PSA 8": {
+          "fair_value": 17.99,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #482 - Lucas Johansen": [
@@ -2768,7 +3646,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 12.14,
-      "num_sales": 43
+      "num_sales": 43,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 57.28,
+          "num_sales": 4
+        },
+        "PSA 9": {
+          "fair_value": 34.62,
+          "num_sales": 9
+        },
+        "PSA 8": {
+          "fair_value": 20.2,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #493 - Filip Kral": [
@@ -2824,7 +3716,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 19.09,
-      "num_sales": 44
+      "num_sales": 44,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 208.0,
+          "num_sales": 9
+        },
+        "PSA 9": {
+          "fair_value": 51.4,
+          "num_sales": 5
+        },
+        "PSA 8": {
+          "fair_value": 15.79,
+          "num_sales": 6
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #500 - Juraj Slafkovsky/Shane Wright CL": [
@@ -2866,14 +3772,26 @@
     {
       "date": "2026-02-15",
       "fair_value": 21.23,
-      "num_sales": 22
+      "num_sales": 22,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 45.0,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #706 - Juuso Parssinen": [
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 9
+      "num_sales": 9,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 23.6,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #707 - Nick Cicek": [
@@ -2922,7 +3840,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 16.5,
-      "num_sales": 21
+      "num_sales": 21,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 157.14,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #714 - Mac Hollowell": [
@@ -2964,7 +3888,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 15.98,
-      "num_sales": 25
+      "num_sales": 25,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 267.39,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 66.05,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2022-23 Upper Deck - Young Guns #720 - Tim Berni": [
@@ -3062,7 +3996,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 51.85,
-      "num_sales": 46
+      "num_sales": 46,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 240.14,
+          "num_sales": 50
+        },
+        "PSA 9": {
+          "fair_value": 64.63,
+          "num_sales": 48
+        },
+        "PSA 8": {
+          "fair_value": 64.62,
+          "num_sales": 12
+        }
+      }
     }
   ],
   "2021-22 Upper Deck - Young Guns #206 - Kyle Burroughs": [
@@ -3188,7 +4136,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 8.82,
-      "num_sales": 43
+      "num_sales": 43,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 194.61,
+          "num_sales": 10
+        },
+        "PSA 9": {
+          "fair_value": 17.5,
+          "num_sales": 13
+        },
+        "PSA 8": {
+          "fair_value": 12.0,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2021-22 Upper Deck - Young Guns #222 - Tanner Jeannot": [
@@ -3209,14 +4171,38 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.51,
-      "num_sales": 50
+      "num_sales": 50,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 69.76,
+          "num_sales": 17
+        },
+        "PSA 9": {
+          "fair_value": 21.66,
+          "num_sales": 15
+        },
+        "PSA 8": {
+          "fair_value": 11.74,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2021-22 Upper Deck - Young Guns #225 - Filip Gustavsson": [
     {
       "date": "2026-02-15",
       "fair_value": 11.2,
-      "num_sales": 34
+      "num_sales": 34,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 86.95,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 11.39,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2021-22 Upper Deck - Young Guns #227 - Calen Addison": [
@@ -3237,7 +4223,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 6.98,
-      "num_sales": 45
+      "num_sales": 45,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 80.79,
+          "num_sales": 14
+        },
+        "PSA 9": {
+          "fair_value": 30.57,
+          "num_sales": 19
+        },
+        "PSA 8": {
+          "fair_value": 18.72,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2021-22 Upper Deck - Young Guns #229 - Daniel Walcott": [
@@ -3265,7 +4265,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 20.21,
-      "num_sales": 40
+      "num_sales": 40,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 69.4,
+          "num_sales": 16
+        },
+        "PSA 9": {
+          "fair_value": 25.33,
+          "num_sales": 29
+        },
+        "PSA 8": {
+          "fair_value": 15.0,
+          "num_sales": 9
+        }
+      }
     }
   ],
   "2021-22 Upper Deck - Young Guns #233 - Jeffrey Viel": [
@@ -3377,7 +4391,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 11.67,
-      "num_sales": 41
+      "num_sales": 41,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 60.99,
+          "num_sales": 4
+        },
+        "PSA 9": {
+          "fair_value": 12.0,
+          "num_sales": 5
+        },
+        "PSA 8": {
+          "fair_value": 13.58,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2021-22 Upper Deck - Young Guns #250 - Cole Caufield/Trevor Zegras CL": [
@@ -3454,7 +4482,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 16.5,
-      "num_sales": 35
+      "num_sales": 35,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 32.31,
+          "num_sales": 8
+        },
+        "PSA 9": {
+          "fair_value": 22.01,
+          "num_sales": 3
+        }
+      }
     }
   ],
   "2021-22 Upper Deck - Young Guns #459 - Dawson Mercer": [
@@ -3468,7 +4506,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 8
+      "num_sales": 8,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 29.99,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2021-22 Upper Deck - Young Guns #463 - Jan Jenik": [
@@ -3496,14 +4540,38 @@
     {
       "date": "2026-02-15",
       "fair_value": 25.35,
-      "num_sales": 42
+      "num_sales": 42,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 96.94,
+          "num_sales": 33
+        },
+        "PSA 9": {
+          "fair_value": 39.64,
+          "num_sales": 17
+        },
+        "PSA 8": {
+          "fair_value": 24.12,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2021-22 Upper Deck - Young Guns #466 - Cole Perfetti": [
     {
       "date": "2026-02-15",
       "fair_value": 11.01,
-      "num_sales": 39
+      "num_sales": 39,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 51.4,
+          "num_sales": 12
+        },
+        "PSA 9": {
+          "fair_value": 24.93,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2021-22 Upper Deck - Young Guns #468 - David Farrance": [
@@ -3531,7 +4599,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 44.68,
-      "num_sales": 43
+      "num_sales": 43,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 85.66,
+          "num_sales": 49
+        },
+        "PSA 9": {
+          "fair_value": 46.51,
+          "num_sales": 16
+        },
+        "PSA 8": {
+          "fair_value": 39.06,
+          "num_sales": 3
+        }
+      }
     }
   ],
   "2021-22 Upper Deck - Young Guns #471 - Yegor Chinakhov": [
@@ -3615,7 +4697,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.51,
-      "num_sales": 18
+      "num_sales": 18,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 35.58,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2021-22 Upper Deck - Young Guns #481 - Vasily Podkolzin": [
@@ -3664,7 +4752,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 12.77,
-      "num_sales": 48
+      "num_sales": 48,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 39.99,
+          "num_sales": 19
+        },
+        "PSA 9": {
+          "fair_value": 13.5,
+          "num_sales": 12
+        },
+        "PSA 8": {
+          "fair_value": 10.49,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2021-22 Upper Deck - Young Guns #490 - William Lockwood": [
@@ -3727,7 +4829,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 11.2,
-      "num_sales": 25
+      "num_sales": 25,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 19.99,
+          "num_sales": 6
+        },
+        "PSA 9": {
+          "fair_value": 10.51,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2021-22 Upper Deck - Young Guns #499 - Jonah Gadjovich": [
@@ -3874,7 +4986,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.84,
-      "num_sales": 16
+      "num_sales": 16,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 35.0,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2021-22 Upper Deck - Young Guns #721 - Cole Schwindt": [
@@ -4070,7 +5188,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 30.49,
-      "num_sales": 46
+      "num_sales": 46,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 61.79,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 28.08,
+          "num_sales": 3
+        }
+      }
     }
   ],
   "2021-22 Upper Deck - Young Guns #750 - Alex Turcotte/Alexander Holtz CL": [
@@ -4112,7 +5240,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 23.13,
-      "num_sales": 46
+      "num_sales": 46,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 78.08,
+          "num_sales": 16
+        },
+        "PSA 9": {
+          "fair_value": 46.98,
+          "num_sales": 16
+        },
+        "PSA 8": {
+          "fair_value": 20.19,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2020-21 Upper Deck - Young Guns #204 - Philip Broberg": [
@@ -4154,7 +5296,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 36.71,
-      "num_sales": 44
+      "num_sales": 44,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 88.5,
+          "num_sales": 4
+        },
+        "PSA 9": {
+          "fair_value": 22.5,
+          "num_sales": 7
+        },
+        "PSA 8": {
+          "fair_value": 25.65,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2020-21 Upper Deck - Young Guns #212 - Lucas Carlsson": [
@@ -4175,7 +5331,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 20.39,
-      "num_sales": 46
+      "num_sales": 46,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 92.17,
+          "num_sales": 4
+        },
+        "PSA 9": {
+          "fair_value": 83.71,
+          "num_sales": 6
+        },
+        "PSA 8": {
+          "fair_value": 19.65,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2020-21 Upper Deck - Young Guns #213 - Ty Dellandrea": [
@@ -4343,7 +5513,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 22.03,
-      "num_sales": 46
+      "num_sales": 46,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 115.01,
+          "num_sales": 28
+        },
+        "PSA 9": {
+          "fair_value": 46.26,
+          "num_sales": 29
+        },
+        "PSA 8": {
+          "fair_value": 10.49,
+          "num_sales": 5
+        }
+      }
     }
   ],
   "2020-21 Upper Deck - Young Guns #237 - Nick Robertson": [
@@ -4420,7 +5604,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 12.43,
-      "num_sales": 43
+      "num_sales": 43,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 71.86,
+          "num_sales": 13
+        },
+        "PSA 9": {
+          "fair_value": 31.57,
+          "num_sales": 16
+        },
+        "PSA 8": {
+          "fair_value": 25.69,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2020-21 Upper Deck - Young Guns #248 - Timothy Liljegren": [
@@ -4462,7 +5660,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 195.0,
-      "num_sales": 45
+      "num_sales": 45,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 194.95,
+          "num_sales": 50
+        },
+        "PSA 9": {
+          "fair_value": 105.79,
+          "num_sales": 37
+        },
+        "PSA 8": {
+          "fair_value": 60.0,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2020-21 Upper Deck - Young Guns #454 - Gage Quinney": [
@@ -4665,7 +5877,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 56.04,
-      "num_sales": 44
+      "num_sales": 44,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 117.86,
+          "num_sales": 35
+        },
+        "PSA 9": {
+          "fair_value": 99.14,
+          "num_sales": 21
+        }
+      }
     }
   ],
   "2020-21 Upper Deck - Young Guns #484 - Pius Suter": [
@@ -4973,7 +6195,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 10.35,
-      "num_sales": 11
+      "num_sales": 11,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 47.73,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2020-21 Upper Deck - Young Guns #728 - Drew O'Connor": [
@@ -5022,7 +6250,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 87.07,
-      "num_sales": 48
+      "num_sales": 48,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 244.4,
+          "num_sales": 50
+        },
+        "PSA 9": {
+          "fair_value": 60.0,
+          "num_sales": 14
+        }
+      }
     }
   ],
   "2019-20 Upper Deck - Young Guns #204 - Ville Heinola": [
@@ -5204,7 +6442,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 23.46,
-      "num_sales": 42
+      "num_sales": 42,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 60.96,
+          "num_sales": 13
+        },
+        "PSA 9": {
+          "fair_value": 22.03,
+          "num_sales": 9
+        }
+      }
     }
   ],
   "2019-20 Upper Deck - Young Guns #230 - Mario Ferraro": [
@@ -5358,7 +6606,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 78.52,
-      "num_sales": 43
+      "num_sales": 43,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 229.85,
+          "num_sales": 39
+        },
+        "PSA 9": {
+          "fair_value": 102.81,
+          "num_sales": 28
+        },
+        "PSA 8": {
+          "fair_value": 44.99,
+          "num_sales": 3
+        }
+      }
     }
   ],
   "2019-20 Upper Deck - Young Guns #452 - Andrew Peeke": [
@@ -5449,7 +6711,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 6.98,
-      "num_sales": 15
+      "num_sales": 15,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 73.99,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 26.44,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2019-20 Upper Deck - Young Guns #465 - Rhett Gardner": [
@@ -5477,7 +6749,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 14.73,
-      "num_sales": 24
+      "num_sales": 24,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 26.8,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 26.16,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2019-20 Upper Deck - Young Guns #469 - Morgan Frost": [
@@ -5512,7 +6794,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 102.81,
-      "num_sales": 43
+      "num_sales": 43,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 336.49,
+          "num_sales": 13
+        },
+        "PSA 9": {
+          "fair_value": 176.25,
+          "num_sales": 11
+        },
+        "PSA 8": {
+          "fair_value": 65.0,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2019-20 Upper Deck - Young Guns #474 - Givani Smith": [
@@ -5554,7 +6850,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 13.58,
-      "num_sales": 25
+      "num_sales": 25,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 29.79,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 15.98,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2019-20 Upper Deck - Young Guns #482 - Max Veronneau": [
@@ -5582,7 +6888,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 20.19,
-      "num_sales": 36
+      "num_sales": 36,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 160.24,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 88.09,
+          "num_sales": 2
+        },
+        "PSA 8": {
+          "fair_value": 19.94,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2019-20 Upper Deck - Young Guns #484 - Carl Grundstrom": [
@@ -5666,7 +6986,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 315.0,
-      "num_sales": 39
+      "num_sales": 39,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 856.1,
+          "num_sales": 17
+        },
+        "PSA 9": {
+          "fair_value": 327.88,
+          "num_sales": 22
+        },
+        "PSA 8": {
+          "fair_value": 291.54,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2019-20 Upper Deck - Young Guns #496 - Sam Lafferty": [
@@ -5729,7 +7063,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 52.87,
-      "num_sales": 9
+      "num_sales": 9,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 205.13,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2019-20 Upper Deck - Young Guns #521 - Yakov Trenin": [
@@ -5785,7 +7125,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 110.0,
-      "num_sales": 10
+      "num_sales": 10,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 126.5,
+          "num_sales": 5
+        },
+        "PSA 9": {
+          "fair_value": 69.76,
+          "num_sales": 5
+        }
+      }
     }
   ],
   "2018-19 Upper Deck - Young Guns #203 - Mikhail Vorobyev": [
@@ -5799,7 +7149,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 43.8,
-      "num_sales": 40
+      "num_sales": 40,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 117.49,
+          "num_sales": 19
+        },
+        "PSA 9": {
+          "fair_value": 32.31,
+          "num_sales": 7
+        },
+        "PSA 8": {
+          "fair_value": 30.83,
+          "num_sales": 3
+        }
+      }
     }
   ],
   "2018-19 Upper Deck - Young Guns #202 - Roope Hintz": [
@@ -5918,7 +7282,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.49,
-      "num_sales": 32
+      "num_sales": 32,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 64.99,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2018-19 Upper Deck - Young Guns #220 - Kiefer Sherwood": [
@@ -5939,7 +7309,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 24.6,
-      "num_sales": 38
+      "num_sales": 38,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 139.07,
+          "num_sales": 9
+        },
+        "PSA 9": {
+          "fair_value": 18.5,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2018-19 Upper Deck - Young Guns #223 - Max Lajoie": [
@@ -6065,14 +7445,34 @@
     {
       "date": "2026-02-15",
       "fair_value": 17.99,
-      "num_sales": 28
+      "num_sales": 28,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 41.4,
+          "num_sales": 5
+        },
+        "PSA 9": {
+          "fair_value": 12.77,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2018-19 Upper Deck - Young Guns #241 - Jordan Kyrou": [
     {
       "date": "2026-02-15",
       "fair_value": 7.16,
-      "num_sales": 28
+      "num_sales": 28,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 86.62,
+          "num_sales": 6
+        },
+        "PSA 9": {
+          "fair_value": 17.64,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2018-19 Upper Deck - Young Guns #243 - Par Lindholm": [
@@ -6086,7 +7486,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 18.82,
-      "num_sales": 28
+      "num_sales": 28,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 81.52,
+          "num_sales": 4
+        },
+        "PSA 9": {
+          "fair_value": 35.99,
+          "num_sales": 3
+        }
+      }
     }
   ],
   "2018-19 Upper Deck - Young Guns #244 - Kristian Vesalainen": [
@@ -6114,14 +7524,34 @@
     {
       "date": "2026-02-15",
       "fair_value": 30.67,
-      "num_sales": 44
+      "num_sales": 44,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 106.2,
+          "num_sales": 18
+        },
+        "PSA 9": {
+          "fair_value": 18.73,
+          "num_sales": 5
+        }
+      }
     }
   ],
   "2018-19 Upper Deck - Young Guns #248 - Elias Pettersson": [
     {
       "date": "2026-02-15",
       "fair_value": 38.19,
-      "num_sales": 24
+      "num_sales": 24,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 69.99,
+          "num_sales": 9
+        },
+        "PSA 9": {
+          "fair_value": 46.64,
+          "num_sales": 7
+        }
+      }
     }
   ],
   "2018-19 Upper Deck - Young Guns #249 - Jesperi Kotkaniemi": [
@@ -6156,7 +7586,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 52.32,
-      "num_sales": 30
+      "num_sales": 30,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 66.29,
+          "num_sales": 6
+        },
+        "PSA 9": {
+          "fair_value": 65.01,
+          "num_sales": 5
+        }
+      }
     }
   ],
   "2018-19 Upper Deck - Young Guns #454 - Jaret Anderson-Dolan": [
@@ -6296,7 +7736,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 10.83,
-      "num_sales": 27
+      "num_sales": 27,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 72.37,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 27.89,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2018-19 Upper Deck - Young Guns #474 - Sami Niku": [
@@ -6373,7 +7823,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 14.68,
-      "num_sales": 29
+      "num_sales": 29,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 30.79,
+          "num_sales": 4
+        },
+        "PSA 9": {
+          "fair_value": 32.31,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2018-19 Upper Deck - Young Guns #485 - Juho Lammikko": [
@@ -6429,7 +7889,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 11.29,
-      "num_sales": 22
+      "num_sales": 22,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 113.68,
+          "num_sales": 7
+        },
+        "PSA 9": {
+          "fair_value": 20.19,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2018-19 Upper Deck - Young Guns #494 - Clark Bishop": [
@@ -6492,7 +7962,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 52.91,
-      "num_sales": 34
+      "num_sales": 34,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 154.21,
+          "num_sales": 11
+        },
+        "PSA 9": {
+          "fair_value": 128.51,
+          "num_sales": 5
+        }
+      }
     }
   ],
   "2018-19 Upper Deck - Young Guns #513 - Jake Bean": [
@@ -6555,14 +8035,38 @@
     {
       "date": "2026-02-15",
       "fair_value": 24.32,
-      "num_sales": 44
+      "num_sales": 44,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 77.85,
+          "num_sales": 6
+        },
+        "PSA 9": {
+          "fair_value": 56.83,
+          "num_sales": 7
+        },
+        "PSA 8": {
+          "fair_value": 26.4,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2017-18 Upper Deck - Young Guns #204 - Pierre-Luc Dubois": [
     {
       "date": "2026-02-15",
       "fair_value": 7.99,
-      "num_sales": 27
+      "num_sales": 27,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 30.11,
+          "num_sales": 6
+        },
+        "PSA 9": {
+          "fair_value": 12.85,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2017-18 Upper Deck - Young Guns #205 - Josh Ho-Sang": [
@@ -6597,7 +8101,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.24,
-      "num_sales": 9
+      "num_sales": 9,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 47.4,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2017-18 Upper Deck - Young Guns #211 - John Hayden": [
@@ -6695,7 +8205,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 8.42,
-      "num_sales": 46
+      "num_sales": 46,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 66.09,
+          "num_sales": 7
+        },
+        "PSA 9": {
+          "fair_value": 27.17,
+          "num_sales": 8
+        },
+        "PSA 8": {
+          "fair_value": 20.38,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2017-18 Upper Deck - Young Guns #224 - Evgeny Svechnikov": [
@@ -6737,7 +8261,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 49.68,
-      "num_sales": 44
+      "num_sales": 44,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 213.02,
+          "num_sales": 12
+        },
+        "PSA 9": {
+          "fair_value": 64.53,
+          "num_sales": 11
+        },
+        "PSA 8": {
+          "fair_value": 28.37,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2017-18 Upper Deck - Young Guns #231 - Jonny Brodzinski": [
@@ -6835,7 +8373,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 15.45,
-      "num_sales": 45
+      "num_sales": 45,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 109.05,
+          "num_sales": 5
+        },
+        "PSA 9": {
+          "fair_value": 33.05,
+          "num_sales": 4
+        },
+        "PSA 8": {
+          "fair_value": 96.99,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2017-18 Upper Deck - Young Guns #244 - Vince Dunn": [
@@ -6891,7 +8443,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 7.79,
-      "num_sales": 32
+      "num_sales": 32,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 75.0,
+          "num_sales": 4
+        },
+        "PSA 9": {
+          "fair_value": 39.16,
+          "num_sales": 7
+        }
+      }
     }
   ],
   "2017-18 Upper Deck - Young Guns #452 - Jan Rutta": [
@@ -7003,7 +8565,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 20.0,
-      "num_sales": 38
+      "num_sales": 38,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 340.0,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2017-18 Upper Deck - Young Guns #468 - Kevin Roy": [
@@ -7024,7 +8592,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 8.99,
-      "num_sales": 23
+      "num_sales": 23,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 100.48,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2017-18 Upper Deck - Young Guns #471 - Peter Cehlarik": [
@@ -7073,7 +8647,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 19.99,
-      "num_sales": 25
+      "num_sales": 25,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 213.99,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 45.53,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2017-18 Upper Deck - Young Guns #478 - Ville Husso": [
@@ -7255,7 +8839,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 21.5,
-      "num_sales": 7
+      "num_sales": 7,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 108.65,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2017-18 Upper Deck - Young Guns #513 - Travis Boyd": [
@@ -7339,7 +8929,25 @@
     {
       "date": "2026-02-15",
       "fair_value": 250.0,
-      "num_sales": 22
+      "num_sales": 22,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 653.0,
+          "num_sales": 18
+        },
+        "PSA 9": {
+          "fair_value": 734.38,
+          "num_sales": 13
+        },
+        "BGS 10": {
+          "fair_value": 1620.77,
+          "num_sales": 2
+        },
+        "BGS 9.5": {
+          "fair_value": 365.71,
+          "num_sales": 5
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #204 - Connor Brown": [
@@ -7360,7 +8968,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 20.62,
-      "num_sales": 44
+      "num_sales": 44,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 66.09,
+          "num_sales": 11
+        },
+        "PSA 9": {
+          "fair_value": 20.5,
+          "num_sales": 5
+        },
+        "PSA 8": {
+          "fair_value": 20.56,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #206 - Jakob Chychrun": [
@@ -7395,7 +9017,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 18.32,
-      "num_sales": 44
+      "num_sales": 44,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 103.7,
+          "num_sales": 6
+        },
+        "PSA 9": {
+          "fair_value": 42.23,
+          "num_sales": 10
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #213 - Anthony Mantha": [
@@ -7409,7 +9041,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 51.2,
-      "num_sales": 38
+      "num_sales": 38,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 97.31,
+          "num_sales": 6
+        },
+        "PSA 9": {
+          "fair_value": 62.86,
+          "num_sales": 6
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #215 - Zach Sanford": [
@@ -7451,7 +9093,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.24,
-      "num_sales": 35
+      "num_sales": 35,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 90.91,
+          "num_sales": 4
+        },
+        "PSA 9": {
+          "fair_value": 34.47,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #220 - Anthony Beauvillier": [
@@ -7479,7 +9131,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 24.41,
-      "num_sales": 30
+      "num_sales": 30,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 106.74,
+          "num_sales": 2
+        },
+        "PSA 9": {
+          "fair_value": 52.33,
+          "num_sales": 5
+        },
+        "PSA 8": {
+          "fair_value": 32.98,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #225 - Jesse Puljujarvi": [
@@ -7493,14 +9159,34 @@
     {
       "date": "2026-02-15",
       "fair_value": 24.18,
-      "num_sales": 36
+      "num_sales": 36,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 314.31,
+          "num_sales": 10
+        },
+        "PSA 9": {
+          "fair_value": 92.91,
+          "num_sales": 4
+        },
+        "PSA 8": {
+          "fair_value": 37.77,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #227 - Pavel Buchnevich": [
     {
       "date": "2026-02-15",
       "fair_value": 5.24,
-      "num_sales": 21
+      "num_sales": 21,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 74.9,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #226 - Josh Morrissey": [
@@ -7528,7 +9214,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.14,
-      "num_sales": 28
+      "num_sales": 28,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 62.41,
+          "num_sales": 5
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #233 - Denis Malgin": [
@@ -7542,14 +9234,34 @@
     {
       "date": "2026-02-15",
       "fair_value": 55.04,
-      "num_sales": 46
+      "num_sales": 46,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 174.99,
+          "num_sales": 12
+        },
+        "PSA 9": {
+          "fair_value": 65.0,
+          "num_sales": 8
+        },
+        "PSA 8": {
+          "fair_value": 20.5,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #232 - Artturi Lehkonen": [
     {
       "date": "2026-02-15",
       "fair_value": 7.82,
-      "num_sales": 45
+      "num_sales": 45,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 66.0,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #234 - Nikita Zaitsev": [
@@ -7668,14 +9380,38 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.24,
-      "num_sales": 17
+      "num_sales": 17,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 64.12,
+          "num_sales": 13
+        },
+        "PSA 9": {
+          "fair_value": 69.76,
+          "num_sales": 5
+        },
+        "PSA 8": {
+          "fair_value": 17.26,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #249 - William Nylander": [
     {
       "date": "2026-02-15",
       "fair_value": 49.21,
-      "num_sales": 47
+      "num_sales": 47,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 146.51,
+          "num_sales": 5
+        },
+        "PSA 9": {
+          "fair_value": 89.0,
+          "num_sales": 7
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #452 - Kasperi Kapanen": [
@@ -7731,7 +9467,29 @@
     {
       "date": "2026-02-15",
       "fair_value": 48.06,
-      "num_sales": 24
+      "num_sales": 24,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 63.15,
+          "num_sales": 8
+        },
+        "PSA 9": {
+          "fair_value": 59.91,
+          "num_sales": 1
+        },
+        "PSA 8": {
+          "fair_value": 36.79,
+          "num_sales": 1
+        },
+        "BGS 10": {
+          "fair_value": 77.1,
+          "num_sales": 1
+        },
+        "BGS 9.5": {
+          "fair_value": 106.98,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #459 - Joel Eriksson Ek": [
@@ -7780,14 +9538,34 @@
     {
       "date": "2026-02-15",
       "fair_value": 13.42,
-      "num_sales": 12
+      "num_sales": 12,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 89.4,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #468 - Mitch Marner": [
     {
       "date": "2026-02-15",
       "fair_value": 40.37,
-      "num_sales": 14
+      "num_sales": 14,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 188.5,
+          "num_sales": 11
+        },
+        "PSA 9": {
+          "fair_value": 122.0,
+          "num_sales": 5
+        },
+        "PSA 8": {
+          "fair_value": 88.11,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #469 - Dominik Simon": [
@@ -7801,7 +9579,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 8.5,
-      "num_sales": 39
+      "num_sales": 39,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 87.47,
+          "num_sales": 10
+        },
+        "PSA 9": {
+          "fair_value": 25.33,
+          "num_sales": 4
+        },
+        "PSA 8": {
+          "fair_value": 23.24,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #470 - Rob O'Gara": [
@@ -7815,7 +9607,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 25.67,
-      "num_sales": 17
+      "num_sales": 17,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 26.0,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 117.86,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #473 - Charlie Lindgren": [
@@ -7829,7 +9631,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.3,
-      "num_sales": 40
+      "num_sales": 40,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 85.0,
+          "num_sales": 4
+        },
+        "PSA 9": {
+          "fair_value": 18.36,
+          "num_sales": 1
+        },
+        "PSA 8": {
+          "fair_value": 9.37,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #474 - Kevin Gravel": [
@@ -7941,7 +9757,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 20.63,
-      "num_sales": 24
+      "num_sales": 24,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 56.9,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #490 - Ryan Pulock": [
@@ -8018,7 +9840,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 18.56,
-      "num_sales": 34
+      "num_sales": 34,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 56.54,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2016-17 Upper Deck - Young Guns #516 - A.J. Greer": [
@@ -8102,7 +9930,33 @@
     {
       "date": "2026-02-15",
       "fair_value": 815.0,
-      "num_sales": 29
+      "num_sales": 29,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 2999.99,
+          "num_sales": 15
+        },
+        "PSA 9": {
+          "fair_value": 1053.09,
+          "num_sales": 16
+        },
+        "PSA 8": {
+          "fair_value": 595.0,
+          "num_sales": 4
+        },
+        "BGS 10": {
+          "fair_value": 1435.0,
+          "num_sales": 1
+        },
+        "BGS 9.5": {
+          "fair_value": 1479.01,
+          "num_sales": 20
+        },
+        "BGS 9": {
+          "fair_value": 962.02,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2015-16 Upper Deck - Young Guns #203 - Sergei Plotnikov": [
@@ -8123,14 +9977,34 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 42
+      "num_sales": 42,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 40.9,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2015-16 Upper Deck - Young Guns #206 - Mikko Rantanen": [
     {
       "date": "2026-02-15",
       "fair_value": 44.55,
-      "num_sales": 44
+      "num_sales": 44,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 224.59,
+          "num_sales": 9
+        },
+        "PSA 9": {
+          "fair_value": 43.88,
+          "num_sales": 13
+        },
+        "PSA 8": {
+          "fair_value": 27.0,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2015-16 Upper Deck - Young Guns #207 - Joel Edmundson": [
@@ -8144,7 +10018,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 10.32,
-      "num_sales": 18
+      "num_sales": 18,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 21.49,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2015-16 Upper Deck - Young Guns #209 - Nick Cousins": [
@@ -8200,7 +10080,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 33.67,
-      "num_sales": 42
+      "num_sales": 42,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 61.0,
+          "num_sales": 9
+        },
+        "PSA 9": {
+          "fair_value": 58.0,
+          "num_sales": 7
+        },
+        "PSA 8": {
+          "fair_value": 41.65,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2015-16 Upper Deck - Young Guns #218 - Shane Prince": [
@@ -8242,14 +10136,42 @@
     {
       "date": "2026-02-15",
       "fair_value": 26.87,
-      "num_sales": 44
+      "num_sales": 44,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 108.93,
+          "num_sales": 13
+        },
+        "PSA 9": {
+          "fair_value": 49.77,
+          "num_sales": 6
+        },
+        "PSA 8": {
+          "fair_value": 30.0,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2015-16 Upper Deck - Young Guns #223 - Nikolaj Ehlers": [
     {
       "date": "2026-02-15",
       "fair_value": 15.79,
-      "num_sales": 40
+      "num_sales": 40,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 78.56,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 27.53,
+          "num_sales": 1
+        },
+        "PSA 8": {
+          "fair_value": 18.55,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2015-16 Upper Deck - Young Guns #224 - Slater Koekkoek": [
@@ -8298,7 +10220,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 29.49,
-      "num_sales": 48
+      "num_sales": 48,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 386.71,
+          "num_sales": 5
+        },
+        "PSA 9": {
+          "fair_value": 117.49,
+          "num_sales": 6
+        },
+        "PSA 8": {
+          "fair_value": 28.57,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2015-16 Upper Deck - Young Guns #231 - Ben Hutton": [
@@ -8445,7 +10381,33 @@
     {
       "date": "2026-02-15",
       "fair_value": 45.59,
-      "num_sales": 41
+      "num_sales": 41,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 257.02,
+          "num_sales": 11
+        },
+        "PSA 9": {
+          "fair_value": 92.92,
+          "num_sales": 9
+        },
+        "PSA 8": {
+          "fair_value": 24.6,
+          "num_sales": 2
+        },
+        "BGS 10": {
+          "fair_value": 225.0,
+          "num_sales": 1
+        },
+        "BGS 9.5": {
+          "fair_value": 112.58,
+          "num_sales": 3
+        },
+        "BGS 9": {
+          "fair_value": 59.47,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2015-16 Upper Deck - Young Guns #454 - Logan Shaw": [
@@ -8543,7 +10505,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 13.36,
-      "num_sales": 29
+      "num_sales": 29,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 77.06,
+          "num_sales": 5
+        },
+        "PSA 8": {
+          "fair_value": 14.99,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2015-16 Upper Deck - Young Guns #467 - Dylan DeMelo": [
@@ -8599,7 +10571,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 18
+      "num_sales": 18,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 79.99,
+          "num_sales": 2
+        },
+        "PSA 9": {
+          "fair_value": 18.0,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2015-16 Upper Deck - Young Guns #476 - Max McCormick": [
@@ -8711,7 +10693,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 10.64,
-      "num_sales": 23
+      "num_sales": 23,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 113.82,
+          "num_sales": 1
+        },
+        "PSA 8": {
+          "fair_value": 27.16,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2015-16 Upper Deck - Young Guns #492 - Raman Hrabarenka": [
@@ -8760,7 +10752,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 15.02,
-      "num_sales": 36
+      "num_sales": 36,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 40.39,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 45.53,
+          "num_sales": 3
+        }
+      }
     }
   ],
   "2015-16 Upper Deck - Young Guns #498 - Tyler Randell": [
@@ -8893,7 +10895,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 34.44,
-      "num_sales": 16
+      "num_sales": 16,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 151.5,
+          "num_sales": 6
+        },
+        "PSA 9": {
+          "fair_value": 21.5,
+          "num_sales": 3
+        },
+        "PSA 8": {
+          "fair_value": 20.0,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2014-15 Upper Deck - Young Guns #207 - Nicolas Deslauriers": [
@@ -8935,7 +10951,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 50.0,
-      "num_sales": 16
+      "num_sales": 16,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 171.44,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 106.42,
+          "num_sales": 3
+        },
+        "PSA 8": {
+          "fair_value": 34.0,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2014-15 Upper Deck - Young Guns #213 - Patrick Brown": [
@@ -9012,7 +11042,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 468.48,
-      "num_sales": 16
+      "num_sales": 16,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 881.24,
+          "num_sales": 5
+        },
+        "PSA 9": {
+          "fair_value": 487.4,
+          "num_sales": 6
+        }
+      }
     }
   ],
   "2014-15 Upper Deck - Young Guns #224 - Oscar Klefbom": [
@@ -9026,7 +11066,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 15
+      "num_sales": 15,
+      "graded": {
+        "BGS 10": {
+          "fair_value": 200.48,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2014-15 Upper Deck - Young Guns #227 - Jonathan Racine": [
@@ -9187,14 +11233,30 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 16
+      "num_sales": 16,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 33.05,
+          "num_sales": 2
+        },
+        "PSA 9": {
+          "fair_value": 34.18,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2014-15 Upper Deck - Young Guns #249 - Adam Lowry": [
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 18
+      "num_sales": 18,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 47.73,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2014-15 Upper Deck - Young Guns #250 - Aaron Ekblad/Sam Reinhart/Leon Draisaitl CL": [
@@ -9257,7 +11319,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 39.25,
-      "num_sales": 13
+      "num_sales": 13,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 155.65,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2014-15 Upper Deck - Young Guns #459 - Colin Smith": [
@@ -9348,14 +11416,30 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 15
+      "num_sales": 15,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 53.15,
+          "num_sales": 1
+        },
+        "BGS 10": {
+          "fair_value": 113.4,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #203 - Alex Galchenyuk": [
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 14
+      "num_sales": 14,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 27.9,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #206 - Jesper Fast": [
@@ -9376,7 +11460,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 17.04,
-      "num_sales": 31
+      "num_sales": 31,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 121.64,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 21.5,
+          "num_sales": 3
+        },
+        "BGS 10": {
+          "fair_value": 276.11,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #208 - Damien Brunner": [
@@ -9446,7 +11544,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 41.33,
-      "num_sales": 45
+      "num_sales": 45,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 152.37,
+          "num_sales": 6
+        },
+        "PSA 9": {
+          "fair_value": 85.0,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #217 - Rasmus Ristolainen": [
@@ -9467,7 +11575,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 13.99,
-      "num_sales": 12
+      "num_sales": 12,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 59.0,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #220 - Olli Maatta": [
@@ -9495,14 +11609,30 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 13
+      "num_sales": 13,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 80.04,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #222 - Jonathan Huberdeau": [
     {
       "date": "2026-02-15",
       "fair_value": 19.46,
-      "num_sales": 29
+      "num_sales": 29,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 79.4,
+          "num_sales": 8
+        },
+        "PSA 9": {
+          "fair_value": 18.17,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #225 - Boone Jenner": [
@@ -9537,14 +11667,30 @@
     {
       "date": "2026-02-15",
       "fair_value": 20.93,
-      "num_sales": 14
+      "num_sales": 14,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 42.22,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 49.76,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #228 - Seth Jones": [
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 23
+      "num_sales": 23,
+      "graded": {
+        "BGS 10": {
+          "fair_value": 264.99,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #231 - Mathew Dumba": [
@@ -9586,7 +11732,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 6.5,
-      "num_sales": 12
+      "num_sales": 12,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 113.82,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #237 - Jacob Trouba": [
@@ -9614,7 +11766,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 890.06,
-      "num_sales": 33
+      "num_sales": 33,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 1880.0,
+          "num_sales": 18
+        },
+        "PSA 9": {
+          "fair_value": 675.61,
+          "num_sales": 18
+        },
+        "PSA 8": {
+          "fair_value": 306.23,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #241 - Nail Yakupov": [
@@ -9635,7 +11801,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 15
+      "num_sales": 15,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 78.47,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #245 - Emerson Etem": [
@@ -9656,7 +11828,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 18.57,
-      "num_sales": 21
+      "num_sales": 21,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 35.2,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #247 - Matt Nieto": [
@@ -9677,14 +11855,34 @@
     {
       "date": "2026-02-15",
       "fair_value": 10.23,
-      "num_sales": 25
+      "num_sales": 25,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 84.17,
+          "num_sales": 2
+        },
+        "PSA 9": {
+          "fair_value": 47.0,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #451 - Filip Forsberg": [
     {
       "date": "2026-02-15",
       "fair_value": 63.08,
-      "num_sales": 11
+      "num_sales": 11,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 170.16,
+          "num_sales": 2
+        },
+        "PSA 9": {
+          "fair_value": 55.0,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #453 - Michael Bournival": [
@@ -9796,7 +11994,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 25.15,
-      "num_sales": 9
+      "num_sales": 9,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 168.89,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #468 - Marek Mazanec": [
@@ -9810,14 +12014,26 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 11
+      "num_sales": 11,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 40.0,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #470 - Aleksander Barkov": [
     {
       "date": "2026-02-15",
       "fair_value": 88.78,
-      "num_sales": 6
+      "num_sales": 6,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 233.53,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #471 - Nikita Zadorov": [
@@ -9845,7 +12061,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 13.9,
-      "num_sales": 12
+      "num_sales": 12,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 42.52,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #475 - Cody Ceci": [
@@ -9866,7 +12088,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 20.0,
-      "num_sales": 9
+      "num_sales": 9,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 229.25,
+          "num_sales": 2
+        },
+        "PSA 9": {
+          "fair_value": 119.94,
+          "num_sales": 1
+        },
+        "PSA 8": {
+          "fair_value": 94.94,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #478 - Jarred Tinordi": [
@@ -9922,7 +12158,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 220.31,
-      "num_sales": 18
+      "num_sales": 18,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 700.0,
+          "num_sales": 6
+        },
+        "PSA 9": {
+          "fair_value": 271.71,
+          "num_sales": 6
+        },
+        "PSA 8": {
+          "fair_value": 150.91,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2013-14 Upper Deck - Young Guns #487 - Antti Raanta": [
@@ -10265,7 +12515,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 19.82,
-      "num_sales": 11
+      "num_sales": 11,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 219.98,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2012-13 Upper Deck - Young Guns #238 - Jakob Silfverberg": [
@@ -10286,7 +12542,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 66.09,
-      "num_sales": 8
+      "num_sales": 8,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 149.99,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 77.1,
+          "num_sales": 3
+        }
+      }
     }
   ],
   "2012-13 Upper Deck - Young Guns #242 - Matt Watkins": [
@@ -10321,7 +12587,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 20.94,
-      "num_sales": 5
+      "num_sales": 5,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 65.06,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2012-13 Upper Deck - Young Guns #246 - J.T. Brown": [
@@ -10419,7 +12691,29 @@
     {
       "date": "2026-02-15",
       "fair_value": 26.79,
-      "num_sales": 14
+      "num_sales": 14,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 147.25,
+          "num_sales": 4
+        },
+        "PSA 9": {
+          "fair_value": 98.58,
+          "num_sales": 2
+        },
+        "PSA 8": {
+          "fair_value": 41.65,
+          "num_sales": 1
+        },
+        "BGS 10": {
+          "fair_value": 276.67,
+          "num_sales": 1
+        },
+        "BGS 9.5": {
+          "fair_value": 143.9,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2011-12 Upper Deck - Young Guns #210 - John Moore": [
@@ -10454,7 +12748,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 58.48,
-      "num_sales": 10
+      "num_sales": 10,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 266.57,
+          "num_sales": 2
+        },
+        "PSA 9": {
+          "fair_value": 105.74,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2011-12 Upper Deck - Young Guns #215 - Anton Lander": [
@@ -10559,7 +12863,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 17.61,
-      "num_sales": 11
+      "num_sales": 11,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 84.82,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 44.03,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2011-12 Upper Deck - Young Guns #230 - Colin Greening": [
@@ -10699,7 +13013,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 41.48,
-      "num_sales": 10
+      "num_sales": 10,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 229.12,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2011-12 Upper Deck - Young Guns #250 - Checklist": [
@@ -10909,14 +13229,30 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 8
+      "num_sales": 8,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 23.5,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2011-12 Upper Deck - Young Guns #480 - Mattias Ekholm": [
     {
       "date": "2026-02-15",
       "fair_value": 11.0,
-      "num_sales": 6
+      "num_sales": 6,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 30.85,
+          "num_sales": 1
+        },
+        "PSA 8": {
+          "fair_value": 34.33,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2011-12 Upper Deck - Young Guns #481 - David Ullstrom": [
@@ -11189,7 +13525,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 17.61,
-      "num_sales": 14
+      "num_sales": 14,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 192.4,
+          "num_sales": 3
+        },
+        "BGS 10": {
+          "fair_value": 45.53,
+          "num_sales": 1
+        },
+        "BGS 9.5": {
+          "fair_value": 28.64,
+          "num_sales": 3
+        }
+      }
     }
   ],
   "2010-11 Upper Deck - Young Guns #221 - Alex Plante": [
@@ -11203,7 +13553,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 22.76,
-      "num_sales": 21
+      "num_sales": 21,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 87.39,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2010-11 Upper Deck - Young Guns #222 - Evgeny Dadonov": [
@@ -11448,7 +13804,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 85.12,
-      "num_sales": 2
+      "num_sales": 2,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 147.34,
+          "num_sales": 3
+        }
+      }
     }
   ],
   "2010-11 Upper Deck - Young Guns #458 - Jon Matsumoto": [
@@ -11742,7 +14104,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 15.66,
-      "num_sales": 7
+      "num_sales": 7,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 10.1,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2010-11 Upper Deck - Young Guns #500 - Magnus Paajarvi/Tyler Seguin CL": [
@@ -11763,21 +14131,55 @@
     {
       "date": "2026-02-15",
       "fair_value": 104.9,
-      "num_sales": 14
+      "num_sales": 14,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 295.21,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 54.0,
+          "num_sales": 6
+        },
+        "PSA 8": {
+          "fair_value": 89.0,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2009-10 Upper Deck - Young Guns #202 - Victor Hedman": [
     {
       "date": "2026-02-15",
       "fair_value": 29.56,
-      "num_sales": 21
+      "num_sales": 21,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 350.29,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 165.92,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2009-10 Upper Deck - Young Guns #203 - Matt Duchene": [
     {
       "date": "2026-02-15",
       "fair_value": 28.6,
-      "num_sales": 14
+      "num_sales": 14,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 198.25,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 28.63,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2009-10 Upper Deck - Young Guns #204 - Ville Leino": [
@@ -11840,7 +14242,29 @@
     {
       "date": "2026-02-15",
       "fair_value": 22.02,
-      "num_sales": 11
+      "num_sales": 11,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 148.19,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 22.72,
+          "num_sales": 1
+        },
+        "PSA 8": {
+          "fair_value": 28.88,
+          "num_sales": 1
+        },
+        "BGS 10": {
+          "fair_value": 176.18,
+          "num_sales": 1
+        },
+        "BGS 9.5": {
+          "fair_value": 38.0,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2009-10 Upper Deck - Young Guns #215 - Jason Demers": [
@@ -12113,7 +14537,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 175.16,
-      "num_sales": 11
+      "num_sales": 11,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 475.0,
+          "num_sales": 6
+        },
+        "PSA 9": {
+          "fair_value": 471.1,
+          "num_sales": 3
+        },
+        "PSA 8": {
+          "fair_value": 149.0,
+          "num_sales": 3
+        }
+      }
     }
   ],
   "2009-10 Upper Deck - Young Guns #453 - Tyler Ennis": [
@@ -12365,7 +14803,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 8
+      "num_sales": 8,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 13.96,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2009-10 Upper Deck - Young Guns #491 - Tyler Bozak": [
@@ -12393,7 +14837,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 15.95,
-      "num_sales": 7
+      "num_sales": 7,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 101.35,
+          "num_sales": 2
+        },
+        "PSA 8": {
+          "fair_value": 17.61,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2009-10 Upper Deck - Young Guns #495 - Mario Bliznak": [
@@ -12722,7 +15176,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 5.1,
-      "num_sales": 14
+      "num_sales": 14,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 149.56,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 42.99,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2008-09 Upper Deck - Young Guns #243 - Vladimir Mihalik": [
@@ -12743,7 +15207,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 58.01,
-      "num_sales": 13
+      "num_sales": 13,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 306.23,
+          "num_sales": 3
+        },
+        "PSA 9": {
+          "fair_value": 103.18,
+          "num_sales": 4
+        },
+        "PSA 8": {
+          "fair_value": 148.38,
+          "num_sales": 5
+        }
+      }
     }
   ],
   "2008-09 Upper Deck - Young Guns #246 - John Mitchell": [
@@ -13191,7 +15669,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 235.66,
-      "num_sales": 25
+      "num_sales": 25,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 1259.45,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 348.83,
+          "num_sales": 4
+        },
+        "PSA 8": {
+          "fair_value": 183.22,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2007-08 Upper Deck - Young Guns #213 - Tyler Weiman": [
@@ -13296,7 +15788,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 220.28,
-      "num_sales": 11
+      "num_sales": 11,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 702.8,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 202.5,
+          "num_sales": 3
+        },
+        "PSA 8": {
+          "fair_value": 178.8,
+          "num_sales": 5
+        }
+      }
     }
   ],
   "2007-08 Upper Deck - Young Guns #228 - Jaroslav Halak": [
@@ -13450,7 +15956,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 30.68,
-      "num_sales": 14
+      "num_sales": 14,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 222.5,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2007-08 Upper Deck - Young Guns #451 - Petteri Wirtanen": [
@@ -13499,7 +16011,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 60.01,
-      "num_sales": 10
+      "num_sales": 10,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 179.45,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2007-08 Upper Deck - Young Guns #458 - Vladimir Sobotka": [
@@ -13821,7 +16339,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 15.46,
-      "num_sales": 7
+      "num_sales": 7,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 250.0,
+          "num_sales": 4
+        }
+      }
     }
   ],
   "2006-07 Upper Deck - Young Guns #205 - Carsen Germyn": [
@@ -13835,7 +16359,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 24.23,
-      "num_sales": 11
+      "num_sales": 11,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 174.99,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2006-07 Upper Deck - Young Guns #207 - Paul Stastny": [
@@ -13919,7 +16449,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 42.59,
-      "num_sales": 18
+      "num_sales": 18,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 1059.68,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 176.55,
+          "num_sales": 4
+        },
+        "PSA 8": {
+          "fair_value": 140.61,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2006-07 Upper Deck - Young Guns #219 - Miroslav Kopriva": [
@@ -13961,7 +16505,17 @@
     {
       "date": "2026-02-15",
       "fair_value": 15.31,
-      "num_sales": 11
+      "num_sales": 11,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 242.43,
+          "num_sales": 1
+        },
+        "PSA 8": {
+          "fair_value": 62.19,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2006-07 Upper Deck - Young Guns #226 - John Oduya": [
@@ -14066,14 +16620,26 @@
     {
       "date": "2026-02-15",
       "fair_value": 9.18,
-      "num_sales": 13
+      "num_sales": 13,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 153.48,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2006-07 Upper Deck - Young Guns #240 - Kris Letang": [
     {
       "date": "2026-02-15",
       "fair_value": 172.49,
-      "num_sales": 5
+      "num_sales": 5,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 318.48,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2006-07 Upper Deck - Young Guns #241 - Matt Carle": [
@@ -14192,7 +16758,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 11.65,
-      "num_sales": 10
+      "num_sales": 10,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 62.41,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2006-07 Upper Deck - Young Guns #458 - Mike Card": [
@@ -14395,14 +16967,38 @@
     {
       "date": "2026-02-15",
       "fair_value": 275.0,
-      "num_sales": 15
+      "num_sales": 15,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 616.88,
+          "num_sales": 4
+        },
+        "PSA 9": {
+          "fair_value": 300.0,
+          "num_sales": 5
+        }
+      }
     }
   ],
   "2006-07 Upper Deck - Young Guns #487 - Joe Pavelski": [
     {
       "date": "2026-02-15",
       "fair_value": 74.99,
-      "num_sales": 8
+      "num_sales": 8,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 35.43,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 49.79,
+          "num_sales": 2
+        },
+        "PSA 8": {
+          "fair_value": 45.15,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2006-07 Upper Deck - Young Guns #488 - Roman Polak": [
@@ -14465,7 +17061,33 @@
     {
       "date": "2026-02-15",
       "fair_value": 1725.79,
-      "num_sales": 9
+      "num_sales": 9,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 7204.8,
+          "num_sales": 8
+        },
+        "PSA 9": {
+          "fair_value": 3667.0,
+          "num_sales": 7
+        },
+        "PSA 8": {
+          "fair_value": 2775.0,
+          "num_sales": 1
+        },
+        "BGS 10": {
+          "fair_value": 1690.0,
+          "num_sales": 1
+        },
+        "BGS 9.5": {
+          "fair_value": 2363.0,
+          "num_sales": 2
+        },
+        "BGS 9": {
+          "fair_value": 1408.54,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2005-06 Upper Deck - Young Guns #202 - Mike Richards": [
@@ -14577,7 +17199,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 62.39,
-      "num_sales": 16
+      "num_sales": 16,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 352.57,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 149.99,
+          "num_sales": 4
+        },
+        "PSA 8": {
+          "fair_value": 39.65,
+          "num_sales": 2
+        }
+      }
     }
   ],
   "2005-06 Upper Deck - Young Guns #219 - Kevin Dallman": [
@@ -14752,21 +17388,59 @@
     {
       "date": "2026-02-15",
       "fair_value": 9.95,
-      "num_sales": 7
+      "num_sales": 7,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 269.35,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2005-06 Upper Deck - Young Guns #242 - Sidney Crosby": [
     {
       "date": "2026-02-15",
       "fair_value": 25.7,
-      "num_sales": 9
+      "num_sales": 9,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 269.35,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2005-06 Upper Deck - Young Guns #443 - Alexander Ovechkin": [
     {
       "date": "2026-02-15",
       "fair_value": 900.0,
-      "num_sales": 17
+      "num_sales": 17,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 3607.25,
+          "num_sales": 6
+        },
+        "PSA 9": {
+          "fair_value": 3332.0,
+          "num_sales": 11
+        },
+        "PSA 8": {
+          "fair_value": 1108.9,
+          "num_sales": 5
+        },
+        "BGS 10": {
+          "fair_value": 7315.85,
+          "num_sales": 1
+        },
+        "BGS 9.5": {
+          "fair_value": 1385.77,
+          "num_sales": 3
+        },
+        "BGS 9": {
+          "fair_value": 1301.97,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2005-06 Upper Deck - Young Guns #445 - Cam Barker": [
@@ -14829,7 +17503,21 @@
     {
       "date": "2026-02-15",
       "fair_value": 16.52,
-      "num_sales": 15
+      "num_sales": 15,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 141.74,
+          "num_sales": 2
+        },
+        "PSA 9": {
+          "fair_value": 79.99,
+          "num_sales": 2
+        },
+        "PSA 8": {
+          "fair_value": 19.5,
+          "num_sales": 3
+        }
+      }
     }
   ],
   "2005-06 Upper Deck - Young Guns #453 - Anthony Stewart": [
@@ -15228,7 +17916,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 74.45,
-      "num_sales": 10
+      "num_sales": 10,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 629.99,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2003-04 Upper Deck - Young Guns #223 - Chris Higgins": [
@@ -15676,7 +18370,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 10.4,
-      "num_sales": 7
+      "num_sales": 7,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 20.99,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2002-03 Upper Deck - Young Guns #212 - Greg Koehler": [
@@ -15844,7 +18544,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 10.42,
-      "num_sales": 7
+      "num_sales": 7,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 33.0,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2002-03 Upper Deck - Young Guns #432 - Shawn Thornton": [
@@ -16418,7 +19124,13 @@
     {
       "date": "2026-02-15",
       "fair_value": 11.68,
-      "num_sales": 9
+      "num_sales": 9,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 55.35,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "2001-02 Upper Deck - Young Guns #437 - Ivan Ciernik": [
@@ -17412,14 +20124,42 @@
     {
       "date": "2026-02-15",
       "fair_value": 13.73,
-      "num_sales": 32
+      "num_sales": 32,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 154.21,
+          "num_sales": 1
+        },
+        "PSA 9": {
+          "fair_value": 12.5,
+          "num_sales": 3
+        },
+        "PSA 8": {
+          "fair_value": 20.48,
+          "num_sales": 1
+        }
+      }
     }
   ],
   "1990-91 Upper Deck - Young Guns #525 - Sergei Fedorov": [
     {
       "date": "2026-02-15",
       "fair_value": 10.69,
-      "num_sales": 39
+      "num_sales": 39,
+      "graded": {
+        "PSA 10": {
+          "fair_value": 74.99,
+          "num_sales": 5
+        },
+        "PSA 9": {
+          "fair_value": 20.0,
+          "num_sales": 4
+        },
+        "PSA 8": {
+          "fair_value": 8.79,
+          "num_sales": 3
+        }
+      }
     }
   ],
   "1990-91 Upper Deck - Young Guns #529 - Ken Hodge": [

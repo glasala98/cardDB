@@ -27,22 +27,31 @@ except ImportError:
 
 
 def is_graded_card(card_name):
-    """Check if the card name indicates it's a graded card."""
-    return bool(re.search(r'\bPSA\s+\d+', card_name, re.IGNORECASE))
+    """Check if the card name indicates it's a graded card (PSA or BGS)."""
+    return bool(re.search(r'\b(PSA|BGS)\s+\d+(\.\d+)?', card_name, re.IGNORECASE))
 
 
 def get_grade_info(card_name):
-    """Extract grading details from card name. Returns (grade_str, grade_num) or (None, None)."""
-    # Check for bracketed format first: [PSA 10]
-    psa_match = re.search(r'\[PSA (\d+)', card_name, re.IGNORECASE)
+    """Extract grading details from card name. Returns (grade_str, grade_num) or (None, None).
+    Supports PSA (integer grades) and BGS (decimal grades like 9.5)."""
+    # Check BGS first (more specific due to decimal grades)
+    bgs_match = re.search(r'\[BGS\s+(\d+(?:\.\d+)?)\]', card_name, re.IGNORECASE)
+    if bgs_match:
+        grade_num = float(bgs_match.group(1))
+        return f"BGS {bgs_match.group(1)}", grade_num
+    bgs_match = re.search(r'\bBGS\s+(\d+(?:\.\d+)?)\b', card_name, re.IGNORECASE)
+    if bgs_match:
+        grade_num = float(bgs_match.group(1))
+        return f"BGS {bgs_match.group(1)}", grade_num
+    # Check PSA (integer grades)
+    psa_match = re.search(r'\[PSA\s+(\d+)\]', card_name, re.IGNORECASE)
     if psa_match:
-        grade_num = int(psa_match.group(1))
-        return f"PSA {grade_num}", grade_num
-    # Also check for unbracketed format: PSA 10 (from manual entry)
+        grade_num = float(psa_match.group(1))
+        return f"PSA {int(grade_num)}", grade_num
     psa_match = re.search(r'\bPSA\s+(\d+)\b', card_name, re.IGNORECASE)
     if psa_match:
-        grade_num = int(psa_match.group(1))
-        return f"PSA {grade_num}", grade_num
+        grade_num = float(psa_match.group(1))
+        return f"PSA {int(grade_num)}", grade_num
     return None, None
 
 
@@ -57,10 +66,12 @@ def clean_card_name_for_search(card_name):
 
     # Work on a copy without grade/condition brackets
     clean = re.sub(r'\[PSA [^\]]*\]', '', card_name)
+    clean = re.sub(r'\[BGS [^\]]*\]', '', clean)
     clean = re.sub(r'\[Passed Pre[^\]]*\]', '', clean)
     clean = re.sub(r'\[Poor to Fair\]', '', clean)
-    # Also strip unbracketed PSA grades (from manual entry)
+    # Also strip unbracketed grades (from manual entry)
     clean = re.sub(r'\bPSA\s+\d+\b', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\bBGS\s+\d+(?:\.\d+)?\b', '', clean, flags=re.IGNORECASE)
 
     # Split on " - " to get the segments
     parts = [p.strip() for p in clean.split(' - ')]
@@ -290,9 +301,18 @@ def clean_card_name_for_search(card_name):
     # Add grade filtering
     if grade_str:
         search_term = f"{search_term} \"{grade_str}\""
-        other_grades = [g for g in range(1, 11) if g != grade_num]
-        for g in other_grades:
-            search_term += f" -\"PSA {g} \""
+        if grade_str.upper().startswith('BGS'):
+            bgs_grades = ['6', '7', '7.5', '8', '8.5', '9', '9.5', '10']
+            current = grade_str.split()[-1]
+            for g in bgs_grades:
+                if g != current:
+                    search_term += f' -"BGS {g}"'
+            search_term += ' -PSA -SGC'
+        else:
+            other_grades = [g for g in range(1, 11) if g != int(grade_num)]
+            for g in other_grades:
+                search_term += f' -"PSA {g} "'
+            search_term += ' -BGS -SGC'
     else:
         search_term = f"{search_term} -PSA -BGS -SGC -graded"
 
@@ -317,21 +337,35 @@ def create_driver():
 
 
 def title_matches_grade(title, grade_str, grade_num):
-    """Check that a listing title matches the expected grade exactly."""
+    """Check that a listing title matches the expected grade exactly (PSA or BGS)."""
     title_upper = title.upper()
 
     if grade_str:
-        # Graded card - title must mention the exact grade
-        # Check for "PSA 10" but NOT "PSA 10" matching inside "PSA 100" etc.
-        pattern = rf'PSA\s*{grade_num}(?:\s|$|[^0-9])'
-        if not re.search(pattern, title_upper):
-            return False
-        # Also reject if title mentions a different PSA grade
-        other_psa = re.findall(r'PSA\s*(\d+)', title_upper)
-        for g in other_psa:
-            if int(g) != grade_num:
+        if grade_str.upper().startswith('BGS'):
+            # BGS matching — handles decimal grades like 9.5
+            grade_display = grade_str.split()[-1]
+            pattern = rf'BGS\s*{re.escape(grade_display)}(?:\s|$|[^0-9.])'
+            if not re.search(pattern, title_upper):
                 return False
-        return True
+            other_bgs = re.findall(r'BGS\s*(\d+(?:\.\d+)?)', title_upper)
+            for g in other_bgs:
+                if float(g) != grade_num:
+                    return False
+            if re.search(r'\bPSA\b', title_upper):
+                return False
+            return True
+        else:
+            # PSA matching
+            pattern = rf'PSA\s*{int(grade_num)}(?:\s|$|[^0-9])'
+            if not re.search(pattern, title_upper):
+                return False
+            other_psa = re.findall(r'PSA\s*(\d+)', title_upper)
+            for g in other_psa:
+                if int(g) != int(grade_num):
+                    return False
+            if re.search(r'\bBGS\b', title_upper):
+                return False
+            return True
     else:
         # Raw card - reject if title mentions any grading service
         if re.search(r'\bPSA\b|\bBGS\b|\bSGC\b|\bGRADED\b', title_upper):
@@ -345,6 +379,7 @@ def build_simplified_query(card_name):
 
     clean = re.sub(r'\[.*?\]', '', card_name)
     clean = re.sub(r'\bPSA\s+\d+\b', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\bBGS\s+\d+(?:\.\d+)?\b', '', clean, flags=re.IGNORECASE)
     parts = [p.strip() for p in clean.split(' - ')]
 
     # Year
@@ -376,6 +411,10 @@ def build_simplified_query(card_name):
 
     if grade_str:
         search_term = f"{search_term} \"{grade_str}\""
+        if grade_str.upper().startswith('BGS'):
+            search_term += ' -PSA -SGC'
+        else:
+            search_term += ' -BGS -SGC'
     else:
         search_term = f"{search_term} -PSA -BGS -SGC -graded"
 

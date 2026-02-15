@@ -1468,6 +1468,14 @@ elif page == "Young Guns DB":
                     display_cols.append(pc)
         else:
             display_cols.extend(['Position', 'Set'])
+        # Add graded columns if they exist
+        graded_col_names = ['PSA10_Value', 'PSA9_Value', 'PSA8_Value',
+                            'BGS10_Value', 'BGS9_5_Value', 'BGS9_Value']
+        has_graded = any(c in filtered.columns for c in graded_col_names)
+        if has_graded:
+            for gc in graded_col_names:
+                if gc in filtered.columns:
+                    display_cols.append(gc)
         display_cols = [c for c in display_cols if c in filtered.columns]
         edit_master = filtered[display_cols].copy()
 
@@ -1476,6 +1484,10 @@ elif page == "Young Guns DB":
             for pc in ['FairValue', 'NumSales', 'Min', 'Max']:
                 if pc in edit_master.columns:
                     edit_master[pc] = pd.to_numeric(edit_master[pc], errors='coerce').fillna(0)
+        if has_graded:
+            for gc in graded_col_names:
+                if gc in edit_master.columns:
+                    edit_master[gc] = pd.to_numeric(edit_master[gc], errors='coerce').fillna(0)
             if 'Trend' in edit_master.columns:
                 trend_map = {'up': '🟢 up', 'down': '🔴 down', 'stable': '⚪ stable', 'no data': '⚫ no data'}
                 edit_master['Trend'] = edit_master['Trend'].map(trend_map).fillna('⚫ no data')
@@ -1509,7 +1521,16 @@ elif page == "Young Guns DB":
                 "Trend": st.column_config.TextColumn("Trend", disabled=True),
                 "LastScraped": st.column_config.TextColumn("Last Scraped", disabled=True),
             })
-        else:
+        if has_graded:
+            col_config_master.update({
+                "PSA10_Value": st.column_config.NumberColumn("PSA 10", format="$%.2f", disabled=True),
+                "PSA9_Value": st.column_config.NumberColumn("PSA 9", format="$%.2f", disabled=True),
+                "PSA8_Value": st.column_config.NumberColumn("PSA 8", format="$%.2f", disabled=True),
+                "BGS10_Value": st.column_config.NumberColumn("BGS 10", format="$%.2f", disabled=True),
+                "BGS9_5_Value": st.column_config.NumberColumn("BGS 9.5", format="$%.2f", disabled=True),
+                "BGS9_Value": st.column_config.NumberColumn("BGS 9", format="$%.2f", disabled=True),
+            })
+        if not has_prices:
             col_config_master.update({
                 "Position": st.column_config.TextColumn("Pos", width="small", disabled=True),
                 "Set": st.column_config.TextColumn("Set", width="medium", disabled=True),
@@ -1571,6 +1592,50 @@ elif page == "Young Guns DB":
                             st.caption(f"Top 3 prices: {' | '.join(stats['top_3_prices'])}")
                     else:
                         st.warning("No sales found on eBay for this card.")
+
+                # Graded prices section
+                graded_data = {}
+                grade_labels = {
+                    'PSA10_Value': 'PSA 10', 'PSA10_Sales': 'PSA 10',
+                    'PSA9_Value': 'PSA 9', 'PSA9_Sales': 'PSA 9',
+                    'PSA8_Value': 'PSA 8', 'PSA8_Sales': 'PSA 8',
+                    'BGS10_Value': 'BGS 10', 'BGS10_Sales': 'BGS 10',
+                    'BGS9_5_Value': 'BGS 9.5', 'BGS9_5_Sales': 'BGS 9.5',
+                    'BGS9_Value': 'BGS 9', 'BGS9_Sales': 'BGS 9',
+                }
+                for val_col, label in [('PSA10_Value', 'PSA 10'), ('PSA9_Value', 'PSA 9'), ('PSA8_Value', 'PSA 8'),
+                                       ('BGS10_Value', 'BGS 10'), ('BGS9_5_Value', 'BGS 9.5'), ('BGS9_Value', 'BGS 9')]:
+                    sales_col = val_col.replace('_Value', '_Sales')
+                    if val_col in card_row_master.index:
+                        val = card_row_master.get(val_col, 0)
+                        sales = card_row_master.get(sales_col, 0)
+                        if pd.notna(val) and float(val) > 0:
+                            graded_data[label] = {'value': float(val), 'sales': int(float(sales)) if pd.notna(sales) else 0}
+
+                if graded_data:
+                    st.markdown("---")
+                    st.markdown(f'<div class="section-header"><span class="icon">&#x1F3C6;</span> Graded Prices</div>', unsafe_allow_html=True)
+
+                    # Show PSA and BGS side by side
+                    psa_cols = {k: v for k, v in graded_data.items() if k.startswith('PSA')}
+                    bgs_cols = {k: v for k, v in graded_data.items() if k.startswith('BGS')}
+
+                    if psa_cols:
+                        gcols = st.columns(len(psa_cols))
+                        for i, (grade, data) in enumerate(psa_cols.items()):
+                            with gcols[i]:
+                                st.metric(grade, f"${data['value']:.2f}", help=f"{data['sales']} sales")
+
+                    if bgs_cols:
+                        gcols = st.columns(len(bgs_cols))
+                        for i, (grade, data) in enumerate(bgs_cols.items()):
+                            with gcols[i]:
+                                st.metric(grade, f"${data['value']:.2f}", help=f"{data['sales']} sales")
+
+                    # Show raw price for comparison
+                    raw_val = card_row_master.get('FairValue', 0)
+                    if pd.notna(raw_val) and float(raw_val) > 0:
+                        st.caption(f"Raw value: ${float(raw_val):.2f}")
 
                 # Price history chart for this card
                 card_name_for_history = f"{card_row_master['Season']} Upper Deck - Young Guns #{int(card_row_master['CardNumber'])} - {card_row_master['PlayerName']}"

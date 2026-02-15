@@ -9,6 +9,11 @@ Usage:
     python -u scrape_master_db.py --season "2024-25"    # Scrape only one season
     python -u scrape_master_db.py --force               # Re-scrape already-scraped cards
     python -u scrape_master_db.py --limit 50            # Scrape only first 50 cards
+
+    # Graded scraping (PSA/BGS prices)
+    python -u scrape_master_db.py --graded              # Scrape graded prices for cards worth $5+
+    python -u scrape_master_db.py --graded --grades "PSA 10,BGS 9.5"  # Only specific grades
+    python -u scrape_master_db.py --graded --min-raw-value 2.0        # Lower the threshold
 """
 
 import sys
@@ -36,6 +41,26 @@ from scrape_card_prices import (
 from dashboard_utils import append_yg_price_history, append_yg_portfolio_snapshot
 
 MASTER_DB_PATH = os.path.join(SCRIPT_DIR, "data", "master_db", "young_guns.csv")
+
+# Grade column mappings: grade_key -> (value_col, sales_col)
+GRADE_COLUMNS = {
+    'PSA 8':   ('PSA8_Value',  'PSA8_Sales'),
+    'PSA 9':   ('PSA9_Value',  'PSA9_Sales'),
+    'PSA 10':  ('PSA10_Value', 'PSA10_Sales'),
+    'BGS 9':   ('BGS9_Value',  'BGS9_Sales'),
+    'BGS 9.5': ('BGS9_5_Value', 'BGS9_5_Sales'),
+    'BGS 10':  ('BGS10_Value', 'BGS10_Sales'),
+}
+
+# All graded CSV columns (flat list)
+GRADED_CSV_COLUMNS = []
+for _vcol, _scol in GRADE_COLUMNS.values():
+    GRADED_CSV_COLUMNS.extend([_vcol, _scol])
+GRADED_CSV_COLUMNS.append('GradedLastScraped')
+
+# Smart probe order: try highest grade first, skip lower if no sales
+PSA_PROBE_ORDER = ['PSA 10', 'PSA 9', 'PSA 8']
+BGS_PROBE_ORDER = ['BGS 10', 'BGS 9.5', 'BGS 9']
 
 # Thread-local storage for Chrome drivers (reused by process_card via get_driver)
 _thread_local = threading.local()
@@ -145,12 +170,85 @@ def scrape_one_card(card_name):
                 _progress['done'] += 1
 
 
+def scrape_one_graded_card(card_name, grades_to_scrape):
+    """Scrape graded prices for a single card across multiple grades.
+    Uses smart probing: if PSA 10 has 0 sales, skip PSA 9 and 8.
+
+    Args:
+        card_name: Base card name (no grade suffix)
+        grades_to_scrape: List of grade keys like ['PSA 10', 'PSA 9', 'BGS 9.5']
+
+    Returns:
+        dict of {grade_key: {'fair_value': float, 'num_sales': int}} for grades with data
+    """
+    results = {}
+
+    # Split into PSA and BGS groups for smart probing
+    psa_grades = [g for g in PSA_PROBE_ORDER if g in grades_to_scrape]
+    bgs_grades = [g for g in BGS_PROBE_ORDER if g in grades_to_scrape]
+
+    for probe_group in [psa_grades, bgs_grades]:
+        skip_rest = False
+        for grade_key in probe_group:
+            if skip_rest:
+                results[grade_key] = {'fair_value': 0, 'num_sales': 0}
+                continue
+
+            # Build graded card name: append [PSA 10] or [BGS 9.5] to the card name
+            graded_name = f"{card_name} [{grade_key}]"
+
+            for attempt in range(2):
+                try:
+                    _, result = process_card(graded_name)
+                    stats = result.get('stats', {})
+                    num_sales = stats.get('num_sales', 0)
+                    fair_price = stats.get('fair_price', 0)
+
+                    results[grade_key] = {
+                        'fair_value': round(fair_price, 2) if num_sales > 0 else 0,
+                        'num_sales': num_sales,
+                    }
+
+                    # Smart probing: if top grade has 0 sales, skip lower grades
+                    if num_sales == 0 and grade_key == probe_group[0]:
+                        skip_rest = True
+
+                    with _lock:
+                        _progress['done'] += 1
+                        if num_sales > 0:
+                            _progress['found'] += 1
+                        else:
+                            _progress['not_found'] += 1
+                    break
+                except Exception:
+                    if attempt == 0:
+                        try:
+                            if hasattr(_thread_local, 'driver'):
+                                _thread_local.driver.quit()
+                        except Exception:
+                            pass
+                        if hasattr(_thread_local, 'driver'):
+                            del _thread_local.driver
+                        continue
+                    with _lock:
+                        _progress['done'] += 1
+                        _progress['errors'] += 1
+                    results[grade_key] = {'fair_value': 0, 'num_sales': 0}
+
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(description="Bulk scrape Master DB cards on eBay")
     parser.add_argument('--workers', type=int, default=15, help="Number of parallel Chrome instances (default: 15)")
     parser.add_argument('--season', type=str, default=None, help="Scrape only this season (e.g. '2024-25')")
     parser.add_argument('--force', action='store_true', help="Re-scrape already-scraped cards")
     parser.add_argument('--limit', type=int, default=0, help="Max cards to scrape (0 = all)")
+    parser.add_argument('--graded', action='store_true', help="Scrape graded prices (PSA 8/9/10, BGS 9/9.5/10)")
+    parser.add_argument('--grades', type=str, default=None,
+                        help="Comma-separated grades to scrape (e.g. 'PSA 10,BGS 9.5'). Default: all 6")
+    parser.add_argument('--min-raw-value', type=float, default=5.0,
+                        help="Skip graded scraping for cards with raw value below this (default: $5)")
     args = parser.parse_args()
 
     # Load master DB
@@ -169,6 +267,14 @@ def main():
             else:
                 df[col] = ''
 
+    # Add graded columns if missing
+    for col in GRADED_CSV_COLUMNS:
+        if col not in df.columns:
+            if col == 'GradedLastScraped':
+                df[col] = ''
+            else:
+                df[col] = pd.NA
+
     # Build CardName for all rows (always refresh in case format changes)
     df['CardName'] = df.apply(build_card_name, axis=1)
 
@@ -181,6 +287,27 @@ def main():
             sys.exit(1)
         print(f"Filtering to season {args.season}: {season_mask.sum()} cards")
 
+    # Parse grade list if provided
+    if args.grades:
+        grades_to_scrape = [g.strip() for g in args.grades.split(',')]
+        invalid = [g for g in grades_to_scrape if g not in GRADE_COLUMNS]
+        if invalid:
+            print(f"ERROR: Invalid grades: {invalid}")
+            print(f"Valid grades: {list(GRADE_COLUMNS.keys())}")
+            sys.exit(1)
+    else:
+        grades_to_scrape = list(GRADE_COLUMNS.keys())
+
+    if args.graded:
+        # ── GRADED SCRAPING MODE ──
+        _run_graded_scrape(df, args, grades_to_scrape)
+    else:
+        # ── RAW SCRAPING MODE (existing behavior) ──
+        _run_raw_scrape(df, args)
+
+
+def _run_raw_scrape(df, args):
+    """Original raw/ungraded scraping pass."""
     # Determine which cards to scrape
     if args.force:
         to_scrape = df.copy()
@@ -196,27 +323,24 @@ def main():
     total = len(to_scrape)
     if total == 0:
         print("No cards to scrape. Use --force to re-scrape.")
-        # Still save in case CardName column was added
         df.to_csv(MASTER_DB_PATH, index=False)
         sys.exit(0)
 
     print(f"\nScraping {total} cards with {args.workers} workers...")
     print(f"Estimated time: ~{total * 5 / args.workers / 60:.0f} minutes\n")
 
-    # Save CSV first to persist CardName column
     df.to_csv(MASTER_DB_PATH, index=False)
 
     start_time = time.time()
     checkpoint_counter = 0
 
-    # Build card name list with original indices
     work_items = list(to_scrape[['CardName']].itertuples())
 
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         futures = {}
         for item in work_items:
             future = executor.submit(scrape_one_card, item.CardName)
-            futures[future] = item.Index  # original df index
+            futures[future] = item.Index
 
         for future in as_completed(futures):
             idx = futures[future]
@@ -233,13 +357,11 @@ def main():
                 df.at[idx, 'Top3Prices'] = ' | '.join(stats.get('top_3_prices', []))
                 df.at[idx, 'LastScraped'] = datetime.now().strftime('%Y-%m-%d %H:%M')
 
-                # Append to price history (thread-safe: writes are serialized here)
                 try:
                     append_yg_price_history(card_name, stats.get('fair_price', 0), stats.get('num_sales', 0))
                 except Exception:
-                    pass  # Don't let history logging break the scrape
+                    pass
 
-            # Progress update every 10 cards
             done = _progress['done']
             if done % 10 == 0 or done == total:
                 elapsed = time.time() - start_time
@@ -250,21 +372,17 @@ def main():
                       f"Errors: {_progress['errors']} | "
                       f"~{remaining:.1f}m remaining", flush=True)
 
-            # Checkpoint save every 50 cards
             if checkpoint_counter >= 50:
                 checkpoint_counter = 0
                 df.to_csv(MASTER_DB_PATH, index=False)
                 print(f"  ** Checkpoint saved ({done} cards done)", flush=True)
 
-    # Final save
     df.to_csv(MASTER_DB_PATH, index=False)
     elapsed = time.time() - start_time
 
-    # Summary
     scraped_count = len(df[df['LastScraped'].notna() & (df['LastScraped'] != '')])
     total_value = df['FairValue'].sum() if df['FairValue'].notna().any() else 0
 
-    # Append portfolio snapshot for historical tracking
     avg_value = total_value / scraped_count if scraped_count > 0 else 0
     try:
         append_yg_portfolio_snapshot(total_value, len(df), avg_value, scraped_count)
@@ -281,6 +399,126 @@ def main():
     print(f"  Total DB scraped: {scraped_count}/{len(df)}")
     print(f"  Total value:      ${total_value:,.2f}")
     print(f"  Saved to:         {MASTER_DB_PATH}")
+    print(f"{'='*60}")
+
+
+def _run_graded_scrape(df, args, grades_to_scrape):
+    """Graded scraping pass — scrapes PSA/BGS prices for cards above min raw value."""
+    min_val = args.min_raw_value
+
+    # Filter to cards that have been raw-scraped and meet minimum value
+    has_raw = df['FairValue'].notna() & (df['FairValue'] >= min_val)
+
+    if args.force:
+        to_scrape = df[has_raw].copy()
+    else:
+        to_scrape = df[has_raw & (df['GradedLastScraped'].isna() | (df['GradedLastScraped'] == ''))].copy()
+
+    if args.season:
+        to_scrape = to_scrape[to_scrape['Season'] == args.season]
+
+    if args.limit > 0:
+        to_scrape = to_scrape.head(args.limit)
+
+    total_cards = len(to_scrape)
+    if total_cards == 0:
+        print(f"No cards to graded-scrape (min raw value: ${min_val:.2f}). Use --force to re-scrape.")
+        df.to_csv(MASTER_DB_PATH, index=False)
+        sys.exit(0)
+
+    # Each card gets up to len(grades_to_scrape) scrapes, but smart probing reduces this
+    max_scrapes = total_cards * len(grades_to_scrape)
+    print(f"\n{'='*60}")
+    print(f"GRADED SCRAPING MODE")
+    print(f"  Cards to scrape:  {total_cards} (raw value >= ${min_val:.2f})")
+    print(f"  Grades:           {', '.join(grades_to_scrape)}")
+    print(f"  Max scrapes:      {max_scrapes} (smart probing will reduce this)")
+    print(f"  Workers:          {args.workers}")
+    print(f"{'='*60}\n")
+
+    df.to_csv(MASTER_DB_PATH, index=False)
+
+    start_time = time.time()
+    checkpoint_counter = 0
+
+    work_items = list(to_scrape[['CardName']].itertuples())
+
+    with ThreadPoolExecutor(max_workers=args.workers) as executor:
+        futures = {}
+        for item in work_items:
+            future = executor.submit(scrape_one_graded_card, item.CardName, grades_to_scrape)
+            futures[future] = item.Index
+
+        for future in as_completed(futures):
+            idx = futures[future]
+            graded_results = future.result()
+            checkpoint_counter += 1
+            card_name = df.at[idx, 'CardName']
+
+            # Write graded results to CSV columns
+            graded_prices_for_history = {}
+            for grade_key, data in graded_results.items():
+                val_col, sales_col = GRADE_COLUMNS[grade_key]
+                df.at[idx, val_col] = data['fair_value']
+                df.at[idx, sales_col] = data['num_sales']
+                if data['num_sales'] > 0:
+                    graded_prices_for_history[grade_key] = {
+                        'fair_value': data['fair_value'],
+                        'num_sales': data['num_sales'],
+                    }
+
+            df.at[idx, 'GradedLastScraped'] = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+            # Append graded data to price history
+            if graded_prices_for_history:
+                try:
+                    raw_val = df.at[idx, 'FairValue']
+                    raw_sales = df.at[idx, 'NumSales']
+                    append_yg_price_history(
+                        card_name,
+                        float(raw_val) if pd.notna(raw_val) else 0,
+                        int(raw_sales) if pd.notna(raw_sales) else 0,
+                        graded_prices=graded_prices_for_history,
+                    )
+                except Exception:
+                    pass
+
+            # Progress
+            cards_done = checkpoint_counter
+            done = _progress['done']
+            elapsed = time.time() - start_time
+            if cards_done % 5 == 0 or cards_done == total_cards:
+                rate = cards_done / elapsed if elapsed > 0 else 0
+                remaining = (total_cards - cards_done) / rate / 60 if rate > 0 else 0
+                print(f"  [{cards_done}/{total_cards} cards] Scrapes: {done} | "
+                      f"Found: {_progress['found']} | "
+                      f"Errors: {_progress['errors']} | "
+                      f"~{remaining:.1f}m remaining", flush=True)
+
+            if cards_done % 25 == 0:
+                df.to_csv(MASTER_DB_PATH, index=False)
+                print(f"  ** Checkpoint saved ({cards_done} cards done)", flush=True)
+
+    df.to_csv(MASTER_DB_PATH, index=False)
+    elapsed = time.time() - start_time
+
+    # Count cards with at least one graded price
+    graded_with_data = 0
+    for _, row in df.iterrows():
+        for grade_key in grades_to_scrape:
+            val_col, sales_col = GRADE_COLUMNS[grade_key]
+            if pd.notna(row.get(val_col)) and row.get(val_col, 0) > 0:
+                graded_with_data += 1
+                break
+
+    print(f"\n{'='*60}")
+    print(f"GRADED SCRAPE DONE in {elapsed/60:.1f} minutes")
+    print(f"  Total scrapes:      {_progress['done']}")
+    print(f"  Prices found:       {_progress['found']}")
+    print(f"  Not found:          {_progress['not_found']}")
+    print(f"  Errors:             {_progress['errors']}")
+    print(f"  Cards with graded:  {graded_with_data}/{total_cards}")
+    print(f"  Saved to:           {MASTER_DB_PATH}")
     print(f"{'='*60}")
 
 
