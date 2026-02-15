@@ -1491,7 +1491,7 @@ elif page == "Young Guns DB":
         col_order_master = [c for c in col_order_master if c in edit_master.columns]
         edit_master = edit_master[col_order_master]
 
-        st.caption(f"Showing {len(edit_master):,} of {total_master:,} cards")
+        st.caption(f"Showing {len(edit_master):,} of {len(master_df):,} cards")
 
         master_editor_key = f"master_editor_{st.session_state.get('master_editor_reset', 0)}"
         col_config_master = {
