@@ -1405,29 +1405,22 @@ elif page == "Young Guns DB":
         has_prices = 'FairValue' in master_df.columns and master_df['FairValue'].notna().any()
         total_value = master_df['FairValue'].sum() if has_prices else 0
 
-        # Compact header: title + key stats inline
-        if has_prices:
-            st.caption(f"{len(master_df):,} cards  |  {master_df['Season'].nunique()} seasons  |  ${total_value:,.0f} total value")
-        else:
-            st.caption(f"{len(master_df):,} cards  |  {master_df['Season'].nunique()} seasons")
-
-        # Search + filters in one compact block
-        master_search = st.text_input("Search cards", placeholder="Search by player, team, season...", key="master_search", label_visibility="collapsed")
-
+        # Search + filters in one line
         seasons = sorted(master_df['Season'].unique().tolist(), reverse=True)
         teams = sorted([t for t in master_df['Team'].unique().tolist() if t])
-        positions = sorted([p for p in master_df['Position'].unique().tolist() if p])
-        set_names = sorted([s for s in master_df['Set'].unique().tolist() if s])
 
-        mf1, mf2, mf3, mf4 = st.columns(4)
-        with mf1:
-            season_filter = st.selectbox("Season", ["All Seasons"] + seasons, key="master_season")
-        with mf2:
-            team_filter = st.selectbox("Team", ["All Teams"] + teams, key="master_team")
-        with mf3:
-            pos_filter = st.selectbox("Position", ["All Positions"] + positions, key="master_pos") if positions else "All Positions"
-        with mf4:
-            set_filter_master = st.selectbox("Set", ["All Sets"] + set_names, key="master_set")
+        sf1, sf2, sf3 = st.columns([3, 1, 1])
+        with sf1:
+            master_search = st.text_input("Search", placeholder="Search by player, team, season...", key="master_search", label_visibility="collapsed")
+        with sf2:
+            season_filter = st.selectbox("Season", ["All Seasons"] + seasons, key="master_season", label_visibility="collapsed")
+        with sf3:
+            team_filter = st.selectbox("Team", ["All Teams"] + teams, key="master_team", label_visibility="collapsed")
+        # Unused filters — keep defaults
+        positions = sorted([p for p in master_df['Position'].unique().tolist() if p])
+        pos_filter = "All Positions"
+        set_filter_master = "All Sets"
+        set_names = sorted([s for s in master_df['Set'].unique().tolist() if s])
 
         # Apply filters
         filtered = master_df.copy()
