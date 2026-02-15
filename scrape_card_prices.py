@@ -113,13 +113,116 @@ def clean_card_name_for_search(card_name):
         part_clean = re.sub(r'#\S+', '', part_clean).strip()
         if part_clean.lower() in ['', 'rookies', 'marquee rookies']:
             continue
-        # Keep value-relevant variants
-        for v in ['Red Prism', 'Arctic Freeze', 'Violet Pixels', 'Emerald Surge',
-                   'Seismic Gold', 'Rainbow', 'Pond Hockey', 'NHL Shield',
+        # Keep value-relevant variants — comprehensive list across manufacturers
+        for v in [
+                   # === Upper Deck ===
+                   'Red Prism', 'Arctic Freeze', 'Violet Pixels', 'Emerald Surge',
+                   'Seismic Gold', 'Pond Hockey', 'NHL Shield', 'Clear Cut',
                    'Outburst', 'Silver Foil', 'Deluxe', 'Exclusives',
                    'Blue Foil', 'Photo Variation', 'Photo Driven',
                    'Color Flow', 'Orange Yellow Spectrum', 'Blue Luster',
-                   'Gold', 'Purple Parallax', 'Hypnosis']:
+                   'Purple Parallax', 'Hypnosis', 'High Gloss',
+                   'French', 'Speckled Rainbow', 'Retro Rainbow',
+                   'UD Canvas', 'Clear Cut Acetate',
+                   'Fluorescence', 'Fluorescent', 'Buyback',
+                   'Printing Plate', 'Black Diamond',
+                   # Upper Deck Exclusives & numbered
+                   'Young Guns Exclusives', 'High Series Exclusives',
+                   'Exclusives Die Cut', 'Update Exclusives',
+                   # Upper Deck SP / SPx
+                   'Spectrum', 'Holoview FX', 'Finite',
+                   # Upper Deck Ice
+                   'Ice Premieres', 'Glacial Graphs', 'Ice Gems',
+                   # Upper Deck Artifacts
+                   'Ruby', 'Emerald', 'Sapphire', 'Copper', 'Silver',
+                   # Upper Deck general parallels
+                   'Platinum', 'Diamond', 'Onyx',
+                   # === Panini Prizm ===
+                   'Silver Prizm', 'Red Prizm', 'Blue Prizm', 'Green Prizm',
+                   'Gold Prizm', 'Orange Prizm', 'Purple Prizm', 'Pink Prizm',
+                   'Black Prizm', 'White Prizm',
+                   'Disco', 'Disco Prizm',
+                   'Neon Green', 'Neon Orange', 'Neon Pink', 'Neon Blue',
+                   'Hyper', 'Hyper Prizm',
+                   'Mojo', 'Snakeskin', 'Camo', 'Tiger Stripe',
+                   'Zebra', 'Tiger', 'Dragon Scale',
+                   'Checkerboard', 'Marble',
+                   'Tie-Dye', 'Scope', 'Fast Break',
+                   'Ice', 'Cracked Ice', 'Choice',
+                   'Stained Glass', 'Color Blast', 'Shimmer',
+                   'Flashback', 'No Huddle', 'Fireworks',
+                   'Red White Blue', 'Red White & Blue',
+                   'Black Gold', 'Black Finite',
+                   'Laser', 'Sparkle', 'Wave',
+                   # === Panini Select ===
+                   'Red Shock', 'Orange Shock', 'Blue Shock',
+                   'Green Shock', 'Purple Shock', 'White Shock',
+                   'Copper Shock', 'Black Shock',
+                   'Red & Yellow Shock', 'Green & Yellow Shock',
+                   'Black & Red Shock',
+                   'Die-Cut', 'Select Die-Cut',
+                   'Tri-Color', 'Tri Color',
+                   'Light Blue', 'Courtside', 'Field Level',
+                   'Purple Die-Cut', 'Silver Die-Cut', 'Gold Die-Cut',
+                   # === Panini Donruss / Optic ===
+                   'Optic', 'Optic Holo', 'Optic Rated Rookie',
+                   'Red Velocity', 'Blue Velocity', 'Pink Velocity',
+                   'Aqua', 'Lime Green', 'Orange Laser',
+                   'Purple Stars', 'Blue Hyper', 'Black Velocity',
+                   'Press Proof', 'Diamond Kings',
+                   'Downtown', 'Kaboom',
+                   # === Panini Mosaic ===
+                   'Mosaic', 'Mosaic Prizm',
+                   'Genesis', 'Reactive Blue', 'Reactive Gold',
+                   'Reactive Orange', 'Reactive Green',
+                   'Green Fluorescent', 'Pink Fluorescent',
+                   'National Pride', 'Stained Glass Mosaic',
+                   # === Panini Contenders ===
+                   'Cracked Ice Ticket', 'Championship Ticket',
+                   'Playoff Ticket', 'Super Bowl Ticket',
+                   'Variation', 'Photo Variation',
+                   # === Panini general ===
+                   'Holo', 'Holofoil', 'Refractor',
+                   'Auto', 'Autograph', 'Patch Auto',
+                   'RPA', 'Rookie Patch Auto',
+                   'Memorabilia', 'Jersey', 'Patch',
+                   # === Topps Chrome ===
+                   'Refractor', 'Gold Refractor', 'Orange Refractor',
+                   'Red Refractor', 'Blue Refractor', 'Green Refractor',
+                   'Purple Refractor', 'Pink Refractor', 'Black Refractor',
+                   'Sepia Refractor', 'Prism Refractor',
+                   'X-Fractor', 'Xfractor',
+                   'SuperFractor', 'Super Refractor',
+                   'Atomic Refractor', 'Wave Refractor',
+                   'Negative Refractor', 'Aqua Refractor',
+                   'Rose Gold Refractor', 'Sapphire',
+                   'Gold Wave', 'Red Wave', 'Blue Wave',
+                   'Speckle', 'Raywave',
+                   # === Topps base / flagship ===
+                   'Gold', 'Rainbow Foil', 'Rainbow',
+                   'Foilboard', 'Silver Pack', 'Silver',
+                   'Vintage Stock', 'Independence Day',
+                   'Platinum Anniversary', 'Mother\'s Day Pink',
+                   'Father\'s Day Blue', 'Memorial Day Camo',
+                   'Black', 'Mini', 'Printing Plate',
+                   'Clear', 'Silk', 'Wood',
+                   # === Topps Finest ===
+                   'Finest Refractor', 'Green Refractor', 'Gold Refractor',
+                   'Superfractor',
+                   # === Topps Bowman ===
+                   'Bowman Chrome', 'Chrome Refractor',
+                   'Bowman 1st', 'First Bowman',
+                   'Shimmer', 'Atomic', 'Mojo Refractor',
+                   'Sky Blue', 'Orange', 'Cream',
+                   # === Topps Heritage ===
+                   'Chrome Heritage', 'Real One Auto',
+                   'Red Ink Auto', 'Blue Ink Auto',
+                   'French Text', 'Action Variation',
+                   'Nickname Variation', 'Error',
+                   # === Topps general inserts ===
+                   'SP', 'SSP', 'Short Print', 'Image Variation',
+                   'Photo Variation', 'Bat Down', 'Rookie Debut',
+                   ]:
             if v.lower() in part_clean.lower():
                 variant = v
                 break
@@ -128,11 +231,26 @@ def clean_card_name_for_search(card_name):
 
     # --- Extract subset that matters ---
     subset = ""
-    for kw in ['Young Guns', 'UD Canvas', 'Prominent Prospects', 'Young Guns Renewed',
+    for kw in [
+               # Upper Deck Hockey
+               'Young Guns', 'UD Canvas', 'Prominent Prospects', 'Young Guns Renewed',
                'Young Guns Checklist', 'Dazzlers', 'Day with the Cup',
                'Bootlegs', 'Holoview', 'Finite Rookies', 'Rookie Autographs',
                'UD Portraits', 'Auto Patch', 'Auto Jersey', 'Signature Fabrics',
-               'License to Ice', 'GR8 Moments', 'Cranked Up']:
+               'License to Ice', 'GR8 Moments', 'Cranked Up',
+               'French Connection', 'Program of Excellence', 'UD Game Jersey',
+               'Rookie Materials', 'Rookie Breakouts', 'Star Rookies',
+               # Panini inserts
+               'Concourse', 'Premier Level', 'Club Level', 'Field Level',
+               'Courtside', 'Rated Rookie', 'Rated Rookies',
+               'Rookie Ticket', 'Contenders Rookie', 'MVP',
+               'Downtown', 'Kaboom', 'Case Hit',
+               'Net Marvels', 'Color Blast', 'No Huddle',
+               # Topps inserts
+               'Rookie Debut', '1st Edition', 'Chrome Rookie',
+               'Bowman 1st', 'Heritage Rookie', 'Finest Rookie',
+               'All-Star Rookie', 'Future Stars', 'Rookie Cup',
+               ]:
         if kw.lower() in clean.lower():
             subset = kw
             break

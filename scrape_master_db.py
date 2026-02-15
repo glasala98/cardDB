@@ -18,7 +18,6 @@ sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', buffering=1)
 
 import argparse
 import time
-import random
 import threading
 import csv
 import json
@@ -32,14 +31,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 
 from scrape_card_prices import (
-    create_driver,
-    search_ebay_sold,
-    calculate_fair_price,
-    build_simplified_query,
-    get_grade_info,
-    title_matches_grade,
     process_card,
-    DEFAULT_PRICE,
 )
 from dashboard_utils import append_yg_price_history, append_yg_portfolio_snapshot
 
@@ -63,46 +55,94 @@ def build_card_name(row):
     return f"{season} Upper Deck - Young Guns #{card_num} - {player}"
 
 
+def _create_fast_driver():
+    """Create a lean Chrome driver optimized for bulk scraping."""
+    from selenium.webdriver.chrome.options import Options as ChromeOptions
+    opts = ChromeOptions()
+    opts.add_argument('--headless')
+    opts.add_argument('--disable-gpu')
+    opts.add_argument('--no-sandbox')
+    opts.add_argument('--disable-dev-shm-usage')
+    opts.add_argument('--window-size=1280,720')
+    opts.add_argument('--disable-extensions')
+    opts.add_argument('--disable-images')
+    opts.add_argument('--blink-settings=imagesEnabled=false')
+    opts.add_argument('--ignore-certificate-errors')
+    opts.add_argument('--disable-blink-features=AutomationControlled')
+    opts.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+    opts.add_experimental_option('excludeSwitches', ['enable-automation'])
+    opts.page_load_strategy = 'eager'  # Don't wait for images/subresources
+    from selenium import webdriver
+    driver = webdriver.Chrome(options=opts)
+    driver.set_page_load_timeout(15)
+    driver.set_script_timeout(10)
+    return driver
+
+
 def get_fast_driver():
-    """Get or create a Chrome driver with short timeouts for bulk scraping."""
+    """Get or create a Chrome driver for the current thread.
+    Automatically recreates if the previous one crashed."""
+    if hasattr(_thread_local, 'driver'):
+        try:
+            _thread_local.driver.title  # quick health check
+        except Exception:
+            try:
+                _thread_local.driver.quit()
+            except Exception:
+                pass
+            del _thread_local.driver
     if not hasattr(_thread_local, 'driver'):
-        driver = create_driver()
-        driver.set_page_load_timeout(20)
-        driver.set_script_timeout(15)
-        _thread_local.driver = driver
+        _thread_local.driver = _create_fast_driver()
     return _thread_local.driver
 
 
-# Monkey-patch the scraper's get_driver to use our fast-timeout version
+# Monkey-patch the scraper's get_driver to use our fast version
 import scrape_card_prices
 scrape_card_prices._thread_local = _thread_local
 scrape_card_prices.get_driver = get_fast_driver
 
+# Reduce the delay inside process_card by patching time.sleep for the scraper module
+_original_sleep = time.sleep
+def _fast_sleep(seconds):
+    """Cap sleep to 0.3s max during bulk scraping."""
+    _original_sleep(min(seconds, 0.3))
+scrape_card_prices.time = type(time)('time')
+scrape_card_prices.time.sleep = _fast_sleep
+scrape_card_prices.time.time = time.time
+
 
 def scrape_one_card(card_name):
-    """Scrape a single card using the existing process_card function.
-    Returns (card_name, result_dict) from process_card.
+    """Scrape a single card with retry on driver crash.
+    Returns (card_name, result_dict).
     """
-    # Stagger to avoid hammering eBay
-    time.sleep(random.uniform(0.3, 1.5))
-
-    try:
-        name, result = process_card(card_name)
-        stats = result.get('stats', {})
-        if stats.get('num_sales', 0) > 0:
+    for attempt in range(2):
+        try:
+            name, result = process_card(card_name)
+            stats = result.get('stats', {})
+            if stats.get('num_sales', 0) > 0:
+                with _lock:
+                    _progress['found'] += 1
+            else:
+                with _lock:
+                    _progress['not_found'] += 1
+            return (name, result)
+        except Exception as e:
+            if attempt == 0:
+                # Kill dead driver so get_fast_driver recreates it
+                try:
+                    if hasattr(_thread_local, 'driver'):
+                        _thread_local.driver.quit()
+                except Exception:
+                    pass
+                if hasattr(_thread_local, 'driver'):
+                    del _thread_local.driver
+                continue
             with _lock:
-                _progress['found'] += 1
-        else:
+                _progress['errors'] += 1
+            return (card_name, {'estimated_value': None, 'stats': {}, 'raw_sales': [], 'search_url': None})
+        finally:
             with _lock:
-                _progress['not_found'] += 1
-        return (name, result)
-    except Exception as e:
-        with _lock:
-            _progress['errors'] += 1
-        return (card_name, {'estimated_value': None, 'stats': {}, 'raw_sales': [], 'search_url': None})
-    finally:
-        with _lock:
-            _progress['done'] += 1
+                _progress['done'] += 1
 
 
 def main():
