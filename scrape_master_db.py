@@ -38,7 +38,10 @@ sys.path.insert(0, SCRIPT_DIR)
 from scrape_card_prices import (
     process_card,
 )
-from dashboard_utils import append_yg_price_history, append_yg_portfolio_snapshot
+from dashboard_utils import (
+    append_yg_portfolio_snapshot,
+    batch_save_yg_raw_sales, batch_append_yg_price_history,
+)
 
 MASTER_DB_PATH = os.path.join(SCRIPT_DIR, "data", "master_db", "young_guns.csv")
 
@@ -179,7 +182,7 @@ def scrape_one_graded_card(card_name, grades_to_scrape):
         grades_to_scrape: List of grade keys like ['PSA 10', 'PSA 9', 'BGS 9.5']
 
     Returns:
-        dict of {grade_key: {'fair_value': float, 'num_sales': int}} for grades with data
+        dict of {grade_key: {'fair_value': float, 'num_sales': int, 'raw_sales': list}} for grades with data
     """
     results = {}
 
@@ -207,6 +210,7 @@ def scrape_one_graded_card(card_name, grades_to_scrape):
                     results[grade_key] = {
                         'fair_value': round(fair_price, 2) if num_sales > 0 else 0,
                         'num_sales': num_sales,
+                        'raw_sales': result.get('raw_sales', []),
                     }
 
                     # Smart probing: if top grade has 0 sales, skip lower grades
@@ -334,7 +338,27 @@ def _run_raw_scrape(df, args):
     start_time = time.time()
     checkpoint_counter = 0
 
+    # Batch accumulators — write to disk at checkpoints instead of per-card
+    pending_history = {}
+    pending_raw_sales = {}
+
     work_items = list(to_scrape[['CardName']].itertuples())
+
+    def _flush_pending():
+        """Write accumulated JSON data to disk."""
+        nonlocal pending_history, pending_raw_sales
+        if pending_history:
+            try:
+                batch_append_yg_price_history(pending_history)
+            except Exception:
+                pass
+            pending_history = {}
+        if pending_raw_sales:
+            try:
+                batch_save_yg_raw_sales(pending_raw_sales)
+            except Exception:
+                pass
+            pending_raw_sales = {}
 
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         futures = {}
@@ -357,12 +381,17 @@ def _run_raw_scrape(df, args):
                 df.at[idx, 'Top3Prices'] = ' | '.join(stats.get('top_3_prices', []))
                 df.at[idx, 'LastScraped'] = datetime.now().strftime('%Y-%m-%d %H:%M')
 
-                try:
-                    append_yg_price_history(card_name, stats.get('fair_price', 0), stats.get('num_sales', 0))
-                except Exception:
-                    pass
+                # Accumulate for batch write
+                pending_history[card_name] = {
+                    'fair_value': stats.get('fair_price', 0),
+                    'num_sales': stats.get('num_sales', 0),
+                }
 
-            done = _progress['done']
+                raw_sales = result.get('raw_sales', [])
+                if raw_sales:
+                    pending_raw_sales[card_name] = raw_sales
+
+            done = checkpoint_counter
             if done % 10 == 0 or done == total:
                 elapsed = time.time() - start_time
                 rate = done / elapsed if elapsed > 0 else 0
@@ -375,7 +404,11 @@ def _run_raw_scrape(df, args):
             if checkpoint_counter >= 50:
                 checkpoint_counter = 0
                 df.to_csv(MASTER_DB_PATH, index=False)
+                _flush_pending()
                 print(f"  ** Checkpoint saved ({done} cards done)", flush=True)
+
+    # Final flush
+    _flush_pending()
 
     df.to_csv(MASTER_DB_PATH, index=False)
     elapsed = time.time() - start_time
@@ -407,12 +440,9 @@ def _run_graded_scrape(df, args, grades_to_scrape):
     min_val = args.min_raw_value
 
     # Filter to cards that have been raw-scraped and meet minimum value
+    # Always scrape all eligible cards so new graded listings are discovered
     has_raw = df['FairValue'].notna() & (df['FairValue'] >= min_val)
-
-    if args.force:
-        to_scrape = df[has_raw].copy()
-    else:
-        to_scrape = df[has_raw & (df['GradedLastScraped'].isna() | (df['GradedLastScraped'] == ''))].copy()
+    to_scrape = df[has_raw].copy()
 
     if args.season:
         to_scrape = to_scrape[to_scrape['Season'] == args.season]
@@ -441,7 +471,27 @@ def _run_graded_scrape(df, args, grades_to_scrape):
     start_time = time.time()
     checkpoint_counter = 0
 
+    # Batch accumulators — write to disk at checkpoints instead of per-card
+    pending_history = {}
+    pending_raw_sales = {}
+
     work_items = list(to_scrape[['CardName']].itertuples())
+
+    def _flush_pending():
+        """Write accumulated JSON data to disk."""
+        nonlocal pending_history, pending_raw_sales
+        if pending_history:
+            try:
+                batch_append_yg_price_history(pending_history)
+            except Exception:
+                pass
+            pending_history = {}
+        if pending_raw_sales:
+            try:
+                batch_save_yg_raw_sales(pending_raw_sales)
+            except Exception:
+                pass
+            pending_raw_sales = {}
 
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         futures = {}
@@ -469,19 +519,22 @@ def _run_graded_scrape(df, args, grades_to_scrape):
 
             df.at[idx, 'GradedLastScraped'] = datetime.now().strftime('%Y-%m-%d %H:%M')
 
-            # Append graded data to price history
+            # Accumulate for batch write
             if graded_prices_for_history:
-                try:
-                    raw_val = df.at[idx, 'FairValue']
-                    raw_sales = df.at[idx, 'NumSales']
-                    append_yg_price_history(
-                        card_name,
-                        float(raw_val) if pd.notna(raw_val) else 0,
-                        int(raw_sales) if pd.notna(raw_sales) else 0,
-                        graded_prices=graded_prices_for_history,
-                    )
-                except Exception:
-                    pass
+                raw_val = df.at[idx, 'FairValue']
+                raw_sales_count = df.at[idx, 'NumSales']
+                pending_history[card_name] = {
+                    'fair_value': float(raw_val) if pd.notna(raw_val) else 0,
+                    'num_sales': int(raw_sales_count) if pd.notna(raw_sales_count) else 0,
+                    'graded_prices': graded_prices_for_history,
+                }
+
+            # Accumulate graded raw sales
+            for grade_key, data in graded_results.items():
+                graded_raw = data.get('raw_sales', [])
+                if graded_raw:
+                    graded_card_key = f"{card_name} [{grade_key}]"
+                    pending_raw_sales[graded_card_key] = graded_raw
 
             # Progress
             cards_done = checkpoint_counter
@@ -495,10 +548,13 @@ def _run_graded_scrape(df, args, grades_to_scrape):
                       f"Errors: {_progress['errors']} | "
                       f"~{remaining:.1f}m remaining", flush=True)
 
-            if cards_done % 25 == 0:
+            if cards_done % 50 == 0:
                 df.to_csv(MASTER_DB_PATH, index=False)
+                _flush_pending()
                 print(f"  ** Checkpoint saved ({cards_done} cards done)", flush=True)
 
+    # Final flush
+    _flush_pending()
     df.to_csv(MASTER_DB_PATH, index=False)
     elapsed = time.time() - start_time
 

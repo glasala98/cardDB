@@ -15,7 +15,7 @@ try:
         archive_card, load_archive, restore_card,
         get_user_paths, load_users, verify_password, init_user_data,
         load_master_db, save_master_db,
-        load_yg_price_history, load_yg_portfolio_history,
+        load_yg_price_history, load_yg_portfolio_history, load_yg_raw_sales, load_yg_market_timeline,
         CSV_PATH, MONEY_COLS, PARSED_COLS
     )
 except ImportError:
@@ -570,39 +570,42 @@ if page == "Card Ledger" and not public_view:
 # ============================================================
 # HEADER & METRICS
 # ============================================================
-title = display_name if display_name else "Hockey Card Collection Dashboard"
-if public_view:
-    title = f"{display_name}'s Collection" if display_name else "Public Collection"
-st.title(title)
+if page == "Young Guns DB":
+    st.title("Young Guns Master Database")
+else:
+    title = display_name if display_name else "Hockey Card Collection Dashboard"
+    if public_view:
+        title = f"{display_name}'s Collection" if display_name else "Public Collection"
+    st.title(title)
 
-found_df = df[df['Num Sales'] > 0]
-not_found_df = df[df['Num Sales'] == 0]
-total_value = found_df['Fair Value'].sum()
-total_all = df['Fair Value'].sum()
+    found_df = df[df['Num Sales'] > 0]
+    not_found_df = df[df['Num Sales'] == 0]
+    total_value = found_df['Fair Value'].sum()
+    total_all = df['Fair Value'].sum()
 
-# Last Updated timestamp
-last_modified = ""
-try:
-    mtime = os.path.getmtime(_csv_path)
-    last_modified = datetime.fromtimestamp(mtime).strftime('%b %d, %Y %I:%M %p')
-except OSError:
-    last_modified = "Unknown"
+    # Last Updated timestamp
+    last_modified = ""
+    try:
+        mtime = os.path.getmtime(_csv_path)
+        last_modified = datetime.fromtimestamp(mtime).strftime('%b %d, %Y %I:%M %p')
+    except OSError:
+        last_modified = "Unknown"
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric("Total Cards", len(df))
-with col2:
-    st.metric("Cards with Data", len(found_df))
-with col3:
-    st.metric("Not Found", len(not_found_df))
-col4, col5 = st.columns(2)
-with col4:
-    st.metric("Collection Value", f"${total_value:,.2f}")
-with col5:
-    st.metric("Total (incl. defaults)", f"${total_all:,.2f}")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Cards", len(df))
+    with col2:
+        st.metric("Cards with Data", len(found_df))
+    with col3:
+        st.metric("Not Found", len(not_found_df))
+    col4, col5 = st.columns(2)
+    with col4:
+        st.metric("Collection Value", f"${total_value:,.2f}")
+    with col5:
+        st.metric("Total (incl. defaults)", f"${total_all:,.2f}")
 
-st.caption(f"Data last updated: {last_modified}")
-st.divider()
+    st.caption(f"Data last updated: {last_modified}")
+    st.divider()
 
 # ============================================================
 # DASHBOARD PAGE
@@ -1392,7 +1395,6 @@ elif page == "Card Inspect":
 # MASTER DB PAGE
 # ============================================================
 elif page == "Young Guns DB":
-    st.markdown('<div class="section-header"><span class="icon">&#x1F3D2;</span> Young Guns Master DB</div>', unsafe_allow_html=True)
 
     master_df = load_master_db()
 
@@ -1678,6 +1680,32 @@ elif page == "Young Guns DB":
                         hc2.metric("Change", f"${change:+.2f}")
                         hc3.metric("% Change", f"{pct:+.1f}%")
 
+                # Individual eBay sales scatter for this card
+                card_raw = load_yg_raw_sales(card_name_for_history)
+                if card_raw and len(card_raw) >= 2:
+                    st.markdown("---")
+                    st.markdown(f'<div class="section-header"><span class="icon">&#x1F4B0;</span> Individual eBay Sales</div>', unsafe_allow_html=True)
+                    raw_df = pd.DataFrame(card_raw)
+                    raw_df['sold_date'] = pd.to_datetime(raw_df['sold_date'])
+                    raw_df = raw_df.sort_values('sold_date')
+                    fig_raw = px.scatter(
+                        raw_df, x='sold_date', y='price_val',
+                        hover_data={'title': True, 'price_val': ':.2f'},
+                        labels={'sold_date': 'Sold Date', 'price_val': 'Sale Price ($)'},
+                        title=f"Individual Sales ({len(raw_df)} listings)",
+                    )
+                    fig_raw.update_traces(marker=dict(size=8, color='#4CAF50'))
+                    # Add rolling average line if enough data
+                    if len(raw_df) >= 5:
+                        raw_df['rolling'] = raw_df['price_val'].rolling(window=5, min_periods=2).mean()
+                        fig_raw.add_scatter(
+                            x=raw_df['sold_date'], y=raw_df['rolling'],
+                            mode='lines', name='5-Sale Avg',
+                            line=dict(width=2, dash='dash', color='#FFD700')
+                        )
+                    fig_raw.update_layout(template="plotly_dark", height=300)
+                    st.plotly_chart(fig_raw, use_container_width=True)
+
         # Bottom summary
         st.divider()
         tc1, tc2, tc3 = st.columns(3)
@@ -1730,6 +1758,57 @@ elif page == "Young Guns DB":
                     st.caption(f"Showing {len(analytics_df)} cards with {price_mode} data")
                 else:
                     analytics_df = priced_df.copy()
+
+                # --- Market History from Raw Sales (90 Days) ---
+                market_timeline = load_yg_market_timeline()
+                if market_timeline and len(market_timeline) >= 2:
+                    st.subheader("Market History (90 Days)")
+                    st.caption("Individual eBay sold listings aggregated by date")
+
+                    mt_df = pd.DataFrame(market_timeline)
+                    mt_df['date'] = pd.to_datetime(mt_df['date'])
+                    mt_df = mt_df.sort_values('date')
+
+                    # 7-day rolling average
+                    mt_df['rolling_avg'] = mt_df['avg_price'].rolling(window=7, min_periods=1).mean().round(2)
+
+                    hist_col1, hist_col2 = st.columns(2)
+                    with hist_col1:
+                        fig_trend = px.line(
+                            mt_df, x='date', y='avg_price',
+                            labels={'date': 'Date', 'avg_price': 'Avg Sale Price ($)'},
+                            title="Average YG Sale Price by Day",
+                        )
+                        fig_trend.add_scatter(
+                            x=mt_df['date'], y=mt_df['rolling_avg'],
+                            mode='lines', name='7-Day Avg',
+                            line=dict(width=3, dash='dash', color='#FFD700')
+                        )
+                        fig_trend.update_layout(template="plotly_dark", height=350)
+                        st.plotly_chart(fig_trend, use_container_width=True)
+
+                    with hist_col2:
+                        fig_vol = px.bar(
+                            mt_df, x='date', y='total_volume',
+                            labels={'date': 'Date', 'total_volume': 'Sales Count'},
+                            title="Daily Sales Volume",
+                        )
+                        fig_vol.update_layout(template="plotly_dark", height=350)
+                        fig_vol.update_traces(marker_color='#4CAF50')
+                        st.plotly_chart(fig_vol, use_container_width=True)
+
+                    # Summary metrics
+                    total_sales = mt_df['total_volume'].sum()
+                    overall_avg = (mt_df['avg_price'] * mt_df['total_volume']).sum() / total_sales if total_sales > 0 else 0
+                    recent_avg = mt_df.tail(7)['avg_price'].mean() if len(mt_df) >= 7 else mt_df['avg_price'].mean()
+                    older_avg = mt_df.head(7)['avg_price'].mean() if len(mt_df) >= 14 else mt_df['avg_price'].mean()
+                    trend_pct = ((recent_avg - older_avg) / older_avg * 100) if older_avg > 0 else 0
+
+                    ms1, ms2, ms3, ms4 = st.columns(4)
+                    ms1.metric("Total Sales Tracked", f"{int(total_sales):,}")
+                    ms2.metric("Weighted Avg Price", f"${overall_avg:,.2f}")
+                    ms3.metric("Recent 7-Day Avg", f"${recent_avg:,.2f}")
+                    ms4.metric("7-Day Trend", f"{trend_pct:+.1f}%")
 
                 # --- Young Guns Market Trend (portfolio history) ---
                 yg_portfolio = load_yg_portfolio_history()

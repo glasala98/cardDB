@@ -628,6 +628,7 @@ def restore_card(card_name, archive_path=None):
 
 YG_PRICE_HISTORY_PATH = os.path.join(MASTER_DB_DIR, "yg_price_history.json")
 YG_PORTFOLIO_HISTORY_PATH = os.path.join(MASTER_DB_DIR, "yg_portfolio_history.json")
+YG_RAW_SALES_PATH = os.path.join(MASTER_DB_DIR, "yg_raw_sales.json")
 
 
 def append_yg_price_history(card_name, fair_value, num_sales, history_path=None,
@@ -734,6 +735,167 @@ def load_yg_portfolio_history(portfolio_path=None):
             return json.load(f)
     except Exception:
         return []
+
+
+def save_yg_raw_sales(card_name, sales, path=None):
+    """Save raw eBay sales for a card, merging with existing data.
+    Deduplicates by (sold_date, title). Caps at 50 sales per card."""
+    path = path or YG_RAW_SALES_PATH
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    data = {}
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except Exception:
+            data = {}
+
+    # Filter to sales with valid sold_date and price
+    new_sales = [
+        {'sold_date': s['sold_date'], 'price_val': s['price_val'], 'title': s.get('title', '')}
+        for s in sales
+        if s.get('sold_date') and s.get('price_val')
+    ]
+
+    existing = data.get(card_name, [])
+    # Merge: use (sold_date, title) as dedup key
+    seen = {(s['sold_date'], s['title']) for s in existing}
+    for s in new_sales:
+        key = (s['sold_date'], s['title'])
+        if key not in seen:
+            existing.append(s)
+            seen.add(key)
+
+    # Cap at 50 most recent
+    existing.sort(key=lambda x: x['sold_date'], reverse=True)
+    data[card_name] = existing[:50]
+
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+def load_yg_raw_sales(card_name=None, path=None):
+    """Load raw sales. If card_name given, return that card's list. Otherwise return all."""
+    path = path or YG_RAW_SALES_PATH
+    if not os.path.exists(path):
+        return [] if card_name else {}
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if card_name:
+            return data.get(card_name, [])
+        return data
+    except Exception:
+        return [] if card_name else {}
+
+
+def batch_save_yg_raw_sales(all_sales_dict, path=None):
+    """Batch-save raw sales for multiple cards in a single file write.
+    Args:
+        all_sales_dict: {card_name: [sales_list]} to merge
+    """
+    path = path or YG_RAW_SALES_PATH
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    data = {}
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        except Exception:
+            data = {}
+
+    for card_name, sales in all_sales_dict.items():
+        new_sales = [
+            {'sold_date': s['sold_date'], 'price_val': s['price_val'], 'title': s.get('title', '')}
+            for s in sales
+            if s.get('sold_date') and s.get('price_val')
+        ]
+        existing = data.get(card_name, [])
+        seen = {(s['sold_date'], s['title']) for s in existing}
+        for s in new_sales:
+            key = (s['sold_date'], s['title'])
+            if key not in seen:
+                existing.append(s)
+                seen.add(key)
+        existing.sort(key=lambda x: x['sold_date'], reverse=True)
+        data[card_name] = existing[:50]
+
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+def batch_append_yg_price_history(updates, path=None):
+    """Batch-append price history for multiple cards in a single file write.
+    Args:
+        updates: {card_name: {'fair_value': float, 'num_sales': int, 'graded_prices': dict|None}}
+    """
+    path = path or YG_PRICE_HISTORY_PATH
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    history = {}
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                history = json.load(f)
+        except Exception:
+            history = {}
+
+    today = datetime.now().strftime('%Y-%m-%d')
+
+    for card_name, info in updates.items():
+        if card_name not in history:
+            history[card_name] = []
+
+        existing = [h for h in history[card_name] if h.get('date') == today]
+        history[card_name] = [h for h in history[card_name] if h.get('date') != today]
+
+        entry = {
+            'date': today,
+            'fair_value': round(info['fair_value'], 2),
+            'num_sales': info['num_sales'],
+        }
+
+        graded_prices = info.get('graded_prices')
+        if existing and existing[0].get('graded') and not graded_prices:
+            entry['graded'] = existing[0]['graded']
+        elif graded_prices:
+            merged_graded = existing[0].get('graded', {}) if existing else {}
+            merged_graded.update(graded_prices)
+            entry['graded'] = merged_graded
+
+        history[card_name].append(entry)
+
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(history, f, indent=2, ensure_ascii=False)
+
+
+def load_yg_market_timeline(path=None):
+    """Aggregate all raw sales across cards into a daily market timeline.
+    Returns a list of dicts: [{date, avg_price, total_volume, min_price, max_price}, ...]
+    sorted by date ascending."""
+    all_sales = load_yg_raw_sales(path=path)
+    if not all_sales:
+        return []
+
+    # Collect all sales by date
+    by_date = {}
+    for card_name, sales in all_sales.items():
+        for s in sales:
+            d = s.get('sold_date')
+            p = s.get('price_val')
+            if d and p:
+                by_date.setdefault(d, []).append(p)
+
+    timeline = []
+    for date, prices in sorted(by_date.items()):
+        timeline.append({
+            'date': date,
+            'avg_price': round(sum(prices) / len(prices), 2),
+            'total_volume': len(prices),
+            'min_price': round(min(prices), 2),
+            'max_price': round(max(prices), 2),
+        })
+
+    return timeline
 
 
 def load_master_db(path=MASTER_DB_PATH):
