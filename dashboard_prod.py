@@ -16,6 +16,8 @@ try:
         get_user_paths, load_users, verify_password, init_user_data,
         load_master_db, save_master_db,
         load_yg_price_history, load_yg_portfolio_history, load_yg_raw_sales, load_yg_market_timeline,
+        load_nhl_player_stats, load_nhl_standings, get_player_stats_for_card,
+        TEAM_ABBREV_TO_NAME,
         CSV_PATH, MONEY_COLS, PARSED_COLS
     )
 except ImportError:
@@ -1689,6 +1691,51 @@ elif page == "Young Guns DB":
                     elif not _has_history:
                         st.caption(f"No sales data available for {_card_price_mode}")
 
+                # ── NHL Player Stats ──
+                _nhl_stats = get_player_stats_for_card(_player)
+                if _nhl_stats:
+                    st.markdown("---")
+                    _nhl_team = TEAM_ABBREV_TO_NAME.get(_nhl_stats['current_team'], _nhl_stats['current_team'])
+                    _nhl_pos = _nhl_stats['position']
+                    st.markdown(f"**NHL Stats** — {_nhl_team} ({_nhl_pos})")
+
+                    if _nhl_stats['type'] == 'skater':
+                        nc1, nc2, nc3, nc4, nc5, nc6 = st.columns(6)
+                        nc1.metric("GP", _nhl_stats['games_played'])
+                        nc2.metric("Goals", _nhl_stats['goals'])
+                        nc3.metric("Assists", _nhl_stats['assists'])
+                        nc4.metric("Points", _nhl_stats['points'])
+                        nc5.metric("+/-", f"{_nhl_stats['plus_minus']:+d}")
+                        nc6.metric("PPG", _nhl_stats.get('powerplay_goals', 0))
+                    else:
+                        nc1, nc2, nc3, nc4, nc5 = st.columns(5)
+                        nc1.metric("GP", _nhl_stats['games_played'])
+                        nc2.metric("Wins", _nhl_stats['wins'])
+                        nc3.metric("Losses", _nhl_stats['losses'])
+                        nc4.metric("SV%", f"{_nhl_stats['save_pct']:.3f}")
+                        nc5.metric("GAA", f"{_nhl_stats['gaa']:.2f}")
+
+                    # Stats trend chart if history exists
+                    _nhl_history = _nhl_stats.get('history', [])
+                    if len(_nhl_history) >= 2:
+                        nhl_hist_df = pd.DataFrame(_nhl_history)
+                        nhl_hist_df['date'] = pd.to_datetime(nhl_hist_df['date'])
+                        nhl_hist_df = nhl_hist_df.sort_values('date')
+                        if _nhl_stats['type'] == 'skater':
+                            fig_nhl = px.line(
+                                nhl_hist_df, x='date', y='points', markers=True,
+                                title="Points Over Time",
+                                labels={'date': 'Date', 'points': 'Points'},
+                            )
+                        else:
+                            fig_nhl = px.line(
+                                nhl_hist_df, x='date', y='wins', markers=True,
+                                title="Wins Over Time",
+                                labels={'date': 'Date', 'wins': 'Wins'},
+                            )
+                        fig_nhl.update_layout(template="plotly_dark", height=250)
+                        st.plotly_chart(fig_nhl, use_container_width=True)
+
                 # ── eBay Scrape Button (admin only) ──
                 if not public_view:
                     st.markdown("---")
@@ -2259,6 +2306,180 @@ elif page == "Young Guns DB":
                                         else:
                                             st.markdown("**PSA 10 vs BGS 10**")
                                             st.caption("No cards with both PSA 10 and BGS 10 data yet")
+
+                # ============================================================
+                # NHL STATS ANALYTICS
+                # ============================================================
+                nhl_data = load_nhl_player_stats()
+                nhl_players = nhl_data.get('players', {}) if nhl_data else {}
+                nhl_standings = nhl_data.get('standings', {}) if nhl_data else {}
+
+                if nhl_players:
+                    # Build a DataFrame merging card prices with NHL stats
+                    nhl_rows = []
+                    for _, row in analytics_df.iterrows():
+                        pname = row['PlayerName']
+                        nhl = nhl_players.get(pname)
+                        if nhl and nhl.get('current_season'):
+                            cs = nhl['current_season']
+                            nhl_row = {
+                                'PlayerName': pname,
+                                'Season': row['Season'],
+                                'Team': row['Team'],
+                                'FairValue': row[price_col],
+                                'Position': nhl.get('position', ''),
+                                'Type': nhl.get('type', 'skater'),
+                                'CurrentTeam': TEAM_ABBREV_TO_NAME.get(nhl.get('current_team', ''), nhl.get('current_team', '')),
+                            }
+                            if nhl['type'] == 'skater':
+                                nhl_row.update({
+                                    'GP': cs.get('games_played', 0),
+                                    'Goals': cs.get('goals', 0),
+                                    'Assists': cs.get('assists', 0),
+                                    'Points': cs.get('points', 0),
+                                    'PlusMinus': cs.get('plus_minus', 0),
+                                    'PPG': cs.get('powerplay_goals', 0),
+                                    'GWG': cs.get('game_winning_goals', 0),
+                                    'Shots': cs.get('shots', 0),
+                                })
+                            else:
+                                team_abbrev = nhl.get('current_team', '')
+                                team_stand = nhl_standings.get(team_abbrev, {})
+                                nhl_row.update({
+                                    'GP': cs.get('games_played', 0),
+                                    'Wins': cs.get('wins', 0),
+                                    'Losses': cs.get('losses', 0),
+                                    'SavePct': cs.get('save_pct', 0),
+                                    'GAA': cs.get('gaa', 0),
+                                    'Shutouts': cs.get('shutouts', 0),
+                                    'TeamPoints': team_stand.get('points', 0),
+                                    'LeagueRank': team_stand.get('league_rank', 0),
+                                })
+                            nhl_rows.append(nhl_row)
+
+                    if nhl_rows:
+                        nhl_df = pd.DataFrame(nhl_rows)
+                        skaters_df = nhl_df[nhl_df['Type'] == 'skater'].copy()
+                        goalies_df = nhl_df[nhl_df['Type'] == 'goalie'].copy()
+
+                        with st.expander(f"NHL Performance vs Card Value ({len(nhl_df)} players)", expanded=False):
+                            if len(skaters_df) > 0:
+                                # --- Price vs Points Scatter ---
+                                st.markdown("**Card Value vs Points (Skaters)**")
+                                st.caption("Do better players have more expensive cards?")
+                                fig_pvp = px.scatter(
+                                    skaters_df, x='Points', y='FairValue',
+                                    hover_name='PlayerName',
+                                    color='Position',
+                                    size='GP',
+                                    hover_data={'Team': True, 'Goals': True, 'Assists': True, 'GP': True},
+                                    labels={'FairValue': f'{price_mode} Value ($)', 'Points': 'NHL Points'},
+                                )
+                                fig_pvp.update_layout(template="plotly_dark", height=450)
+                                st.plotly_chart(fig_pvp, use_container_width=True)
+
+                                # --- Top Performers Table ---
+                                st.markdown("---")
+                                st.markdown("**Top Performers by Points**")
+                                top_performers = skaters_df.nlargest(20, 'Points')[
+                                    ['PlayerName', 'CurrentTeam', 'Position', 'GP', 'Goals', 'Assists', 'Points', 'PlusMinus', 'FairValue']
+                                ].copy()
+                                st.dataframe(
+                                    top_performers,
+                                    use_container_width=True,
+                                    hide_index=True,
+                                    column_config={
+                                        'FairValue': st.column_config.NumberColumn(f"{price_mode} ($)", format="$%.2f"),
+                                        'PlusMinus': st.column_config.NumberColumn("+/-"),
+                                        'CurrentTeam': st.column_config.TextColumn("Team"),
+                                        'Position': st.column_config.TextColumn("Pos"),
+                                    },
+                                )
+
+                                # --- Price vs Goals (Forwards vs Defensemen) ---
+                                st.markdown("---")
+                                fwd_df = skaters_df[skaters_df['Position'].isin(['C', 'L', 'R'])].copy()
+                                def_df = skaters_df[skaters_df['Position'] == 'D'].copy()
+
+                                if len(fwd_df) > 0 and len(def_df) > 0:
+                                    pvg_col1, pvg_col2 = st.columns(2)
+                                    with pvg_col1:
+                                        st.markdown("**Forwards: Goals vs Card Value**")
+                                        fig_fwd = px.scatter(
+                                            fwd_df, x='Goals', y='FairValue',
+                                            hover_name='PlayerName',
+                                            color='Position',
+                                            hover_data={'Points': True, 'Assists': True},
+                                            labels={'FairValue': f'{price_mode} ($)', 'Goals': 'Goals'},
+                                            color_discrete_map={'C': '#636EFA', 'L': '#00CC96', 'R': '#EF553B'},
+                                        )
+                                        fig_fwd.update_layout(template="plotly_dark", height=350)
+                                        st.plotly_chart(fig_fwd, use_container_width=True)
+
+                                    with pvg_col2:
+                                        st.markdown("**Defensemen: Points vs Card Value**")
+                                        fig_def = px.scatter(
+                                            def_df, x='Points', y='FairValue',
+                                            hover_name='PlayerName',
+                                            hover_data={'Goals': True, 'Assists': True, 'PlusMinus': True},
+                                            labels={'FairValue': f'{price_mode} ($)', 'Points': 'Points'},
+                                        )
+                                        fig_def.update_traces(marker=dict(color='#AB63FA'))
+                                        fig_def.update_layout(template="plotly_dark", height=350)
+                                        st.plotly_chart(fig_def, use_container_width=True)
+
+                                # --- Best Value: Points per Dollar ---
+                                st.markdown("---")
+                                st.markdown("**Best Value: Points per Dollar**")
+                                st.caption("Players with the most NHL points relative to card price")
+                                value_df = skaters_df[(skaters_df['FairValue'] > 1) & (skaters_df['Points'] > 5)].copy()
+                                if len(value_df) > 0:
+                                    value_df['PtsPer$'] = (value_df['Points'] / value_df['FairValue']).round(1)
+                                    best_value = value_df.nlargest(15, 'PtsPer$')[
+                                        ['PlayerName', 'CurrentTeam', 'Position', 'Points', 'Goals', 'FairValue', 'PtsPer$']
+                                    ]
+                                    st.dataframe(
+                                        best_value,
+                                        use_container_width=True,
+                                        hide_index=True,
+                                        column_config={
+                                            'FairValue': st.column_config.NumberColumn(f"{price_mode} ($)", format="$%.2f"),
+                                            'PtsPer$': st.column_config.NumberColumn("Pts/$", format="%.1f"),
+                                            'CurrentTeam': st.column_config.TextColumn("Team"),
+                                        },
+                                    )
+
+                            # --- Goalie Analytics ---
+                            if len(goalies_df) > 0:
+                                st.markdown("---")
+                                st.markdown("**Goalie Performance vs Card Value**")
+                                fig_goalie = px.scatter(
+                                    goalies_df, x='Wins', y='FairValue',
+                                    hover_name='PlayerName',
+                                    size='GP',
+                                    color='SavePct',
+                                    color_continuous_scale='RdYlGn',
+                                    hover_data={'SavePct': ':.3f', 'GAA': ':.2f', 'TeamPoints': True},
+                                    labels={'FairValue': f'{price_mode} Value ($)', 'Wins': 'Wins', 'SavePct': 'SV%'},
+                                )
+                                fig_goalie.update_layout(template="plotly_dark", height=400)
+                                st.plotly_chart(fig_goalie, use_container_width=True)
+
+                                st.markdown("**Goalie Stats**")
+                                goalie_table = goalies_df.nlargest(15, 'Wins')[
+                                    ['PlayerName', 'CurrentTeam', 'GP', 'Wins', 'Losses', 'SavePct', 'GAA', 'Shutouts', 'FairValue']
+                                ].copy()
+                                st.dataframe(
+                                    goalie_table,
+                                    use_container_width=True,
+                                    hide_index=True,
+                                    column_config={
+                                        'FairValue': st.column_config.NumberColumn(f"{price_mode} ($)", format="$%.2f"),
+                                        'SavePct': st.column_config.NumberColumn("SV%", format="%.3f"),
+                                        'GAA': st.column_config.NumberColumn("GAA", format="%.2f"),
+                                        'CurrentTeam': st.column_config.TextColumn("Team"),
+                                    },
+                                )
 
     # Season breakdown
     if not master_df.empty:
