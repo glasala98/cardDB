@@ -1823,7 +1823,7 @@ elif page == "Young Guns DB":
                 # --- Young Guns Market Trend (portfolio history) ---
                 yg_portfolio = load_yg_portfolio_history()
                 if yg_portfolio and len(yg_portfolio) > 0:
-                    with st.expander("Young Guns Market Trend", expanded=True):
+                    with st.expander("Young Guns Market Trend", expanded=False):
                         port_df = pd.DataFrame(yg_portfolio)
                         port_df['date'] = pd.to_datetime(port_df['date'])
                         port_df = port_df.sort_values('date')
@@ -1861,7 +1861,7 @@ elif page == "Young Guns DB":
                             mt4.metric("Cards Scraped", f"{int(latest.get('cards_scraped', 0)):,}")
 
                 # --- Top 20 Most Valuable ---
-                with st.expander(f"Top 20 Most Valuable ({price_mode})", expanded=True):
+                with st.expander(f"Top 20 Most Valuable ({price_mode})", expanded=False):
                     top20_cols = ['Season', 'CardNumber', 'PlayerName', 'Team', price_col, 'NumSales']
                     top20_cols = [c for c in top20_cols if c in analytics_df.columns]
                     top20 = analytics_df.nlargest(20, price_col)[top20_cols].copy()
