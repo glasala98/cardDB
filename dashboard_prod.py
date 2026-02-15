@@ -1398,12 +1398,22 @@ elif page == "Master DB":
         mc3.metric("Teams", total_teams)
         mc4.metric("Missing Team", missing_team)
 
+        # Export button
+        export_master = master_df[['Season', 'CardNumber', 'PlayerName', 'Team', 'Position']].copy()
+        csv_bytes_master = export_master.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            "Export Master DB CSV",
+            data=csv_bytes_master,
+            file_name=f"master_db_{datetime.now().strftime('%Y%m%d')}.csv",
+            mime="text/csv",
+        )
+
         st.markdown("---")
 
-        # Search bar
-        master_search = st.text_input("Search players", placeholder="Search by player name...", key="master_search")
+        # Search bar (full width)
+        master_search = st.text_input("Search cards", placeholder="Search by player, team, season...", key="master_search")
 
-        # Filters
+        # Filter row (2x2 for mobile)
         mf1, mf2 = st.columns(2)
         with mf1:
             seasons = sorted(master_df['Season'].unique().tolist(), reverse=True)
@@ -1411,6 +1421,14 @@ elif page == "Master DB":
         with mf2:
             teams = sorted([t for t in master_df['Team'].unique().tolist() if t])
             team_filter = st.selectbox("Team", ["All Teams"] + teams, key="master_team")
+        mf3, mf4 = st.columns(2)
+        with mf3:
+            positions = sorted([p for p in master_df['Position'].unique().tolist() if p])
+            pos_filter = st.selectbox("Position", ["All Positions"] + positions, key="master_pos") if positions else "All Positions"
+        with mf4:
+            set_names = sorted(master_df['Set'].unique().tolist())
+            set_names = [s for s in set_names if s]
+            set_filter_master = st.selectbox("Set", ["All Sets"] + set_names, key="master_set")
 
         # Apply filters
         filtered = master_df.copy()
@@ -1418,31 +1436,108 @@ elif page == "Master DB":
             filtered = filtered[filtered['Season'] == season_filter]
         if team_filter != "All Teams":
             filtered = filtered[filtered['Team'] == team_filter]
-        if master_search:
-            search_lower = master_search.lower()
-            filtered = filtered[filtered['PlayerName'].str.lower().str.contains(search_lower, na=False)]
+        if positions and pos_filter != "All Positions":
+            filtered = filtered[filtered['Position'] == pos_filter]
+        if set_filter_master != "All Sets":
+            filtered = filtered[filtered['Set'] == set_filter_master]
+        if master_search.strip():
+            terms = master_search.strip().lower().split()
+            searchable = (filtered['PlayerName'].fillna('') + ' ' + filtered['Team'].fillna('') + ' ' + filtered['Season'].fillna('')).str.lower()
+            search_mask = searchable.apply(lambda x: all(t in x for t in terms))
+            filtered = filtered[search_mask]
 
         # Sort
         filtered = filtered.sort_values(['Season', 'CardNumber'], ascending=[False, True])
 
-        st.caption(f"Showing {len(filtered):,} of {total_master:,} cards")
+        # Build display dataframe
+        display_cols = ['Season', 'CardNumber', 'PlayerName', 'Team', 'Position', 'Set']
+        edit_master = filtered[display_cols].copy()
 
-        # Display table
-        display_cols = ['Season', 'CardNumber', 'PlayerName', 'Team', 'Position']
-        display_cols = [c for c in display_cols if c in filtered.columns]
-        st.dataframe(
-            filtered[display_cols],
+        # Add View checkbox column
+        edit_master['View'] = False
+
+        # Reorder columns: View first
+        col_order_master = ['View', 'Season', 'CardNumber', 'PlayerName', 'Team', 'Position', 'Set']
+        col_order_master = [c for c in col_order_master if c in edit_master.columns]
+        edit_master = edit_master[col_order_master]
+
+        st.caption(f"Showing {len(edit_master):,} of {total_master:,} cards")
+
+        master_editor_key = f"master_editor_{st.session_state.get('master_editor_reset', 0)}"
+        edited_master = st.data_editor(
+            edit_master,
+            key=master_editor_key,
             use_container_width=True,
             hide_index=True,
             column_config={
-                'Season': st.column_config.TextColumn('Season', width='small'),
-                'CardNumber': st.column_config.NumberColumn('Card #', width='small'),
-                'PlayerName': st.column_config.TextColumn('Player', width='medium'),
-                'Team': st.column_config.TextColumn('Team', width='medium'),
-                'Position': st.column_config.TextColumn('Pos', width='small'),
+                "View": st.column_config.CheckboxColumn("View", width="small", default=False),
+                "Season": st.column_config.TextColumn("Season", width="small", disabled=True),
+                "CardNumber": st.column_config.NumberColumn("#", width="small", disabled=True),
+                "PlayerName": st.column_config.TextColumn("Player", width="medium", disabled=True),
+                "Team": st.column_config.TextColumn("Team", width="medium", disabled=True),
+                "Position": st.column_config.TextColumn("Pos", width="small", disabled=True),
+                "Set": st.column_config.TextColumn("Set", width="medium", disabled=True),
             },
             height=600,
         )
+
+        # Handle View checkbox — show card detail + scrape section
+        viewed_master = edited_master[edited_master['View'] == True]
+        if len(viewed_master) > 0:
+            viewed_idx = viewed_master.index[0]
+            if viewed_idx in edit_master.index and viewed_idx in filtered.index:
+                card_row_master = filtered.loc[viewed_idx]
+                st.markdown("---")
+                st.markdown(f'<div class="section-header"><span class="icon">&#x1F50D;</span> Card Detail</div>', unsafe_allow_html=True)
+
+                dc1, dc2, dc3 = st.columns(3)
+                with dc1:
+                    st.metric("Player", card_row_master['PlayerName'])
+                with dc2:
+                    st.metric("Team", card_row_master['Team'] if card_row_master['Team'] else "Unknown")
+                with dc3:
+                    st.metric("Card #", int(card_row_master['CardNumber']))
+                dc4, dc5, dc6 = st.columns(3)
+                with dc4:
+                    st.metric("Season", card_row_master['Season'])
+                with dc5:
+                    st.metric("Set", card_row_master['Set'])
+                with dc6:
+                    st.metric("Position", card_row_master['Position'] if card_row_master['Position'] else "N/A")
+
+                # Build eBay search query from master DB fields
+                ebay_query = f"{card_row_master['Season']} Upper Deck Young Guns #{int(card_row_master['CardNumber'])} {card_row_master['PlayerName']}"
+
+                st.markdown("---")
+                st.markdown(f'<div class="section-header"><span class="icon">&#x1F6D2;</span> eBay Price Lookup</div>', unsafe_allow_html=True)
+                st.caption(f"Search query: `{ebay_query}`")
+
+                if not public_view and st.button("Scrape eBay Prices", type="primary", key="master_scrape"):
+                    with st.spinner(f"Searching eBay for {card_row_master['PlayerName']}..."):
+                        stats = scrape_single_card(ebay_query, results_json_path=_results_path)
+                    if stats and stats.get('num_sales', 0) > 0:
+                        st.success(f"Found {stats['num_sales']} sales!")
+                        sc1, sc2, sc3 = st.columns(3)
+                        with sc1:
+                            st.metric("Fair Value", f"${stats['fair_price']:.2f}")
+                        with sc2:
+                            st.metric("Sales Found", stats['num_sales'])
+                        with sc3:
+                            st.metric("Range", f"${stats['min']:.2f} — ${stats['max']:.2f}")
+                        if stats.get('top_3_prices'):
+                            st.caption(f"Top 3 prices: {' | '.join(stats['top_3_prices'])}")
+                    else:
+                        st.warning("No sales found on eBay for this card.")
+
+        # Bottom summary
+        st.divider()
+        tc1, tc2, tc3 = st.columns(3)
+        with tc1:
+            st.metric("Cards Shown", len(edit_master))
+        with tc2:
+            st.metric("Seasons Shown", filtered['Season'].nunique())
+        with tc3:
+            st.metric("Teams Shown", filtered[filtered['Team'] != '']['Team'].nunique())
 
     # CSV Upload section
     if not public_view:
