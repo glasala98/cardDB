@@ -1582,7 +1582,7 @@ elif page == "Young Guns DB":
                 ebay_query = f"{_season} Upper Deck Young Guns #{_card_num} {_player}"
                 card_name_for_history = f"{_season} Upper Deck - Young Guns #{_card_num} - {_player}"
 
-                # ── Raw Price Summary ──
+                # ── Build price modes map ──
                 _raw_val = card_row_master.get('FairValue', 0)
                 _raw_val = float(_raw_val) if pd.notna(_raw_val) else 0
                 _num_sales = card_row_master.get('NumSales', 0)
@@ -1596,121 +1596,131 @@ elif page == "Young Guns DB":
                 _last_scraped = card_row_master.get('LastScraped', '')
                 _last_scraped = str(_last_scraped) if pd.notna(_last_scraped) else ''
 
+                # Build available price modes: Raw + any graded with data
+                _price_modes = {}
                 if _raw_val > 0:
-                    rc1, rc2, rc3, rc4, rc5 = st.columns(5)
-                    rc1.metric("Raw Value", f"${_raw_val:.2f}")
-                    rc2.metric("Sales", _num_sales)
-                    rc3.metric("Min", f"${_min_val:.2f}")
-                    rc4.metric("Max", f"${_max_val:.2f}")
-                    _trend_icon = {"up": "+", "down": "-", "stable": "~"}.get(_trend, "")
-                    rc5.metric("Trend", _trend.capitalize() if _trend else "N/A", delta=_trend_icon if _trend_icon else None)
-
-                # ── Graded Prices ──
-                graded_data = {}
-                for val_col, label in [('PSA10_Value', 'PSA 10'), ('PSA9_Value', 'PSA 9'), ('PSA8_Value', 'PSA 8'),
-                                       ('BGS10_Value', 'BGS 10'), ('BGS9_5_Value', 'BGS 9.5'), ('BGS9_Value', 'BGS 9')]:
+                    _price_modes['Raw'] = {'value': _raw_val, 'sales': _num_sales, 'min': _min_val, 'max': _max_val, 'sales_key': card_name_for_history}
+                for val_col, label, bracket in [
+                    ('PSA10_Value', 'PSA 10', 'PSA 10'), ('PSA9_Value', 'PSA 9', 'PSA 9'), ('PSA8_Value', 'PSA 8', 'PSA 8'),
+                    ('BGS10_Value', 'BGS 10', 'BGS 10'), ('BGS9_5_Value', 'BGS 9.5', 'BGS 9.5'), ('BGS9_Value', 'BGS 9', 'BGS 9'),
+                ]:
                     sales_col = val_col.replace('_Value', '_Sales')
                     if val_col in card_row_master.index:
                         val = card_row_master.get(val_col, 0)
                         sales = card_row_master.get(sales_col, 0)
                         if pd.notna(val) and float(val) > 0:
-                            graded_data[label] = {'value': float(val), 'sales': int(float(sales)) if pd.notna(sales) else 0}
+                            _price_modes[label] = {
+                                'value': float(val),
+                                'sales': int(float(sales)) if pd.notna(sales) else 0,
+                                'min': 0, 'max': 0,
+                                'sales_key': f"{card_name_for_history} [{bracket}]",
+                            }
 
-                if graded_data:
-                    st.markdown("---")
-                    psa_grades = {k: v for k, v in graded_data.items() if k.startswith('PSA')}
-                    bgs_grades = {k: v for k, v in graded_data.items() if k.startswith('BGS')}
+                if _price_modes:
+                    # ── Price Mode Selector ──
+                    _mode_labels = list(_price_modes.keys())
+                    _card_price_mode = st.radio(
+                        "Price Mode", _mode_labels,
+                        horizontal=True, index=0, key="card_detail_price_mode",
+                    )
+                    _active = _price_modes[_card_price_mode]
 
-                    # All grades in one row with raw for comparison
-                    all_grades = list(graded_data.items())
-                    gcols = st.columns(len(all_grades) + 1)
-                    with gcols[0]:
-                        st.metric("Raw", f"${_raw_val:.2f}" if _raw_val > 0 else "N/A")
-                    for i, (grade, gdata) in enumerate(all_grades):
-                        with gcols[i + 1]:
-                            # Show multiplier vs raw as delta
-                            mult = f"{gdata['value'] / _raw_val:.1f}x" if _raw_val > 0 else ""
-                            st.metric(grade, f"${gdata['value']:.2f}", delta=mult, delta_color="off")
+                    # ── Price Summary Metrics ──
+                    if _card_price_mode == 'Raw':
+                        rc1, rc2, rc3, rc4, rc5 = st.columns(5)
+                        rc1.metric("Fair Value", f"${_active['value']:.2f}")
+                        rc2.metric("Sales", _active['sales'])
+                        rc3.metric("Min", f"${_active['min']:.2f}")
+                        rc4.metric("Max", f"${_active['max']:.2f}")
+                        _trend_icon = {"up": "+", "down": "-", "stable": "~"}.get(_trend, "")
+                        rc5.metric("Trend", _trend.capitalize() if _trend else "N/A", delta=_trend_icon if _trend_icon else None)
+                    else:
+                        rc1, rc2, rc3 = st.columns(3)
+                        rc1.metric(f"{_card_price_mode} Value", f"${_active['value']:.2f}")
+                        rc2.metric("Sales", _active['sales'])
+                        mult = f"{_active['value'] / _raw_val:.1f}x raw" if _raw_val > 0 else ""
+                        rc3.metric("Premium", mult if mult else "N/A")
 
-                elif _raw_val > 0:
-                    st.caption("No graded price data available for this card")
+                    # ── Sales History Chart ──
+                    _sales_key = _active['sales_key']
+                    card_raw = load_yg_raw_sales(_sales_key)
+                    _has_raw_sales = card_raw and len(card_raw) >= 2
 
-                # ── Price History & Sales Charts ──
-                card_history = load_yg_price_history(card_name_for_history)
-                card_raw = load_yg_raw_sales(card_name_for_history)
-                _has_history = card_history and len(card_history) > 0
-                _has_raw_sales = card_raw and len(card_raw) >= 2
+                    # Price history (only for raw mode)
+                    card_history = load_yg_price_history(card_name_for_history) if _card_price_mode == 'Raw' else None
+                    _has_history = card_history and len(card_history) > 0
 
-                if _has_history or _has_raw_sales:
-                    st.markdown("---")
+                    if _has_history or _has_raw_sales:
+                        st.markdown("---")
 
-                if _has_history and _has_raw_sales:
-                    # Side by side: price history + individual sales
-                    chart_col1, chart_col2 = st.columns(2)
-                elif _has_history:
-                    chart_col1 = st.container()
-                    chart_col2 = None
-                elif _has_raw_sales:
-                    chart_col1 = None
-                    chart_col2 = st.container()
-                else:
-                    chart_col1 = chart_col2 = None
+                    if _has_history and _has_raw_sales:
+                        chart_col1, chart_col2 = st.columns(2)
+                    elif _has_history:
+                        chart_col1 = st.container()
+                        chart_col2 = None
+                    elif _has_raw_sales:
+                        chart_col1 = None
+                        chart_col2 = st.container()
+                    else:
+                        chart_col1 = chart_col2 = None
 
-                if _has_history and chart_col1:
-                    with chart_col1:
-                        hist_df = pd.DataFrame(card_history)
-                        hist_df['date'] = pd.to_datetime(hist_df['date'])
-                        hist_df = hist_df.sort_values('date')
-                        fig_card_hist = px.line(
-                            hist_df, x='date', y='fair_value',
-                            markers=True,
-                            labels={'date': 'Date', 'fair_value': 'Fair Value ($)'},
-                            hover_data={'num_sales': True},
-                            title="Fair Value Over Time",
-                        )
-                        fig_card_hist.update_layout(template="plotly_dark", height=350)
-                        st.plotly_chart(fig_card_hist, use_container_width=True)
-
-                        if len(hist_df) >= 2:
-                            first_val = hist_df.iloc[0]['fair_value']
-                            last_val = hist_df.iloc[-1]['fair_value']
-                            change = last_val - first_val
-                            pct = (change / first_val * 100) if first_val > 0 else 0
-                            hc1, hc2, hc3 = st.columns(3)
-                            hc1.metric("Current", f"${last_val:.2f}")
-                            hc2.metric("Change", f"${change:+.2f}")
-                            hc3.metric("% Change", f"{pct:+.1f}%")
-
-                if _has_raw_sales and chart_col2:
-                    with chart_col2:
-                        raw_df = pd.DataFrame(card_raw)
-                        raw_df['sold_date'] = pd.to_datetime(raw_df['sold_date'])
-                        raw_df = raw_df.sort_values('sold_date')
-                        fig_raw = px.scatter(
-                            raw_df, x='sold_date', y='price_val',
-                            hover_data={'title': True, 'price_val': ':.2f'},
-                            labels={'sold_date': 'Sold Date', 'price_val': 'Sale Price ($)'},
-                            title=f"Individual eBay Sales ({len(raw_df)} listings)",
-                        )
-                        fig_raw.update_traces(marker=dict(size=8, color='#4CAF50'))
-                        if len(raw_df) >= 5:
-                            raw_df['rolling'] = raw_df['price_val'].rolling(window=5, min_periods=2).mean()
-                            fig_raw.add_scatter(
-                                x=raw_df['sold_date'], y=raw_df['rolling'],
-                                mode='lines', name='5-Sale Avg',
-                                line=dict(width=2, dash='dash', color='#FFD700')
+                    if _has_history and chart_col1:
+                        with chart_col1:
+                            hist_df = pd.DataFrame(card_history)
+                            hist_df['date'] = pd.to_datetime(hist_df['date'])
+                            hist_df = hist_df.sort_values('date')
+                            fig_card_hist = px.line(
+                                hist_df, x='date', y='fair_value',
+                                markers=True,
+                                labels={'date': 'Date', 'fair_value': 'Fair Value ($)'},
+                                hover_data={'num_sales': True},
+                                title="Fair Value Over Time",
                             )
-                        fig_raw.update_layout(template="plotly_dark", height=350)
-                        st.plotly_chart(fig_raw, use_container_width=True)
+                            fig_card_hist.update_layout(template="plotly_dark", height=350)
+                            st.plotly_chart(fig_card_hist, use_container_width=True)
 
-                        # Sales summary
-                        _avg_sale = raw_df['price_val'].mean()
-                        _median_sale = raw_df['price_val'].median()
-                        _recent_5 = raw_df.tail(5)['price_val'].mean()
-                        sc1, sc2, sc3 = st.columns(3)
-                        sc1.metric("Avg Sale", f"${_avg_sale:.2f}")
-                        sc2.metric("Median Sale", f"${_median_sale:.2f}")
-                        sc3.metric("Last 5 Avg", f"${_recent_5:.2f}")
+                            if len(hist_df) >= 2:
+                                first_val = hist_df.iloc[0]['fair_value']
+                                last_val = hist_df.iloc[-1]['fair_value']
+                                change = last_val - first_val
+                                pct = (change / first_val * 100) if first_val > 0 else 0
+                                hc1, hc2, hc3 = st.columns(3)
+                                hc1.metric("Current", f"${last_val:.2f}")
+                                hc2.metric("Change", f"${change:+.2f}")
+                                hc3.metric("% Change", f"{pct:+.1f}%")
+
+                    if _has_raw_sales:
+                        _chart_target = chart_col2 if chart_col2 else st.container()
+                        with _chart_target:
+                            raw_df = pd.DataFrame(card_raw)
+                            raw_df['sold_date'] = pd.to_datetime(raw_df['sold_date'])
+                            raw_df = raw_df.sort_values('sold_date')
+                            fig_raw = px.scatter(
+                                raw_df, x='sold_date', y='price_val',
+                                hover_data={'title': True, 'price_val': ':.2f'},
+                                labels={'sold_date': 'Sold Date', 'price_val': 'Sale Price ($)'},
+                                title=f"{_card_price_mode} Sales ({len(raw_df)} listings)",
+                            )
+                            fig_raw.update_traces(marker=dict(size=8, color='#4CAF50'))
+                            if len(raw_df) >= 5:
+                                raw_df['rolling'] = raw_df['price_val'].rolling(window=5, min_periods=2).mean()
+                                fig_raw.add_scatter(
+                                    x=raw_df['sold_date'], y=raw_df['rolling'],
+                                    mode='lines', name='5-Sale Avg',
+                                    line=dict(width=2, dash='dash', color='#FFD700')
+                                )
+                            fig_raw.update_layout(template="plotly_dark", height=350)
+                            st.plotly_chart(fig_raw, use_container_width=True)
+
+                            _avg_sale = raw_df['price_val'].mean()
+                            _median_sale = raw_df['price_val'].median()
+                            _recent_5 = raw_df.tail(5)['price_val'].mean()
+                            sc1, sc2, sc3 = st.columns(3)
+                            sc1.metric("Avg Sale", f"${_avg_sale:.2f}")
+                            sc2.metric("Median Sale", f"${_median_sale:.2f}")
+                            sc3.metric("Last 5 Avg", f"${_recent_5:.2f}")
+                    elif not _has_history:
+                        st.caption(f"No sales data available for {_card_price_mode}")
 
                 # ── eBay Scrape Button (admin only) ──
                 if not public_view:
