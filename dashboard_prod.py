@@ -29,8 +29,122 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    .stMetric { background-color: #1E1E1E; padding: 15px; border-radius: 5px; border: 1px solid #333; }
-    div[data-testid="stMetricValue"] { font-size: 1.4rem; }
+    /* ============================================
+       GLOBAL THEME & CARD-STYLE METRICS
+       ============================================ */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header[data-testid="stHeader"] {background: rgba(0,0,0,0);}
+
+    /* Metric card styling */
+    div[data-testid="stMetric"] {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        border-left: 3px solid #636EFA;
+        border-radius: 8px;
+        padding: 12px 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    div[data-testid="stMetricValue"] {
+        font-size: 1.3rem;
+        font-weight: 700;
+    }
+    div[data-testid="stMetricLabel"] {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        opacity: 0.7;
+    }
+
+    /* Styled containers */
+    div[data-testid="stExpander"] {
+        border: 1px solid #333;
+        border-radius: 8px;
+        background: #1a1a2e;
+    }
+
+    /* Divider accent */
+    hr { border-color: #636EFA !important; opacity: 0.3; }
+
+    /* Button polish */
+    button[kind="primary"] {
+        background-color: #636EFA !important;
+        border: none !important;
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+    }
+    button[kind="primary"]:hover { background-color: #4f5bd5 !important; }
+    button[kind="secondary"] {
+        border: 1px solid #636EFA !important;
+        border-radius: 6px !important;
+    }
+
+    /* Sidebar navigation pills */
+    div[data-testid="stSidebar"] div[role="radiogroup"] label {
+        border-radius: 20px !important;
+        padding: 6px 16px !important;
+        margin: 2px 0 !important;
+        transition: background 0.2s;
+    }
+    div[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+        background: rgba(99, 110, 250, 0.15);
+    }
+
+    /* Data table polish */
+    div[data-testid="stDataFrame"] { border-radius: 8px; overflow: hidden; }
+
+    /* Alert banners */
+    div[data-testid="stAlert"] { border-radius: 8px !important; font-size: 0.9rem; }
+
+    /* ============================================
+       MOBILE RESPONSIVE (< 768px)
+       ============================================ */
+    @media (max-width: 768px) {
+        div[data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+            min-width: 45% !important;
+            flex: 1 1 45% !important;
+        }
+        div[data-testid="stMetricValue"] { font-size: 1.1rem; }
+        div[data-testid="stMetricLabel"] { font-size: 0.7rem; }
+        div[data-testid="stMetric"] { padding: 8px 12px; }
+        button { width: 100% !important; }
+        .main .block-container {
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            padding-top: 1rem !important;
+        }
+        h1 { font-size: 1.5rem !important; }
+        h2, .stSubheader { font-size: 1.2rem !important; }
+        div[data-testid="stDataFrame"] {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        div[data-testid="stDownloadButton"] button { width: 100% !important; }
+    }
+
+    /* TABLET (768px - 1024px) */
+    @media (min-width: 769px) and (max-width: 1024px) {
+        div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+            min-width: 30% !important;
+        }
+        .main .block-container {
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
+        }
+    }
+
+    /* SMALL PHONE (< 480px) */
+    @media (max-width: 480px) {
+        div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+            min-width: 100% !important;
+            flex: 1 1 100% !important;
+        }
+        div[data-testid="stMetricValue"] { font-size: 1rem; }
+        h1 { font-size: 1.3rem !important; }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -65,7 +179,8 @@ if not public_view:
     if not users_config:
         correct_pw = os.environ.get("DASHBOARD_PASSWORD", "")
         if correct_pw and not st.session_state.get("authenticated"):
-            st.title("Hockey Card Collection Dashboard")
+            st.markdown("<div style='max-width:400px;margin:3rem auto;'>", unsafe_allow_html=True)
+            st.markdown("## Card Collection Dashboard")
             password = st.text_input("Enter password to access the dashboard", type="password")
             if st.button("Login", type="primary"):
                 if password == correct_pw:
@@ -73,14 +188,17 @@ if not public_view:
                     st.rerun()
                 else:
                     st.error("Incorrect password")
+            st.markdown("</div>", unsafe_allow_html=True)
             st.stop()
     else:
         # Multi-user login
         if not st.session_state.get("authenticated"):
-            st.title("Hockey Card Collection Dashboard")
+            st.markdown("<div style='max-width:400px;margin:3rem auto;'>", unsafe_allow_html=True)
+            st.markdown("## Card Collection Dashboard")
+            st.caption("Sign in to manage your collection")
             username = st.text_input("Username")
             password = st.text_input("Password", type="password")
-            if st.button("Login", type="primary"):
+            if st.button("Login", type="primary", use_container_width=True):
                 if verify_password(username, password):
                     st.session_state.authenticated = True
                     st.session_state.username = username
@@ -90,6 +208,7 @@ if not public_view:
                     st.rerun()
                 else:
                     st.error("Invalid username or password")
+            st.markdown("</div>", unsafe_allow_html=True)
             st.stop()
 
 # ============================================================
@@ -318,13 +437,14 @@ try:
 except OSError:
     last_modified = "Unknown"
 
-col1, col2, col3, col4, col5 = st.columns(5)
+col1, col2, col3 = st.columns(3)
 with col1:
     st.metric("Total Cards", len(df))
 with col2:
     st.metric("Cards with Data", len(found_df))
 with col3:
     st.metric("Not Found", len(not_found_df))
+col4, col5 = st.columns(2)
 with col4:
     st.metric("Collection Value", f"${total_value:,.2f}")
 with col5:
@@ -347,10 +467,11 @@ if page == "Dashboard":
     cards_up = len(df[df['Trend'] == 'up'])
     cards_down = len(df[df['Trend'] == 'down'])
 
-    dc1, dc2, dc3, dc4, dc5 = st.columns(5)
+    dc1, dc2, dc3 = st.columns(3)
     dc1.metric("Total Cards", total_cards)
     dc2.metric("Collection Value", f"${total_value:,.2f}")
     dc3.metric("Avg Card Value", f"${avg_value:,.2f}")
+    dc4, dc5 = st.columns(2)
     dc4.metric("Trending Up", cards_up)
     dc5.metric("Trending Down", cards_down)
 
@@ -500,10 +621,11 @@ elif page == "Charts":
         seven_ago = port_df[port_df['date'] <= (pd.Timestamp.now() - pd.Timedelta(days=7))]
         weekly_change = (latest['total_value'] - seven_ago.iloc[-1]['total_value']) if len(seven_ago) > 0 else None
 
-        pc1, pc2, pc3, pc4 = st.columns(4)
+        pc1, pc2 = st.columns(2)
         pc1.metric("Current Value", f"${latest['total_value']:,.2f}",
                     delta=f"${value_change:+,.2f}")
         pc2.metric("Total Cards", int(latest['total_cards']))
+        pc3, pc4 = st.columns(2)
         pc3.metric("Avg Card Value", f"${latest['avg_value']:,.2f}")
         if weekly_change is not None:
             pc4.metric("7-Day Change", f"${weekly_change:+,.2f}")
@@ -536,9 +658,10 @@ elif page == "Card Ledger":
     top_card_name = parse_card_name(df.at[top_card_idx, 'Card Name'])['Player'] if top_card_idx is not None else "N/A"
     top_card_val = df.at[top_card_idx, 'Fair Value'] if top_card_idx is not None else 0
 
-    mcol1, mcol2, mcol3, mcol4 = st.columns(4)
+    mcol1, mcol2 = st.columns(2)
     mcol1.metric("Total Cards", total_cards)
     mcol2.metric("Collection Value", f"${total_value:,.2f}")
+    mcol3, mcol4 = st.columns(2)
     mcol3.metric("Avg Card Value", f"${avg_value:,.2f}")
     mcol4.metric("Most Valuable", f"{top_card_name}", delta=f"${top_card_val:,.2f}")
 
@@ -560,8 +683,8 @@ elif page == "Card Ledger":
     # Search bar (full width)
     search_query = st.text_input("Search cards", placeholder="Search by player, set, year, card number...")
 
-    # Filter row
-    fcol1, fcol2, fcol3, fcol4 = st.columns(4)
+    # Filter row (2x2 for mobile)
+    fcol1, fcol2 = st.columns(2)
     with fcol1:
         sets = sorted(df['Set'].dropna().unique().tolist())
         sets = [s for s in sets if s]
@@ -569,6 +692,7 @@ elif page == "Card Ledger":
     with fcol2:
         trend_options = sorted(df['Trend'].unique().tolist())
         trend_filter = st.multiselect("Trend", options=trend_options, default=trend_options)
+    fcol3, fcol4 = st.columns(2)
     with fcol3:
         grade_filter = st.selectbox("Grade", ["All", "Raw", "Graded"])
     with fcol4:
@@ -864,29 +988,28 @@ elif page == "Card Inspect":
 
         # Card details
         st.markdown("---")
-        dc1, dc2, dc3 = st.columns(3)
+        dc1, dc2 = st.columns(2)
         with dc1:
             st.metric("Player", card_row['Player'])
         with dc2:
             st.metric("Set", card_row['Set'] if card_row['Set'] else "N/A")
+        dc3, dc4, dc5 = st.columns(3)
         with dc3:
             st.metric("Subset", card_row['Subset'] if card_row['Subset'] else "Base")
-
-        dc4, dc5, dc6, dc7 = st.columns(4)
         with dc4:
             st.metric("Card #", card_row['Card #'] if card_row['Card #'] else "N/A")
         with dc5:
-            st.metric("Serial", card_row['Serial'] if card_row['Serial'] else "N/A")
-        with dc6:
-            st.metric("Grade", card_row['Grade'] if card_row['Grade'] else "Raw")
+            st.metric("Serial / Grade",
+                       f"{card_row['Serial'] if card_row['Serial'] else 'N/A'} | {card_row['Grade'] if card_row['Grade'] else 'Raw'}")
 
-        vc1, vc2, vc3, vc4, vc5 = st.columns(5)
+        vc1, vc2, vc3 = st.columns(3)
         with vc1:
             st.metric("Fair Value", f"${card_row['Fair Value']:.2f}")
         with vc2:
             st.metric("Trend", card_row['Trend'])
         with vc3:
             st.metric("Sales Found", int(card_row['Num Sales']))
+        vc4, vc5 = st.columns(2)
         with vc4:
             st.metric("Min", f"${card_row['Min']:.2f}")
         with vc5:
