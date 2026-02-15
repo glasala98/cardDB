@@ -1685,9 +1685,38 @@ elif page == "Young Guns DB":
             priced_df['Min'] = pd.to_numeric(priced_df['Min'], errors='coerce').fillna(0)
             priced_df['Max'] = pd.to_numeric(priced_df['Max'], errors='coerce').fillna(0)
 
+            # Coerce graded columns to numeric
+            graded_value_cols = ['PSA8_Value', 'PSA9_Value', 'PSA10_Value', 'BGS9_Value', 'BGS9_5_Value', 'BGS10_Value']
+            graded_sales_cols = ['PSA8_Sales', 'PSA9_Sales', 'PSA10_Sales', 'BGS9_Sales', 'BGS9_5_Sales', 'BGS10_Sales']
+            for gc in graded_value_cols + graded_sales_cols:
+                if gc in priced_df.columns:
+                    priced_df[gc] = pd.to_numeric(priced_df[gc], errors='coerce').fillna(0)
+
             if len(priced_df) > 0:
                 st.divider()
                 st.markdown('<div class="section-header"><span class="icon">&#x1F4CA;</span> Young Guns Analytics</div>', unsafe_allow_html=True)
+
+                # Price Mode selector — switches all charts between raw and graded values
+                price_col_map = {'Raw': 'FairValue'}
+                for gc in graded_value_cols:
+                    if gc in priced_df.columns and (priced_df[gc] > 0).any():
+                        label = gc.replace('_Value', '').replace('PSA', 'PSA ').replace('BGS', 'BGS ').replace('9_5', '9.5')
+                        price_col_map[label] = gc
+
+                price_mode = st.radio(
+                    "Price Mode", list(price_col_map.keys()),
+                    horizontal=True, index=0, key="yg_price_mode",
+                    help="Switch all charts between raw and graded price data"
+                )
+                price_col = price_col_map[price_mode]
+                price_label = f"{price_mode} Value ($)"
+
+                # Filter to cards with data for the selected mode
+                if price_mode != 'Raw':
+                    analytics_df = priced_df[priced_df[price_col] > 0].copy()
+                    st.caption(f"Showing {len(analytics_df)} cards with {price_mode} data")
+                else:
+                    analytics_df = priced_df.copy()
 
                 # --- Young Guns Market Trend (portfolio history) ---
                 yg_portfolio = load_yg_portfolio_history()
@@ -1730,14 +1759,16 @@ elif page == "Young Guns DB":
                         mt4.metric("Cards Scraped", f"{int(latest.get('cards_scraped', 0)):,}")
 
                 # --- Top 20 Most Valuable ---
-                st.subheader("Top 20 Most Valuable")
-                top20 = priced_df.nlargest(20, 'FairValue')[['Season', 'CardNumber', 'PlayerName', 'Team', 'FairValue', 'NumSales']].copy()
+                st.subheader(f"Top 20 Most Valuable ({price_mode})")
+                top20_cols = ['Season', 'CardNumber', 'PlayerName', 'Team', price_col, 'NumSales']
+                top20_cols = [c for c in top20_cols if c in analytics_df.columns]
+                top20 = analytics_df.nlargest(20, price_col)[top20_cols].copy()
                 top20['Label'] = top20['PlayerName'] + ' (' + top20['Season'] + ')'
                 fig_top20 = px.bar(
-                    top20, x='FairValue', y='Label', orientation='h',
-                    color='FairValue', color_continuous_scale='Blues',
-                    hover_data={'PlayerName': True, 'Team': True, 'NumSales': True, 'Label': False},
-                    labels={'FairValue': 'Fair Value ($)', 'Label': ''},
+                    top20, x=price_col, y='Label', orientation='h',
+                    color=price_col, color_continuous_scale='Blues',
+                    hover_data={'PlayerName': True, 'Team': True, 'Label': False},
+                    labels={price_col: price_label, 'Label': ''},
                 )
                 fig_top20.update_layout(
                     template="plotly_dark", height=500,
@@ -1748,12 +1779,12 @@ elif page == "Young Guns DB":
 
                 # --- Most Liquid (highest sales volume) ---
                 st.subheader("Most Liquid (Highest Sales Volume)")
-                top_liquid = priced_df.nlargest(15, 'NumSales')[['Season', 'PlayerName', 'Team', 'FairValue', 'NumSales']].copy()
+                top_liquid = analytics_df.nlargest(15, 'NumSales')[['Season', 'PlayerName', 'Team', price_col, 'NumSales']].copy()
                 top_liquid['Label'] = top_liquid['PlayerName'] + ' (' + top_liquid['Season'] + ')'
                 fig_liquid = px.bar(
                     top_liquid, x='NumSales', y='Label', orientation='h',
-                    color='FairValue', color_continuous_scale='Greens',
-                    hover_data={'PlayerName': True, 'FairValue': True, 'Label': False},
+                    color=price_col, color_continuous_scale='Greens',
+                    hover_data={'PlayerName': True, price_col: True, 'Label': False},
                     labels={'NumSales': 'Sales Found', 'Label': ''},
                 )
                 fig_liquid.update_layout(
@@ -1766,10 +1797,10 @@ elif page == "Young Guns DB":
                 # --- Price Distribution ---
                 col_dist1, col_dist2 = st.columns(2)
                 with col_dist1:
-                    st.subheader("Price Distribution")
+                    st.subheader(f"Price Distribution ({price_mode})")
                     fig_hist = px.histogram(
-                        priced_df, x='FairValue', nbins=50,
-                        labels={'FairValue': 'Fair Value ($)', 'count': 'Cards'},
+                        analytics_df, x=price_col, nbins=50,
+                        labels={price_col: price_label, 'count': 'Cards'},
                         color_discrete_sequence=['#636EFA'],
                     )
                     fig_hist.update_layout(template="plotly_dark", height=350)
@@ -1777,8 +1808,8 @@ elif page == "Young Guns DB":
 
                 with col_dist2:
                     st.subheader("Trend Breakdown")
-                    if 'Trend' in priced_df.columns:
-                        trend_counts = priced_df['Trend'].fillna('no data').value_counts().reset_index()
+                    if 'Trend' in analytics_df.columns:
+                        trend_counts = analytics_df['Trend'].fillna('no data').value_counts().reset_index()
                         trend_counts.columns = ['Trend', 'Count']
                         fig_trend = px.pie(
                             trend_counts, names='Trend', values='Count',
@@ -1790,35 +1821,35 @@ elif page == "Young Guns DB":
                         st.plotly_chart(fig_trend, use_container_width=True)
 
                 # --- Value by Season ---
-                st.subheader("Average Card Value by Season")
-                season_stats = priced_df.groupby('Season').agg(
-                    AvgValue=('FairValue', 'mean'),
-                    TotalValue=('FairValue', 'sum'),
-                    Cards=('FairValue', 'count'),
-                    MaxValue=('FairValue', 'max'),
+                st.subheader(f"Average Card Value by Season ({price_mode})")
+                season_stats = analytics_df.groupby('Season').agg(
+                    AvgValue=(price_col, 'mean'),
+                    TotalValue=(price_col, 'sum'),
+                    Cards=(price_col, 'count'),
+                    MaxValue=(price_col, 'max'),
                 ).reset_index().sort_values('Season')
                 fig_season_val = px.bar(
                     season_stats, x='Season', y='AvgValue',
                     color='TotalValue', color_continuous_scale='Viridis',
                     hover_data={'TotalValue': ':.2f', 'Cards': True, 'MaxValue': ':.2f'},
-                    labels={'AvgValue': 'Avg Value ($)', 'TotalValue': 'Total Value ($)'},
+                    labels={'AvgValue': f'Avg {price_mode} ($)', 'TotalValue': 'Total Value ($)'},
                 )
                 fig_season_val.update_layout(template="plotly_dark", height=400, coloraxis_showscale=False)
                 st.plotly_chart(fig_season_val, use_container_width=True)
 
                 # --- Value by Team ---
-                st.subheader("Total Value by Team (Top 20)")
-                team_stats = priced_df[priced_df['Team'] != ''].groupby('Team').agg(
-                    TotalValue=('FairValue', 'sum'),
-                    AvgValue=('FairValue', 'mean'),
-                    Cards=('FairValue', 'count'),
-                    TopCard=('FairValue', 'max'),
+                st.subheader(f"Total Value by Team - Top 20 ({price_mode})")
+                team_stats = analytics_df[analytics_df['Team'] != ''].groupby('Team').agg(
+                    TotalValue=(price_col, 'sum'),
+                    AvgValue=(price_col, 'mean'),
+                    Cards=(price_col, 'count'),
+                    TopCard=(price_col, 'max'),
                 ).reset_index().nlargest(20, 'TotalValue')
                 fig_team = px.bar(
                     team_stats, x='TotalValue', y='Team', orientation='h',
                     color='AvgValue', color_continuous_scale='Oranges',
                     hover_data={'AvgValue': ':.2f', 'Cards': True, 'TopCard': ':.2f'},
-                    labels={'TotalValue': 'Total Value ($)', 'AvgValue': 'Avg ($)'},
+                    labels={'TotalValue': f'Total {price_mode} ($)', 'AvgValue': 'Avg ($)'},
                 )
                 fig_team.update_layout(
                     template="plotly_dark", height=500,
@@ -1828,34 +1859,34 @@ elif page == "Young Guns DB":
                 st.plotly_chart(fig_team, use_container_width=True)
 
                 # --- Price vs Volume Scatter ---
-                st.subheader("Price vs. Sales Volume")
-                scatter_df = priced_df[priced_df['NumSales'] > 0].copy()
+                st.subheader(f"Price vs. Sales Volume ({price_mode})")
+                scatter_df = analytics_df[analytics_df['NumSales'] > 0].copy()
                 if len(scatter_df) > 0:
                     scatter_df['Spread'] = scatter_df['Max'] - scatter_df['Min']
                     fig_scatter = px.scatter(
-                        scatter_df, x='NumSales', y='FairValue',
+                        scatter_df, x='NumSales', y=price_col,
                         size='Spread', hover_name='PlayerName',
                         color='Season',
-                        hover_data={'Team': True, 'Season': True, 'Min': ':.2f', 'Max': ':.2f'},
-                        labels={'NumSales': 'Sales Found', 'FairValue': 'Fair Value ($)'},
+                        hover_data={'Team': True, 'Season': True},
+                        labels={'NumSales': 'Sales Found', price_col: price_label},
                     )
                     fig_scatter.update_layout(template="plotly_dark", height=500)
                     st.plotly_chart(fig_scatter, use_container_width=True)
 
                 # --- Hidden Gems: high sales, low price ---
-                st.subheader("Hidden Gems (High Volume, Low Price)")
+                st.subheader(f"Hidden Gems - High Volume, Low Price ({price_mode})")
                 st.caption("Cards with lots of sales but below-average price — potential undervalued picks")
-                avg_price = priced_df['FairValue'].mean()
-                gems = priced_df[
-                    (priced_df['NumSales'] >= 5) & (priced_df['FairValue'] < avg_price)
-                ].nlargest(15, 'NumSales')[['Season', 'PlayerName', 'Team', 'FairValue', 'NumSales']].copy()
+                avg_price = analytics_df[price_col].mean()
+                gems = analytics_df[
+                    (analytics_df['NumSales'] >= 5) & (analytics_df[price_col] < avg_price)
+                ].nlargest(15, 'NumSales')[['Season', 'PlayerName', 'Team', price_col, 'NumSales']].copy()
                 if len(gems) > 0:
                     st.dataframe(
                         gems,
                         use_container_width=True,
                         hide_index=True,
                         column_config={
-                            'FairValue': st.column_config.NumberColumn("Fair Value ($)", format="$%.2f"),
+                            price_col: st.column_config.NumberColumn(price_label, format="$%.2f"),
                             'NumSales': st.column_config.NumberColumn("Sales"),
                         },
                     )
@@ -1865,16 +1896,16 @@ elif page == "Young Guns DB":
                 # --- Premium Cards: highest spread ---
                 st.subheader("Widest Price Spreads")
                 st.caption("Cards with the biggest gap between min and max sale — volatile or condition-sensitive")
-                spread_df = priced_df.copy()
+                spread_df = analytics_df.copy()
                 spread_df['Spread'] = spread_df['Max'] - spread_df['Min']
-                top_spread = spread_df.nlargest(15, 'Spread')[['Season', 'PlayerName', 'Team', 'FairValue', 'Min', 'Max', 'Spread']].copy()
+                top_spread = spread_df.nlargest(15, 'Spread')[['Season', 'PlayerName', 'Team', price_col, 'Min', 'Max', 'Spread']].copy()
                 if len(top_spread) > 0:
                     st.dataframe(
                         top_spread,
                         use_container_width=True,
                         hide_index=True,
                         column_config={
-                            'FairValue': st.column_config.NumberColumn("Fair Value ($)", format="$%.2f"),
+                            price_col: st.column_config.NumberColumn(price_label, format="$%.2f"),
                             'Min': st.column_config.NumberColumn("Min ($)", format="$%.2f"),
                             'Max': st.column_config.NumberColumn("Max ($)", format="$%.2f"),
                             'Spread': st.column_config.NumberColumn("Spread ($)", format="$%.2f"),
@@ -1883,14 +1914,14 @@ elif page == "Young Guns DB":
 
                 # --- Price Tiers ---
                 st.divider()
-                st.subheader("Price Tiers")
+                st.subheader(f"Price Tiers ({price_mode})")
                 st.caption("How many cards fall into each value bracket")
                 tier_bins = [0, 1, 5, 10, 20, 50, 100, 250, float('inf')]
                 tier_labels = ['< $1', '$1-5', '$5-10', '$10-20', '$20-50', '$50-100', '$100-250', '$250+']
-                priced_df['Tier'] = pd.cut(priced_df['FairValue'], bins=tier_bins, labels=tier_labels, right=False)
-                tier_counts = priced_df['Tier'].value_counts().reindex(tier_labels).fillna(0).reset_index()
+                analytics_df['Tier'] = pd.cut(analytics_df[price_col], bins=tier_bins, labels=tier_labels, right=False)
+                tier_counts = analytics_df['Tier'].value_counts().reindex(tier_labels).fillna(0).reset_index()
                 tier_counts.columns = ['Tier', 'Cards']
-                tier_counts['TotalValue'] = priced_df.groupby('Tier', observed=False)['FairValue'].sum().reindex(tier_labels).fillna(0).values
+                tier_counts['TotalValue'] = analytics_df.groupby('Tier', observed=False)[price_col].sum().reindex(tier_labels).fillna(0).values
 
                 tier_col1, tier_col2 = st.columns(2)
                 with tier_col1:
@@ -1915,7 +1946,7 @@ elif page == "Young Guns DB":
 
                 # --- ROI by Era ---
                 st.divider()
-                st.subheader("ROI by Era")
+                st.subheader(f"ROI by Era ({price_mode})")
                 st.caption("Comparing average card value across different eras of Young Guns")
 
                 def get_era(season):
@@ -1933,13 +1964,13 @@ elif page == "Young Guns DB":
                     else:
                         return '2020+'
 
-                priced_df['Era'] = priced_df['Season'].apply(get_era)
-                era_stats = priced_df.groupby('Era').agg(
-                    AvgValue=('FairValue', 'mean'),
-                    MedianValue=('FairValue', 'median'),
-                    TotalValue=('FairValue', 'sum'),
-                    Cards=('FairValue', 'count'),
-                    MaxCard=('FairValue', 'max'),
+                analytics_df['Era'] = analytics_df['Season'].apply(get_era)
+                era_stats = analytics_df.groupby('Era').agg(
+                    AvgValue=(price_col, 'mean'),
+                    MedianValue=(price_col, 'median'),
+                    TotalValue=(price_col, 'sum'),
+                    Cards=(price_col, 'count'),
+                    MaxCard=(price_col, 'max'),
                     AvgSales=('NumSales', 'mean'),
                 ).reset_index()
                 era_order = ['1990s', '2000-04', '2005-09', '2010-14', '2015-19', '2020+']
@@ -1984,6 +2015,151 @@ elif page == "Young Guns DB":
                         'Avg Sales': st.column_config.NumberColumn("Avg Sales", format="%.1f"),
                     },
                 )
+
+                # ============================================================
+                # GRADED ANALYTICS (only when graded data exists)
+                # ============================================================
+                _has_psa10 = 'PSA10_Value' in priced_df.columns and (priced_df['PSA10_Value'] > 0).any()
+                _has_bgs10 = 'BGS10_Value' in priced_df.columns and (priced_df['BGS10_Value'] > 0).any()
+                if _has_psa10 or _has_bgs10:
+                    _graded_mask = pd.Series(False, index=priced_df.index)
+                    if _has_psa10:
+                        _graded_mask = _graded_mask | (priced_df['PSA10_Value'] > 0)
+                    if _has_bgs10:
+                        _graded_mask = _graded_mask | (priced_df['BGS10_Value'] > 0)
+                    graded_df = priced_df[_graded_mask].copy()
+                else:
+                    graded_df = pd.DataFrame()
+
+                if len(graded_df) > 0:
+                    st.divider()
+                    st.markdown('<div class="section-header"><span class="icon">&#x1F3C6;</span> Grading Analytics</div>', unsafe_allow_html=True)
+                    st.caption(f"{len(graded_df)} cards with graded price data")
+
+                    # --- 3a. Grading ROI Table (Top 20 PSA 10 multipliers) ---
+                    if 'PSA10_Value' in graded_df.columns:
+                        psa10_df = graded_df[(graded_df['PSA10_Value'] > 0) & (graded_df['FairValue'] > 0)].copy()
+                        if len(psa10_df) > 0:
+                            psa10_df['PSA10_Mult'] = (psa10_df['PSA10_Value'] / psa10_df['FairValue']).round(1)
+                            st.subheader("Best Cards to Grade (PSA 10 ROI)")
+                            st.caption("Highest PSA 10 multiplier vs raw price — best grading ROI")
+                            roi_table = psa10_df.nlargest(20, 'PSA10_Mult')[
+                                ['Season', 'PlayerName', 'Team', 'FairValue', 'PSA10_Value', 'PSA10_Mult']
+                            ].copy()
+                            st.dataframe(
+                                roi_table,
+                                use_container_width=True,
+                                hide_index=True,
+                                column_config={
+                                    'FairValue': st.column_config.NumberColumn("Raw ($)", format="$%.2f"),
+                                    'PSA10_Value': st.column_config.NumberColumn("PSA 10 ($)", format="$%.2f"),
+                                    'PSA10_Mult': st.column_config.NumberColumn("Multiplier", format="%.1fx"),
+                                },
+                            )
+
+                    # --- 3b. Graded vs Raw Scatter ---
+                    if 'PSA10_Value' in graded_df.columns:
+                        scatter_graded = graded_df[(graded_df['PSA10_Value'] > 0) & (graded_df['FairValue'] > 0)].copy()
+                        if len(scatter_graded) > 0:
+                            st.subheader("Graded vs Raw Value")
+                            st.caption("Points above the diagonal = grading adds value")
+                            fig_graded_scatter = px.scatter(
+                                scatter_graded, x='FairValue', y='PSA10_Value',
+                                hover_name='PlayerName',
+                                color='Season',
+                                hover_data={'Team': True, 'FairValue': ':.2f', 'PSA10_Value': ':.2f'},
+                                labels={'FairValue': 'Raw Value ($)', 'PSA10_Value': 'PSA 10 Value ($)'},
+                            )
+                            # Add 1:1 diagonal reference line
+                            max_val = max(scatter_graded['FairValue'].max(), scatter_graded['PSA10_Value'].max())
+                            fig_graded_scatter.add_shape(
+                                type="line", x0=0, y0=0, x1=max_val, y1=max_val,
+                                line=dict(color="gray", dash="dash", width=1),
+                            )
+                            fig_graded_scatter.update_layout(template="plotly_dark", height=500)
+                            st.plotly_chart(fig_graded_scatter, use_container_width=True)
+
+                    # --- 3c. Average Grade Premium Bar Chart ---
+                    st.subheader("Average Grade Premium")
+                    st.caption("Average multiplier over raw price for each grade")
+                    premium_data = []
+                    grade_col_pairs = [
+                        ('PSA 8', 'PSA8_Value'), ('PSA 9', 'PSA9_Value'), ('PSA 10', 'PSA10_Value'),
+                        ('BGS 9', 'BGS9_Value'), ('BGS 9.5', 'BGS9_5_Value'), ('BGS 10', 'BGS10_Value'),
+                    ]
+                    for grade_label, vcol in grade_col_pairs:
+                        if vcol in graded_df.columns:
+                            valid = graded_df[(graded_df[vcol] > 0) & (graded_df['FairValue'] > 0)]
+                            if len(valid) > 0:
+                                avg_mult = (valid[vcol] / valid['FairValue']).mean()
+                                premium_data.append({
+                                    'Grade': grade_label,
+                                    'Avg Multiplier': round(avg_mult, 2),
+                                    'Cards': len(valid),
+                                })
+                    if premium_data:
+                        premium_df = pd.DataFrame(premium_data)
+                        fig_premium = px.bar(
+                            premium_df, x='Grade', y='Avg Multiplier',
+                            color='Avg Multiplier', color_continuous_scale='RdYlGn',
+                            hover_data={'Cards': True},
+                            text='Avg Multiplier',
+                        )
+                        fig_premium.update_traces(texttemplate='%{text:.1f}x', textposition='outside')
+                        fig_premium.update_layout(
+                            template="plotly_dark", height=400,
+                            coloraxis_showscale=False,
+                            yaxis_title="Average Multiplier (vs Raw)",
+                        )
+                        st.plotly_chart(fig_premium, use_container_width=True)
+
+                    # --- 3d. Grading ROI by Season ---
+                    if 'PSA10_Value' in graded_df.columns:
+                        season_roi = graded_df[(graded_df['PSA10_Value'] > 0) & (graded_df['FairValue'] > 0)].copy()
+                        if len(season_roi) > 0:
+                            season_roi['PSA10_Mult'] = season_roi['PSA10_Value'] / season_roi['FairValue']
+                            season_roi_stats = season_roi.groupby('Season').agg(
+                                AvgMult=('PSA10_Mult', 'mean'),
+                                Cards=('PSA10_Mult', 'count'),
+                            ).reset_index().sort_values('Season')
+
+                            roi_col1, roi_col2 = st.columns(2)
+                            with roi_col1:
+                                st.subheader("PSA 10 ROI by Season")
+                                fig_season_roi = px.bar(
+                                    season_roi_stats, x='Season', y='AvgMult',
+                                    color='AvgMult', color_continuous_scale='RdYlGn',
+                                    hover_data={'Cards': True},
+                                    labels={'AvgMult': 'Avg PSA 10 Multiplier'},
+                                )
+                                fig_season_roi.update_layout(template="plotly_dark", height=400, coloraxis_showscale=False)
+                                st.plotly_chart(fig_season_roi, use_container_width=True)
+
+                            # --- 3e. PSA vs BGS Comparison ---
+                            with roi_col2:
+                                if 'BGS10_Value' in graded_df.columns:
+                                    both_slabs = graded_df[
+                                        (graded_df['PSA10_Value'] > 0) & (graded_df['BGS10_Value'] > 0)
+                                    ].copy()
+                                    if len(both_slabs) > 0:
+                                        st.subheader("PSA 10 vs BGS 10")
+                                        fig_psa_bgs = px.scatter(
+                                            both_slabs, x='PSA10_Value', y='BGS10_Value',
+                                            hover_name='PlayerName',
+                                            color='Season',
+                                            hover_data={'Team': True, 'FairValue': ':.2f'},
+                                            labels={'PSA10_Value': 'PSA 10 ($)', 'BGS10_Value': 'BGS 10 ($)'},
+                                        )
+                                        max_slab = max(both_slabs['PSA10_Value'].max(), both_slabs['BGS10_Value'].max())
+                                        fig_psa_bgs.add_shape(
+                                            type="line", x0=0, y0=0, x1=max_slab, y1=max_slab,
+                                            line=dict(color="gray", dash="dash", width=1),
+                                        )
+                                        fig_psa_bgs.update_layout(template="plotly_dark", height=400)
+                                        st.plotly_chart(fig_psa_bgs, use_container_width=True)
+                                    else:
+                                        st.subheader("PSA 10 vs BGS 10")
+                                        st.caption("No cards with both PSA 10 and BGS 10 data yet")
 
     # CSV Upload section
     if not public_view:
