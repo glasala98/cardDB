@@ -2250,47 +2250,6 @@ elif page == "Young Guns DB":
                                             st.markdown("**PSA 10 vs BGS 10**")
                                             st.caption("No cards with both PSA 10 and BGS 10 data yet")
 
-    # CSV Upload section
-    if not public_view:
-        st.markdown("---")
-        st.markdown('<div class="section-header"><span class="icon">&#x1F4E4;</span> Import Cards</div>', unsafe_allow_html=True)
-        st.caption("Upload a CSV with columns: Season, Set, CardNumber, PlayerName, Team (optional: Position)")
-        uploaded_master = st.file_uploader("Upload CSV", type=['csv'], key="master_upload")
-        if uploaded_master is not None:
-            try:
-                new_df = pd.read_csv(uploaded_master)
-                required_cols = ['Season', 'Set', 'CardNumber', 'PlayerName']
-                missing_cols = [c for c in required_cols if c not in new_df.columns]
-                if missing_cols:
-                    st.error(f"Missing required columns: {', '.join(missing_cols)}")
-                else:
-                    # Normalize
-                    for col in ['Team', 'Position']:
-                        if col not in new_df.columns:
-                            new_df[col] = ''
-                    if 'Rookie' not in new_df.columns:
-                        new_df['Rookie'] = 'Y'
-                    new_df = new_df[['Season', 'Set', 'CardNumber', 'PlayerName', 'Team', 'Position', 'Rookie']]
-                    new_df['Team'] = new_df['Team'].fillna('').str.strip()
-                    new_df['Position'] = new_df['Position'].fillna('').str.strip()
-
-                    st.info(f"Found {len(new_df)} cards in upload.")
-                    st.dataframe(new_df.head(10), use_container_width=True, hide_index=True)
-
-                    if st.button("Import to Young Guns DB", type="primary"):
-                        if master_df.empty:
-                            combined = new_df
-                        else:
-                            combined = pd.concat([master_df, new_df], ignore_index=True)
-                        # Deduplicate on Season + CardNumber (keep last = new data wins)
-                        combined = combined.drop_duplicates(subset=['Season', 'CardNumber'], keep='last')
-                        combined = combined.sort_values(['Season', 'CardNumber'], ascending=[False, True])
-                        save_master_db(combined)
-                        st.success(f"Imported! Young Guns DB now has {len(combined):,} cards.")
-                        st.rerun()
-            except Exception as e:
-                st.error(f"Error reading CSV: {e}")
-
     # Season breakdown
     if not master_df.empty:
         st.markdown("---")
