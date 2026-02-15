@@ -1762,14 +1762,14 @@ elif page == "Young Guns DB":
                 # --- Market History from Raw Sales ---
                 market_timeline = load_yg_market_timeline()
                 if market_timeline and len(market_timeline) >= 2:
-                    _mt_dates = [m['date'] for m in market_timeline]
-                    _days_span = (pd.to_datetime(max(_mt_dates)) - pd.to_datetime(min(_mt_dates))).days
+                    mt_df = pd.DataFrame(market_timeline)
+                    mt_df['date'] = pd.to_datetime(mt_df['date'])
+                    # Filter out outlier dates beyond 90 days from most recent sale
+                    _cutoff = mt_df['date'].max() - pd.Timedelta(days=90)
+                    mt_df = mt_df[mt_df['date'] >= _cutoff].sort_values('date')
+                    _days_span = (mt_df['date'].max() - mt_df['date'].min()).days
                     with st.expander(f"Market History ({_days_span} Days)", expanded=True):
                         st.caption("Individual eBay sold listings aggregated by date")
-
-                        mt_df = pd.DataFrame(market_timeline)
-                        mt_df['date'] = pd.to_datetime(mt_df['date'])
-                        mt_df = mt_df.sort_values('date')
 
                         # 7-day rolling average
                         mt_df['rolling_avg'] = mt_df['avg_price'].rolling(window=7, min_periods=1).mean().round(2)
