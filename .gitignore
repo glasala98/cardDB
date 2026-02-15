@@ -1,4 +1,5 @@
 __pycache__/
 *.pyc
 backups/
-data/
+data/*
+!data/master_db/

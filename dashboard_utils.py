@@ -39,6 +39,10 @@ BACKUP_DIR = os.path.join(SCRIPT_DIR, "backups")
 ARCHIVE_PATH = os.path.join(SCRIPT_DIR, "card_archive.csv")
 MONEY_COLS = ['Fair Value', 'Median (All)', 'Min', 'Max']
 
+# Master DB paths (shared across all users)
+MASTER_DB_DIR = os.path.join(SCRIPT_DIR, "data", "master_db")
+MASTER_DB_PATH = os.path.join(MASTER_DB_DIR, "young_guns.csv")
+
 # Empty CSV columns for new users
 EMPTY_CSV_COLS = ['Card Name', 'Fair Value', 'Trend', 'Top 3 Prices', 'Median (All)', 'Min', 'Max', 'Num Sales', 'Tags']
 
@@ -615,3 +619,21 @@ def restore_card(card_name, archive_path=None):
         return card_rows.iloc[0].to_dict()
     except Exception:
         return None
+
+
+# ── Master DB ───────────────────────────────────────────────────
+
+def load_master_db(path=MASTER_DB_PATH):
+    """Load the master card database CSV."""
+    if not os.path.exists(path):
+        return pd.DataFrame()
+    df = pd.read_csv(path)
+    df['Team'] = df['Team'].fillna('').str.strip()
+    df['Position'] = df['Position'].fillna('').str.strip()
+    return df
+
+
+def save_master_db(df, path=MASTER_DB_PATH):
+    """Save the master card database CSV."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    df.to_csv(path, index=False)

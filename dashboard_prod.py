@@ -14,6 +14,7 @@ try:
         append_portfolio_snapshot, load_portfolio_history, scrape_graded_comparison,
         archive_card, load_archive, restore_card,
         get_user_paths, load_users, verify_password, init_user_data,
+        load_master_db, save_master_db,
         CSV_PATH, MONEY_COLS, PARSED_COLS
     )
 except ImportError:
@@ -396,7 +397,7 @@ if not public_view and st.session_state.get('authenticated') and load_users():
 if public_view:
     nav_pages = ["Dashboard", "Charts", "Card Inspect"]
 else:
-    nav_pages = ["Dashboard", "Charts", "Card Ledger", "Card Inspect"]
+    nav_pages = ["Dashboard", "Charts", "Card Ledger", "Card Inspect", "Master DB"]
 if 'nav_page' in st.session_state and st.session_state.nav_page in nav_pages:
     st.session_state['_nav_radio'] = st.session_state.nav_page
     del st.session_state.nav_page
@@ -1372,3 +1373,128 @@ elif page == "Card Inspect":
                     )
         else:
             st.info("No eBay sales history available. Rescrape to populate data.")
+
+# ============================================================
+# MASTER DB PAGE
+# ============================================================
+elif page == "Master DB":
+    st.markdown('<div class="section-header"><span class="icon">&#x1F4DA;</span> Master Card Database</div>', unsafe_allow_html=True)
+
+    master_df = load_master_db()
+
+    if master_df.empty:
+        st.warning("No master database found. Upload a CSV to get started.")
+    else:
+        # Summary metrics
+        total_master = len(master_df)
+        total_seasons = master_df['Season'].nunique()
+        total_teams = master_df[master_df['Team'] != '']['Team'].nunique()
+        missing_team = len(master_df[master_df['Team'] == ''])
+
+        mc1, mc2 = st.columns(2)
+        mc1.metric("Total Cards", f"{total_master:,}")
+        mc2.metric("Seasons Covered", total_seasons)
+        mc3, mc4 = st.columns(2)
+        mc3.metric("Teams", total_teams)
+        mc4.metric("Missing Team", missing_team)
+
+        st.markdown("---")
+
+        # Search bar
+        master_search = st.text_input("Search players", placeholder="Search by player name...", key="master_search")
+
+        # Filters
+        mf1, mf2 = st.columns(2)
+        with mf1:
+            seasons = sorted(master_df['Season'].unique().tolist(), reverse=True)
+            season_filter = st.selectbox("Season", ["All Seasons"] + seasons, key="master_season")
+        with mf2:
+            teams = sorted([t for t in master_df['Team'].unique().tolist() if t])
+            team_filter = st.selectbox("Team", ["All Teams"] + teams, key="master_team")
+
+        # Apply filters
+        filtered = master_df.copy()
+        if season_filter != "All Seasons":
+            filtered = filtered[filtered['Season'] == season_filter]
+        if team_filter != "All Teams":
+            filtered = filtered[filtered['Team'] == team_filter]
+        if master_search:
+            search_lower = master_search.lower()
+            filtered = filtered[filtered['PlayerName'].str.lower().str.contains(search_lower, na=False)]
+
+        # Sort
+        filtered = filtered.sort_values(['Season', 'CardNumber'], ascending=[False, True])
+
+        st.caption(f"Showing {len(filtered):,} of {total_master:,} cards")
+
+        # Display table
+        display_cols = ['Season', 'CardNumber', 'PlayerName', 'Team', 'Position']
+        display_cols = [c for c in display_cols if c in filtered.columns]
+        st.dataframe(
+            filtered[display_cols],
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                'Season': st.column_config.TextColumn('Season', width='small'),
+                'CardNumber': st.column_config.NumberColumn('Card #', width='small'),
+                'PlayerName': st.column_config.TextColumn('Player', width='medium'),
+                'Team': st.column_config.TextColumn('Team', width='medium'),
+                'Position': st.column_config.TextColumn('Pos', width='small'),
+            },
+            height=600,
+        )
+
+    # CSV Upload section
+    if not public_view:
+        st.markdown("---")
+        st.markdown('<div class="section-header"><span class="icon">&#x1F4E4;</span> Import Cards</div>', unsafe_allow_html=True)
+        st.caption("Upload a CSV with columns: Season, Set, CardNumber, PlayerName, Team (optional: Position)")
+        uploaded_master = st.file_uploader("Upload CSV", type=['csv'], key="master_upload")
+        if uploaded_master is not None:
+            try:
+                new_df = pd.read_csv(uploaded_master)
+                required_cols = ['Season', 'Set', 'CardNumber', 'PlayerName']
+                missing_cols = [c for c in required_cols if c not in new_df.columns]
+                if missing_cols:
+                    st.error(f"Missing required columns: {', '.join(missing_cols)}")
+                else:
+                    # Normalize
+                    for col in ['Team', 'Position']:
+                        if col not in new_df.columns:
+                            new_df[col] = ''
+                    if 'Rookie' not in new_df.columns:
+                        new_df['Rookie'] = 'Y'
+                    new_df = new_df[['Season', 'Set', 'CardNumber', 'PlayerName', 'Team', 'Position', 'Rookie']]
+                    new_df['Team'] = new_df['Team'].fillna('').str.strip()
+                    new_df['Position'] = new_df['Position'].fillna('').str.strip()
+
+                    st.info(f"Found {len(new_df)} cards in upload.")
+                    st.dataframe(new_df.head(10), use_container_width=True, hide_index=True)
+
+                    if st.button("Import to Master DB", type="primary"):
+                        if master_df.empty:
+                            combined = new_df
+                        else:
+                            combined = pd.concat([master_df, new_df], ignore_index=True)
+                        # Deduplicate on Season + CardNumber (keep last = new data wins)
+                        combined = combined.drop_duplicates(subset=['Season', 'CardNumber'], keep='last')
+                        combined = combined.sort_values(['Season', 'CardNumber'], ascending=[False, True])
+                        save_master_db(combined)
+                        st.success(f"Imported! Master DB now has {len(combined):,} cards.")
+                        st.rerun()
+            except Exception as e:
+                st.error(f"Error reading CSV: {e}")
+
+    # Season breakdown
+    if not master_df.empty:
+        st.markdown("---")
+        with st.expander("Season Breakdown"):
+            season_counts = master_df.groupby('Season').size().reset_index(name='Cards')
+            season_counts = season_counts.sort_values('Season')
+            fig_seasons = px.bar(
+                season_counts, x='Season', y='Cards',
+                title="Cards per Season",
+                color_discrete_sequence=['#636EFA'],
+            )
+            fig_seasons.update_layout(template="plotly_dark", height=400)
+            st.plotly_chart(fig_seasons, use_container_width=True)
