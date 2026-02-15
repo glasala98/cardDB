@@ -629,6 +629,90 @@ def restore_card(card_name, archive_path=None):
 YG_PRICE_HISTORY_PATH = os.path.join(MASTER_DB_DIR, "yg_price_history.json")
 YG_PORTFOLIO_HISTORY_PATH = os.path.join(MASTER_DB_DIR, "yg_portfolio_history.json")
 YG_RAW_SALES_PATH = os.path.join(MASTER_DB_DIR, "yg_raw_sales.json")
+NHL_STATS_PATH = os.path.join(MASTER_DB_DIR, "nhl_player_stats.json")
+
+TEAM_NAME_TO_ABBREV = {
+    "Anaheim Ducks": "ANA", "Arizona Coyotes": "ARI", "Boston Bruins": "BOS",
+    "Buffalo Sabres": "BUF", "Calgary Flames": "CGY", "Carolina Hurricanes": "CAR",
+    "Chicago Blackhawks": "CHI", "Colorado Avalanche": "COL", "Columbus Blue Jackets": "CBJ",
+    "Dallas Stars": "DAL", "Detroit Red Wings": "DET", "Edmonton Oilers": "EDM",
+    "Florida Panthers": "FLA", "Los Angeles Kings": "LAK", "Minnesota Wild": "MIN",
+    "Montreal Canadiens": "MTL", "Nashville Predators": "NSH", "New Jersey Devils": "NJD",
+    "New York Islanders": "NYI", "New York Rangers": "NYR", "Ottawa Senators": "OTT",
+    "Philadelphia Flyers": "PHI", "Pittsburgh Penguins": "PIT", "San Jose Sharks": "SJS",
+    "Seattle Kraken": "SEA", "St. Louis Blues": "STL", "Tampa Bay Lightning": "TBL",
+    "Toronto Maple Leafs": "TOR", "Utah Hockey Club": "UTA", "Vancouver Canucks": "VAN",
+    "Vegas Golden Knights": "VGK", "Washington Capitals": "WSH", "Winnipeg Jets": "WPG",
+}
+TEAM_ABBREV_TO_NAME = {v: k for k, v in TEAM_NAME_TO_ABBREV.items()}
+
+
+def load_nhl_player_stats(player_name=None, path=None):
+    """Load NHL stats. If player_name given, return that player's dict."""
+    path = path or NHL_STATS_PATH
+    if not os.path.exists(path):
+        return {} if player_name is None else None
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if player_name:
+            return data.get('players', {}).get(player_name)
+        return data
+    except Exception:
+        return {} if player_name is None else None
+
+
+def save_nhl_player_stats(data, path=None):
+    """Write the full NHL stats JSON."""
+    path = path or NHL_STATS_PATH
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+def load_nhl_standings(path=None):
+    """Load team standings from the stats JSON."""
+    data = load_nhl_player_stats(path=path)
+    return data.get('standings', {})
+
+
+def get_player_stats_for_card(player_name, path=None):
+    """Get formatted stats summary for a card's player."""
+    stats = load_nhl_player_stats(player_name, path=path)
+    if not stats:
+        return None
+    current = stats.get('current_season', {})
+    result = {
+        'type': stats.get('type', 'skater'),
+        'position': stats.get('position', ''),
+        'current_team': stats.get('current_team', ''),
+        'nhl_id': stats.get('nhl_id'),
+        'history': stats.get('history', []),
+    }
+    if result['type'] == 'skater':
+        result.update({
+            'goals': current.get('goals', 0),
+            'assists': current.get('assists', 0),
+            'points': current.get('points', 0),
+            'games_played': current.get('games_played', 0),
+            'plus_minus': current.get('plus_minus', 0),
+            'shots': current.get('shots', 0),
+            'shooting_pct': current.get('shooting_pct', 0),
+            'powerplay_goals': current.get('powerplay_goals', 0),
+            'game_winning_goals': current.get('game_winning_goals', 0),
+            'summary': f"{current.get('points',0)}pts ({current.get('goals',0)}G, {current.get('assists',0)}A) in {current.get('games_played',0)}GP",
+        })
+    else:
+        result.update({
+            'wins': current.get('wins', 0),
+            'losses': current.get('losses', 0),
+            'save_pct': current.get('save_pct', 0),
+            'gaa': current.get('gaa', 0),
+            'games_played': current.get('games_played', 0),
+            'shutouts': current.get('shutouts', 0),
+            'summary': f"{current.get('wins',0)}W-{current.get('losses',0)}L, {current.get('save_pct',0):.3f}SV%, {current.get('gaa',0):.2f}GAA",
+        })
+    return result
 
 
 def append_yg_price_history(card_name, fair_value, num_sales, history_path=None,
