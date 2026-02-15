@@ -1401,58 +1401,32 @@ elif page == "Young Guns DB":
     if master_df.empty:
         st.warning("No master database found. Upload a CSV to get started.")
     else:
-        # Summary metrics
-        total_master = len(master_df)
-        total_seasons = master_df['Season'].nunique()
-        total_teams = master_df[master_df['Team'] != '']['Team'].nunique()
-        missing_team = len(master_df[master_df['Team'] == ''])
-
         # Check if price data exists
         has_prices = 'FairValue' in master_df.columns and master_df['FairValue'].notna().any()
-        scraped_count = len(master_df[master_df['LastScraped'].notna() & (master_df['LastScraped'] != '')]) if 'LastScraped' in master_df.columns else 0
         total_value = master_df['FairValue'].sum() if has_prices else 0
 
-        mc1, mc2 = st.columns(2)
-        mc1.metric("Total Cards", f"{total_master:,}")
-        mc2.metric("Seasons Covered", total_seasons)
-        mc3, mc4 = st.columns(2)
+        # Compact header: title + key stats inline
         if has_prices:
-            mc3.metric("Cards Scraped", f"{scraped_count:,}")
-            mc4.metric("Total Value", f"${total_value:,.2f}")
+            st.caption(f"{len(master_df):,} cards  |  {master_df['Season'].nunique()} seasons  |  ${total_value:,.0f} total value")
         else:
-            mc3.metric("Teams", total_teams)
-            mc4.metric("Missing Team", missing_team)
+            st.caption(f"{len(master_df):,} cards  |  {master_df['Season'].nunique()} seasons")
 
-        # Export button
-        export_master = master_df[['Season', 'CardNumber', 'PlayerName', 'Team', 'Position']].copy()
-        csv_bytes_master = export_master.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            "Export Young Guns DB CSV",
-            data=csv_bytes_master,
-            file_name=f"master_db_{datetime.now().strftime('%Y%m%d')}.csv",
-            mime="text/csv",
-        )
+        # Search + filters in one compact block
+        master_search = st.text_input("Search cards", placeholder="Search by player, team, season...", key="master_search", label_visibility="collapsed")
 
-        st.markdown("---")
+        seasons = sorted(master_df['Season'].unique().tolist(), reverse=True)
+        teams = sorted([t for t in master_df['Team'].unique().tolist() if t])
+        positions = sorted([p for p in master_df['Position'].unique().tolist() if p])
+        set_names = sorted([s for s in master_df['Set'].unique().tolist() if s])
 
-        # Search bar (full width)
-        master_search = st.text_input("Search cards", placeholder="Search by player, team, season...", key="master_search")
-
-        # Filter row (2x2 for mobile)
-        mf1, mf2 = st.columns(2)
+        mf1, mf2, mf3, mf4 = st.columns(4)
         with mf1:
-            seasons = sorted(master_df['Season'].unique().tolist(), reverse=True)
             season_filter = st.selectbox("Season", ["All Seasons"] + seasons, key="master_season")
         with mf2:
-            teams = sorted([t for t in master_df['Team'].unique().tolist() if t])
             team_filter = st.selectbox("Team", ["All Teams"] + teams, key="master_team")
-        mf3, mf4 = st.columns(2)
         with mf3:
-            positions = sorted([p for p in master_df['Position'].unique().tolist() if p])
             pos_filter = st.selectbox("Position", ["All Positions"] + positions, key="master_pos") if positions else "All Positions"
         with mf4:
-            set_names = sorted(master_df['Set'].unique().tolist())
-            set_names = [s for s in set_names if s]
             set_filter_master = st.selectbox("Set", ["All Sets"] + set_names, key="master_set")
 
         # Apply filters
