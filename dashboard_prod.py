@@ -27,6 +27,45 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+
+def _trend_badge(trend):
+    """Return HTML for a colored trend badge."""
+    t = trend.lower().strip() if isinstance(trend, str) else 'no data'
+    cls = {'up': 'up', 'down': 'down', 'stable': 'stable'}.get(t, 'nodata')
+    label = {'up': 'Trending Up', 'down': 'Trending Down', 'stable': 'Stable'}.get(t, 'No Data')
+    return f'<span class="trend-badge {cls}">{label}</span>'
+
+
+def _tier_badge(value):
+    """Return HTML for a gold/silver/bronze value tier badge."""
+    if value >= 100:
+        return '<span class="tier-badge gold">GOLD</span>'
+    elif value >= 25:
+        return '<span class="tier-badge silver">SILVER</span>'
+    elif value >= 5:
+        return '<span class="tier-badge bronze">BRONZE</span>'
+    return ''
+
+
+def _mover_html(player, card_set, current, pct, is_gainer=True):
+    """Return HTML for a styled mover item."""
+    cls = 'gainer' if is_gainer else 'loser'
+    pcls = 'positive' if is_gainer else 'negative'
+    sign = '+' if pct >= 0 else ''
+    return f'''<div class="mover-item {cls}">
+        <div><div class="player-name">{player}</div><div class="set-name">{card_set[:35]}</div></div>
+        <div class="price-change {pcls}">${current:.2f} <span style="font-size:0.8rem">({sign}{pct:.1f}%)</span></div>
+    </div>'''
+
+
+def _recent_html(player, value, trend, scraped_date):
+    """Return HTML for a styled recently scraped item."""
+    badge = _trend_badge(trend)
+    return f'''<div class="recent-item">
+        <div><span class="player-name">{player}</span> {badge}</div>
+        <div><span class="price-tag">${value:.2f}</span> <span class="scraped-date">{scraped_date}</span></div>
+    </div>'''
+
 st.markdown("""
 <style>
     /* ============================================
@@ -94,6 +133,103 @@ st.markdown("""
 
     /* Alert banners */
     div[data-testid="stAlert"] { border-radius: 8px !important; font-size: 0.9rem; }
+
+    /* ============================================
+       STYLED HTML CARDS & SECTIONS
+       ============================================ */
+    .section-card {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        border: 1px solid #2a2a4a;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 16px;
+    }
+    .section-card h3 {
+        margin-top: 0;
+        font-size: 1.1rem;
+        opacity: 0.9;
+    }
+    /* Mover item rows */
+    .mover-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 14px;
+        border-radius: 8px;
+        margin-bottom: 6px;
+        background: rgba(255,255,255,0.03);
+        border-left: 3px solid transparent;
+    }
+    .mover-item.gainer { border-left-color: #00CC96; }
+    .mover-item.loser { border-left-color: #EF553B; }
+    .mover-item .player-name {
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+    .mover-item .set-name {
+        font-size: 0.8rem;
+        opacity: 0.6;
+    }
+    .mover-item .price-change {
+        text-align: right;
+        font-weight: 700;
+    }
+    .mover-item .price-change.positive { color: #00CC96; }
+    .mover-item .price-change.negative { color: #EF553B; }
+
+    /* Recent card items */
+    .recent-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 14px;
+        border-radius: 8px;
+        margin-bottom: 6px;
+        background: rgba(255,255,255,0.03);
+        border-left: 3px solid #636EFA;
+    }
+    .recent-item .player-name { font-weight: 600; }
+    .recent-item .scraped-date { font-size: 0.8rem; opacity: 0.5; }
+    .recent-item .price-tag { font-weight: 700; color: #636EFA; }
+
+    /* Trend badges */
+    .trend-badge {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .trend-badge.up { background: rgba(0,204,150,0.15); color: #00CC96; }
+    .trend-badge.down { background: rgba(239,85,59,0.15); color: #EF553B; }
+    .trend-badge.stable { background: rgba(99,110,250,0.15); color: #636EFA; }
+    .trend-badge.nodata { background: rgba(128,128,128,0.15); color: #888; }
+
+    /* Value tier badges */
+    .tier-badge {
+        display: inline-block;
+        padding: 3px 12px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+    .tier-badge.gold { background: linear-gradient(135deg, #b8860b, #ffd700); color: #1a1a2e; }
+    .tier-badge.silver { background: linear-gradient(135deg, #808080, #c0c0c0); color: #1a1a2e; }
+    .tier-badge.bronze { background: linear-gradient(135deg, #8b4513, #cd7f32); color: #1a1a2e; }
+
+    /* Section headers with icon */
+    .section-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+    .section-header .icon {
+        font-size: 1.3rem;
+    }
 
     /* ============================================
        MOBILE RESPONSIVE (< 768px)
@@ -457,7 +593,7 @@ st.divider()
 # DASHBOARD PAGE
 # ============================================================
 if page == "Dashboard":
-    st.subheader("Collection Overview")
+    st.markdown('<div class="section-header"><span class="icon">&#x1F3C6;</span> Collection Overview</div>', unsafe_allow_html=True)
 
     # Quick stats
     total_cards = len(df)
@@ -478,59 +614,66 @@ if page == "Dashboard":
     st.markdown("---")
 
     # Top Movers — cards with biggest value changes
+    movers = []
+    for _, row in df.iterrows():
+        history = load_price_history(row['Card Name'], history_path=_history_path)
+        if len(history) >= 2:
+            curr = history[-1]['fair_value']
+            prev = history[-2]['fair_value']
+            change = curr - prev
+            movers.append({
+                'Player': row['Player'],
+                'Set': row['Set'],
+                'Current': curr,
+                'Change': change,
+                'Pct': (change / prev * 100) if prev > 0 else 0,
+            })
+
     left_col, right_col = st.columns(2)
 
     with left_col:
-        st.subheader("Top Gainers")
-        movers = []
-        for _, row in df.iterrows():
-            history = load_price_history(row['Card Name'], history_path=_history_path)
-            if len(history) >= 2:
-                curr = history[-1]['fair_value']
-                prev = history[-2]['fair_value']
-                change = curr - prev
-                movers.append({
-                    'Player': row['Player'],
-                    'Set': row['Set'],
-                    'Current': curr,
-                    'Change': change,
-                    'Pct': (change / prev * 100) if prev > 0 else 0,
-                })
+        gainers_html = '<div class="section-card"><div class="section-header"><span class="icon">&#x25B2;</span> Top Gainers</div>'
         if movers:
             gainers = sorted([m for m in movers if m['Change'] > 0], key=lambda x: x['Change'], reverse=True)[:5]
             if gainers:
                 for g in gainers:
-                    st.markdown(f"**{g['Player']}** ({g['Set'][:30]}) — ${g['Current']:.2f} *({g['Pct']:+.1f}%)*")
+                    gainers_html += _mover_html(g['Player'], g['Set'], g['Current'], g['Pct'], is_gainer=True)
             else:
-                st.caption("No gainers yet.")
+                gainers_html += '<p style="opacity:0.5;font-size:0.85rem;">No gainers yet.</p>'
         else:
-            st.caption("Need 2+ scrapes for mover data.")
+            gainers_html += '<p style="opacity:0.5;font-size:0.85rem;">Need 2+ scrapes for mover data.</p>'
+        gainers_html += '</div>'
+        st.markdown(gainers_html, unsafe_allow_html=True)
 
     with right_col:
-        st.subheader("Top Losers")
+        losers_html = '<div class="section-card"><div class="section-header"><span class="icon">&#x25BC;</span> Top Losers</div>'
         if movers:
             losers = sorted([m for m in movers if m['Change'] < 0], key=lambda x: x['Change'])[:5]
             if losers:
                 for l in losers:
-                    st.markdown(f"**{l['Player']}** ({l['Set'][:30]}) — ${l['Current']:.2f} *({l['Pct']:+.1f}%)*")
+                    losers_html += _mover_html(l['Player'], l['Set'], l['Current'], l['Pct'], is_gainer=False)
             else:
-                st.caption("No losers yet.")
+                losers_html += '<p style="opacity:0.5;font-size:0.85rem;">No losers yet.</p>'
         else:
-            st.caption("Need 2+ scrapes for mover data.")
+            losers_html += '<p style="opacity:0.5;font-size:0.85rem;">Need 2+ scrapes for mover data.</p>'
+        losers_html += '</div>'
+        st.markdown(losers_html, unsafe_allow_html=True)
 
     st.markdown("---")
 
     # Recently Scraped
-    st.subheader("Recently Scraped")
+    recent_html = '<div class="section-card"><div class="section-header"><span class="icon">&#x1F4C5;</span> Recently Scraped</div>'
     if 'Last Scraped' in df.columns:
         recent = df[df['Last Scraped'] != ''].sort_values('Last Scraped', ascending=False).head(5)
         if len(recent) > 0:
             for _, row in recent.iterrows():
-                st.markdown(f"**{row['Player']}** — ${row['Fair Value']:.2f} ({row['Trend']}) — scraped {row['Last Scraped']}")
+                recent_html += _recent_html(row['Player'], row['Fair Value'], row['Trend'], row['Last Scraped'])
         else:
-            st.caption("No scrape data yet.")
+            recent_html += '<p style="opacity:0.5;font-size:0.85rem;">No scrape data yet.</p>'
     else:
-        st.caption("No scrape data yet.")
+        recent_html += '<p style="opacity:0.5;font-size:0.85rem;">No scrape data yet.</p>'
+    recent_html += '</div>'
+    st.markdown(recent_html, unsafe_allow_html=True)
 
     # Portfolio mini-chart
     portfolio_history = load_portfolio_history(_portfolio_path)
@@ -605,7 +748,7 @@ elif page == "Charts":
 
     # Portfolio Value Over Time
     st.divider()
-    st.subheader("Portfolio Value Over Time")
+    st.markdown('<div class="section-header"><span class="icon">&#x1F4CA;</span> Portfolio Value Over Time</div>', unsafe_allow_html=True)
     portfolio_history = load_portfolio_history(_portfolio_path)
 
     if portfolio_history and len(portfolio_history) >= 2:
@@ -648,7 +791,7 @@ elif page == "Charts":
 # CARD LEDGER PAGE
 # ============================================================
 elif page == "Card Ledger":
-    st.subheader("Edit Card Values")
+    st.markdown('<div class="section-header"><span class="icon">&#x1F4DD;</span> Card Ledger</div>', unsafe_allow_html=True)
 
     # Collection summary metrics
     total_cards = len(df)
@@ -1002,18 +1145,18 @@ elif page == "Card Inspect":
             st.metric("Serial / Grade",
                        f"{card_row['Serial'] if card_row['Serial'] else 'N/A'} | {card_row['Grade'] if card_row['Grade'] else 'Raw'}")
 
+        # Value and trend with visual badges
+        tier = _tier_badge(card_row['Fair Value'])
+        trend = _trend_badge(card_row['Trend'])
+        st.markdown(f'<div style="margin: 8px 0 16px 0;">{tier} {trend}</div>', unsafe_allow_html=True)
+
         vc1, vc2, vc3 = st.columns(3)
         with vc1:
             st.metric("Fair Value", f"${card_row['Fair Value']:.2f}")
         with vc2:
-            st.metric("Trend", card_row['Trend'])
-        with vc3:
             st.metric("Sales Found", int(card_row['Num Sales']))
-        vc4, vc5 = st.columns(2)
-        with vc4:
-            st.metric("Min", f"${card_row['Min']:.2f}")
-        with vc5:
-            st.metric("Max", f"${card_row['Max']:.2f}")
+        with vc3:
+            st.metric("Range", f"${card_row['Min']:.2f} — ${card_row['Max']:.2f}")
 
         # Rescrape button (hidden in public view)
         if not public_view and st.button("Rescrape Price", type="primary"):
@@ -1043,7 +1186,7 @@ elif page == "Card Inspect":
 
         # Fair Value Over Time (from price_history.json)
         st.markdown("---")
-        st.subheader("Fair Value Tracking")
+        st.markdown('<div class="section-header"><span class="icon">&#x1F4C8;</span> Fair Value Tracking</div>', unsafe_allow_html=True)
         history = load_price_history(selected_card, history_path=_history_path)
 
         if history:
@@ -1092,7 +1235,7 @@ elif page == "Card Inspect":
         # Grading ROI Calculator
         if not public_view:
             st.markdown("---")
-            st.subheader("Grading ROI Calculator")
+            st.markdown('<div class="section-header"><span class="icon">&#x1F4B0;</span> Grading ROI Calculator</div>', unsafe_allow_html=True)
             if not card_row['Grade']:
                 gc1, gc2 = st.columns(2)
                 with gc1:
@@ -1167,7 +1310,7 @@ elif page == "Card Inspect":
 
         # eBay Sales History
         st.markdown("---")
-        st.subheader("eBay Sales History")
+        st.markdown('<div class="section-header"><span class="icon">&#x1F6D2;</span> eBay Sales History</div>', unsafe_allow_html=True)
         sales = load_sales_history(selected_card, results_json_path=_results_path)
 
         if sales:
