@@ -15,6 +15,7 @@ try:
         archive_card, load_archive, restore_card,
         get_user_paths, load_users, verify_password, init_user_data,
         load_master_db, save_master_db,
+        load_yg_price_history, load_yg_portfolio_history,
         CSV_PATH, MONEY_COLS, PARSED_COLS
     )
 except ImportError:
@@ -397,7 +398,7 @@ if not public_view and st.session_state.get('authenticated') and load_users():
 if public_view:
     nav_pages = ["Dashboard", "Charts", "Card Inspect"]
 else:
-    nav_pages = ["Dashboard", "Charts", "Card Ledger", "Card Inspect", "Master DB"]
+    nav_pages = ["Dashboard", "Charts", "Card Ledger", "Card Inspect", "Young Guns DB"]
 if 'nav_page' in st.session_state and st.session_state.nav_page in nav_pages:
     st.session_state['_nav_radio'] = st.session_state.nav_page
     del st.session_state.nav_page
@@ -1377,8 +1378,8 @@ elif page == "Card Inspect":
 # ============================================================
 # MASTER DB PAGE
 # ============================================================
-elif page == "Master DB":
-    st.markdown('<div class="section-header"><span class="icon">&#x1F4DA;</span> Master Card Database</div>', unsafe_allow_html=True)
+elif page == "Young Guns DB":
+    st.markdown('<div class="section-header"><span class="icon">&#x1F3D2;</span> Young Guns Master DB</div>', unsafe_allow_html=True)
 
     master_df = load_master_db()
 
@@ -1391,18 +1392,27 @@ elif page == "Master DB":
         total_teams = master_df[master_df['Team'] != '']['Team'].nunique()
         missing_team = len(master_df[master_df['Team'] == ''])
 
+        # Check if price data exists
+        has_prices = 'FairValue' in master_df.columns and master_df['FairValue'].notna().any()
+        scraped_count = len(master_df[master_df['LastScraped'].notna() & (master_df['LastScraped'] != '')]) if 'LastScraped' in master_df.columns else 0
+        total_value = master_df['FairValue'].sum() if has_prices else 0
+
         mc1, mc2 = st.columns(2)
         mc1.metric("Total Cards", f"{total_master:,}")
         mc2.metric("Seasons Covered", total_seasons)
         mc3, mc4 = st.columns(2)
-        mc3.metric("Teams", total_teams)
-        mc4.metric("Missing Team", missing_team)
+        if has_prices:
+            mc3.metric("Cards Scraped", f"{scraped_count:,}")
+            mc4.metric("Total Value", f"${total_value:,.2f}")
+        else:
+            mc3.metric("Teams", total_teams)
+            mc4.metric("Missing Team", missing_team)
 
         # Export button
         export_master = master_df[['Season', 'CardNumber', 'PlayerName', 'Team', 'Position']].copy()
         csv_bytes_master = export_master.to_csv(index=False).encode('utf-8')
         st.download_button(
-            "Export Master DB CSV",
+            "Export Young Guns DB CSV",
             data=csv_bytes_master,
             file_name=f"master_db_{datetime.now().strftime('%Y%m%d')}.csv",
             mime="text/csv",
@@ -1450,34 +1460,67 @@ elif page == "Master DB":
         filtered = filtered.sort_values(['Season', 'CardNumber'], ascending=[False, True])
 
         # Build display dataframe
-        display_cols = ['Season', 'CardNumber', 'PlayerName', 'Team', 'Position', 'Set']
+        display_cols = ['Season', 'CardNumber', 'PlayerName', 'Team']
+        # Add price columns if they exist
+        if has_prices:
+            for pc in ['FairValue', 'NumSales', 'Min', 'Max', 'Trend', 'LastScraped']:
+                if pc in filtered.columns:
+                    display_cols.append(pc)
+        else:
+            display_cols.extend(['Position', 'Set'])
+        display_cols = [c for c in display_cols if c in filtered.columns]
         edit_master = filtered[display_cols].copy()
+
+        # Fill NAs for price columns
+        if has_prices:
+            for pc in ['FairValue', 'NumSales', 'Min', 'Max']:
+                if pc in edit_master.columns:
+                    edit_master[pc] = pd.to_numeric(edit_master[pc], errors='coerce').fillna(0)
+            if 'Trend' in edit_master.columns:
+                trend_map = {'up': '🟢 up', 'down': '🔴 down', 'stable': '⚪ stable', 'no data': '⚫ no data'}
+                edit_master['Trend'] = edit_master['Trend'].map(trend_map).fillna('⚫ no data')
+            if 'LastScraped' in edit_master.columns:
+                edit_master['LastScraped'] = edit_master['LastScraped'].fillna('')
 
         # Add View checkbox column
         edit_master['View'] = False
 
         # Reorder columns: View first
-        col_order_master = ['View', 'Season', 'CardNumber', 'PlayerName', 'Team', 'Position', 'Set']
+        col_order_master = ['View'] + [c for c in display_cols]
         col_order_master = [c for c in col_order_master if c in edit_master.columns]
         edit_master = edit_master[col_order_master]
 
         st.caption(f"Showing {len(edit_master):,} of {total_master:,} cards")
 
         master_editor_key = f"master_editor_{st.session_state.get('master_editor_reset', 0)}"
+        col_config_master = {
+            "View": st.column_config.CheckboxColumn("View", width="small", default=False),
+            "Season": st.column_config.TextColumn("Season", width="small", disabled=True),
+            "CardNumber": st.column_config.NumberColumn("#", width="small", disabled=True),
+            "PlayerName": st.column_config.TextColumn("Player", width="medium", disabled=True),
+            "Team": st.column_config.TextColumn("Team", width="medium", disabled=True),
+        }
+        if has_prices:
+            col_config_master.update({
+                "FairValue": st.column_config.NumberColumn("Fair Value ($)", format="$%.2f", disabled=True),
+                "NumSales": st.column_config.NumberColumn("Sales", disabled=True),
+                "Min": st.column_config.NumberColumn("Min ($)", format="$%.2f", disabled=True),
+                "Max": st.column_config.NumberColumn("Max ($)", format="$%.2f", disabled=True),
+                "Trend": st.column_config.TextColumn("Trend", disabled=True),
+                "LastScraped": st.column_config.TextColumn("Last Scraped", disabled=True),
+            })
+        else:
+            col_config_master.update({
+                "Position": st.column_config.TextColumn("Pos", width="small", disabled=True),
+                "Set": st.column_config.TextColumn("Set", width="medium", disabled=True),
+            })
+
         edited_master = st.data_editor(
             edit_master,
             key=master_editor_key,
             use_container_width=True,
             hide_index=True,
-            column_config={
-                "View": st.column_config.CheckboxColumn("View", width="small", default=False),
-                "Season": st.column_config.TextColumn("Season", width="small", disabled=True),
-                "CardNumber": st.column_config.NumberColumn("#", width="small", disabled=True),
-                "PlayerName": st.column_config.TextColumn("Player", width="medium", disabled=True),
-                "Team": st.column_config.TextColumn("Team", width="medium", disabled=True),
-                "Position": st.column_config.TextColumn("Pos", width="small", disabled=True),
-                "Set": st.column_config.TextColumn("Set", width="medium", disabled=True),
-            },
+            column_config=col_config_master,
             height=600,
         )
 
@@ -1529,6 +1572,34 @@ elif page == "Master DB":
                     else:
                         st.warning("No sales found on eBay for this card.")
 
+                # Price history chart for this card
+                card_name_for_history = f"{card_row_master['Season']} Upper Deck - Young Guns #{int(card_row_master['CardNumber'])} - {card_row_master['PlayerName']}"
+                card_history = load_yg_price_history(card_name_for_history)
+                if card_history and len(card_history) > 0:
+                    st.markdown("---")
+                    st.markdown(f'<div class="section-header"><span class="icon">&#x1F4C8;</span> Fair Value Over Time</div>', unsafe_allow_html=True)
+                    hist_df = pd.DataFrame(card_history)
+                    hist_df['date'] = pd.to_datetime(hist_df['date'])
+                    hist_df = hist_df.sort_values('date')
+                    fig_card_hist = px.line(
+                        hist_df, x='date', y='fair_value',
+                        markers=True,
+                        labels={'date': 'Date', 'fair_value': 'Fair Value ($)'},
+                        hover_data={'num_sales': True},
+                    )
+                    fig_card_hist.update_layout(template="plotly_dark", height=300)
+                    st.plotly_chart(fig_card_hist, use_container_width=True)
+
+                    if len(hist_df) >= 2:
+                        first_val = hist_df.iloc[0]['fair_value']
+                        last_val = hist_df.iloc[-1]['fair_value']
+                        change = last_val - first_val
+                        pct = (change / first_val * 100) if first_val > 0 else 0
+                        hc1, hc2, hc3 = st.columns(3)
+                        hc1.metric("Current", f"${last_val:.2f}")
+                        hc2.metric("Change", f"${change:+.2f}")
+                        hc3.metric("% Change", f"{pct:+.1f}%")
+
         # Bottom summary
         st.divider()
         tc1, tc2, tc3 = st.columns(3)
@@ -1538,6 +1609,316 @@ elif page == "Master DB":
             st.metric("Seasons Shown", filtered['Season'].nunique())
         with tc3:
             st.metric("Teams Shown", filtered[filtered['Team'] != '']['Team'].nunique())
+
+        # ============================================================
+        # YOUNG GUNS ANALYTICS (only when price data exists)
+        # ============================================================
+        if has_prices:
+            priced_df = master_df[master_df['FairValue'].notna() & (master_df['FairValue'] > 0)].copy()
+            priced_df['FairValue'] = pd.to_numeric(priced_df['FairValue'], errors='coerce').fillna(0)
+            priced_df['NumSales'] = pd.to_numeric(priced_df['NumSales'], errors='coerce').fillna(0)
+            priced_df['Min'] = pd.to_numeric(priced_df['Min'], errors='coerce').fillna(0)
+            priced_df['Max'] = pd.to_numeric(priced_df['Max'], errors='coerce').fillna(0)
+
+            if len(priced_df) > 0:
+                st.divider()
+                st.markdown('<div class="section-header"><span class="icon">&#x1F4CA;</span> Young Guns Analytics</div>', unsafe_allow_html=True)
+
+                # --- Young Guns Market Trend (portfolio history) ---
+                yg_portfolio = load_yg_portfolio_history()
+                if yg_portfolio and len(yg_portfolio) > 0:
+                    st.subheader("Young Guns Market Trend")
+                    port_df = pd.DataFrame(yg_portfolio)
+                    port_df['date'] = pd.to_datetime(port_df['date'])
+                    port_df = port_df.sort_values('date')
+
+                    mkt_col1, mkt_col2 = st.columns(2)
+                    with mkt_col1:
+                        fig_mkt_val = px.line(
+                            port_df, x='date', y='total_value',
+                            markers=True,
+                            labels={'date': 'Date', 'total_value': 'Total Market Value ($)'},
+                            title="Total YG Market Value",
+                        )
+                        fig_mkt_val.update_layout(template="plotly_dark", height=350)
+                        st.plotly_chart(fig_mkt_val, use_container_width=True)
+
+                    with mkt_col2:
+                        fig_mkt_avg = px.line(
+                            port_df, x='date', y='avg_value',
+                            markers=True,
+                            labels={'date': 'Date', 'avg_value': 'Avg Card Value ($)'},
+                            title="Average Card Value Over Time",
+                        )
+                        fig_mkt_avg.update_layout(template="plotly_dark", height=350)
+                        st.plotly_chart(fig_mkt_avg, use_container_width=True)
+
+                    if len(port_df) >= 2:
+                        latest = port_df.iloc[-1]
+                        first = port_df.iloc[0]
+                        val_change = latest['total_value'] - first['total_value']
+                        val_pct = (val_change / first['total_value'] * 100) if first['total_value'] > 0 else 0
+                        mt1, mt2, mt3, mt4 = st.columns(4)
+                        mt1.metric("Current Total", f"${latest['total_value']:,.2f}")
+                        mt2.metric("Value Change", f"${val_change:+,.2f}")
+                        mt3.metric("% Change", f"{val_pct:+.1f}%")
+                        mt4.metric("Cards Scraped", f"{int(latest.get('cards_scraped', 0)):,}")
+
+                # --- Top 20 Most Valuable ---
+                st.subheader("Top 20 Most Valuable")
+                top20 = priced_df.nlargest(20, 'FairValue')[['Season', 'CardNumber', 'PlayerName', 'Team', 'FairValue', 'NumSales']].copy()
+                top20['Label'] = top20['PlayerName'] + ' (' + top20['Season'] + ')'
+                fig_top20 = px.bar(
+                    top20, x='FairValue', y='Label', orientation='h',
+                    color='FairValue', color_continuous_scale='Blues',
+                    hover_data={'PlayerName': True, 'Team': True, 'NumSales': True, 'Label': False},
+                    labels={'FairValue': 'Fair Value ($)', 'Label': ''},
+                )
+                fig_top20.update_layout(
+                    template="plotly_dark", height=500,
+                    yaxis={'categoryorder': 'total ascending'},
+                    coloraxis_showscale=False,
+                )
+                st.plotly_chart(fig_top20, use_container_width=True)
+
+                # --- Most Liquid (highest sales volume) ---
+                st.subheader("Most Liquid (Highest Sales Volume)")
+                top_liquid = priced_df.nlargest(15, 'NumSales')[['Season', 'PlayerName', 'Team', 'FairValue', 'NumSales']].copy()
+                top_liquid['Label'] = top_liquid['PlayerName'] + ' (' + top_liquid['Season'] + ')'
+                fig_liquid = px.bar(
+                    top_liquid, x='NumSales', y='Label', orientation='h',
+                    color='FairValue', color_continuous_scale='Greens',
+                    hover_data={'PlayerName': True, 'FairValue': True, 'Label': False},
+                    labels={'NumSales': 'Sales Found', 'Label': ''},
+                )
+                fig_liquid.update_layout(
+                    template="plotly_dark", height=400,
+                    yaxis={'categoryorder': 'total ascending'},
+                    coloraxis_showscale=False,
+                )
+                st.plotly_chart(fig_liquid, use_container_width=True)
+
+                # --- Price Distribution ---
+                col_dist1, col_dist2 = st.columns(2)
+                with col_dist1:
+                    st.subheader("Price Distribution")
+                    fig_hist = px.histogram(
+                        priced_df, x='FairValue', nbins=50,
+                        labels={'FairValue': 'Fair Value ($)', 'count': 'Cards'},
+                        color_discrete_sequence=['#636EFA'],
+                    )
+                    fig_hist.update_layout(template="plotly_dark", height=350)
+                    st.plotly_chart(fig_hist, use_container_width=True)
+
+                with col_dist2:
+                    st.subheader("Trend Breakdown")
+                    if 'Trend' in priced_df.columns:
+                        trend_counts = priced_df['Trend'].fillna('no data').value_counts().reset_index()
+                        trend_counts.columns = ['Trend', 'Count']
+                        fig_trend = px.pie(
+                            trend_counts, names='Trend', values='Count',
+                            color='Trend',
+                            color_discrete_map={'up': '#00CC96', 'down': '#EF553B', 'stable': '#636EFA', 'no data': 'gray'},
+                            hole=0.4,
+                        )
+                        fig_trend.update_layout(template="plotly_dark", height=350)
+                        st.plotly_chart(fig_trend, use_container_width=True)
+
+                # --- Value by Season ---
+                st.subheader("Average Card Value by Season")
+                season_stats = priced_df.groupby('Season').agg(
+                    AvgValue=('FairValue', 'mean'),
+                    TotalValue=('FairValue', 'sum'),
+                    Cards=('FairValue', 'count'),
+                    MaxValue=('FairValue', 'max'),
+                ).reset_index().sort_values('Season')
+                fig_season_val = px.bar(
+                    season_stats, x='Season', y='AvgValue',
+                    color='TotalValue', color_continuous_scale='Viridis',
+                    hover_data={'TotalValue': ':.2f', 'Cards': True, 'MaxValue': ':.2f'},
+                    labels={'AvgValue': 'Avg Value ($)', 'TotalValue': 'Total Value ($)'},
+                )
+                fig_season_val.update_layout(template="plotly_dark", height=400, coloraxis_showscale=False)
+                st.plotly_chart(fig_season_val, use_container_width=True)
+
+                # --- Value by Team ---
+                st.subheader("Total Value by Team (Top 20)")
+                team_stats = priced_df[priced_df['Team'] != ''].groupby('Team').agg(
+                    TotalValue=('FairValue', 'sum'),
+                    AvgValue=('FairValue', 'mean'),
+                    Cards=('FairValue', 'count'),
+                    TopCard=('FairValue', 'max'),
+                ).reset_index().nlargest(20, 'TotalValue')
+                fig_team = px.bar(
+                    team_stats, x='TotalValue', y='Team', orientation='h',
+                    color='AvgValue', color_continuous_scale='Oranges',
+                    hover_data={'AvgValue': ':.2f', 'Cards': True, 'TopCard': ':.2f'},
+                    labels={'TotalValue': 'Total Value ($)', 'AvgValue': 'Avg ($)'},
+                )
+                fig_team.update_layout(
+                    template="plotly_dark", height=500,
+                    yaxis={'categoryorder': 'total ascending'},
+                    coloraxis_showscale=False,
+                )
+                st.plotly_chart(fig_team, use_container_width=True)
+
+                # --- Price vs Volume Scatter ---
+                st.subheader("Price vs. Sales Volume")
+                scatter_df = priced_df[priced_df['NumSales'] > 0].copy()
+                if len(scatter_df) > 0:
+                    scatter_df['Spread'] = scatter_df['Max'] - scatter_df['Min']
+                    fig_scatter = px.scatter(
+                        scatter_df, x='NumSales', y='FairValue',
+                        size='Spread', hover_name='PlayerName',
+                        color='Season',
+                        hover_data={'Team': True, 'Season': True, 'Min': ':.2f', 'Max': ':.2f'},
+                        labels={'NumSales': 'Sales Found', 'FairValue': 'Fair Value ($)'},
+                    )
+                    fig_scatter.update_layout(template="plotly_dark", height=500)
+                    st.plotly_chart(fig_scatter, use_container_width=True)
+
+                # --- Hidden Gems: high sales, low price ---
+                st.subheader("Hidden Gems (High Volume, Low Price)")
+                st.caption("Cards with lots of sales but below-average price — potential undervalued picks")
+                avg_price = priced_df['FairValue'].mean()
+                gems = priced_df[
+                    (priced_df['NumSales'] >= 5) & (priced_df['FairValue'] < avg_price)
+                ].nlargest(15, 'NumSales')[['Season', 'PlayerName', 'Team', 'FairValue', 'NumSales']].copy()
+                if len(gems) > 0:
+                    st.dataframe(
+                        gems,
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={
+                            'FairValue': st.column_config.NumberColumn("Fair Value ($)", format="$%.2f"),
+                            'NumSales': st.column_config.NumberColumn("Sales"),
+                        },
+                    )
+                else:
+                    st.caption("No hidden gems found yet — need more price data.")
+
+                # --- Premium Cards: highest spread ---
+                st.subheader("Widest Price Spreads")
+                st.caption("Cards with the biggest gap between min and max sale — volatile or condition-sensitive")
+                spread_df = priced_df.copy()
+                spread_df['Spread'] = spread_df['Max'] - spread_df['Min']
+                top_spread = spread_df.nlargest(15, 'Spread')[['Season', 'PlayerName', 'Team', 'FairValue', 'Min', 'Max', 'Spread']].copy()
+                if len(top_spread) > 0:
+                    st.dataframe(
+                        top_spread,
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={
+                            'FairValue': st.column_config.NumberColumn("Fair Value ($)", format="$%.2f"),
+                            'Min': st.column_config.NumberColumn("Min ($)", format="$%.2f"),
+                            'Max': st.column_config.NumberColumn("Max ($)", format="$%.2f"),
+                            'Spread': st.column_config.NumberColumn("Spread ($)", format="$%.2f"),
+                        },
+                    )
+
+                # --- Price Tiers ---
+                st.divider()
+                st.subheader("Price Tiers")
+                st.caption("How many cards fall into each value bracket")
+                tier_bins = [0, 1, 5, 10, 20, 50, 100, 250, float('inf')]
+                tier_labels = ['< $1', '$1-5', '$5-10', '$10-20', '$20-50', '$50-100', '$100-250', '$250+']
+                priced_df['Tier'] = pd.cut(priced_df['FairValue'], bins=tier_bins, labels=tier_labels, right=False)
+                tier_counts = priced_df['Tier'].value_counts().reindex(tier_labels).fillna(0).reset_index()
+                tier_counts.columns = ['Tier', 'Cards']
+                tier_counts['TotalValue'] = priced_df.groupby('Tier', observed=False)['FairValue'].sum().reindex(tier_labels).fillna(0).values
+
+                tier_col1, tier_col2 = st.columns(2)
+                with tier_col1:
+                    fig_tier_cards = px.bar(
+                        tier_counts, x='Tier', y='Cards',
+                        color='Cards', color_continuous_scale='Blues',
+                        labels={'Tier': 'Price Range', 'Cards': 'Number of Cards'},
+                        title="Cards per Tier",
+                    )
+                    fig_tier_cards.update_layout(template="plotly_dark", height=350, coloraxis_showscale=False)
+                    st.plotly_chart(fig_tier_cards, use_container_width=True)
+
+                with tier_col2:
+                    fig_tier_val = px.bar(
+                        tier_counts, x='Tier', y='TotalValue',
+                        color='TotalValue', color_continuous_scale='Greens',
+                        labels={'Tier': 'Price Range', 'TotalValue': 'Total Value ($)'},
+                        title="Value per Tier",
+                    )
+                    fig_tier_val.update_layout(template="plotly_dark", height=350, coloraxis_showscale=False)
+                    st.plotly_chart(fig_tier_val, use_container_width=True)
+
+                # --- ROI by Era ---
+                st.divider()
+                st.subheader("ROI by Era")
+                st.caption("Comparing average card value across different eras of Young Guns")
+
+                def get_era(season):
+                    year = int(season[:4])
+                    if year < 2000:
+                        return '1990s'
+                    elif year < 2005:
+                        return '2000-04'
+                    elif year < 2010:
+                        return '2005-09'
+                    elif year < 2015:
+                        return '2010-14'
+                    elif year < 2020:
+                        return '2015-19'
+                    else:
+                        return '2020+'
+
+                priced_df['Era'] = priced_df['Season'].apply(get_era)
+                era_stats = priced_df.groupby('Era').agg(
+                    AvgValue=('FairValue', 'mean'),
+                    MedianValue=('FairValue', 'median'),
+                    TotalValue=('FairValue', 'sum'),
+                    Cards=('FairValue', 'count'),
+                    MaxCard=('FairValue', 'max'),
+                    AvgSales=('NumSales', 'mean'),
+                ).reset_index()
+                era_order = ['1990s', '2000-04', '2005-09', '2010-14', '2015-19', '2020+']
+                era_stats['Era'] = pd.Categorical(era_stats['Era'], categories=era_order, ordered=True)
+                era_stats = era_stats.sort_values('Era')
+
+                era_col1, era_col2 = st.columns(2)
+                with era_col1:
+                    fig_era_avg = px.bar(
+                        era_stats, x='Era', y=['AvgValue', 'MedianValue'],
+                        barmode='group',
+                        labels={'value': 'Value ($)', 'variable': 'Metric'},
+                        title="Avg vs Median Value by Era",
+                        color_discrete_map={'AvgValue': '#636EFA', 'MedianValue': '#00CC96'},
+                    )
+                    fig_era_avg.update_layout(template="plotly_dark", height=350)
+                    st.plotly_chart(fig_era_avg, use_container_width=True)
+
+                with era_col2:
+                    fig_era_total = px.bar(
+                        era_stats, x='Era', y='TotalValue',
+                        color='Cards', color_continuous_scale='Viridis',
+                        hover_data={'Cards': True, 'MaxCard': ':.2f', 'AvgSales': ':.1f'},
+                        labels={'TotalValue': 'Total Value ($)', 'Cards': 'Card Count'},
+                        title="Total Value & Card Count by Era",
+                    )
+                    fig_era_total.update_layout(template="plotly_dark", height=350, coloraxis_showscale=False)
+                    st.plotly_chart(fig_era_total, use_container_width=True)
+
+                # Era summary table
+                era_display = era_stats[['Era', 'Cards', 'AvgValue', 'MedianValue', 'TotalValue', 'MaxCard', 'AvgSales']].copy()
+                era_display.columns = ['Era', 'Cards', 'Avg Value', 'Median Value', 'Total Value', 'Top Card', 'Avg Sales']
+                st.dataframe(
+                    era_display,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        'Avg Value': st.column_config.NumberColumn("Avg Value ($)", format="$%.2f"),
+                        'Median Value': st.column_config.NumberColumn("Median ($)", format="$%.2f"),
+                        'Total Value': st.column_config.NumberColumn("Total Value ($)", format="$%.2f"),
+                        'Top Card': st.column_config.NumberColumn("Top Card ($)", format="$%.2f"),
+                        'Avg Sales': st.column_config.NumberColumn("Avg Sales", format="%.1f"),
+                    },
+                )
 
     # CSV Upload section
     if not public_view:
@@ -1566,7 +1947,7 @@ elif page == "Master DB":
                     st.info(f"Found {len(new_df)} cards in upload.")
                     st.dataframe(new_df.head(10), use_container_width=True, hide_index=True)
 
-                    if st.button("Import to Master DB", type="primary"):
+                    if st.button("Import to Young Guns DB", type="primary"):
                         if master_df.empty:
                             combined = new_df
                         else:
@@ -1575,7 +1956,7 @@ elif page == "Master DB":
                         combined = combined.drop_duplicates(subset=['Season', 'CardNumber'], keep='last')
                         combined = combined.sort_values(['Season', 'CardNumber'], ascending=[False, True])
                         save_master_db(combined)
-                        st.success(f"Imported! Master DB now has {len(combined):,} cards.")
+                        st.success(f"Imported! Young Guns DB now has {len(combined):,} cards.")
                         st.rerun()
             except Exception as e:
                 st.error(f"Error reading CSV: {e}")

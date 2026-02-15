@@ -7,7 +7,10 @@ from datetime import datetime
 import urllib.parse
 import pandas as pd
 import yaml
-import bcrypt
+try:
+    import bcrypt
+except ImportError:
+    bcrypt = None
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -622,6 +625,93 @@ def restore_card(card_name, archive_path=None):
 
 
 # ── Master DB ───────────────────────────────────────────────────
+
+YG_PRICE_HISTORY_PATH = os.path.join(MASTER_DB_DIR, "yg_price_history.json")
+YG_PORTFOLIO_HISTORY_PATH = os.path.join(MASTER_DB_DIR, "yg_portfolio_history.json")
+
+
+def append_yg_price_history(card_name, fair_value, num_sales, history_path=None):
+    """Append a price snapshot for a Young Guns card to the YG history log."""
+    history_path = history_path or YG_PRICE_HISTORY_PATH
+    os.makedirs(os.path.dirname(history_path), exist_ok=True)
+    history = {}
+    if os.path.exists(history_path):
+        try:
+            with open(history_path, 'r', encoding='utf-8') as f:
+                history = json.load(f)
+        except Exception:
+            history = {}
+
+    if card_name not in history:
+        history[card_name] = []
+
+    today = datetime.now().strftime('%Y-%m-%d')
+    # Deduplicate: replace today's entry if it exists
+    history[card_name] = [h for h in history[card_name] if h.get('date') != today]
+    history[card_name].append({
+        'date': today,
+        'fair_value': round(fair_value, 2),
+        'num_sales': num_sales,
+    })
+
+    with open(history_path, 'w', encoding='utf-8') as f:
+        json.dump(history, f, indent=2, ensure_ascii=False)
+
+
+def load_yg_price_history(card_name=None, history_path=None):
+    """Load YG price history. If card_name given, return that card's list.
+    If None, return entire dict."""
+    history_path = history_path or YG_PRICE_HISTORY_PATH
+    if not os.path.exists(history_path):
+        return [] if card_name else {}
+    try:
+        with open(history_path, 'r', encoding='utf-8') as f:
+            history = json.load(f)
+        if card_name:
+            return history.get(card_name, [])
+        return history
+    except Exception:
+        return [] if card_name else {}
+
+
+def append_yg_portfolio_snapshot(total_value, total_cards, avg_value, cards_scraped,
+                                 portfolio_path=None):
+    """Append a daily YG market snapshot. Deduplicates by date."""
+    portfolio_path = portfolio_path or YG_PORTFOLIO_HISTORY_PATH
+    os.makedirs(os.path.dirname(portfolio_path), exist_ok=True)
+    snapshots = []
+    if os.path.exists(portfolio_path):
+        try:
+            with open(portfolio_path, 'r', encoding='utf-8') as f:
+                snapshots = json.load(f)
+        except Exception:
+            snapshots = []
+
+    today = datetime.now().strftime('%Y-%m-%d')
+    snapshots = [s for s in snapshots if s['date'] != today]
+    snapshots.append({
+        'date': today,
+        'total_value': round(total_value, 2),
+        'total_cards': total_cards,
+        'avg_value': round(avg_value, 2),
+        'cards_scraped': cards_scraped,
+    })
+
+    with open(portfolio_path, 'w', encoding='utf-8') as f:
+        json.dump(snapshots, f, indent=2, ensure_ascii=False)
+
+
+def load_yg_portfolio_history(portfolio_path=None):
+    """Load YG market snapshots list."""
+    portfolio_path = portfolio_path or YG_PORTFOLIO_HISTORY_PATH
+    if not os.path.exists(portfolio_path):
+        return []
+    try:
+        with open(portfolio_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return []
+
 
 def load_master_db(path=MASTER_DB_PATH):
     """Load the master card database CSV."""
