@@ -40,7 +40,7 @@ ARCHIVE_PATH = os.path.join(SCRIPT_DIR, "card_archive.csv")
 MONEY_COLS = ['Fair Value', 'Median (All)', 'Min', 'Max']
 
 # Empty CSV columns for new users
-EMPTY_CSV_COLS = ['Card Name', 'Fair Value', 'Trend', 'Top 3 Prices', 'Median (All)', 'Min', 'Max', 'Num Sales']
+EMPTY_CSV_COLS = ['Card Name', 'Fair Value', 'Trend', 'Top 3 Prices', 'Median (All)', 'Min', 'Max', 'Num Sales', 'Tags']
 
 
 # ── User management ──────────────────────────────────────────────
@@ -171,6 +171,20 @@ If you can't determine a field, use your best guess based on card design, logos,
         return None, str(e)
 
 
+def _merge_sales(new_sales, existing_sales, max_sales=100):
+    """Merge new sales with existing, deduplicating by (sold_date, title). Cap at max_sales."""
+    seen = set()
+    merged = []
+    for sale in new_sales + existing_sales:
+        key = (sale.get('sold_date', ''), sale.get('title', ''))
+        if key not in seen:
+            seen.add(key)
+            merged.append(sale)
+    # Sort by date descending (newest first), undated last
+    merged.sort(key=lambda s: s.get('sold_date') or '0000-00-00', reverse=True)
+    return merged[:max_sales]
+
+
 def scrape_single_card(card_name, results_json_path=None):
     """Scrape eBay for a single card and return result dict."""
     if results_json_path is None:
@@ -259,8 +273,11 @@ def scrape_single_card(card_name, results_json_path=None):
                         results = json.load(f)
                 except Exception:
                     results = {}
+            # Merge new sales with existing ones (accumulate history)
+            existing_sales = results.get(card_name, {}).get('raw_sales', [])
+            merged = _merge_sales(sales, existing_sales)
             results[card_name] = {
-                'raw_sales': sales,
+                'raw_sales': merged,
                 'fair_price': stats.get('fair_price'),
                 'num_sales': stats.get('num_sales'),
                 'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -382,6 +399,11 @@ def load_data(csv_path=CSV_PATH, results_json_path=None):
             df['Last Scraped'] = ''
     else:
         df['Last Scraped'] = ''
+
+    # Ensure Tags column exists (backward compat for existing CSVs)
+    if 'Tags' not in df.columns:
+        df['Tags'] = ''
+    df['Tags'] = df['Tags'].fillna('')
 
     return df
 

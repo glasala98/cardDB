@@ -139,9 +139,9 @@ if not public_view and st.session_state.get('authenticated') and load_users():
 
 # Check for programmatic navigation (e.g. from View Card button)
 if public_view:
-    nav_pages = ["Charts", "Card Inspect"]
+    nav_pages = ["Dashboard", "Charts", "Card Inspect"]
 else:
-    nav_pages = ["Charts", "Card Ledger", "Card Inspect"]
+    nav_pages = ["Dashboard", "Charts", "Card Ledger", "Card Inspect"]
 if 'nav_page' in st.session_state and st.session_state.nav_page in nav_pages:
     st.session_state['_nav_radio'] = st.session_state.nav_page
     del st.session_state.nav_page
@@ -334,9 +334,100 @@ st.caption(f"Data last updated: {last_modified}")
 st.divider()
 
 # ============================================================
+# DASHBOARD PAGE
+# ============================================================
+if page == "Dashboard":
+    st.subheader("Collection Overview")
+
+    # Quick stats
+    total_cards = len(df)
+    found_df = df[df['Num Sales'] > 0]
+    total_value = found_df['Fair Value'].sum()
+    avg_value = total_value / len(found_df) if len(found_df) > 0 else 0
+    cards_up = len(df[df['Trend'] == 'up'])
+    cards_down = len(df[df['Trend'] == 'down'])
+
+    dc1, dc2, dc3, dc4, dc5 = st.columns(5)
+    dc1.metric("Total Cards", total_cards)
+    dc2.metric("Collection Value", f"${total_value:,.2f}")
+    dc3.metric("Avg Card Value", f"${avg_value:,.2f}")
+    dc4.metric("Trending Up", cards_up)
+    dc5.metric("Trending Down", cards_down)
+
+    st.markdown("---")
+
+    # Top Movers — cards with biggest value changes
+    left_col, right_col = st.columns(2)
+
+    with left_col:
+        st.subheader("Top Gainers")
+        movers = []
+        for _, row in df.iterrows():
+            history = load_price_history(row['Card Name'], history_path=_history_path)
+            if len(history) >= 2:
+                curr = history[-1]['fair_value']
+                prev = history[-2]['fair_value']
+                change = curr - prev
+                movers.append({
+                    'Player': row['Player'],
+                    'Set': row['Set'],
+                    'Current': curr,
+                    'Change': change,
+                    'Pct': (change / prev * 100) if prev > 0 else 0,
+                })
+        if movers:
+            gainers = sorted([m for m in movers if m['Change'] > 0], key=lambda x: x['Change'], reverse=True)[:5]
+            if gainers:
+                for g in gainers:
+                    st.markdown(f"**{g['Player']}** ({g['Set'][:30]}) — ${g['Current']:.2f} *({g['Pct']:+.1f}%)*")
+            else:
+                st.caption("No gainers yet.")
+        else:
+            st.caption("Need 2+ scrapes for mover data.")
+
+    with right_col:
+        st.subheader("Top Losers")
+        if movers:
+            losers = sorted([m for m in movers if m['Change'] < 0], key=lambda x: x['Change'])[:5]
+            if losers:
+                for l in losers:
+                    st.markdown(f"**{l['Player']}** ({l['Set'][:30]}) — ${l['Current']:.2f} *({l['Pct']:+.1f}%)*")
+            else:
+                st.caption("No losers yet.")
+        else:
+            st.caption("Need 2+ scrapes for mover data.")
+
+    st.markdown("---")
+
+    # Recently Scraped
+    st.subheader("Recently Scraped")
+    if 'Last Scraped' in df.columns:
+        recent = df[df['Last Scraped'] != ''].sort_values('Last Scraped', ascending=False).head(5)
+        if len(recent) > 0:
+            for _, row in recent.iterrows():
+                st.markdown(f"**{row['Player']}** — ${row['Fair Value']:.2f} ({row['Trend']}) — scraped {row['Last Scraped']}")
+        else:
+            st.caption("No scrape data yet.")
+    else:
+        st.caption("No scrape data yet.")
+
+    # Portfolio mini-chart
+    portfolio_history = load_portfolio_history(_portfolio_path)
+    if portfolio_history and len(portfolio_history) >= 2:
+        st.markdown("---")
+        st.subheader("Portfolio Trend")
+        port_df = pd.DataFrame(portfolio_history)
+        port_df['date'] = pd.to_datetime(port_df['date'])
+        port_df = port_df.sort_values('date')
+        fig_mini = px.line(port_df, x='date', y='total_value', markers=True,
+                           labels={'date': 'Date', 'total_value': 'Value ($)'})
+        fig_mini.update_layout(template="plotly_dark", height=300)
+        st.plotly_chart(fig_mini, use_container_width=True)
+
+# ============================================================
 # CHARTS PAGE
 # ============================================================
-if page == "Charts":
+elif page == "Charts":
     c1, c2 = st.columns((2, 1))
 
     with c1:
@@ -451,13 +542,26 @@ elif page == "Card Ledger":
     mcol3.metric("Avg Card Value", f"${avg_value:,.2f}")
     mcol4.metric("Most Valuable", f"{top_card_name}", delta=f"${top_card_val:,.2f}")
 
+    # Export button
+    export_cols = ['Player', 'Year', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Tags',
+                   'Fair Value', 'Trend', 'Num Sales', 'Min', 'Max']
+    export_df = df[[c for c in export_cols if c in df.columns]].copy()
+    csv_bytes = export_df.to_csv(index=False).encode('utf-8')
+    export_name = display_name.replace(' ', '_') if display_name else 'collection'
+    st.download_button(
+        "Export Collection CSV",
+        data=csv_bytes,
+        file_name=f"{export_name}_{datetime.now().strftime('%Y%m%d')}.csv",
+        mime="text/csv",
+    )
+
     st.markdown("---")
 
     # Search bar (full width)
     search_query = st.text_input("Search cards", placeholder="Search by player, set, year, card number...")
 
     # Filter row
-    fcol1, fcol2, fcol3 = st.columns(3)
+    fcol1, fcol2, fcol3, fcol4 = st.columns(4)
     with fcol1:
         sets = sorted(df['Set'].dropna().unique().tolist())
         sets = [s for s in sets if s]
@@ -467,6 +571,9 @@ elif page == "Card Ledger":
         trend_filter = st.multiselect("Trend", options=trend_options, default=trend_options)
     with fcol3:
         grade_filter = st.selectbox("Grade", ["All", "Raw", "Graded"])
+    with fcol4:
+        all_tags = sorted(set(t.strip() for tags in df['Tags'].dropna() for t in tags.split(',') if t.strip()))
+        tag_filter = st.selectbox("Tag", ["All Tags"] + all_tags)
 
     # Apply filters
     mask = df['Trend'].isin(trend_filter)
@@ -476,12 +583,15 @@ elif page == "Card Ledger":
         mask &= df['Grade'] == ''
     elif grade_filter == "Graded":
         mask &= df['Grade'] != ''
+    if tag_filter != "All Tags":
+        mask &= df['Tags'].str.contains(tag_filter, case=False, na=False)
     filtered_df = df[mask].copy()
 
-    display_cols = ['Player', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Fair Value', 'Trend', 'Num Sales', 'Min', 'Max', 'Top 3 Prices', 'Last Scraped']
+    display_cols = ['Player', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Tags', 'Fair Value', 'Trend', 'Num Sales', 'Min', 'Max', 'Top 3 Prices', 'Last Scraped']
     edit_df = filtered_df[display_cols].copy()
     edit_df['Top 3 Prices'] = edit_df['Top 3 Prices'].fillna('')
     edit_df['Last Scraped'] = edit_df['Last Scraped'].fillna('')
+    edit_df['Tags'] = edit_df['Tags'].fillna('')
 
     if search_query.strip():
         terms = search_query.strip().lower().split()
@@ -499,7 +609,7 @@ elif page == "Card Ledger":
 
     # Reorder: card description → sales/value → actions
     col_order = ['View', 'Player', 'Set', 'Subset', 'Card #', 'Serial', 'Grade',
-                 'Num Sales', 'Fair Value', 'Min', 'Max', 'Trend',
+                 'Tags', 'Num Sales', 'Fair Value', 'Min', 'Max', 'Trend',
                  'Top 3 Prices', 'Last Scraped', 'Remove']
     col_order = [c for c in col_order if c in edit_df.columns]
     edit_df = edit_df[col_order]
@@ -520,6 +630,7 @@ elif page == "Card Ledger":
             "Card #": st.column_config.TextColumn("#", width="small", disabled=True),
             "Serial": st.column_config.TextColumn("Serial", width="small", disabled=True),
             "Grade": st.column_config.TextColumn("Grade", width="small", disabled=True),
+            "Tags": st.column_config.TextColumn("Tags", width="medium"),
             "Num Sales": st.column_config.NumberColumn("Sales", disabled=True),
             "Fair Value": st.column_config.NumberColumn("Fair Value ($)", format="$%.2f", min_value=0),
             "Min": st.column_config.NumberColumn("Min ($)", format="$%.2f", disabled=True),
@@ -579,6 +690,7 @@ elif page == "Card Ledger":
                     # Strip emoji prefix from trend before saving
                     raw_trend = row['Trend'].split(' ', 1)[-1] if isinstance(row['Trend'], str) else row['Trend']
                     st.session_state.df.at[idx, 'Trend'] = raw_trend
+                    st.session_state.df.at[idx, 'Tags'] = row.get('Tags', '')
                     if row['Player'] != edit_df.at[idx, 'Player']:
                         old_player = edit_df.at[idx, 'Player']
                         new_player = row['Player']
@@ -599,7 +711,8 @@ elif page == "Card Ledger":
                         'Median (All)': r['Fair Value'],
                         'Min': r['Fair Value'],
                         'Max': r['Fair Value'],
-                        'Num Sales': 0
+                        'Num Sales': 0,
+                        'Tags': r.get('Tags', '')
                     }
                     parsed = parse_card_name(card_name)
                     new_row.update(parsed)

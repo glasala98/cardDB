@@ -72,7 +72,18 @@ def daily_scrape_user(csv_path, results_path, history_path, backup_dir, max_work
                 num_sales = stats.get('num_sales', 0)
                 fair_price = stats.get('fair_price', 0)
 
-                # Update results JSON (merge, don't replace entire file)
+                # Merge new sales with existing (accumulate history)
+                existing_sales = results.get(card_name, {}).get('raw_sales', [])
+                new_sales = result.get('raw_sales', [])
+                seen = set()
+                merged = []
+                for sale in new_sales + existing_sales:
+                    key = (sale.get('sold_date', ''), sale.get('title', ''))
+                    if key not in seen:
+                        seen.add(key)
+                        merged.append(sale)
+                merged.sort(key=lambda s: s.get('sold_date') or '0000-00-00', reverse=True)
+                result['raw_sales'] = merged[:100]
                 results[card_name] = result
 
                 # Update the dataframe row
