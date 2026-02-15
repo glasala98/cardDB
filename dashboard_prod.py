@@ -1632,21 +1632,6 @@ elif page == "Young Guns DB":
                             mult = f"{gdata['value'] / _raw_val:.1f}x" if _raw_val > 0 else ""
                             st.metric(grade, f"${gdata['value']:.2f}", delta=mult, delta_color="off")
 
-                    # Grade premium bar chart
-                    if len(graded_data) >= 2:
-                        grade_chart_data = [{'Grade': 'Raw', 'Value': _raw_val, 'Sales': _num_sales}]
-                        for grade, gdata in graded_data.items():
-                            grade_chart_data.append({'Grade': grade, 'Value': gdata['value'], 'Sales': gdata['sales']})
-                        grade_chart_df = pd.DataFrame(grade_chart_data)
-                        fig_grades = px.bar(
-                            grade_chart_df, x='Grade', y='Value',
-                            color='Value', color_continuous_scale='Blues',
-                            text='Value', hover_data={'Sales': True},
-                            labels={'Value': 'Fair Value ($)'},
-                        )
-                        fig_grades.update_traces(texttemplate='$%{text:.2f}', textposition='outside')
-                        fig_grades.update_layout(template="plotly_dark", height=300, coloraxis_showscale=False, showlegend=False)
-                        st.plotly_chart(fig_grades, use_container_width=True)
                 elif _raw_val > 0:
                     st.caption("No graded price data available for this card")
 
