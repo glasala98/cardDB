@@ -308,46 +308,54 @@ if 'user' in query_params:
     st.session_state.user_paths = user_paths
 
 # ============================================================
-# LOGIN GATE
+# LOGIN GATE (Young Guns DB is public, other pages require auth)
 # ============================================================
+_needs_auth = False
 if not public_view:
     users_config = load_users()
 
-    # If no users.yaml exists or is empty, fall back to env var password (backward compat)
-    if not users_config:
-        correct_pw = os.environ.get("DASHBOARD_PASSWORD", "")
-        if correct_pw and not st.session_state.get("authenticated"):
-            st.markdown("<div style='max-width:400px;margin:3rem auto;'>", unsafe_allow_html=True)
-            st.markdown("## Card Collection Dashboard")
-            password = st.text_input("Enter password to access the dashboard", type="password")
-            if st.button("Login", type="primary"):
-                if password == correct_pw:
-                    st.session_state.authenticated = True
-                    st.rerun()
-                else:
-                    st.error("Incorrect password")
-            st.markdown("</div>", unsafe_allow_html=True)
-            st.stop()
+    if not st.session_state.get("authenticated"):
+        # Show sidebar nav so users can access Young Guns DB without login
+        _selected_page = st.sidebar.radio("Navigate", ["Young Guns DB", "Login"], key="_nav_preauth")
+
+        if _selected_page == "Login":
+            # If no users.yaml exists or is empty, fall back to env var password
+            if not users_config:
+                correct_pw = os.environ.get("DASHBOARD_PASSWORD", "")
+                if correct_pw:
+                    st.markdown("<div style='max-width:400px;margin:3rem auto;'>", unsafe_allow_html=True)
+                    st.markdown("## Card Collection Dashboard")
+                    password = st.text_input("Enter password to access the dashboard", type="password")
+                    if st.button("Login", type="primary"):
+                        if password == correct_pw:
+                            st.session_state.authenticated = True
+                            st.rerun()
+                        else:
+                            st.error("Incorrect password")
+                    st.markdown("</div>", unsafe_allow_html=True)
+                    st.stop()
+            else:
+                st.markdown("<div style='max-width:400px;margin:3rem auto;'>", unsafe_allow_html=True)
+                st.markdown("## Card Collection Dashboard")
+                st.caption("Sign in to manage your collection")
+                username = st.text_input("Username")
+                password = st.text_input("Password", type="password")
+                if st.button("Login", type="primary", use_container_width=True):
+                    if verify_password(username, password):
+                        st.session_state.authenticated = True
+                        st.session_state.username = username
+                        st.session_state.display_name = users_config[username].get('display_name', username)
+                        st.session_state.pop('df', None)
+                        st.rerun()
+                    else:
+                        st.error("Invalid username or password")
+                st.markdown("</div>", unsafe_allow_html=True)
+                st.stop()
+        else:
+            # Young Guns DB selected without auth — mark as public-like access
+            _needs_auth = False
     else:
-        # Multi-user login
-        if not st.session_state.get("authenticated"):
-            st.markdown("<div style='max-width:400px;margin:3rem auto;'>", unsafe_allow_html=True)
-            st.markdown("## Card Collection Dashboard")
-            st.caption("Sign in to manage your collection")
-            username = st.text_input("Username")
-            password = st.text_input("Password", type="password")
-            if st.button("Login", type="primary", use_container_width=True):
-                if verify_password(username, password):
-                    st.session_state.authenticated = True
-                    st.session_state.username = username
-                    st.session_state.display_name = users_config[username].get('display_name', username)
-                    # Clear any stale data from previous user
-                    st.session_state.pop('df', None)
-                    st.rerun()
-                else:
-                    st.error("Invalid username or password")
-            st.markdown("</div>", unsafe_allow_html=True)
-            st.stop()
+        _needs_auth = False
 
 # ============================================================
 # USER PATHS SETUP
@@ -395,15 +403,20 @@ if not public_view and st.session_state.get('authenticated') and load_users():
         st.rerun()
 
 # Check for programmatic navigation (e.g. from View Card button)
-if public_view:
-    nav_pages = ["Dashboard", "Charts", "Card Inspect"]
+_is_authenticated = st.session_state.get('authenticated', False)
+if not _is_authenticated and not public_view:
+    # Unauthenticated — only Young Guns DB is accessible (nav already shown in pre-auth block)
+    page = "Young Guns DB"
 else:
-    nav_pages = ["Dashboard", "Charts", "Card Ledger", "Card Inspect", "Young Guns DB"]
-if 'nav_page' in st.session_state and st.session_state.nav_page in nav_pages:
-    st.session_state['_nav_radio'] = st.session_state.nav_page
-    del st.session_state.nav_page
+    if public_view:
+        nav_pages = ["Young Guns DB", "Dashboard", "Charts", "Card Inspect"]
+    else:
+        nav_pages = ["Young Guns DB", "Dashboard", "Charts", "Card Ledger", "Card Inspect"]
+    if 'nav_page' in st.session_state and st.session_state.nav_page in nav_pages:
+        st.session_state['_nav_radio'] = st.session_state.nav_page
+        del st.session_state.nav_page
 
-page = st.sidebar.radio("Navigate", nav_pages, key="_nav_radio")
+    page = st.sidebar.radio("Navigate", nav_pages, key="_nav_radio")
 
 # Show Scan Card and Add New Card only on Card Ledger page (not in public view)
 if page == "Card Ledger" and not public_view:
