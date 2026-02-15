@@ -1759,10 +1759,12 @@ elif page == "Young Guns DB":
                 else:
                     analytics_df = priced_df.copy()
 
-                # --- Market History from Raw Sales (90 Days) ---
+                # --- Market History from Raw Sales ---
                 market_timeline = load_yg_market_timeline()
                 if market_timeline and len(market_timeline) >= 2:
-                    with st.expander("Market History (90 Days)", expanded=True):
+                    _mt_dates = [m['date'] for m in market_timeline]
+                    _days_span = (pd.to_datetime(max(_mt_dates)) - pd.to_datetime(min(_mt_dates))).days
+                    with st.expander(f"Market History ({_days_span} Days)", expanded=True):
                         st.caption("Individual eBay sold listings aggregated by date")
 
                         mt_df = pd.DataFrame(market_timeline)
