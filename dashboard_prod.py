@@ -17,6 +17,7 @@ try:
         load_master_db, save_master_db,
         load_yg_price_history, load_yg_portfolio_history, load_yg_raw_sales, load_yg_market_timeline,
         load_nhl_player_stats, load_nhl_standings, get_player_stats_for_card,
+        load_correlation_history, CANADIAN_TEAM_ABBREVS,
         TEAM_ABBREV_TO_NAME,
         CSV_PATH, MONEY_COLS, PARSED_COLS
     )
@@ -2308,7 +2309,7 @@ elif page == "Young Guns DB":
                                             st.caption("No cards with both PSA 10 and BGS 10 data yet")
 
                 # ============================================================
-                # NHL STATS ANALYTICS
+                # PRICE vs PERFORMANCE CORRELATION ANALYTICS
                 # ============================================================
                 nhl_data = load_nhl_player_stats()
                 nhl_players = nhl_data.get('players', {}) if nhl_data else {}
@@ -2317,8 +2318,12 @@ elif page == "Young Guns DB":
                 if nhl_players:
                     # Build a DataFrame merging card prices with NHL stats
                     nhl_rows = []
+                    _seen_nhl = set()
                     for _, row in analytics_df.iterrows():
                         pname = row['PlayerName']
+                        if pname in _seen_nhl:
+                            continue
+                        _seen_nhl.add(pname)
                         nhl = nhl_players.get(pname)
                         if nhl and nhl.get('current_season'):
                             cs = nhl['current_season']
@@ -2329,6 +2334,7 @@ elif page == "Young Guns DB":
                                 'FairValue': row[price_col],
                                 'Position': nhl.get('position', ''),
                                 'Type': nhl.get('type', 'skater'),
+                                'TeamAbbrev': nhl.get('current_team', ''),
                                 'CurrentTeam': TEAM_ABBREV_TO_NAME.get(nhl.get('current_team', ''), nhl.get('current_team', '')),
                             }
                             if nhl['type'] == 'skater':
@@ -2362,124 +2368,423 @@ elif page == "Young Guns DB":
                         skaters_df = nhl_df[nhl_df['Type'] == 'skater'].copy()
                         goalies_df = nhl_df[nhl_df['Type'] == 'goalie'].copy()
 
-                        with st.expander(f"NHL Performance vs Card Value ({len(nhl_df)} players)", expanded=False):
-                            if len(skaters_df) > 0:
-                                # --- Price vs Points Scatter ---
-                                st.markdown("**Card Value vs Points (Skaters)**")
-                                st.caption("Do better players have more expensive cards?")
-                                fig_pvp = px.scatter(
-                                    skaters_df, x='Points', y='FairValue',
-                                    hover_name='PlayerName',
-                                    color='Position',
-                                    size='GP',
-                                    hover_data={'Team': True, 'Goals': True, 'Assists': True, 'GP': True},
-                                    labels={'FairValue': f'{price_mode} Value ($)', 'Points': 'NHL Points'},
-                                )
-                                fig_pvp.update_layout(template="plotly_dark", height=450)
-                                st.plotly_chart(fig_pvp, use_container_width=True)
+                        # Load correlation history
+                        corr_history = load_correlation_history()
+                        latest_date = max(corr_history.keys()) if corr_history else None
+                        latest_snap = corr_history.get(latest_date, {}) if latest_date else {}
+                        latest_corr = latest_snap.get('correlations', {})
 
-                                # --- Top Performers Table ---
-                                st.markdown("---")
-                                st.markdown("**Top Performers by Points**")
-                                top_performers = skaters_df.nlargest(20, 'Points')[
-                                    ['PlayerName', 'CurrentTeam', 'Position', 'GP', 'Goals', 'Assists', 'Points', 'PlusMinus', 'FairValue']
-                                ].copy()
-                                st.dataframe(
-                                    top_performers,
-                                    use_container_width=True,
-                                    hide_index=True,
-                                    column_config={
-                                        'FairValue': st.column_config.NumberColumn(f"{price_mode} ($)", format="$%.2f"),
-                                        'PlusMinus': st.column_config.NumberColumn("+/-"),
-                                        'CurrentTeam': st.column_config.TextColumn("Team"),
-                                        'Position': st.column_config.TextColumn("Pos"),
-                                    },
-                                )
+                        with st.expander(f"Price vs Performance Correlation ({len(nhl_df)} players)", expanded=False):
+                            # --- Key Metrics Header ---
+                            pts_corr = latest_corr.get('points_vs_price', {})
+                            goals_corr = latest_corr.get('goals_vs_price', {})
+                            km1, km2, km3, km4 = st.columns(4)
+                            with km1:
+                                st.metric("Points-Price R", f"{pts_corr.get('r', 0):.3f}" if pts_corr else "N/A")
+                            with km2:
+                                r_sq = pts_corr.get('r_squared', 0)
+                                st.metric("R-Squared", f"{r_sq:.1%}" if pts_corr else "N/A")
+                            with km3:
+                                st.metric("Skaters", f"{len(skaters_df)}")
+                            with km4:
+                                tp = latest_snap.get('team_premiums', {})
+                                ca_prices = [d['avg_price'] for t, d in tp.items() if d.get('country') == 'CA']
+                                us_prices = [d['avg_price'] for t, d in tp.items() if d.get('country') == 'US']
+                                if ca_prices and us_prices:
+                                    ca_avg = sum(ca_prices) / len(ca_prices)
+                                    us_avg = sum(us_prices) / len(us_prices)
+                                    prem = ((ca_avg / max(us_avg, 0.01)) - 1) * 100
+                                    st.metric("Canadian Premium", f"{prem:+.0f}%")
+                                else:
+                                    st.metric("Goalies", f"{len(goalies_df)}")
 
-                                # --- Price vs Goals (Forwards vs Defensemen) ---
-                                st.markdown("---")
-                                fwd_df = skaters_df[skaters_df['Position'].isin(['C', 'L', 'R'])].copy()
-                                def_df = skaters_df[skaters_df['Position'] == 'D'].copy()
+                            # --- 7 Tabs ---
+                            tab_corr, tab_tiers, tab_teams, tab_pos, tab_value, tab_goalies, tab_trends = st.tabs([
+                                "Correlation", "Price Tiers", "Teams", "Positions", "Value Finder", "Goalies", "Trends"
+                            ])
 
-                                if len(fwd_df) > 0 and len(def_df) > 0:
-                                    pvg_col1, pvg_col2 = st.columns(2)
-                                    with pvg_col1:
-                                        st.markdown("**Forwards: Goals vs Card Value**")
-                                        fig_fwd = px.scatter(
-                                            fwd_df, x='Goals', y='FairValue',
-                                            hover_name='PlayerName',
-                                            color='Position',
-                                            hover_data={'Points': True, 'Assists': True},
+                            # ========== TAB 1: CORRELATION ==========
+                            with tab_corr:
+                                if len(skaters_df) > 0:
+                                    st.markdown("**Points vs Card Value**")
+                                    fig_pvp = px.scatter(
+                                        skaters_df, x='Points', y='FairValue',
+                                        hover_name='PlayerName',
+                                        color='Position',
+                                        size='GP',
+                                        hover_data={'CurrentTeam': True, 'Goals': True, 'Assists': True, 'GP': True},
+                                        labels={'FairValue': f'{price_mode} Value ($)', 'Points': 'NHL Points'},
+                                    )
+                                    # Add regression line from stored coefficients
+                                    if pts_corr and pts_corr.get('slope'):
+                                        x_range = [skaters_df['Points'].min(), skaters_df['Points'].max()]
+                                        y_range = [pts_corr['slope'] * x + pts_corr['intercept'] for x in x_range]
+                                        fig_pvp.add_trace(go.Scatter(
+                                            x=x_range, y=y_range, mode='lines',
+                                            name=f"R={pts_corr['r']:.3f}",
+                                            line=dict(color='#FFD700', width=2, dash='dash'),
+                                        ))
+                                    fig_pvp.update_layout(template="plotly_dark", height=450)
+                                    st.plotly_chart(fig_pvp, use_container_width=True)
+
+                                    # Goals vs Price (smaller, side by side)
+                                    gc1, gc2 = st.columns(2)
+                                    with gc1:
+                                        st.markdown("**Goals vs Card Value**")
+                                        fig_gvp = px.scatter(
+                                            skaters_df, x='Goals', y='FairValue',
+                                            hover_name='PlayerName', color='Position',
                                             labels={'FairValue': f'{price_mode} ($)', 'Goals': 'Goals'},
-                                            color_discrete_map={'C': '#636EFA', 'L': '#00CC96', 'R': '#EF553B'},
                                         )
-                                        fig_fwd.update_layout(template="plotly_dark", height=350)
-                                        st.plotly_chart(fig_fwd, use_container_width=True)
+                                        if goals_corr and goals_corr.get('slope'):
+                                            gx = [skaters_df['Goals'].min(), skaters_df['Goals'].max()]
+                                            gy = [goals_corr['slope'] * x + goals_corr['intercept'] for x in gx]
+                                            fig_gvp.add_trace(go.Scatter(
+                                                x=gx, y=gy, mode='lines',
+                                                name=f"R={goals_corr['r']:.3f}",
+                                                line=dict(color='#FFD700', width=2, dash='dash'),
+                                            ))
+                                        fig_gvp.update_layout(template="plotly_dark", height=350)
+                                        st.plotly_chart(fig_gvp, use_container_width=True)
 
-                                    with pvg_col2:
-                                        st.markdown("**Defensemen: Points vs Card Value**")
-                                        fig_def = px.scatter(
-                                            def_df, x='Points', y='FairValue',
-                                            hover_name='PlayerName',
-                                            hover_data={'Goals': True, 'Assists': True, 'PlusMinus': True},
-                                            labels={'FairValue': f'{price_mode} ($)', 'Points': 'Points'},
+                                    with gc2:
+                                        st.markdown("**Top Performers by Points**")
+                                        top_perf = skaters_df.nlargest(15, 'Points')[
+                                            ['PlayerName', 'CurrentTeam', 'Position', 'GP', 'Goals', 'Assists', 'Points', 'PlusMinus', 'FairValue']
+                                        ].copy()
+                                        st.dataframe(
+                                            top_perf, use_container_width=True, hide_index=True,
+                                            column_config={
+                                                'FairValue': st.column_config.NumberColumn(f"{price_mode} ($)", format="$%.2f"),
+                                                'PlusMinus': st.column_config.NumberColumn("+/-"),
+                                                'CurrentTeam': st.column_config.TextColumn("Team"),
+                                                'Position': st.column_config.TextColumn("Pos"),
+                                            },
                                         )
-                                        fig_def.update_traces(marker=dict(color='#AB63FA'))
-                                        fig_def.update_layout(template="plotly_dark", height=350)
-                                        st.plotly_chart(fig_def, use_container_width=True)
 
-                                # --- Best Value: Points per Dollar ---
-                                st.markdown("---")
-                                st.markdown("**Best Value: Points per Dollar**")
-                                st.caption("Players with the most NHL points relative to card price")
-                                value_df = skaters_df[(skaters_df['FairValue'] > 1) & (skaters_df['Points'] > 5)].copy()
-                                if len(value_df) > 0:
-                                    value_df['PtsPer$'] = (value_df['Points'] / value_df['FairValue']).round(1)
-                                    best_value = value_df.nlargest(15, 'PtsPer$')[
-                                        ['PlayerName', 'CurrentTeam', 'Position', 'Points', 'Goals', 'FairValue', 'PtsPer$']
-                                    ]
+                            # ========== TAB 2: PRICE TIERS ==========
+                            with tab_tiers:
+                                tier_data = latest_snap.get('tiers', [])
+                                if tier_data:
+                                    st.markdown("**Average Card Price by Points Bracket**")
+                                    st.caption("The exponential curve: performance only matters above ~30 points")
+                                    tier_df = pd.DataFrame(tier_data)
+                                    fig_tiers = px.bar(
+                                        tier_df, x='label', y='avg_price',
+                                        text='count',
+                                        color='avg_price',
+                                        color_continuous_scale='Blues',
+                                        labels={'label': 'Points Bracket', 'avg_price': 'Avg Card Price ($)', 'count': 'Cards'},
+                                    )
+                                    fig_tiers.update_traces(texttemplate='%{text} cards', textposition='outside')
+                                    fig_tiers.update_layout(
+                                        template="plotly_dark", height=400,
+                                        coloraxis_showscale=False,
+                                        xaxis={'categoryorder': 'array', 'categoryarray': [t['label'] for t in tier_data]},
+                                    )
+                                    st.plotly_chart(fig_tiers, use_container_width=True)
+
                                     st.dataframe(
-                                        best_value,
-                                        use_container_width=True,
-                                        hide_index=True,
+                                        tier_df[['label', 'avg_price', 'median_price', 'count']].rename(columns={
+                                            'label': 'Bracket', 'avg_price': 'Avg Price', 'median_price': 'Median', 'count': 'Cards'
+                                        }),
+                                        use_container_width=True, hide_index=True,
+                                        column_config={
+                                            'Avg Price': st.column_config.NumberColumn(format="$%.2f"),
+                                            'Median': st.column_config.NumberColumn(format="$%.2f"),
+                                        },
+                                    )
+                                else:
+                                    st.info("Run the NHL stats scraper to generate tier data.")
+
+                            # ========== TAB 3: TEAMS ==========
+                            with tab_teams:
+                                tp = latest_snap.get('team_premiums', {})
+                                if tp:
+                                    # CA vs US comparison
+                                    ca_data = {t: d for t, d in tp.items() if d.get('country') == 'CA'}
+                                    us_data = {t: d for t, d in tp.items() if d.get('country') == 'US'}
+                                    ca_avg = sum(d['avg_price'] for d in ca_data.values()) / max(len(ca_data), 1)
+                                    us_avg = sum(d['avg_price'] for d in us_data.values()) / max(len(us_data), 1)
+
+                                    tm1, tm2, tm3 = st.columns(3)
+                                    with tm1:
+                                        st.metric("Canadian Teams Avg", f"${ca_avg:.2f}", f"{len(ca_data)} teams")
+                                    with tm2:
+                                        st.metric("US Teams Avg", f"${us_avg:.2f}", f"{len(us_data)} teams")
+                                    with tm3:
+                                        prem_pct = ((ca_avg / max(us_avg, 0.01)) - 1) * 100
+                                        st.metric("Premium", f"{prem_pct:+.0f}%")
+
+                                    # Bar chart by team
+                                    team_rows = []
+                                    for t, d in tp.items():
+                                        team_rows.append({
+                                            'Team': TEAM_ABBREV_TO_NAME.get(t, t),
+                                            'Abbrev': t,
+                                            'Avg Price': d['avg_price'],
+                                            'Cards': d['count'],
+                                            'Market': 'Canadian' if d.get('country') == 'CA' else 'US',
+                                        })
+                                    team_df = pd.DataFrame(team_rows).sort_values('Avg Price', ascending=True)
+
+                                    fig_teams = px.bar(
+                                        team_df, x='Avg Price', y='Team', orientation='h',
+                                        color='Market',
+                                        color_discrete_map={'Canadian': '#EF553B', 'US': '#636EFA'},
+                                        hover_data={'Cards': True, 'Abbrev': True},
+                                        labels={'Avg Price': 'Avg Card Price ($)'},
+                                    )
+                                    fig_teams.update_layout(
+                                        template="plotly_dark", height=max(400, len(team_df) * 18),
+                                        yaxis={'categoryorder': 'total ascending'},
+                                    )
+                                    st.plotly_chart(fig_teams, use_container_width=True)
+                                else:
+                                    st.info("Run the NHL stats scraper to generate team data.")
+
+                            # ========== TAB 4: POSITIONS ==========
+                            with tab_pos:
+                                pb = latest_snap.get('position_breakdown', {})
+                                if pb and len(skaters_df) > 0:
+                                    # Position bar chart
+                                    pos_rows = []
+                                    pos_labels = {'C': 'Center', 'L': 'Left Wing', 'R': 'Right Wing', 'D': 'Defense', 'G': 'Goalie'}
+                                    for p, d in pb.items():
+                                        pos_rows.append({
+                                            'Position': pos_labels.get(p, p),
+                                            'Avg Price': d.get('avg_price', 0),
+                                            'Avg Points': d.get('avg_points', d.get('avg_wins', 0)),
+                                            'Cards': d.get('count', 0),
+                                        })
+                                    pos_df = pd.DataFrame(pos_rows)
+
+                                    pc1, pc2 = st.columns(2)
+                                    with pc1:
+                                        st.markdown("**Avg Card Price by Position**")
+                                        fig_pos = px.bar(
+                                            pos_df, x='Position', y='Avg Price',
+                                            color='Avg Price', color_continuous_scale='Greens',
+                                            text='Cards',
+                                            labels={'Avg Price': 'Avg Card Price ($)'},
+                                        )
+                                        fig_pos.update_traces(texttemplate='%{text} cards', textposition='outside')
+                                        fig_pos.update_layout(template="plotly_dark", height=350, coloraxis_showscale=False)
+                                        st.plotly_chart(fig_pos, use_container_width=True)
+
+                                    with pc2:
+                                        st.markdown("**Forwards vs Defensemen**")
+                                        fwd_df = skaters_df[skaters_df['Position'].isin(['C', 'L', 'R'])].copy()
+                                        def_df = skaters_df[skaters_df['Position'] == 'D'].copy()
+                                        fig_fvd = go.Figure()
+                                        if len(fwd_df) > 0:
+                                            fig_fvd.add_trace(go.Scatter(
+                                                x=fwd_df['Points'], y=fwd_df['FairValue'],
+                                                mode='markers', name='Forwards',
+                                                text=fwd_df['PlayerName'],
+                                                marker=dict(color='#00CC96', size=8, opacity=0.7),
+                                            ))
+                                        if len(def_df) > 0:
+                                            fig_fvd.add_trace(go.Scatter(
+                                                x=def_df['Points'], y=def_df['FairValue'],
+                                                mode='markers', name='Defensemen',
+                                                text=def_df['PlayerName'],
+                                                marker=dict(color='#AB63FA', size=8, opacity=0.7),
+                                            ))
+                                        fig_fvd.update_layout(
+                                            template="plotly_dark", height=350,
+                                            xaxis_title="Points", yaxis_title=f"{price_mode} Value ($)",
+                                        )
+                                        st.plotly_chart(fig_fvd, use_container_width=True)
+                                else:
+                                    st.info("Run the NHL stats scraper to generate position data.")
+
+                            # ========== TAB 5: VALUE FINDER ==========
+                            with tab_value:
+                                if len(skaters_df) > 0 and pts_corr and pts_corr.get('slope'):
+                                    slope = pts_corr['slope']
+                                    intercept = pts_corr['intercept']
+                                    val_df = skaters_df[skaters_df['GP'] >= 10].copy()
+                                    val_df['Expected'] = (val_df['Points'] * slope + intercept).round(2)
+                                    val_df['Expected'] = val_df['Expected'].clip(lower=1.0)
+                                    val_df['Premium%'] = (((val_df['FairValue'] / val_df['Expected']) - 1) * 100).round(1)
+
+                                    ov1, ov2 = st.columns(2)
+                                    with ov1:
+                                        st.markdown("**Most Overvalued** (Price >> Expected)")
+                                        st.caption("High card price relative to on-ice production")
+                                        overvalued = val_df[val_df['FairValue'] > 5].nlargest(15, 'Premium%')[
+                                            ['PlayerName', 'CurrentTeam', 'Points', 'GP', 'FairValue', 'Expected', 'Premium%']
+                                        ]
+                                        st.dataframe(
+                                            overvalued, use_container_width=True, hide_index=True,
+                                            column_config={
+                                                'FairValue': st.column_config.NumberColumn("Actual ($)", format="$%.2f"),
+                                                'Expected': st.column_config.NumberColumn("Expected ($)", format="$%.2f"),
+                                                'Premium%': st.column_config.NumberColumn("Premium", format="%+.0f%%"),
+                                                'CurrentTeam': st.column_config.TextColumn("Team"),
+                                            },
+                                        )
+
+                                    with ov2:
+                                        st.markdown("**Most Undervalued** (Price << Expected)")
+                                        st.caption("Strong stats but cheap card — potential value buys")
+                                        undervalued = val_df[val_df['Points'] >= 15].nsmallest(15, 'Premium%')[
+                                            ['PlayerName', 'CurrentTeam', 'Points', 'GP', 'FairValue', 'Expected', 'Premium%']
+                                        ]
+                                        st.dataframe(
+                                            undervalued, use_container_width=True, hide_index=True,
+                                            column_config={
+                                                'FairValue': st.column_config.NumberColumn("Actual ($)", format="$%.2f"),
+                                                'Expected': st.column_config.NumberColumn("Expected ($)", format="$%.2f"),
+                                                'Premium%': st.column_config.NumberColumn("Discount", format="%+.0f%%"),
+                                                'CurrentTeam': st.column_config.TextColumn("Team"),
+                                            },
+                                        )
+
+                                    # Residual scatter
+                                    st.markdown("---")
+                                    st.markdown("**Actual vs Expected Price**")
+                                    st.caption("Points above the line = overvalued, below = undervalued")
+                                    fig_resid = px.scatter(
+                                        val_df, x='Expected', y='FairValue',
+                                        hover_name='PlayerName',
+                                        color='Position',
+                                        hover_data={'Points': True, 'CurrentTeam': True, 'Premium%': True},
+                                        labels={'Expected': 'Expected Price ($)', 'FairValue': f'Actual {price_mode} ($)'},
+                                    )
+                                    max_val = max(val_df['Expected'].max(), val_df['FairValue'].max())
+                                    fig_resid.add_trace(go.Scatter(
+                                        x=[0, max_val], y=[0, max_val], mode='lines',
+                                        name='Fair Value Line',
+                                        line=dict(color='gray', dash='dash', width=1),
+                                    ))
+                                    fig_resid.update_layout(template="plotly_dark", height=400)
+                                    st.plotly_chart(fig_resid, use_container_width=True)
+                                else:
+                                    st.info("Run the NHL stats scraper to generate value analysis.")
+
+                            # ========== TAB 6: GOALIES ==========
+                            with tab_goalies:
+                                if len(goalies_df) > 0:
+                                    g1, g2 = st.columns(2)
+                                    with g1:
+                                        st.markdown("**Wins vs Card Value**")
+                                        fig_gw = px.scatter(
+                                            goalies_df, x='Wins', y='FairValue',
+                                            hover_name='PlayerName', size='GP',
+                                            color='SavePct', color_continuous_scale='RdYlGn',
+                                            hover_data={'SavePct': ':.3f', 'GAA': ':.2f', 'TeamPoints': True},
+                                            labels={'FairValue': f'{price_mode} ($)', 'Wins': 'Wins', 'SavePct': 'SV%'},
+                                        )
+                                        fig_gw.update_layout(template="plotly_dark", height=350)
+                                        st.plotly_chart(fig_gw, use_container_width=True)
+
+                                    with g2:
+                                        st.markdown("**Save % vs Card Value**")
+                                        fig_gsv = px.scatter(
+                                            goalies_df, x='SavePct', y='FairValue',
+                                            hover_name='PlayerName', size='GP',
+                                            color='Wins', color_continuous_scale='Viridis',
+                                            hover_data={'Wins': True, 'GAA': ':.2f'},
+                                            labels={'FairValue': f'{price_mode} ($)', 'SavePct': 'Save %'},
+                                        )
+                                        fig_gsv.update_layout(template="plotly_dark", height=350)
+                                        st.plotly_chart(fig_gsv, use_container_width=True)
+
+                                    # Team placement factor
+                                    if 'TeamPoints' in goalies_df.columns:
+                                        st.markdown("**Team Points vs Goalie Card Value**")
+                                        st.caption("Does playing for a winning team inflate goalie card prices?")
+                                        fig_gtp = px.scatter(
+                                            goalies_df, x='TeamPoints', y='FairValue',
+                                            hover_name='PlayerName', size='Wins',
+                                            hover_data={'SavePct': ':.3f', 'CurrentTeam': True},
+                                            labels={'FairValue': f'{price_mode} ($)', 'TeamPoints': 'Team Points'},
+                                        )
+                                        fig_gtp.update_layout(template="plotly_dark", height=350)
+                                        st.plotly_chart(fig_gtp, use_container_width=True)
+
+                                    st.markdown("**Goalie Stats**")
+                                    goalie_table = goalies_df.nlargest(15, 'Wins')[
+                                        ['PlayerName', 'CurrentTeam', 'GP', 'Wins', 'Losses', 'SavePct', 'GAA', 'Shutouts', 'FairValue']
+                                    ].copy()
+                                    st.dataframe(
+                                        goalie_table, use_container_width=True, hide_index=True,
                                         column_config={
                                             'FairValue': st.column_config.NumberColumn(f"{price_mode} ($)", format="$%.2f"),
-                                            'PtsPer$': st.column_config.NumberColumn("Pts/$", format="%.1f"),
+                                            'SavePct': st.column_config.NumberColumn("SV%", format="%.3f"),
+                                            'GAA': st.column_config.NumberColumn("GAA", format="%.2f"),
                                             'CurrentTeam': st.column_config.TextColumn("Team"),
                                         },
                                     )
+                                else:
+                                    st.info("No goalie data available.")
 
-                            # --- Goalie Analytics ---
-                            if len(goalies_df) > 0:
-                                st.markdown("---")
-                                st.markdown("**Goalie Performance vs Card Value**")
-                                fig_goalie = px.scatter(
-                                    goalies_df, x='Wins', y='FairValue',
-                                    hover_name='PlayerName',
-                                    size='GP',
-                                    color='SavePct',
-                                    color_continuous_scale='RdYlGn',
-                                    hover_data={'SavePct': ':.3f', 'GAA': ':.2f', 'TeamPoints': True},
-                                    labels={'FairValue': f'{price_mode} Value ($)', 'Wins': 'Wins', 'SavePct': 'SV%'},
-                                )
-                                fig_goalie.update_layout(template="plotly_dark", height=400)
-                                st.plotly_chart(fig_goalie, use_container_width=True)
+                            # ========== TAB 7: TRENDS ==========
+                            with tab_trends:
+                                if len(corr_history) > 1:
+                                    dates = sorted(corr_history.keys())
+                                    trend_rows = []
+                                    for d in dates:
+                                        snap = corr_history[d]
+                                        c = snap.get('correlations', {})
+                                        trend_rows.append({
+                                            'Date': d,
+                                            'Points-Price R': c.get('points_vs_price', {}).get('r', 0),
+                                            'Goals-Price R': c.get('goals_vs_price', {}).get('r', 0),
+                                            'Skaters': snap.get('meta', {}).get('skaters_with_price', 0),
+                                        })
+                                    trend_df = pd.DataFrame(trend_rows)
 
-                                st.markdown("**Goalie Stats**")
-                                goalie_table = goalies_df.nlargest(15, 'Wins')[
-                                    ['PlayerName', 'CurrentTeam', 'GP', 'Wins', 'Losses', 'SavePct', 'GAA', 'Shutouts', 'FairValue']
-                                ].copy()
-                                st.dataframe(
-                                    goalie_table,
-                                    use_container_width=True,
-                                    hide_index=True,
-                                    column_config={
-                                        'FairValue': st.column_config.NumberColumn(f"{price_mode} ($)", format="$%.2f"),
-                                        'SavePct': st.column_config.NumberColumn("SV%", format="%.3f"),
-                                        'GAA': st.column_config.NumberColumn("GAA", format="%.2f"),
-                                        'CurrentTeam': st.column_config.TextColumn("Team"),
-                                    },
-                                )
+                                    st.markdown("**Correlation Trend Over Time**")
+                                    st.caption("Is the market becoming more efficient (higher R) or more hype-driven (lower R)?")
+                                    fig_trend = go.Figure()
+                                    fig_trend.add_trace(go.Scatter(
+                                        x=trend_df['Date'], y=trend_df['Points-Price R'],
+                                        mode='lines+markers', name='Points vs Price',
+                                        line=dict(color='#636EFA', width=2),
+                                    ))
+                                    fig_trend.add_trace(go.Scatter(
+                                        x=trend_df['Date'], y=trend_df['Goals-Price R'],
+                                        mode='lines+markers', name='Goals vs Price',
+                                        line=dict(color='#00CC96', width=2),
+                                    ))
+                                    fig_trend.update_layout(
+                                        template="plotly_dark", height=350,
+                                        yaxis_title="R-Value", xaxis_title="Date",
+                                    )
+                                    st.plotly_chart(fig_trend, use_container_width=True)
+
+                                    # Tier trends
+                                    tier_trend_rows = []
+                                    for d in dates:
+                                        snap = corr_history[d]
+                                        for t in snap.get('tiers', []):
+                                            tier_trend_rows.append({
+                                                'Date': d,
+                                                'Tier': t['label'],
+                                                'Avg Price': t['avg_price'],
+                                            })
+                                    if tier_trend_rows:
+                                        tt_df = pd.DataFrame(tier_trend_rows)
+                                        st.markdown("**Price Tier Trends**")
+                                        fig_tt = px.line(
+                                            tt_df, x='Date', y='Avg Price', color='Tier',
+                                            labels={'Avg Price': 'Avg Card Price ($)'},
+                                        )
+                                        fig_tt.update_layout(template="plotly_dark", height=350)
+                                        st.plotly_chart(fig_tt, use_container_width=True)
+
+                                    # Market efficiency indicator
+                                    if len(trend_df) >= 2:
+                                        first_r = trend_df.iloc[0]['Points-Price R']
+                                        last_r = trend_df.iloc[-1]['Points-Price R']
+                                        delta = last_r - first_r
+                                        direction = "more efficient" if delta > 0.01 else "less efficient" if delta < -0.01 else "stable"
+                                        st.info(f"Market trend: R moved from {first_r:.3f} to {last_r:.3f} ({delta:+.3f}) — market is becoming **{direction}**")
+                                else:
+                                    st.info("Correlation trends will appear after 2+ NHL stats scrapes on different days. Run the scraper periodically to build history.")
 
     # Season breakdown
     if not master_df.empty:

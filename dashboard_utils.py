@@ -630,6 +630,8 @@ YG_PRICE_HISTORY_PATH = os.path.join(MASTER_DB_DIR, "yg_price_history.json")
 YG_PORTFOLIO_HISTORY_PATH = os.path.join(MASTER_DB_DIR, "yg_portfolio_history.json")
 YG_RAW_SALES_PATH = os.path.join(MASTER_DB_DIR, "yg_raw_sales.json")
 NHL_STATS_PATH = os.path.join(MASTER_DB_DIR, "nhl_player_stats.json")
+YG_CORRELATION_HISTORY_PATH = os.path.join(MASTER_DB_DIR, "yg_correlation_history.json")
+CANADIAN_TEAM_ABBREVS = {'TOR', 'MTL', 'OTT', 'WPG', 'CGY', 'EDM', 'VAN'}
 
 TEAM_NAME_TO_ABBREV = {
     "Anaheim Ducks": "ANA", "Arizona Coyotes": "ARI", "Boston Bruins": "BOS",
@@ -713,6 +715,208 @@ def get_player_stats_for_card(player_name, path=None):
             'summary': f"{current.get('wins',0)}W-{current.get('losses',0)}L, {current.get('save_pct',0):.3f}SV%, {current.get('gaa',0):.2f}GAA",
         })
     return result
+
+
+def compute_correlation_snapshot(cards_df, nhl_players, nhl_standings):
+    """Compute a price-vs-performance correlation snapshot.
+
+    Args:
+        cards_df: DataFrame with at least PlayerName, FairValue columns
+        nhl_players: dict from nhl_player_stats.json 'players' key
+        nhl_standings: dict from nhl_player_stats.json 'standings' key
+
+    Returns:
+        dict: snapshot ready to store in yg_correlation_history.json
+    """
+    from scipy.stats import linregress
+
+    # Build paired data
+    paired_skaters = []
+    paired_goalies = []
+    seen_players = set()
+
+    for _, row in cards_df.iterrows():
+        pname = row['PlayerName']
+        if pname in seen_players:
+            continue
+        seen_players.add(pname)
+        price = float(row.get('FairValue', 0) or 0)
+        if price <= 0:
+            continue
+        nhl = nhl_players.get(pname)
+        if not nhl or not nhl.get('current_season'):
+            continue
+
+        cs = nhl['current_season']
+        team = nhl.get('current_team', '')
+        pos = nhl.get('position', '')
+
+        if nhl.get('type') == 'skater':
+            paired_skaters.append({
+                'name': pname, 'price': price,
+                'points': cs.get('points', 0),
+                'goals': cs.get('goals', 0),
+                'assists': cs.get('assists', 0),
+                'gp': cs.get('games_played', 0),
+                'plus_minus': cs.get('plus_minus', 0),
+                'team': team, 'position': pos,
+            })
+        else:
+            team_stand = nhl_standings.get(team, {})
+            paired_goalies.append({
+                'name': pname, 'price': price,
+                'wins': cs.get('wins', 0),
+                'svpct': cs.get('save_pct', 0),
+                'gaa': cs.get('gaa', 0),
+                'team': team, 'position': 'G',
+                'team_points': team_stand.get('points', 0),
+            })
+
+    def safe_linregress(x_vals, y_vals):
+        if len(x_vals) < 3:
+            return None
+        result = linregress(x_vals, y_vals)
+        return {
+            'r': round(result.rvalue, 4),
+            'r_squared': round(result.rvalue ** 2, 4),
+            'slope': round(result.slope, 4),
+            'intercept': round(result.intercept, 4),
+            'p_value': round(result.pvalue, 6),
+            'n': len(x_vals),
+        }
+
+    # Correlations
+    sk_prices = [s['price'] for s in paired_skaters]
+    sk_points = [s['points'] for s in paired_skaters]
+    sk_goals = [s['goals'] for s in paired_skaters]
+    sk_assists = [s['assists'] for s in paired_skaters]
+
+    correlations = {}
+    correlations['points_vs_price'] = safe_linregress(sk_points, sk_prices)
+    correlations['goals_vs_price'] = safe_linregress(sk_goals, sk_prices)
+    correlations['assists_vs_price'] = safe_linregress(sk_assists, sk_prices)
+
+    gl_prices = [g['price'] for g in paired_goalies]
+    gl_wins = [g['wins'] for g in paired_goalies]
+    gl_svpct = [g['svpct'] for g in paired_goalies]
+    correlations['goalie_wins_vs_price'] = safe_linregress(gl_wins, gl_prices)
+    correlations['goalie_svpct_vs_price'] = safe_linregress(gl_svpct, gl_prices)
+    correlations = {k: v for k, v in correlations.items() if v is not None}
+
+    # Tiers
+    tier_brackets = [
+        (0, 5, '<5 pts'), (6, 10, '6-10 pts'), (11, 20, '11-20 pts'),
+        (21, 30, '21-30 pts'), (31, 40, '31-40 pts'), (41, 50, '41-50 pts'),
+        (51, 999, '51+ pts'),
+    ]
+    tiers = []
+    for low, high, label in tier_brackets:
+        tier_players = [s for s in paired_skaters if low <= s['points'] <= high]
+        if tier_players:
+            prices = [s['price'] for s in tier_players]
+            avg_p = round(sum(prices) / len(prices), 2)
+            med_p = round(sorted(prices)[len(prices) // 2], 2)
+            tiers.append({
+                'bracket': f"{low}-{high}" if high < 999 else f"{low}+",
+                'label': label, 'avg_price': avg_p, 'median_price': med_p,
+                'count': len(tier_players),
+            })
+
+    # Team premiums
+    team_groups = {}
+    for s in paired_skaters + paired_goalies:
+        t = s['team']
+        if t not in team_groups:
+            team_groups[t] = {'prices': [], 'points': [], 'wins': []}
+        team_groups[t]['prices'].append(s['price'])
+        if 'points' in s:
+            team_groups[t]['points'].append(s['points'])
+        if 'wins' in s:
+            team_groups[t]['wins'].append(s['wins'])
+
+    team_premiums = {}
+    for t, data in team_groups.items():
+        entry = {
+            'avg_price': round(sum(data['prices']) / len(data['prices']), 2),
+            'count': len(data['prices']),
+            'country': 'CA' if t in CANADIAN_TEAM_ABBREVS else 'US',
+        }
+        if data['points']:
+            entry['avg_points'] = round(sum(data['points']) / len(data['points']), 1)
+        team_premiums[t] = entry
+
+    # Position breakdown
+    pos_groups = {}
+    for s in paired_skaters:
+        p = s['position']
+        pos_groups.setdefault(p, {'prices': [], 'points': []})
+        pos_groups[p]['prices'].append(s['price'])
+        pos_groups[p]['points'].append(s['points'])
+
+    position_breakdown = {}
+    for p, data in pos_groups.items():
+        position_breakdown[p] = {
+            'avg_price': round(sum(data['prices']) / len(data['prices']), 2),
+            'avg_points': round(sum(data['points']) / len(data['points']), 1),
+            'count': len(data['prices']),
+        }
+    if paired_goalies:
+        position_breakdown['G'] = {
+            'avg_price': round(sum(g['price'] for g in paired_goalies) / len(paired_goalies), 2),
+            'avg_wins': round(sum(g['wins'] for g in paired_goalies) / len(paired_goalies), 1),
+            'count': len(paired_goalies),
+        }
+
+    # Compact per-player data
+    players_compact = {}
+    for s in paired_skaters:
+        players_compact[s['name']] = {
+            'price': s['price'], 'points': s['points'],
+            'goals': s['goals'], 'gp': s['gp'],
+            'team': s['team'], 'position': s['position'],
+        }
+    for g in paired_goalies:
+        players_compact[g['name']] = {
+            'price': g['price'], 'wins': g['wins'],
+            'svpct': g['svpct'], 'team': g['team'], 'position': 'G',
+        }
+
+    return {
+        'meta': {
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M'),
+            'matched_players': len(paired_skaters) + len(paired_goalies),
+            'skaters_with_price': len(paired_skaters),
+            'goalies_with_price': len(paired_goalies),
+        },
+        'correlations': correlations,
+        'tiers': tiers,
+        'team_premiums': team_premiums,
+        'position_breakdown': position_breakdown,
+        'players': players_compact,
+    }
+
+
+def load_correlation_history(path=None):
+    """Load the full correlation history dict."""
+    path = path or YG_CORRELATION_HISTORY_PATH
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_correlation_snapshot(snapshot, path=None):
+    """Append/overwrite today's correlation snapshot."""
+    path = path or YG_CORRELATION_HISTORY_PATH
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    history = load_correlation_history(path)
+    today = datetime.now().strftime('%Y-%m-%d')
+    history[today] = snapshot
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(history, f, indent=2, ensure_ascii=False)
 
 
 def append_yg_price_history(card_name, fair_value, num_sales, history_path=None,

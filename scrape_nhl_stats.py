@@ -26,6 +26,7 @@ sys.path.insert(0, SCRIPT_DIR)
 from dashboard_utils import (
     load_master_db, save_master_db,
     load_nhl_player_stats, save_nhl_player_stats,
+    compute_correlation_snapshot, save_correlation_snapshot,
     TEAM_NAME_TO_ABBREV, TEAM_ABBREV_TO_NAME,
     NHL_STATS_PATH,
 )
@@ -392,6 +393,21 @@ def main():
     if positions_updated > 0:
         save_master_db(df)
         print(f"  Updated {positions_updated} positions in young_guns.csv")
+
+    # Step 7: Compute and save correlation snapshot
+    print("\nComputing price-vs-performance correlations...")
+    try:
+        snapshot = compute_correlation_snapshot(df, matched, standings)
+        save_correlation_snapshot(snapshot)
+        corr = snapshot.get('correlations', {})
+        pts_r = corr.get('points_vs_price', {}).get('r', 0)
+        goals_r = corr.get('goals_vs_price', {}).get('r', 0)
+        n = snapshot['meta']['skaters_with_price']
+        print(f"  Points vs Price r={pts_r:.3f}, Goals vs Price r={goals_r:.3f} (n={n} skaters)")
+        print(f"  {len(snapshot.get('tiers', []))} price tiers, {len(snapshot.get('team_premiums', {}))} teams")
+        print(f"  Saved correlation snapshot for {datetime.now().strftime('%Y-%m-%d')}")
+    except Exception as e:
+        print(f"  WARNING: Could not compute correlations: {e}")
 
     print("\n" + "=" * 60)
     print("DONE")
