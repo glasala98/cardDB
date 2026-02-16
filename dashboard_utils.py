@@ -1226,3 +1226,264 @@ def save_master_db(df, path=MASTER_DB_PATH):
     """Save the master card database CSV."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
     df.to_csv(path, index=False)
+
+
+# ============================================================
+# MARKET ALERTS
+# ============================================================
+def get_market_alerts(price_history, top_n=5, min_pct=5):
+    """Detect cards with significant price swings between last 2 scrapes.
+
+    Returns list of dicts sorted by abs(pct_change) descending:
+        {card_name, old_price, new_price, pct_change, direction}
+    """
+    alerts = []
+    for card_name, entries in price_history.items():
+        if len(entries) < 2:
+            continue
+        latest = entries[-1]
+        prev = entries[-2]
+        new_p = float(latest.get('fair_value', 0) or 0)
+        old_p = float(prev.get('fair_value', 0) or 0)
+        if old_p <= 0 or new_p <= 0:
+            continue
+        pct = ((new_p - old_p) / old_p) * 100
+        if abs(pct) < min_pct:
+            continue
+        alerts.append({
+            'card_name': card_name,
+            'old_price': old_p,
+            'new_price': new_p,
+            'pct_change': round(pct, 1),
+            'direction': 'up' if pct > 0 else 'down',
+        })
+    alerts.sort(key=lambda x: abs(x['pct_change']), reverse=True)
+    return alerts[:top_n * 2]  # return top gainers + losers
+
+
+# ============================================================
+# CARD OF THE DAY
+# ============================================================
+def get_card_of_the_day(master_df, nhl_players, price_history, correlation_snapshot=None):
+    """Pick the card of the day: biggest gainer, or most undervalued if no movers.
+
+    Returns dict: {card_name, player, team, price, reason, stats, pct_change}
+    """
+    import hashlib
+    today = datetime.now().strftime('%Y-%m-%d')
+
+    # Try biggest gainer first
+    best_gainer = None
+    best_pct = 0
+    for card_name, entries in price_history.items():
+        if len(entries) < 2:
+            continue
+        new_p = float(entries[-1].get('fair_value', 0) or 0)
+        old_p = float(entries[-2].get('fair_value', 0) or 0)
+        if old_p <= 0 or new_p <= 0:
+            continue
+        pct = ((new_p - old_p) / old_p) * 100
+        if pct > best_pct:
+            best_pct = pct
+            best_gainer = card_name
+
+    if best_gainer and best_pct > 5:
+        row = master_df[master_df['CardName'] == best_gainer]
+        player = row.iloc[0]['PlayerName'] if len(row) > 0 else best_gainer
+        team = row.iloc[0].get('Team', '') if len(row) > 0 else ''
+        price = float(row.iloc[0].get('FairValue', 0)) if len(row) > 0 else 0
+        nhl = nhl_players.get(player, {})
+        cs = nhl.get('current_season', {})
+        return {
+            'card_name': best_gainer, 'player': player, 'team': team,
+            'price': price, 'pct_change': round(best_pct, 1),
+            'reason': f'Biggest gainer today: +{best_pct:.1f}%',
+            'stats': cs,
+        }
+
+    # Fallback: most undervalued card (use correlation regression)
+    if correlation_snapshot:
+        pts_corr = correlation_snapshot.get('correlations', {}).get('points_vs_price', {})
+        slope = pts_corr.get('slope', 0)
+        intercept = pts_corr.get('intercept', 0)
+        players_data = correlation_snapshot.get('players', {})
+        if slope > 0 and players_data:
+            best_value = None
+            best_ratio = 0
+            for pname, pdata in players_data.items():
+                if pdata.get('position') == 'G':
+                    continue
+                expected = slope * pdata.get('points', 0) + intercept
+                actual = pdata.get('price', 0)
+                if actual <= 0 or expected <= 0:
+                    continue
+                ratio = expected / actual  # higher = more undervalued
+                if ratio > best_ratio:
+                    best_ratio = ratio
+                    best_value = pname
+
+            if best_value:
+                pdata = players_data[best_value]
+                row = master_df[master_df['PlayerName'] == best_value]
+                card_name = row.iloc[0]['CardName'] if len(row) > 0 else ''
+                return {
+                    'card_name': card_name, 'player': best_value,
+                    'team': pdata.get('team', ''),
+                    'price': pdata.get('price', 0), 'pct_change': 0,
+                    'reason': f'Best value: {best_ratio:.1f}x undervalued vs expected',
+                    'stats': nhl_players.get(best_value, {}).get('current_season', {}),
+                }
+
+    # Final fallback: deterministic pick based on date hash
+    if len(master_df) > 0:
+        idx = int(hashlib.md5(today.encode()).hexdigest(), 16) % len(master_df)
+        row = master_df.iloc[idx]
+        player = row.get('PlayerName', '')
+        nhl = nhl_players.get(player, {})
+        return {
+            'card_name': row.get('CardName', ''), 'player': player,
+            'team': row.get('Team', ''),
+            'price': float(row.get('FairValue', 0) or 0), 'pct_change': 0,
+            'reason': 'Featured card',
+            'stats': nhl.get('current_season', {}),
+        }
+    return None
+
+
+# ============================================================
+# TEAM MARKET MULTIPLIER
+# ============================================================
+def compute_team_multipliers(correlation_snapshot):
+    """Compute team market multipliers: actual avg price vs regression-expected price.
+
+    Returns dict: {team_abbrev: {actual, expected, multiplier, premium_pct, count, country}}
+    """
+    pts_corr = correlation_snapshot.get('correlations', {}).get('points_vs_price', {})
+    slope = pts_corr.get('slope', 0)
+    intercept = pts_corr.get('intercept', 0)
+    team_premiums = correlation_snapshot.get('team_premiums', {})
+
+    if slope <= 0 or not team_premiums:
+        return {}
+
+    multipliers = {}
+    for team, data in team_premiums.items():
+        avg_pts = data.get('avg_points', 0)
+        avg_price = data.get('avg_price', 0)
+        if avg_pts <= 0 or avg_price <= 0:
+            continue
+        expected = slope * avg_pts + intercept
+        if expected <= 0:
+            expected = 1.0
+        mult = avg_price / expected
+        multipliers[team] = {
+            'actual': round(avg_price, 2),
+            'expected': round(expected, 2),
+            'multiplier': round(mult, 2),
+            'premium_pct': round((mult - 1) * 100, 1),
+            'count': data.get('count', 0),
+            'country': data.get('country', 'US'),
+        }
+    return multipliers
+
+
+# ============================================================
+# ROOKIE SEASON IMPACT SCORE
+# ============================================================
+def compute_impact_scores(master_df, nhl_players, team_multipliers=None):
+    """Compute a 0-100 Impact Score for each player.
+
+    Weights:
+        Points pace (pts/GP):  40%
+        Team market:           20%
+        Draft position:        15%
+        Shooting %:            10%
+        Plus/minus rate:       15%
+
+    Returns dict: {player_name: {score, breakdown: {pace, team, draft, shooting, plusminus}}}
+    """
+    raw = {}
+    for _, row in master_df.iterrows():
+        pname = row['PlayerName']
+        if pname in raw:
+            continue
+        nhl = nhl_players.get(pname)
+        if not nhl or not nhl.get('current_season'):
+            continue
+        cs = nhl['current_season']
+        bio = nhl.get('bio', {})
+        gp = cs.get('games_played', 0)
+        if gp < 5:
+            continue
+
+        pts_pace = cs.get('points', 0) / gp
+        shooting = cs.get('shooting_pct', 0) * 100 if cs.get('shooting_pct', 0) < 1 else cs.get('shooting_pct', 0)
+        pm_rate = cs.get('plus_minus', 0) / gp
+        draft_pick = bio.get('draft_overall', 300)  # undrafted = 300
+        team = nhl.get('current_team', '')
+
+        # Team multiplier score
+        tm_score = 1.0
+        if team_multipliers and team in team_multipliers:
+            tm_score = team_multipliers[team].get('multiplier', 1.0)
+
+        raw[pname] = {
+            'pts_pace': pts_pace,
+            'shooting': shooting,
+            'pm_rate': pm_rate,
+            'draft_pick': draft_pick,
+            'tm_score': tm_score,
+            'team': team,
+            'gp': gp,
+            'points': cs.get('points', 0),
+            'goals': cs.get('goals', 0),
+            'position': nhl.get('position', ''),
+            'type': nhl.get('type', 'skater'),
+        }
+
+    if not raw:
+        return {}
+
+    # Normalize each factor to 0-100
+    all_pace = [v['pts_pace'] for v in raw.values()]
+    all_shoot = [v['shooting'] for v in raw.values()]
+    all_pm = [v['pm_rate'] for v in raw.values()]
+    all_draft = [v['draft_pick'] for v in raw.values()]
+    all_tm = [v['tm_score'] for v in raw.values()]
+
+    def normalize(val, vals, invert=False):
+        mn, mx = min(vals), max(vals)
+        if mx == mn:
+            return 50
+        n = (val - mn) / (mx - mn) * 100
+        return 100 - n if invert else n
+
+    scores = {}
+    for pname, v in raw.items():
+        if v['type'] != 'skater':
+            continue
+        pace_n = normalize(v['pts_pace'], all_pace)
+        shoot_n = normalize(v['shooting'], all_shoot)
+        pm_n = normalize(v['pm_rate'], all_pm)
+        draft_n = normalize(v['draft_pick'], all_draft, invert=True)  # lower pick = better
+        tm_n = normalize(v['tm_score'], all_tm)
+
+        score = (pace_n * 0.40 + tm_n * 0.20 + draft_n * 0.15 +
+                 shoot_n * 0.10 + pm_n * 0.15)
+
+        scores[pname] = {
+            'score': round(score, 1),
+            'breakdown': {
+                'pace': round(pace_n, 1),
+                'team': round(tm_n, 1),
+                'draft': round(draft_n, 1),
+                'shooting': round(shoot_n, 1),
+                'plusminus': round(pm_n, 1),
+            },
+            'team': v['team'],
+            'points': v['points'],
+            'goals': v['goals'],
+            'gp': v['gp'],
+            'position': v['position'],
+        }
+    return scores

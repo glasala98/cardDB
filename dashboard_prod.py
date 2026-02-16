@@ -20,6 +20,8 @@ try:
         get_player_bio_for_card, get_all_player_bios,
         load_correlation_history, CANADIAN_TEAM_ABBREVS,
         TEAM_ABBREV_TO_NAME,
+        get_market_alerts, get_card_of_the_day,
+        compute_team_multipliers, compute_impact_scores,
         CSV_PATH, MONEY_COLS, PARSED_COLS
     )
 except ImportError:
@@ -1466,6 +1468,76 @@ elif page == "Young Guns DB":
         has_prices = 'FairValue' in master_df.columns and master_df['FairValue'].notna().any()
         total_value = master_df['FairValue'].sum() if has_prices else 0
 
+        # ── Market Alerts Banner ──
+        _yg_ph = load_yg_price_history()
+        _alerts = get_market_alerts(_yg_ph, top_n=5) if _yg_ph else []
+
+        if _alerts:
+            gainers = [a for a in _alerts if a['direction'] == 'up'][:3]
+            losers = [a for a in _alerts if a['direction'] == 'down'][:3]
+            alert_html = '<div style="display:flex;gap:10px;overflow-x:auto;padding:6px 0;margin-bottom:8px;">'
+            for a in gainers:
+                # Parse player name from card_name
+                parts = a['card_name'].split(' - ')
+                pname = parts[-1] if len(parts) >= 3 else a['card_name']
+                alert_html += (
+                    f'<div style="background:linear-gradient(135deg,#0a2e0a,#1a4d1a);border:1px solid #2d7a2d;'
+                    f'border-radius:8px;padding:8px 14px;min-width:180px;flex-shrink:0;">'
+                    f'<div style="color:#5fdd5f;font-size:0.75rem;font-weight:600;">{pname}</div>'
+                    f'<div style="color:#4ade80;font-size:1.1rem;font-weight:700;">+{a["pct_change"]}%</div>'
+                    f'<div style="color:#888;font-size:0.7rem;">${a["old_price"]:.2f} &rarr; ${a["new_price"]:.2f}</div>'
+                    f'</div>'
+                )
+            for a in losers:
+                parts = a['card_name'].split(' - ')
+                pname = parts[-1] if len(parts) >= 3 else a['card_name']
+                alert_html += (
+                    f'<div style="background:linear-gradient(135deg,#2e0a0a,#4d1a1a);border:1px solid #7a2d2d;'
+                    f'border-radius:8px;padding:8px 14px;min-width:180px;flex-shrink:0;">'
+                    f'<div style="color:#dd5f5f;font-size:0.75rem;font-weight:600;">{pname}</div>'
+                    f'<div style="color:#f87171;font-size:1.1rem;font-weight:700;">{a["pct_change"]}%</div>'
+                    f'<div style="color:#888;font-size:0.7rem;">${a["old_price"]:.2f} &rarr; ${a["new_price"]:.2f}</div>'
+                    f'</div>'
+                )
+            alert_html += '</div>'
+            st.markdown(alert_html, unsafe_allow_html=True)
+
+        # ── Card of the Day ──
+        _nhl_data_cotd = load_nhl_player_stats()
+        _nhl_players_cotd = _nhl_data_cotd.get('players', {}) if _nhl_data_cotd else {}
+        _corr_hist = load_correlation_history()
+        _latest_corr_snap = _corr_hist.get(max(_corr_hist.keys()), {}) if _corr_hist else {}
+        _cotd = get_card_of_the_day(master_df, _nhl_players_cotd, _yg_ph, _latest_corr_snap)
+
+        if _cotd:
+            _cotd_stats = _cotd.get('stats', {})
+            _cotd_stat_line = ''
+            if _cotd_stats:
+                if 'points' in _cotd_stats:
+                    _cotd_stat_line = f"{_cotd_stats.get('goals', 0)}G {_cotd_stats.get('assists', 0)}A {_cotd_stats.get('points', 0)}P in {_cotd_stats.get('games_played', 0)}GP"
+                elif 'wins' in _cotd_stats:
+                    _cotd_stat_line = f"{_cotd_stats.get('wins', 0)}W {_cotd_stats.get('losses', 0)}L {_cotd_stats.get('save_pct', 0):.3f}SV%"
+
+            _cotd_pct_html = ''
+            if _cotd['pct_change'] > 0:
+                _cotd_pct_html = f'<span style="color:#4ade80;font-weight:700;margin-left:8px;">+{_cotd["pct_change"]}%</span>'
+
+            st.markdown(
+                f'<div style="background:linear-gradient(135deg,#1a1a2e,#16213e);border:1px solid #0f3460;'
+                f'border-radius:10px;padding:12px 18px;margin-bottom:10px;">'
+                f'<div style="color:#a78bfa;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:1px;">Card of the Day</div>'
+                f'<div style="display:flex;align-items:center;gap:12px;margin-top:4px;">'
+                f'<div style="font-size:1.15rem;font-weight:700;color:#e2e8f0;">{_cotd["player"]}'
+                f'{_cotd_pct_html}</div>'
+                f'<div style="color:#94a3b8;font-size:0.85rem;">{_cotd["team"]}</div>'
+                f'<div style="color:#38bdf8;font-size:0.95rem;font-weight:600;">${_cotd["price"]:.2f}</div>'
+                f'</div>'
+                f'<div style="color:#64748b;font-size:0.75rem;margin-top:2px;">'
+                f'{_cotd_stat_line} &mdash; {_cotd["reason"]}</div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
+
         # Search + filters in one line
         seasons = sorted(master_df['Season'].unique().tolist(), reverse=True)
         teams = sorted([t for t in master_df['Team'].unique().tolist() if t])
@@ -2645,6 +2717,65 @@ elif page == "Young Guns DB":
                         latest_snap = corr_history.get(latest_date, {}) if latest_date else {}
                         latest_corr = latest_snap.get('correlations', {})
 
+                        # ── Impact Score Leaderboard ──
+                        _team_mults = compute_team_multipliers(latest_snap) if latest_snap else {}
+                        _impact = compute_impact_scores(master_df, nhl_players, _team_mults)
+                        if _impact:
+                            with st.expander(f"Rookie Impact Score ({len(_impact)} players)", expanded=False):
+                                st.caption("Composite 0-100 score: Points Pace 40% | Team Market 20% | Draft Position 15% | +/- Rate 15% | Shooting % 10%")
+                                _imp_rows = []
+                                for pname, d in _impact.items():
+                                    _card_row = master_df[master_df['PlayerName'] == pname]
+                                    _price = float(_card_row.iloc[0].get('FairValue', 0)) if len(_card_row) > 0 else 0
+                                    _imp_rows.append({
+                                        'Player': pname,
+                                        'Score': d['score'],
+                                        'Team': TEAM_ABBREV_TO_NAME.get(d.get('team', ''), d.get('team', '')),
+                                        'Pos': d.get('position', ''),
+                                        'GP': d.get('gp', 0),
+                                        'Pts': d.get('points', 0),
+                                        'Goals': d.get('goals', 0),
+                                        'Price': _price,
+                                        'Pace': d['breakdown']['pace'],
+                                        'Mkt': d['breakdown']['team'],
+                                        'Draft': d['breakdown']['draft'],
+                                        'Shot': d['breakdown']['shooting'],
+                                        '+/-': d['breakdown']['plusminus'],
+                                    })
+                                _imp_df = pd.DataFrame(_imp_rows).sort_values('Score', ascending=False)
+
+                                # Top metrics
+                                im1, im2, im3, im4 = st.columns(4)
+                                _top = _imp_df.iloc[0]
+                                im1.metric("Top Scorer", f"{_top['Player']}", f"{_top['Score']:.0f}/100")
+                                im2.metric("Avg Score", f"{_imp_df['Score'].mean():.1f}")
+                                im3.metric("Median Score", f"{_imp_df['Score'].median():.1f}")
+                                im4.metric("Players Scored", f"{len(_imp_df)}")
+
+                                # Scatter: Impact Score vs Price
+                                fig_imp = px.scatter(
+                                    _imp_df, x='Score', y='Price',
+                                    hover_name='Player',
+                                    hover_data={'Team': True, 'GP': True, 'Pts': True, 'Goals': True},
+                                    color='Score', color_continuous_scale='YlOrRd',
+                                    labels={'Score': 'Impact Score (0-100)', 'Price': 'Card Price ($)'},
+                                )
+                                fig_imp.update_layout(template="plotly_dark", height=400)
+                                fig_imp.update_traces(marker=dict(size=8))
+                                st.plotly_chart(fig_imp, use_container_width=True)
+
+                                # Top 20 leaderboard
+                                st.markdown("**Top 20 Impact Scores**")
+                                _show_cols = ['Player', 'Score', 'Team', 'Pos', 'GP', 'Pts', 'Goals', 'Price', 'Pace', 'Mkt', 'Draft', 'Shot', '+/-']
+                                st.dataframe(
+                                    _imp_df.head(20)[_show_cols],
+                                    hide_index=True, use_container_width=True,
+                                    column_config={
+                                        'Score': st.column_config.ProgressColumn("Score", min_value=0, max_value=100, format="%.0f"),
+                                        'Price': st.column_config.NumberColumn("Price", format="$%.2f"),
+                                    }
+                                )
+
                         with st.expander(f"Price vs Performance Correlation ({len(nhl_df)} players)", expanded=False):
                             # --- Key Metrics Header ---
                             pts_corr = latest_corr.get('points_vs_price', {})
@@ -2669,9 +2800,9 @@ elif page == "Young Guns DB":
                                 else:
                                     st.metric("Goalies", f"{len(goalies_df)}")
 
-                            # --- 7 Tabs ---
-                            tab_corr, tab_tiers, tab_teams, tab_pos, tab_value, tab_goalies, tab_nationality, tab_draft, tab_trends = st.tabs([
-                                "Correlation", "Price Tiers", "Teams", "Positions", "Value Finder", "Goalies", "Nationality", "Draft", "Trends"
+                            # --- 10 Tabs ---
+                            tab_corr, tab_tiers, tab_teams, tab_pos, tab_value, tab_goalies, tab_nationality, tab_draft, tab_seasonal, tab_trends = st.tabs([
+                                "Correlation", "Price Tiers", "Teams", "Positions", "Value Finder", "Goalies", "Nationality", "Draft", "Seasonal", "Trends"
                             ])
 
                             # ========== TAB 1: CORRELATION ==========
@@ -2811,6 +2942,53 @@ elif page == "Young Guns DB":
                                         yaxis={'categoryorder': 'total ascending'},
                                     )
                                     st.plotly_chart(fig_teams, use_container_width=True)
+
+                                    # Team Market Multiplier
+                                    st.markdown("---")
+                                    st.markdown("**Team Market Multiplier**")
+                                    st.caption("How much each team's market inflates/deflates card prices beyond what player performance alone predicts.")
+                                    _tm = compute_team_multipliers(latest_snap)
+                                    if _tm:
+                                        tm_rows = []
+                                        for t, d in _tm.items():
+                                            tm_rows.append({
+                                                'Team': TEAM_ABBREV_TO_NAME.get(t, t),
+                                                'Abbrev': t,
+                                                'Actual Avg': d['actual'],
+                                                'Expected Avg': d['expected'],
+                                                'Multiplier': d['multiplier'],
+                                                'Premium': f"{d['premium_pct']:+.1f}%",
+                                                'Cards': d['count'],
+                                                'Market': 'Canadian' if d['country'] == 'CA' else 'US',
+                                            })
+                                        tm_df = pd.DataFrame(tm_rows).sort_values('Multiplier', ascending=True)
+
+                                        fig_mult = px.bar(
+                                            tm_df, x='Multiplier', y='Team', orientation='h',
+                                            color='Market',
+                                            color_discrete_map={'Canadian': '#EF553B', 'US': '#636EFA'},
+                                            hover_data={'Actual Avg': ':.2f', 'Expected Avg': ':.2f', 'Premium': True, 'Cards': True},
+                                        )
+                                        fig_mult.add_vline(x=1.0, line_dash="dash", line_color="#888", annotation_text="Fair Value (1.0x)")
+                                        fig_mult.update_layout(
+                                            template="plotly_dark", height=max(400, len(tm_df) * 18),
+                                            yaxis={'categoryorder': 'total ascending'},
+                                            xaxis_title="Market Multiplier",
+                                        )
+                                        st.plotly_chart(fig_mult, use_container_width=True)
+
+                                        # Top overvalued / undervalued teams
+                                        ovc1, ovc2 = st.columns(2)
+                                        with ovc1:
+                                            st.markdown("**Highest Premium Teams**")
+                                            top_prem = tm_df.sort_values('Multiplier', ascending=False).head(5)
+                                            st.dataframe(top_prem[['Team', 'Multiplier', 'Premium', 'Actual Avg', 'Expected Avg', 'Cards']],
+                                                         hide_index=True, use_container_width=True)
+                                        with ovc2:
+                                            st.markdown("**Most Discounted Teams**")
+                                            low_prem = tm_df.sort_values('Multiplier', ascending=True).head(5)
+                                            st.dataframe(low_prem[['Team', 'Multiplier', 'Premium', 'Actual Avg', 'Expected Avg', 'Cards']],
+                                                         hide_index=True, use_container_width=True)
                                 else:
                                     st.info("Run the NHL stats scraper to generate team data.")
 
@@ -3148,7 +3326,103 @@ elif page == "Young Guns DB":
                                 else:
                                     st.info("Run `python scrape_nhl_stats.py --fetch-bios` to fetch draft data.")
 
-                            # ========== TAB 9: TRENDS ==========
+                            # ========== TAB 9: SEASONAL ==========
+                            with tab_seasonal:
+                                st.markdown("**Seasonal Price Trends**")
+                                st.caption("How card prices move through the NHL season. Data accumulates over time from daily scrapes.")
+
+                                # Load full price history and group by month
+                                _seas_ph = load_yg_price_history()
+                                _monthly_data = {}
+                                _total_cards_tracked = 0
+                                _total_data_points = 0
+                                for cname, entries in _seas_ph.items():
+                                    if len(entries) < 2:
+                                        continue
+                                    _total_cards_tracked += 1
+                                    for i in range(1, len(entries)):
+                                        prev_p = float(entries[i-1].get('fair_value', 0) or 0)
+                                        cur_p = float(entries[i].get('fair_value', 0) or 0)
+                                        if prev_p <= 0 or cur_p <= 0:
+                                            continue
+                                        pct = ((cur_p - prev_p) / prev_p) * 100
+                                        dt = entries[i].get('date', '')
+                                        if len(dt) >= 7:
+                                            month_key = dt[:7]  # YYYY-MM
+                                            _monthly_data.setdefault(month_key, []).append(pct)
+                                            _total_data_points += 1
+
+                                if _monthly_data:
+                                    _month_rows = []
+                                    for mk in sorted(_monthly_data.keys()):
+                                        vals = _monthly_data[mk]
+                                        _month_rows.append({
+                                            'Month': mk,
+                                            'Avg Change (%)': round(sum(vals) / len(vals), 2),
+                                            'Median Change (%)': round(sorted(vals)[len(vals) // 2], 2),
+                                            'Cards Moving': len(vals),
+                                            'Gainers': len([v for v in vals if v > 0]),
+                                            'Losers': len([v for v in vals if v < 0]),
+                                        })
+                                    _month_df = pd.DataFrame(_month_rows)
+
+                                    sm1, sm2, sm3 = st.columns(3)
+                                    sm1.metric("Months Tracked", len(_month_df))
+                                    sm2.metric("Cards with History", _total_cards_tracked)
+                                    sm3.metric("Data Points", _total_data_points)
+
+                                    if len(_month_df) > 1:
+                                        fig_seas = px.bar(
+                                            _month_df, x='Month', y='Avg Change (%)',
+                                            color='Avg Change (%)',
+                                            color_continuous_scale='RdYlGn',
+                                            color_continuous_midpoint=0,
+                                            hover_data={'Median Change (%)': True, 'Cards Moving': True, 'Gainers': True, 'Losers': True},
+                                        )
+                                        fig_seas.update_layout(template="plotly_dark", height=350, xaxis_title="Month", yaxis_title="Avg Price Change (%)")
+                                        st.plotly_chart(fig_seas, use_container_width=True)
+
+                                    st.dataframe(_month_df, hide_index=True, use_container_width=True)
+
+                                    # NHL season phase analysis
+                                    _phase_map = {
+                                        'Pre-Season (Sep)': ['09'],
+                                        'Early Season (Oct-Nov)': ['10', '11'],
+                                        'Mid Season (Dec-Jan)': ['12', '01'],
+                                        'Trade Deadline (Feb)': ['02'],
+                                        'Stretch Run (Mar)': ['03'],
+                                        'Playoffs (Apr-Jun)': ['04', '05', '06'],
+                                        'Off-Season (Jul-Aug)': ['07', '08'],
+                                    }
+                                    _phase_rows = []
+                                    for phase, months in _phase_map.items():
+                                        phase_vals = []
+                                        for mk, vals in _monthly_data.items():
+                                            if len(mk) >= 7 and mk[5:7] in months:
+                                                phase_vals.extend(vals)
+                                        if phase_vals:
+                                            _phase_rows.append({
+                                                'Season Phase': phase,
+                                                'Avg Change (%)': round(sum(phase_vals) / len(phase_vals), 2),
+                                                'Data Points': len(phase_vals),
+                                            })
+                                    if _phase_rows:
+                                        st.markdown("**By NHL Season Phase**")
+                                        _phase_df = pd.DataFrame(_phase_rows)
+                                        fig_phase = px.bar(
+                                            _phase_df, x='Season Phase', y='Avg Change (%)',
+                                            color='Avg Change (%)',
+                                            color_continuous_scale='RdYlGn',
+                                            color_continuous_midpoint=0,
+                                            text='Data Points',
+                                        )
+                                        fig_phase.update_traces(texttemplate='%{text} pts', textposition='outside')
+                                        fig_phase.update_layout(template="plotly_dark", height=350)
+                                        st.plotly_chart(fig_phase, use_container_width=True)
+                                else:
+                                    st.info("Seasonal trends will appear after multiple days of price scraping. The daily cron job is accumulating data — check back after a week of scrapes.")
+
+                            # ========== TAB 10: TRENDS ==========
                             with tab_trends:
                                 if len(corr_history) > 1:
                                     dates = sorted(corr_history.keys())
