@@ -901,6 +901,7 @@ elif page == "Card Ledger":
     filtered_df = df[mask].copy()
 
     display_cols = ['Player', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Tags', 'Fair Value', 'Cost Basis', 'Trend', 'Num Sales', 'Min', 'Max', 'Top 3 Prices', 'Last Scraped']
+    display_cols = [c for c in display_cols if c in filtered_df.columns]
     edit_df = filtered_df[display_cols].copy()
     edit_df['Top 3 Prices'] = edit_df['Top 3 Prices'].fillna('')
     edit_df['Last Scraped'] = edit_df['Last Scraped'].fillna('')

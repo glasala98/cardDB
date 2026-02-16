@@ -376,6 +376,8 @@ def load_data(csv_path=CSV_PATH, results_json_path=None):
         results_json_path = RESULTS_JSON_PATH
     df = pd.read_csv(csv_path)
     for col in MONEY_COLS:
+        if col not in df.columns:
+            continue
         df[col] = df[col].astype(str).str.replace('$', '', regex=False).str.replace(',', '', regex=False)
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     df['Num Sales'] = pd.to_numeric(df['Num Sales'], errors='coerce').fillna(0).astype(int)
