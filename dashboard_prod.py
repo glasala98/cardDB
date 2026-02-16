@@ -422,6 +422,38 @@ else:
 
     page = st.sidebar.radio("Navigate", nav_pages, key="_nav_radio")
 
+# Site Guide
+st.sidebar.divider()
+with st.sidebar.expander("Site Guide", expanded=False):
+    st.markdown("""
+**Young Guns DB**
+Browse 500+ Young Guns cards with daily-updated prices. Click any row to see full card detail: price history, NHL stats, trajectory chart, and ownership tracking. Filter by season, team, or price tier. Scroll down for analytics: Grading ROI, Player Compare, and Correlation Analytics.
+
+**Dashboard**
+Personal collection overview with total value, P&L summary, and portfolio value chart over time. Requires login.
+
+**Charts**
+Visual breakdowns of your personal collection: value distribution, trend analysis, and grading insights.
+
+**Card Ledger**
+Full editable table of your personal cards. Add new cards via the sidebar card scanner or manual entry. Track cost basis and tags.
+
+**Card Inspect**
+Deep-dive into any single card: price history chart, raw eBay sales data, and graded price comparisons.
+
+---
+
+**Inside Young Guns DB:**
+
+*Correlation Analytics* — 9 tabs analyzing NHL performance vs card prices: regression scatter, price tiers, teams, positions, value finder (over/undervalued), goalies, nationality, draft position, and historical trends.
+
+*Player Compare* — Pick two players for side-by-side stats comparison, price history overlay chart, and graded value comparison.
+
+*Cost Basis / P&L* — Click a card and check "I own this" to track your cost basis and see profit/loss. Works in both YG DB and personal collection.
+
+*Sidebar Scanner* — Upload a photo of your card to auto-identify it (Card Ledger page only).
+""")
+
 # Show Scan Card and Add New Card only on Card Ledger page (not in public view)
 if page == "Card Ledger" and not public_view:
     st.sidebar.divider()
