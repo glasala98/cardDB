@@ -2033,364 +2033,398 @@ elif page == "Young Guns DB":
                 else:
                     analytics_df = priced_df.copy()
 
-                # --- Market History from Raw Sales ---
+                # ============================================================
+                # MARKET OVERVIEW (grouped expander)
+                # ============================================================
                 market_timeline = load_yg_market_timeline()
-                if market_timeline and len(market_timeline) >= 2:
-                    mt_df = pd.DataFrame(market_timeline)
-                    mt_df['date'] = pd.to_datetime(mt_df['date'])
-                    mt_df = mt_df.sort_values('date')
-                    # Filter outlier dates: find where consistent daily data starts
-                    # (first date in a run of 3+ consecutive days with 5+ total sales)
-                    if len(mt_df) > 10:
-                        _vol = mt_df['total_volume'].values
-                        _dates = mt_df['date'].values
-                        for i in range(len(mt_df) - 2):
-                            window_vol = _vol[i] + _vol[i+1] + _vol[i+2]
-                            day_gap = (pd.Timestamp(_dates[i+2]) - pd.Timestamp(_dates[i])).days
-                            if window_vol >= 15 and day_gap <= 5:
-                                mt_df = mt_df.iloc[i:]
-                                break
-                    _days_span = (mt_df['date'].max() - mt_df['date'].min()).days
-                    with st.expander(f"Market History ({_days_span} Days)", expanded=True):
-                        st.caption("Individual eBay sold listings aggregated by date")
-
-                        # 7-day rolling average
-                        mt_df['rolling_avg'] = mt_df['avg_price'].rolling(window=7, min_periods=1).mean().round(2)
-
-                        hist_col1, hist_col2 = st.columns(2)
-                        with hist_col1:
-                            fig_trend = px.line(
-                                mt_df, x='date', y='avg_price',
-                                labels={'date': 'Date', 'avg_price': 'Avg Sale Price ($)'},
-                                title="Average YG Sale Price by Day",
-                            )
-                            fig_trend.add_scatter(
-                                x=mt_df['date'], y=mt_df['rolling_avg'],
-                                mode='lines', name='7-Day Avg',
-                                line=dict(width=3, dash='dash', color='#FFD700')
-                            )
-                            fig_trend.update_layout(template="plotly_dark", height=350)
-                            st.plotly_chart(fig_trend, use_container_width=True)
-
-                        with hist_col2:
-                            fig_vol = px.bar(
-                                mt_df, x='date', y='total_volume',
-                                labels={'date': 'Date', 'total_volume': 'Sales Count'},
-                                title="Daily Sales Volume",
-                            )
-                            fig_vol.update_layout(template="plotly_dark", height=350)
-                            fig_vol.update_traces(marker_color='#4CAF50')
-                            st.plotly_chart(fig_vol, use_container_width=True)
-
-                        # Summary metrics
-                        total_sales = mt_df['total_volume'].sum()
-                        overall_avg = (mt_df['avg_price'] * mt_df['total_volume']).sum() / total_sales if total_sales > 0 else 0
-                        recent_avg = mt_df.tail(7)['avg_price'].mean() if len(mt_df) >= 7 else mt_df['avg_price'].mean()
-                        older_avg = mt_df.head(7)['avg_price'].mean() if len(mt_df) >= 14 else mt_df['avg_price'].mean()
-                        trend_pct = ((recent_avg - older_avg) / older_avg * 100) if older_avg > 0 else 0
-
-                        ms1, ms2, ms3, ms4 = st.columns(4)
-                        ms1.metric("Total Sales Tracked", f"{int(total_sales):,}")
-                        ms2.metric("Weighted Avg Price", f"${overall_avg:,.2f}")
-                        ms3.metric("Recent 7-Day Avg", f"${recent_avg:,.2f}")
-                        ms4.metric("7-Day Trend", f"{trend_pct:+.1f}%")
-
-                # --- Young Guns Market Trend (portfolio history) ---
                 yg_portfolio = load_yg_portfolio_history()
-                if yg_portfolio and len(yg_portfolio) > 0:
-                    with st.expander("Young Guns Market Trend", expanded=False):
-                        port_df = pd.DataFrame(yg_portfolio)
-                        port_df['date'] = pd.to_datetime(port_df['date'])
-                        port_df = port_df.sort_values('date')
+                _has_market = market_timeline and len(market_timeline) >= 2
+                _has_portfolio = yg_portfolio and len(yg_portfolio) > 0
 
-                        mkt_col1, mkt_col2 = st.columns(2)
-                        with mkt_col1:
-                            fig_mkt_val = px.line(
-                                port_df, x='date', y='total_value',
-                                markers=True,
-                                labels={'date': 'Date', 'total_value': 'Total Market Value ($)'},
-                                title="Total YG Market Value",
+                if _has_market or _has_portfolio:
+                    with st.expander("Market Overview", expanded=True):
+                        _mkt_tabs = []
+                        _mkt_tab_names = []
+                        if _has_market:
+                            _mkt_tab_names.append("Sales History")
+                        if _has_portfolio:
+                            _mkt_tab_names.append("Market Trend")
+                        _mkt_tab_names.append("Season Breakdown")
+                        _mkt_tabs = st.tabs(_mkt_tab_names)
+                        _tab_idx = 0
+
+                        if _has_market:
+                            with _mkt_tabs[_tab_idx]:
+                                mt_df = pd.DataFrame(market_timeline)
+                                mt_df['date'] = pd.to_datetime(mt_df['date'])
+                                mt_df = mt_df.sort_values('date')
+                                if len(mt_df) > 10:
+                                    _vol = mt_df['total_volume'].values
+                                    _dates = mt_df['date'].values
+                                    for i in range(len(mt_df) - 2):
+                                        window_vol = _vol[i] + _vol[i+1] + _vol[i+2]
+                                        day_gap = (pd.Timestamp(_dates[i+2]) - pd.Timestamp(_dates[i])).days
+                                        if window_vol >= 15 and day_gap <= 5:
+                                            mt_df = mt_df.iloc[i:]
+                                            break
+                                _days_span = (mt_df['date'].max() - mt_df['date'].min()).days
+                                st.caption(f"Individual eBay sold listings aggregated by date ({_days_span} days)")
+
+                                mt_df['rolling_avg'] = mt_df['avg_price'].rolling(window=7, min_periods=1).mean().round(2)
+
+                                hist_col1, hist_col2 = st.columns(2)
+                                with hist_col1:
+                                    fig_trend = px.line(
+                                        mt_df, x='date', y='avg_price',
+                                        labels={'date': 'Date', 'avg_price': 'Avg Sale Price ($)'},
+                                        title="Average YG Sale Price by Day",
+                                    )
+                                    fig_trend.add_scatter(
+                                        x=mt_df['date'], y=mt_df['rolling_avg'],
+                                        mode='lines', name='7-Day Avg',
+                                        line=dict(width=3, dash='dash', color='#FFD700')
+                                    )
+                                    fig_trend.update_layout(template="plotly_dark", height=350)
+                                    st.plotly_chart(fig_trend, use_container_width=True)
+
+                                with hist_col2:
+                                    fig_vol = px.bar(
+                                        mt_df, x='date', y='total_volume',
+                                        labels={'date': 'Date', 'total_volume': 'Sales Count'},
+                                        title="Daily Sales Volume",
+                                    )
+                                    fig_vol.update_layout(template="plotly_dark", height=350)
+                                    fig_vol.update_traces(marker_color='#4CAF50')
+                                    st.plotly_chart(fig_vol, use_container_width=True)
+
+                                total_sales = mt_df['total_volume'].sum()
+                                overall_avg = (mt_df['avg_price'] * mt_df['total_volume']).sum() / total_sales if total_sales > 0 else 0
+                                recent_avg = mt_df.tail(7)['avg_price'].mean() if len(mt_df) >= 7 else mt_df['avg_price'].mean()
+                                older_avg = mt_df.head(7)['avg_price'].mean() if len(mt_df) >= 14 else mt_df['avg_price'].mean()
+                                trend_pct = ((recent_avg - older_avg) / older_avg * 100) if older_avg > 0 else 0
+
+                                ms1, ms2, ms3, ms4 = st.columns(4)
+                                ms1.metric("Total Sales Tracked", f"{int(total_sales):,}")
+                                ms2.metric("Weighted Avg Price", f"${overall_avg:,.2f}")
+                                ms3.metric("Recent 7-Day Avg", f"${recent_avg:,.2f}")
+                                ms4.metric("7-Day Trend", f"{trend_pct:+.1f}%")
+                            _tab_idx += 1
+
+                        if _has_portfolio:
+                            with _mkt_tabs[_tab_idx]:
+                                port_df = pd.DataFrame(yg_portfolio)
+                                port_df['date'] = pd.to_datetime(port_df['date'])
+                                port_df = port_df.sort_values('date')
+
+                                mkt_col1, mkt_col2 = st.columns(2)
+                                with mkt_col1:
+                                    fig_mkt_val = px.line(
+                                        port_df, x='date', y='total_value',
+                                        markers=True,
+                                        labels={'date': 'Date', 'total_value': 'Total Market Value ($)'},
+                                        title="Total YG Market Value",
+                                    )
+                                    fig_mkt_val.update_layout(template="plotly_dark", height=350)
+                                    st.plotly_chart(fig_mkt_val, use_container_width=True)
+
+                                with mkt_col2:
+                                    fig_mkt_avg = px.line(
+                                        port_df, x='date', y='avg_value',
+                                        markers=True,
+                                        labels={'date': 'Date', 'avg_value': 'Avg Card Value ($)'},
+                                        title="Average Card Value Over Time",
+                                    )
+                                    fig_mkt_avg.update_layout(template="plotly_dark", height=350)
+                                    st.plotly_chart(fig_mkt_avg, use_container_width=True)
+
+                                if len(port_df) >= 2:
+                                    latest = port_df.iloc[-1]
+                                    first = port_df.iloc[0]
+                                    val_change = latest['total_value'] - first['total_value']
+                                    val_pct = (val_change / first['total_value'] * 100) if first['total_value'] > 0 else 0
+                                    mt1, mt2, mt3, mt4 = st.columns(4)
+                                    mt1.metric("Current Total", f"${latest['total_value']:,.2f}")
+                                    mt2.metric("Value Change", f"${val_change:+,.2f}")
+                                    mt3.metric("% Change", f"{val_pct:+.1f}%")
+                                    mt4.metric("Cards Scraped", f"{int(latest.get('cards_scraped', 0)):,}")
+                            _tab_idx += 1
+
+                        # Season Breakdown tab (moved from bottom of page)
+                        with _mkt_tabs[_tab_idx]:
+                            season_counts = master_df.groupby('Season').size().reset_index(name='Cards')
+                            season_counts = season_counts.sort_values('Season')
+                            fig_seasons = px.bar(
+                                season_counts, x='Season', y='Cards',
+                                title="Cards per Season",
+                                color_discrete_sequence=['#636EFA'],
                             )
-                            fig_mkt_val.update_layout(template="plotly_dark", height=350)
-                            st.plotly_chart(fig_mkt_val, use_container_width=True)
+                            fig_seasons.update_layout(template="plotly_dark", height=400)
+                            st.plotly_chart(fig_seasons, use_container_width=True)
 
-                        with mkt_col2:
-                            fig_mkt_avg = px.line(
-                                port_df, x='date', y='avg_value',
-                                markers=True,
-                                labels={'date': 'Date', 'avg_value': 'Avg Card Value ($)'},
-                                title="Average Card Value Over Time",
+                # ============================================================
+                # PRICE ANALYSIS (grouped expander)
+                # ============================================================
+                with st.expander("Price Analysis", expanded=False):
+                    _pa_top20, _pa_liquid, _pa_dist, _pa_season_team, _pa_pvs, _pa_gems, _pa_tiers, _pa_roi = st.tabs([
+                        "Top 20", "Most Liquid", "Distribution", "Season & Team", "Price vs Volume", "Hidden Gems", "Price Tiers", "ROI by Era"
+                    ])
+
+                    # --- Top 20 Most Valuable ---
+                    with _pa_top20:
+                        top20_cols = ['Season', 'CardNumber', 'PlayerName', 'Team', price_col, 'NumSales']
+                        top20_cols = [c for c in top20_cols if c in analytics_df.columns]
+                        top20 = analytics_df.nlargest(20, price_col)[top20_cols].copy()
+                        top20['Label'] = top20['PlayerName'] + ' (' + top20['Season'] + ')'
+                        fig_top20 = px.bar(
+                            top20, x=price_col, y='Label', orientation='h',
+                            color=price_col, color_continuous_scale='Blues',
+                            hover_data={'PlayerName': True, 'Team': True, 'Label': False},
+                            labels={price_col: price_label, 'Label': ''},
+                        )
+                        fig_top20.update_layout(
+                            template="plotly_dark", height=500,
+                            yaxis={'categoryorder': 'total ascending'},
+                            coloraxis_showscale=False,
+                        )
+                        st.plotly_chart(fig_top20, use_container_width=True)
+
+                    # --- Most Liquid ---
+                    with _pa_liquid:
+                        top_liquid = analytics_df.nlargest(15, 'NumSales')[['Season', 'PlayerName', 'Team', price_col, 'NumSales']].copy()
+                        top_liquid['Label'] = top_liquid['PlayerName'] + ' (' + top_liquid['Season'] + ')'
+                        fig_liquid = px.bar(
+                            top_liquid, x='NumSales', y='Label', orientation='h',
+                            color=price_col, color_continuous_scale='Greens',
+                            hover_data={'PlayerName': True, price_col: True, 'Label': False},
+                            labels={'NumSales': 'Sales Found', 'Label': ''},
+                        )
+                        fig_liquid.update_layout(
+                            template="plotly_dark", height=400,
+                            yaxis={'categoryorder': 'total ascending'},
+                            coloraxis_showscale=False,
+                        )
+                        st.plotly_chart(fig_liquid, use_container_width=True)
+
+                    # --- Distribution ---
+                    with _pa_dist:
+                        col_dist1, col_dist2 = st.columns(2)
+                        with col_dist1:
+                            fig_hist = px.histogram(
+                                analytics_df, x=price_col, nbins=50,
+                                labels={price_col: price_label, 'count': 'Cards'},
+                                color_discrete_sequence=['#636EFA'],
                             )
-                            fig_mkt_avg.update_layout(template="plotly_dark", height=350)
-                            st.plotly_chart(fig_mkt_avg, use_container_width=True)
+                            fig_hist.update_layout(template="plotly_dark", height=350)
+                            st.plotly_chart(fig_hist, use_container_width=True)
 
-                        if len(port_df) >= 2:
-                            latest = port_df.iloc[-1]
-                            first = port_df.iloc[0]
-                            val_change = latest['total_value'] - first['total_value']
-                            val_pct = (val_change / first['total_value'] * 100) if first['total_value'] > 0 else 0
-                            mt1, mt2, mt3, mt4 = st.columns(4)
-                            mt1.metric("Current Total", f"${latest['total_value']:,.2f}")
-                            mt2.metric("Value Change", f"${val_change:+,.2f}")
-                            mt3.metric("% Change", f"{val_pct:+.1f}%")
-                            mt4.metric("Cards Scraped", f"{int(latest.get('cards_scraped', 0)):,}")
+                        with col_dist2:
+                            if 'Trend' in analytics_df.columns:
+                                trend_counts = analytics_df['Trend'].fillna('no data').value_counts().reset_index()
+                                trend_counts.columns = ['Trend', 'Count']
+                                fig_trend = px.pie(
+                                    trend_counts, names='Trend', values='Count',
+                                    color='Trend',
+                                    color_discrete_map={'up': '#00CC96', 'down': '#EF553B', 'stable': '#636EFA', 'no data': 'gray'},
+                                    hole=0.4,
+                                )
+                                fig_trend.update_layout(template="plotly_dark", height=350)
+                                st.plotly_chart(fig_trend, use_container_width=True)
 
-                # --- Top 20 Most Valuable ---
-                with st.expander(f"Top 20 Most Valuable ({price_mode})", expanded=False):
-                    top20_cols = ['Season', 'CardNumber', 'PlayerName', 'Team', price_col, 'NumSales']
-                    top20_cols = [c for c in top20_cols if c in analytics_df.columns]
-                    top20 = analytics_df.nlargest(20, price_col)[top20_cols].copy()
-                    top20['Label'] = top20['PlayerName'] + ' (' + top20['Season'] + ')'
-                    fig_top20 = px.bar(
-                        top20, x=price_col, y='Label', orientation='h',
-                        color=price_col, color_continuous_scale='Blues',
-                        hover_data={'PlayerName': True, 'Team': True, 'Label': False},
-                        labels={price_col: price_label, 'Label': ''},
-                    )
-                    fig_top20.update_layout(
-                        template="plotly_dark", height=500,
-                        yaxis={'categoryorder': 'total ascending'},
-                        coloraxis_showscale=False,
-                    )
-                    st.plotly_chart(fig_top20, use_container_width=True)
-
-                # --- Most Liquid (highest sales volume) ---
-                with st.expander("Most Liquid (Highest Sales Volume)", expanded=False):
-                    top_liquid = analytics_df.nlargest(15, 'NumSales')[['Season', 'PlayerName', 'Team', price_col, 'NumSales']].copy()
-                    top_liquid['Label'] = top_liquid['PlayerName'] + ' (' + top_liquid['Season'] + ')'
-                    fig_liquid = px.bar(
-                        top_liquid, x='NumSales', y='Label', orientation='h',
-                        color=price_col, color_continuous_scale='Greens',
-                        hover_data={'PlayerName': True, price_col: True, 'Label': False},
-                        labels={'NumSales': 'Sales Found', 'Label': ''},
-                    )
-                    fig_liquid.update_layout(
-                        template="plotly_dark", height=400,
-                        yaxis={'categoryorder': 'total ascending'},
-                        coloraxis_showscale=False,
-                    )
-                    st.plotly_chart(fig_liquid, use_container_width=True)
-
-                # --- Price Distribution & Trend ---
-                with st.expander(f"Price Distribution & Trend ({price_mode})", expanded=False):
-                    col_dist1, col_dist2 = st.columns(2)
-                    with col_dist1:
-                        fig_hist = px.histogram(
-                            analytics_df, x=price_col, nbins=50,
-                            labels={price_col: price_label, 'count': 'Cards'},
-                            color_discrete_sequence=['#636EFA'],
+                    # --- Season & Team ---
+                    with _pa_season_team:
+                        season_stats = analytics_df.groupby('Season').agg(
+                            AvgValue=(price_col, 'mean'),
+                            TotalValue=(price_col, 'sum'),
+                            Cards=(price_col, 'count'),
+                            MaxValue=(price_col, 'max'),
+                        ).reset_index().sort_values('Season')
+                        fig_season_val = px.bar(
+                            season_stats, x='Season', y='AvgValue',
+                            color='TotalValue', color_continuous_scale='Viridis',
+                            hover_data={'TotalValue': ':.2f', 'Cards': True, 'MaxValue': ':.2f'},
+                            labels={'AvgValue': f'Avg {price_mode} ($)', 'TotalValue': 'Total Value ($)'},
+                            title=f"Average Card Value by Season",
                         )
-                        fig_hist.update_layout(template="plotly_dark", height=350)
-                        st.plotly_chart(fig_hist, use_container_width=True)
+                        fig_season_val.update_layout(template="plotly_dark", height=400, coloraxis_showscale=False)
+                        st.plotly_chart(fig_season_val, use_container_width=True)
 
-                    with col_dist2:
-                        if 'Trend' in analytics_df.columns:
-                            trend_counts = analytics_df['Trend'].fillna('no data').value_counts().reset_index()
-                            trend_counts.columns = ['Trend', 'Count']
-                            fig_trend = px.pie(
-                                trend_counts, names='Trend', values='Count',
-                                color='Trend',
-                                color_discrete_map={'up': '#00CC96', 'down': '#EF553B', 'stable': '#636EFA', 'no data': 'gray'},
-                                hole=0.4,
+                        st.markdown("---")
+                        team_stats = analytics_df[analytics_df['Team'] != ''].groupby('Team').agg(
+                            TotalValue=(price_col, 'sum'),
+                            AvgValue=(price_col, 'mean'),
+                            Cards=(price_col, 'count'),
+                            TopCard=(price_col, 'max'),
+                        ).reset_index().nlargest(20, 'TotalValue')
+                        fig_team = px.bar(
+                            team_stats, x='TotalValue', y='Team', orientation='h',
+                            color='AvgValue', color_continuous_scale='Oranges',
+                            hover_data={'AvgValue': ':.2f', 'Cards': True, 'TopCard': ':.2f'},
+                            labels={'TotalValue': f'Total {price_mode} ($)', 'AvgValue': 'Avg ($)'},
+                            title=f"Total Value by Team - Top 20",
+                        )
+                        fig_team.update_layout(
+                            template="plotly_dark", height=500,
+                            yaxis={'categoryorder': 'total ascending'},
+                            coloraxis_showscale=False,
+                        )
+                        st.plotly_chart(fig_team, use_container_width=True)
+
+                    # --- Price vs Volume ---
+                    with _pa_pvs:
+                        scatter_df = analytics_df[analytics_df['NumSales'] > 0].copy()
+                        if len(scatter_df) > 0:
+                            scatter_df['Spread'] = scatter_df['Max'] - scatter_df['Min']
+                            fig_scatter = px.scatter(
+                                scatter_df, x='NumSales', y=price_col,
+                                size='Spread', hover_name='PlayerName',
+                                color='Season',
+                                hover_data={'Team': True, 'Season': True},
+                                labels={'NumSales': 'Sales Found', price_col: price_label},
                             )
-                            fig_trend.update_layout(template="plotly_dark", height=350)
-                            st.plotly_chart(fig_trend, use_container_width=True)
+                            fig_scatter.update_layout(template="plotly_dark", height=500)
+                            st.plotly_chart(fig_scatter, use_container_width=True)
 
-                # --- Value by Season & Team ---
-                with st.expander(f"Value by Season & Team ({price_mode})", expanded=False):
-                    season_stats = analytics_df.groupby('Season').agg(
-                        AvgValue=(price_col, 'mean'),
-                        TotalValue=(price_col, 'sum'),
-                        Cards=(price_col, 'count'),
-                        MaxValue=(price_col, 'max'),
-                    ).reset_index().sort_values('Season')
-                    fig_season_val = px.bar(
-                        season_stats, x='Season', y='AvgValue',
-                        color='TotalValue', color_continuous_scale='Viridis',
-                        hover_data={'TotalValue': ':.2f', 'Cards': True, 'MaxValue': ':.2f'},
-                        labels={'AvgValue': f'Avg {price_mode} ($)', 'TotalValue': 'Total Value ($)'},
-                        title=f"Average Card Value by Season",
-                    )
-                    fig_season_val.update_layout(template="plotly_dark", height=400, coloraxis_showscale=False)
-                    st.plotly_chart(fig_season_val, use_container_width=True)
-
-                    st.markdown("---")
-                    team_stats = analytics_df[analytics_df['Team'] != ''].groupby('Team').agg(
-                        TotalValue=(price_col, 'sum'),
-                        AvgValue=(price_col, 'mean'),
-                        Cards=(price_col, 'count'),
-                        TopCard=(price_col, 'max'),
-                    ).reset_index().nlargest(20, 'TotalValue')
-                    fig_team = px.bar(
-                        team_stats, x='TotalValue', y='Team', orientation='h',
-                        color='AvgValue', color_continuous_scale='Oranges',
-                        hover_data={'AvgValue': ':.2f', 'Cards': True, 'TopCard': ':.2f'},
-                        labels={'TotalValue': f'Total {price_mode} ($)', 'AvgValue': 'Avg ($)'},
-                        title=f"Total Value by Team - Top 20",
-                    )
-                    fig_team.update_layout(
-                        template="plotly_dark", height=500,
-                        yaxis={'categoryorder': 'total ascending'},
-                        coloraxis_showscale=False,
-                    )
-                    st.plotly_chart(fig_team, use_container_width=True)
-
-                # --- Price vs Volume Scatter ---
-                with st.expander(f"Price vs. Sales Volume ({price_mode})", expanded=False):
-                    scatter_df = analytics_df[analytics_df['NumSales'] > 0].copy()
-                    if len(scatter_df) > 0:
-                        scatter_df['Spread'] = scatter_df['Max'] - scatter_df['Min']
-                        fig_scatter = px.scatter(
-                            scatter_df, x='NumSales', y=price_col,
-                            size='Spread', hover_name='PlayerName',
-                            color='Season',
-                            hover_data={'Team': True, 'Season': True},
-                            labels={'NumSales': 'Sales Found', price_col: price_label},
-                        )
-                        fig_scatter.update_layout(template="plotly_dark", height=500)
-                        st.plotly_chart(fig_scatter, use_container_width=True)
-
-                # --- Hidden Gems & Price Spreads ---
-                with st.expander("Hidden Gems & Price Spreads", expanded=False):
-                    st.markdown(f"**Hidden Gems - High Volume, Low Price ({price_mode})**")
-                    st.caption("Cards with lots of sales but below-average price — potential undervalued picks")
-                    avg_price = analytics_df[price_col].mean()
-                    gems = analytics_df[
-                        (analytics_df['NumSales'] >= 5) & (analytics_df[price_col] < avg_price)
-                    ].nlargest(15, 'NumSales')[['Season', 'PlayerName', 'Team', price_col, 'NumSales']].copy()
-                    if len(gems) > 0:
-                        st.dataframe(
-                            gems,
-                            use_container_width=True,
-                            hide_index=True,
-                            column_config={
-                                price_col: st.column_config.NumberColumn(price_label, format="$%.2f"),
-                                'NumSales': st.column_config.NumberColumn("Sales"),
-                            },
-                        )
-                    else:
-                        st.caption("No hidden gems found yet — need more price data.")
-
-                    st.markdown("---")
-                    st.markdown("**Widest Price Spreads**")
-                    st.caption("Cards with the biggest gap between min and max sale — volatile or condition-sensitive")
-                    spread_df = analytics_df.copy()
-                    spread_df['Spread'] = spread_df['Max'] - spread_df['Min']
-                    top_spread = spread_df.nlargest(15, 'Spread')[['Season', 'PlayerName', 'Team', price_col, 'Min', 'Max', 'Spread']].copy()
-                    if len(top_spread) > 0:
-                        st.dataframe(
-                            top_spread,
-                            use_container_width=True,
-                            hide_index=True,
-                            column_config={
-                                price_col: st.column_config.NumberColumn(price_label, format="$%.2f"),
-                                'Min': st.column_config.NumberColumn("Min ($)", format="$%.2f"),
-                                'Max': st.column_config.NumberColumn("Max ($)", format="$%.2f"),
-                                'Spread': st.column_config.NumberColumn("Spread ($)", format="$%.2f"),
-                            },
-                        )
-
-                # --- Price Tiers ---
-                with st.expander(f"Price Tiers ({price_mode})", expanded=False):
-                    st.caption("How many cards fall into each value bracket")
-                    tier_bins = [0, 1, 5, 10, 20, 50, 100, 250, float('inf')]
-                    tier_labels = ['< $1', '$1-5', '$5-10', '$10-20', '$20-50', '$50-100', '$100-250', '$250+']
-                    analytics_df['Tier'] = pd.cut(analytics_df[price_col], bins=tier_bins, labels=tier_labels, right=False)
-                    tier_counts = analytics_df['Tier'].value_counts().reindex(tier_labels).fillna(0).reset_index()
-                    tier_counts.columns = ['Tier', 'Cards']
-                    tier_counts['TotalValue'] = analytics_df.groupby('Tier', observed=False)[price_col].sum().reindex(tier_labels).fillna(0).values
-
-                    tier_col1, tier_col2 = st.columns(2)
-                    with tier_col1:
-                        fig_tier_cards = px.bar(
-                            tier_counts, x='Tier', y='Cards',
-                            color='Cards', color_continuous_scale='Blues',
-                            labels={'Tier': 'Price Range', 'Cards': 'Number of Cards'},
-                            title="Cards per Tier",
-                        )
-                        fig_tier_cards.update_layout(template="plotly_dark", height=350, coloraxis_showscale=False)
-                        st.plotly_chart(fig_tier_cards, use_container_width=True)
-
-                    with tier_col2:
-                        fig_tier_val = px.bar(
-                            tier_counts, x='Tier', y='TotalValue',
-                            color='TotalValue', color_continuous_scale='Greens',
-                            labels={'Tier': 'Price Range', 'TotalValue': 'Total Value ($)'},
-                            title="Value per Tier",
-                        )
-                        fig_tier_val.update_layout(template="plotly_dark", height=350, coloraxis_showscale=False)
-                        st.plotly_chart(fig_tier_val, use_container_width=True)
-
-                # --- ROI by Era ---
-                with st.expander(f"ROI by Era ({price_mode})", expanded=False):
-                    st.caption("Comparing average card value across different eras of Young Guns")
-
-                    def get_era(season):
-                        year = int(season[:4])
-                        if year < 2000:
-                            return '1990s'
-                        elif year < 2005:
-                            return '2000-04'
-                        elif year < 2010:
-                            return '2005-09'
-                        elif year < 2015:
-                            return '2010-14'
-                        elif year < 2020:
-                            return '2015-19'
+                    # --- Hidden Gems ---
+                    with _pa_gems:
+                        st.markdown(f"**Hidden Gems - High Volume, Low Price ({price_mode})**")
+                        st.caption("Cards with lots of sales but below-average price — potential undervalued picks")
+                        avg_price = analytics_df[price_col].mean()
+                        gems = analytics_df[
+                            (analytics_df['NumSales'] >= 5) & (analytics_df[price_col] < avg_price)
+                        ].nlargest(15, 'NumSales')[['Season', 'PlayerName', 'Team', price_col, 'NumSales']].copy()
+                        if len(gems) > 0:
+                            st.dataframe(
+                                gems,
+                                use_container_width=True,
+                                hide_index=True,
+                                column_config={
+                                    price_col: st.column_config.NumberColumn(price_label, format="$%.2f"),
+                                    'NumSales': st.column_config.NumberColumn("Sales"),
+                                },
+                            )
                         else:
-                            return '2020+'
+                            st.caption("No hidden gems found yet — need more price data.")
 
-                    analytics_df['Era'] = analytics_df['Season'].apply(get_era)
-                    era_stats = analytics_df.groupby('Era').agg(
-                        AvgValue=(price_col, 'mean'),
-                        MedianValue=(price_col, 'median'),
-                        TotalValue=(price_col, 'sum'),
-                        Cards=(price_col, 'count'),
-                        MaxCard=(price_col, 'max'),
-                        AvgSales=('NumSales', 'mean'),
-                    ).reset_index()
-                    era_order = ['1990s', '2000-04', '2005-09', '2010-14', '2015-19', '2020+']
-                    era_stats['Era'] = pd.Categorical(era_stats['Era'], categories=era_order, ordered=True)
-                    era_stats = era_stats.sort_values('Era')
+                        st.markdown("---")
+                        st.markdown("**Widest Price Spreads**")
+                        st.caption("Cards with the biggest gap between min and max sale — volatile or condition-sensitive")
+                        spread_df = analytics_df.copy()
+                        spread_df['Spread'] = spread_df['Max'] - spread_df['Min']
+                        top_spread = spread_df.nlargest(15, 'Spread')[['Season', 'PlayerName', 'Team', price_col, 'Min', 'Max', 'Spread']].copy()
+                        if len(top_spread) > 0:
+                            st.dataframe(
+                                top_spread,
+                                use_container_width=True,
+                                hide_index=True,
+                                column_config={
+                                    price_col: st.column_config.NumberColumn(price_label, format="$%.2f"),
+                                    'Min': st.column_config.NumberColumn("Min ($)", format="$%.2f"),
+                                    'Max': st.column_config.NumberColumn("Max ($)", format="$%.2f"),
+                                    'Spread': st.column_config.NumberColumn("Spread ($)", format="$%.2f"),
+                                },
+                            )
 
-                    era_col1, era_col2 = st.columns(2)
-                    with era_col1:
-                        fig_era_avg = px.bar(
-                            era_stats, x='Era', y=['AvgValue', 'MedianValue'],
-                            barmode='group',
-                            labels={'value': 'Value ($)', 'variable': 'Metric'},
-                            title="Avg vs Median Value by Era",
-                            color_discrete_map={'AvgValue': '#636EFA', 'MedianValue': '#00CC96'},
+                    # --- Price Tiers ---
+                    with _pa_tiers:
+                        st.caption("How many cards fall into each value bracket")
+                        tier_bins = [0, 1, 5, 10, 20, 50, 100, 250, float('inf')]
+                        tier_labels = ['< $1', '$1-5', '$5-10', '$10-20', '$20-50', '$50-100', '$100-250', '$250+']
+                        analytics_df['Tier'] = pd.cut(analytics_df[price_col], bins=tier_bins, labels=tier_labels, right=False)
+                        tier_counts = analytics_df['Tier'].value_counts().reindex(tier_labels).fillna(0).reset_index()
+                        tier_counts.columns = ['Tier', 'Cards']
+                        tier_counts['TotalValue'] = analytics_df.groupby('Tier', observed=False)[price_col].sum().reindex(tier_labels).fillna(0).values
+
+                        tier_col1, tier_col2 = st.columns(2)
+                        with tier_col1:
+                            fig_tier_cards = px.bar(
+                                tier_counts, x='Tier', y='Cards',
+                                color='Cards', color_continuous_scale='Blues',
+                                labels={'Tier': 'Price Range', 'Cards': 'Number of Cards'},
+                                title="Cards per Tier",
+                            )
+                            fig_tier_cards.update_layout(template="plotly_dark", height=350, coloraxis_showscale=False)
+                            st.plotly_chart(fig_tier_cards, use_container_width=True)
+
+                        with tier_col2:
+                            fig_tier_val = px.bar(
+                                tier_counts, x='Tier', y='TotalValue',
+                                color='TotalValue', color_continuous_scale='Greens',
+                                labels={'Tier': 'Price Range', 'TotalValue': 'Total Value ($)'},
+                                title="Value per Tier",
+                            )
+                            fig_tier_val.update_layout(template="plotly_dark", height=350, coloraxis_showscale=False)
+                            st.plotly_chart(fig_tier_val, use_container_width=True)
+
+                    # --- ROI by Era ---
+                    with _pa_roi:
+                        st.caption("Comparing average card value across different eras of Young Guns")
+
+                        def get_era(season):
+                            year = int(season[:4])
+                            if year < 2000:
+                                return '1990s'
+                            elif year < 2005:
+                                return '2000-04'
+                            elif year < 2010:
+                                return '2005-09'
+                            elif year < 2015:
+                                return '2010-14'
+                            elif year < 2020:
+                                return '2015-19'
+                            else:
+                                return '2020+'
+
+                        analytics_df['Era'] = analytics_df['Season'].apply(get_era)
+                        era_stats = analytics_df.groupby('Era').agg(
+                            AvgValue=(price_col, 'mean'),
+                            MedianValue=(price_col, 'median'),
+                            TotalValue=(price_col, 'sum'),
+                            Cards=(price_col, 'count'),
+                            MaxCard=(price_col, 'max'),
+                            AvgSales=('NumSales', 'mean'),
+                        ).reset_index()
+                        era_order = ['1990s', '2000-04', '2005-09', '2010-14', '2015-19', '2020+']
+                        era_stats['Era'] = pd.Categorical(era_stats['Era'], categories=era_order, ordered=True)
+                        era_stats = era_stats.sort_values('Era')
+
+                        era_col1, era_col2 = st.columns(2)
+                        with era_col1:
+                            fig_era_avg = px.bar(
+                                era_stats, x='Era', y=['AvgValue', 'MedianValue'],
+                                barmode='group',
+                                labels={'value': 'Value ($)', 'variable': 'Metric'},
+                                title="Avg vs Median Value by Era",
+                                color_discrete_map={'AvgValue': '#636EFA', 'MedianValue': '#00CC96'},
+                            )
+                            fig_era_avg.update_layout(template="plotly_dark", height=350)
+                            st.plotly_chart(fig_era_avg, use_container_width=True)
+
+                        with era_col2:
+                            fig_era_total = px.bar(
+                                era_stats, x='Era', y='TotalValue',
+                                color='Cards', color_continuous_scale='Viridis',
+                                hover_data={'Cards': True, 'MaxCard': ':.2f', 'AvgSales': ':.1f'},
+                                labels={'TotalValue': 'Total Value ($)', 'Cards': 'Card Count'},
+                                title="Total Value & Card Count by Era",
+                            )
+                            fig_era_total.update_layout(template="plotly_dark", height=350, coloraxis_showscale=False)
+                            st.plotly_chart(fig_era_total, use_container_width=True)
+
+                        # Era summary table
+                        era_display = era_stats[['Era', 'Cards', 'AvgValue', 'MedianValue', 'TotalValue', 'MaxCard', 'AvgSales']].copy()
+                        era_display.columns = ['Era', 'Cards', 'Avg Value', 'Median Value', 'Total Value', 'Top Card', 'Avg Sales']
+                        st.dataframe(
+                            era_display,
+                            use_container_width=True,
+                            hide_index=True,
+                            column_config={
+                                'Avg Value': st.column_config.NumberColumn("Avg Value ($)", format="$%.2f"),
+                                'Median Value': st.column_config.NumberColumn("Median ($)", format="$%.2f"),
+                                'Total Value': st.column_config.NumberColumn("Total Value ($)", format="$%.2f"),
+                                'Top Card': st.column_config.NumberColumn("Top Card ($)", format="$%.2f"),
+                                'Avg Sales': st.column_config.NumberColumn("Avg Sales", format="%.1f"),
+                            },
                         )
-                        fig_era_avg.update_layout(template="plotly_dark", height=350)
-                        st.plotly_chart(fig_era_avg, use_container_width=True)
-
-                    with era_col2:
-                        fig_era_total = px.bar(
-                            era_stats, x='Era', y='TotalValue',
-                            color='Cards', color_continuous_scale='Viridis',
-                            hover_data={'Cards': True, 'MaxCard': ':.2f', 'AvgSales': ':.1f'},
-                            labels={'TotalValue': 'Total Value ($)', 'Cards': 'Card Count'},
-                            title="Total Value & Card Count by Era",
-                        )
-                        fig_era_total.update_layout(template="plotly_dark", height=350, coloraxis_showscale=False)
-                        st.plotly_chart(fig_era_total, use_container_width=True)
-
-                    # Era summary table
-                    era_display = era_stats[['Era', 'Cards', 'AvgValue', 'MedianValue', 'TotalValue', 'MaxCard', 'AvgSales']].copy()
-                    era_display.columns = ['Era', 'Cards', 'Avg Value', 'Median Value', 'Total Value', 'Top Card', 'Avg Sales']
-                    st.dataframe(
-                        era_display,
-                        use_container_width=True,
-                        hide_index=True,
-                        column_config={
-                            'Avg Value': st.column_config.NumberColumn("Avg Value ($)", format="$%.2f"),
-                            'Median Value': st.column_config.NumberColumn("Median ($)", format="$%.2f"),
-                            'Total Value': st.column_config.NumberColumn("Total Value ($)", format="$%.2f"),
-                            'Top Card': st.column_config.NumberColumn("Top Card ($)", format="$%.2f"),
-                            'Avg Sales': st.column_config.NumberColumn("Avg Sales", format="%.1f"),
-                        },
-                    )
 
                 # ============================================================
                 # GRADED ANALYTICS (only when graded data exists)
@@ -3487,16 +3521,4 @@ elif page == "Young Guns DB":
                                 else:
                                     st.info("Correlation trends will appear after 2+ NHL stats scrapes on different days. Run the scraper periodically to build history.")
 
-    # Season breakdown
-    if not master_df.empty:
-        st.markdown("---")
-        with st.expander("Season Breakdown"):
-            season_counts = master_df.groupby('Season').size().reset_index(name='Cards')
-            season_counts = season_counts.sort_values('Season')
-            fig_seasons = px.bar(
-                season_counts, x='Season', y='Cards',
-                title="Cards per Season",
-                color_discrete_sequence=['#636EFA'],
-            )
-            fig_seasons.update_layout(template="plotly_dark", height=400)
-            st.plotly_chart(fig_seasons, use_container_width=True)
+    # Season breakdown — moved into Market Overview expander above
