@@ -104,6 +104,27 @@ def normalize_name(name):
     return ''.join(c for c in nfkd if not unicodedata.combining(c)).strip().lower()
 
 
+def fetch_player_bio(nhl_id):
+    """Fetch player bio from NHL API. Returns dict with birth/draft info."""
+    data = fetch_json(f"{NHL_API_BASE}/player/{nhl_id}/landing")
+    if not data:
+        return None
+    draft = data.get('draftDetails', {}) or {}
+    return {
+        'birth_country': data.get('birthCountry', {}).get('default', '') if isinstance(data.get('birthCountry'), dict) else data.get('birthCountry', ''),
+        'birth_city': data.get('birthCity', {}).get('default', '') if isinstance(data.get('birthCity'), dict) else data.get('birthCity', ''),
+        'birth_state_province': data.get('birthStateProvince', {}).get('default', '') if isinstance(data.get('birthStateProvince'), dict) else data.get('birthStateProvince', ''),
+        'birth_date': data.get('birthDate', ''),
+        'draft_year': draft.get('year'),
+        'draft_round': draft.get('round'),
+        'draft_overall': draft.get('overallPick'),
+        'draft_team': draft.get('teamAbbrev', ''),
+        'height_inches': data.get('heightInInches'),
+        'weight_pounds': data.get('weightInPounds'),
+        'shoots_catches': data.get('shootsCatches', ''),
+    }
+
+
 def build_player_index(all_teams_data):
     """Build player index from all team roster data.
     Returns (skaters_by_name, goalies_by_name) dicts keyed by 'First Last'."""
@@ -260,6 +281,7 @@ def main():
     parser = argparse.ArgumentParser(description="Scrape NHL player stats and match to Young Guns DB")
     parser.add_argument('--season', type=str, help="Only match cards from this season (e.g. 2025-26)")
     parser.add_argument('--dry-run', action='store_true', help="Show matches without saving")
+    parser.add_argument('--fetch-bios', action='store_true', help="Fetch player bios (nationality, draft info)")
     parser.add_argument('--verbose', action='store_true', help="Print detailed match info")
     args = parser.parse_args()
 
@@ -373,6 +395,9 @@ def main():
     for name, entry in existing_players.items():
         if name not in matched:
             matched[name] = entry
+        elif entry.get('bio') and not matched[name].get('bio'):
+            # Preserve existing bio data
+            matched[name]['bio'] = entry['bio']
 
     output = {
         'meta': {
@@ -394,7 +419,39 @@ def main():
         save_master_db(df)
         print(f"  Updated {positions_updated} positions in young_guns.csv")
 
-    # Step 7: Compute and save correlation snapshot
+    # Step 7: Fetch player bios (nationality, draft info)
+    if args.fetch_bios:
+        print("\nFetching player bios...")
+        bio_count = 0
+        bio_skipped = 0
+        bio_errors = 0
+        for player_name, entry in matched.items():
+            nhl_id = entry.get('nhl_id')
+            if not nhl_id:
+                continue
+            # Skip if already have bio data
+            if entry.get('bio') and entry['bio'].get('birth_country'):
+                bio_skipped += 1
+                continue
+            bio = fetch_player_bio(nhl_id)
+            if bio:
+                entry['bio'] = bio
+                bio_count += 1
+                if args.verbose:
+                    country = bio.get('birth_country', '?')
+                    draft = f"Rd {bio['draft_round']}, #{bio['draft_overall']}" if bio.get('draft_round') else "Undrafted"
+                    print(f"  BIO: {player_name} -- {country}, {draft}")
+            else:
+                bio_errors += 1
+            time.sleep(0.3)
+        print(f"  Fetched {bio_count} bios, {bio_skipped} cached, {bio_errors} errors")
+
+        # Re-save with bios included
+        output['players'] = matched
+        save_nhl_player_stats(output)
+        print(f"  Re-saved with bios to: {NHL_STATS_PATH}")
+
+    # Step 8: Compute and save correlation snapshot
     print("\nComputing price-vs-performance correlations...")
     try:
         snapshot = compute_correlation_snapshot(df, matched, standings)

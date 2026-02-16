@@ -1,7 +1,3409 @@
 {
   "2026-02-15": {
     "meta": {
-      "timestamp": "2026-02-15 23:13",
+      "timestamp": "2026-02-15 23:38",
+      "matched_players": 390,
+      "skaters_with_price": 348,
+      "goalies_with_price": 42
+    },
+    "correlations": {
+      "points_vs_price": {
+        "r": 0.4902,
+        "r_squared": 0.2403,
+        "slope": 0.8824,
+        "intercept": -2.8322,
+        "p_value": 0.0,
+        "n": 348
+      },
+      "goals_vs_price": {
+        "r": 0.4068,
+        "r_squared": 0.1655,
+        "slope": 1.6222,
+        "intercept": 0.8358,
+        "p_value": 0.0,
+        "n": 348
+      },
+      "assists_vs_price": {
+        "r": 0.5037,
+        "r_squared": 0.2537,
+        "slope": 1.4903,
+        "intercept": -3.1828,
+        "p_value": 0.0,
+        "n": 348
+      },
+      "goalie_wins_vs_price": {
+        "r": 0.3681,
+        "r_squared": 0.1355,
+        "slope": 0.3488,
+        "intercept": 5.7379,
+        "p_value": 0.01647,
+        "n": 42
+      },
+      "goalie_svpct_vs_price": {
+        "r": 0.1344,
+        "r_squared": 0.0181,
+        "slope": 36.13,
+        "intercept": -22.9026,
+        "p_value": 0.396115,
+        "n": 42
+      }
+    },
+    "tiers": [
+      {
+        "bracket": "0-5",
+        "label": "<5 pts",
+        "avg_price": 5.02,
+        "median_price": 3.48,
+        "count": 134
+      },
+      {
+        "bracket": "6-10",
+        "label": "6-10 pts",
+        "avg_price": 5.6,
+        "median_price": 3.67,
+        "count": 39
+      },
+      {
+        "bracket": "11-20",
+        "label": "11-20 pts",
+        "avg_price": 5.63,
+        "median_price": 3.67,
+        "count": 71
+      },
+      {
+        "bracket": "21-30",
+        "label": "21-30 pts",
+        "avg_price": 7.8,
+        "median_price": 3.67,
+        "count": 57
+      },
+      {
+        "bracket": "31-40",
+        "label": "31-40 pts",
+        "avg_price": 14.51,
+        "median_price": 8.08,
+        "count": 19
+      },
+      {
+        "bracket": "41-50",
+        "label": "41-50 pts",
+        "avg_price": 29.93,
+        "median_price": 19.09,
+        "count": 15
+      },
+      {
+        "bracket": "51+",
+        "label": "51+ pts",
+        "avg_price": 86.62,
+        "median_price": 26.07,
+        "count": 13
+      }
+    ],
+    "team_premiums": {
+      "CHI": {
+        "avg_price": 24.54,
+        "count": 15,
+        "country": "US",
+        "avg_points": 14.9
+      },
+      "NYR": {
+        "avg_price": 6.52,
+        "count": 13,
+        "country": "US",
+        "avg_points": 9.2
+      },
+      "MTL": {
+        "avg_price": 35.47,
+        "count": 15,
+        "country": "CA",
+        "avg_points": 21.7
+      },
+      "ANA": {
+        "avg_price": 9.03,
+        "count": 14,
+        "country": "US",
+        "avg_points": 17.9
+      },
+      "STL": {
+        "avg_price": 7.7,
+        "count": 14,
+        "country": "US",
+        "avg_points": 12.3
+      },
+      "SEA": {
+        "avg_price": 6.19,
+        "count": 9,
+        "country": "US",
+        "avg_points": 14.4
+      },
+      "NSH": {
+        "avg_price": 3.21,
+        "count": 12,
+        "country": "US",
+        "avg_points": 14.5
+      },
+      "CGY": {
+        "avg_price": 7.38,
+        "count": 17,
+        "country": "CA",
+        "avg_points": 7.8
+      },
+      "PHI": {
+        "avg_price": 8.11,
+        "count": 16,
+        "country": "US",
+        "avg_points": 15.6
+      },
+      "BUF": {
+        "avg_price": 4.49,
+        "count": 20,
+        "country": "US",
+        "avg_points": 16.3
+      },
+      "BOS": {
+        "avg_price": 6.43,
+        "count": 15,
+        "country": "US",
+        "avg_points": 14.8
+      },
+      "VAN": {
+        "avg_price": 6.24,
+        "count": 17,
+        "country": "CA",
+        "avg_points": 8.6
+      },
+      "EDM": {
+        "avg_price": 4.33,
+        "count": 7,
+        "country": "CA",
+        "avg_points": 11.3
+      },
+      "FLA": {
+        "avg_price": 4.4,
+        "count": 8,
+        "country": "US",
+        "avg_points": 13.3
+      },
+      "NYI": {
+        "avg_price": 5.87,
+        "count": 9,
+        "country": "US",
+        "avg_points": 9.9
+      },
+      "PIT": {
+        "avg_price": 3.77,
+        "count": 15,
+        "country": "US",
+        "avg_points": 10.6
+      },
+      "WSH": {
+        "avg_price": 6.19,
+        "count": 12,
+        "country": "US",
+        "avg_points": 16.7
+      },
+      "TOR": {
+        "avg_price": 9.09,
+        "count": 11,
+        "country": "CA",
+        "avg_points": 14.3
+      },
+      "CAR": {
+        "avg_price": 12.34,
+        "count": 10,
+        "country": "US",
+        "avg_points": 17.9
+      },
+      "WPG": {
+        "avg_price": 3.82,
+        "count": 10,
+        "country": "CA",
+        "avg_points": 12.5
+      },
+      "COL": {
+        "avg_price": 5.48,
+        "count": 12,
+        "country": "US",
+        "avg_points": 10.0
+      },
+      "SJS": {
+        "avg_price": 33.26,
+        "count": 14,
+        "country": "US",
+        "avg_points": 19.3
+      },
+      "CBJ": {
+        "avg_price": 9.03,
+        "count": 13,
+        "country": "US",
+        "avg_points": 17.8
+      },
+      "DAL": {
+        "avg_price": 11.38,
+        "count": 10,
+        "country": "US",
+        "avg_points": 23.2
+      },
+      "TBL": {
+        "avg_price": 4.02,
+        "count": 10,
+        "country": "US",
+        "avg_points": 16.7
+      },
+      "NJD": {
+        "avg_price": 6.09,
+        "count": 11,
+        "country": "US",
+        "avg_points": 9.2
+      },
+      "DET": {
+        "avg_price": 14.51,
+        "count": 8,
+        "country": "US",
+        "avg_points": 18.2
+      },
+      "LAK": {
+        "avg_price": 8.52,
+        "count": 10,
+        "country": "US",
+        "avg_points": 14.2
+      },
+      "UTA": {
+        "avg_price": 8.8,
+        "count": 9,
+        "country": "US",
+        "avg_points": 19.3
+      },
+      "OTT": {
+        "avg_price": 8.89,
+        "count": 16,
+        "country": "CA",
+        "avg_points": 21.7
+      },
+      "MIN": {
+        "avg_price": 29.04,
+        "count": 9,
+        "country": "US",
+        "avg_points": 25.3
+      },
+      "VGK": {
+        "avg_price": 6.16,
+        "count": 9,
+        "country": "US",
+        "avg_points": 11.1
+      }
+    },
+    "position_breakdown": {
+      "D": {
+        "avg_price": 7.12,
+        "avg_points": 10.7,
+        "count": 116
+      },
+      "R": {
+        "avg_price": 10.39,
+        "avg_points": 16.0,
+        "count": 62
+      },
+      "C": {
+        "avg_price": 12.92,
+        "avg_points": 16.9,
+        "count": 115
+      },
+      "L": {
+        "avg_price": 11.44,
+        "avg_points": 18.1,
+        "count": 55
+      },
+      "G": {
+        "avg_price": 9.42,
+        "avg_wins": 10.5,
+        "count": 42
+      }
+    },
+    "players": {
+      "Artyom Levshunov": {
+        "price": 26.23,
+        "points": 21,
+        "goals": 2,
+        "gp": 52,
+        "team": "CHI",
+        "position": "D"
+      },
+      "Gabe Perreault": {
+        "price": 16.82,
+        "points": 8,
+        "goals": 3,
+        "gp": 24,
+        "team": "NYR",
+        "position": "R"
+      },
+      "Ivan Demidov": {
+        "price": 177.72,
+        "points": 46,
+        "goals": 12,
+        "gp": 57,
+        "team": "MTL",
+        "position": "R"
+      },
+      "Tim Washe": {
+        "price": 3.67,
+        "points": 2,
+        "goals": 1,
+        "gp": 13,
+        "team": "ANA",
+        "position": "C"
+      },
+      "Jimmy Snuggerud": {
+        "price": 17.39,
+        "points": 24,
+        "goals": 10,
+        "gp": 45,
+        "team": "STL",
+        "position": "R"
+      },
+      "Jack Finley": {
+        "price": 10.99,
+        "points": 3,
+        "goals": 2,
+        "gp": 22,
+        "team": "STL",
+        "position": "C"
+      },
+      "Jani Nyman": {
+        "price": 3.08,
+        "points": 6,
+        "goals": 4,
+        "gp": 24,
+        "team": "SEA",
+        "position": "R"
+      },
+      "Ozzy Wiesblatt": {
+        "price": 3.67,
+        "points": 4,
+        "goals": 1,
+        "gp": 30,
+        "team": "NSH",
+        "position": "C"
+      },
+      "Sam Morton": {
+        "price": 10.93,
+        "points": 0,
+        "goals": 0,
+        "gp": 3,
+        "team": "CGY",
+        "position": "C"
+      },
+      "Oliver Moore": {
+        "price": 5.0,
+        "points": 16,
+        "goals": 5,
+        "gp": 45,
+        "team": "CHI",
+        "position": "C"
+      },
+      "Rodrigo Abols": {
+        "price": 11.0,
+        "points": 10,
+        "goals": 3,
+        "gp": 42,
+        "team": "PHI",
+        "position": "C"
+      },
+      "Colton Dach": {
+        "price": 11.06,
+        "points": 9,
+        "goals": 3,
+        "gp": 52,
+        "team": "CHI",
+        "position": "C"
+      },
+      "Noah Ostlund": {
+        "price": 3.67,
+        "points": 19,
+        "goals": 10,
+        "gp": 45,
+        "team": "BUF",
+        "position": "C"
+      },
+      "Michael Callahan": {
+        "price": 3.08,
+        "points": 0,
+        "goals": 0,
+        "gp": 5,
+        "team": "BOS",
+        "position": "D"
+      },
+      "Elias Pettersson": {
+        "price": 4.41,
+        "points": 8,
+        "goals": 2,
+        "gp": 47,
+        "team": "VAN",
+        "position": "D"
+      },
+      "Quinn Hutson": {
+        "price": 5.46,
+        "points": 1,
+        "goals": 1,
+        "gp": 4,
+        "team": "EDM",
+        "position": "R"
+      },
+      "Jacob Gaucher": {
+        "price": 3.67,
+        "points": 0,
+        "goals": 0,
+        "gp": 3,
+        "team": "PHI",
+        "position": "C"
+      },
+      "Dalibor Dvorsky": {
+        "price": 19.97,
+        "points": 15,
+        "goals": 9,
+        "gp": 47,
+        "team": "STL",
+        "position": "R"
+      },
+      "Matthew Wood": {
+        "price": 1.93,
+        "points": 17,
+        "goals": 9,
+        "gp": 46,
+        "team": "NSH",
+        "position": "R"
+      },
+      "Donovan Sebrango": {
+        "price": 10.93,
+        "points": 2,
+        "goals": 0,
+        "gp": 19,
+        "team": "FLA",
+        "position": "D"
+      },
+      "Jacob Melanson": {
+        "price": 3.67,
+        "points": 4,
+        "goals": 1,
+        "gp": 22,
+        "team": "SEA",
+        "position": "R"
+      },
+      "Marc Gatcomb": {
+        "price": 11.05,
+        "points": 4,
+        "goals": 1,
+        "gp": 29,
+        "team": "NYI",
+        "position": "C"
+      },
+      "Ian Moore": {
+        "price": 3.67,
+        "points": 9,
+        "goals": 2,
+        "gp": 41,
+        "team": "ANA",
+        "position": "D"
+      },
+      "Ville Koivunen": {
+        "price": 3.08,
+        "points": 5,
+        "goals": 2,
+        "gp": 27,
+        "team": "PIT",
+        "position": "R"
+      },
+      "Rory Kerins": {
+        "price": 10.93,
+        "points": 0,
+        "goals": 0,
+        "gp": 2,
+        "team": "CGY",
+        "position": "C"
+      },
+      "Zayne Parekh": {
+        "price": 21.29,
+        "points": 1,
+        "goals": 0,
+        "gp": 13,
+        "team": "CGY",
+        "position": "D"
+      },
+      "Joakim Kemell": {
+        "price": 3.08,
+        "points": 0,
+        "goals": 0,
+        "gp": 2,
+        "team": "NSH",
+        "position": "R"
+      },
+      "Ryan Leonard": {
+        "price": 13.58,
+        "points": 30,
+        "goals": 10,
+        "gp": 52,
+        "team": "WSH",
+        "position": "R"
+      },
+      "Matthew Robertson": {
+        "price": 4.96,
+        "points": 11,
+        "goals": 4,
+        "gp": 47,
+        "team": "NYR",
+        "position": "D"
+      },
+      "Ethen Frank": {
+        "price": 3.67,
+        "points": 23,
+        "goals": 11,
+        "gp": 48,
+        "team": "WSH",
+        "position": "C"
+      },
+      "Jacob Quillan": {
+        "price": 3.67,
+        "points": 0,
+        "goals": 0,
+        "gp": 4,
+        "team": "TOR",
+        "position": "C"
+      },
+      "Justin Robidas": {
+        "price": 11.02,
+        "points": 1,
+        "goals": 0,
+        "gp": 2,
+        "team": "CAR",
+        "position": "C"
+      },
+      "Parker Ford": {
+        "price": 3.67,
+        "points": 1,
+        "goals": 0,
+        "gp": 11,
+        "team": "WPG",
+        "position": "C"
+      },
+      "Sam Rinzel": {
+        "price": 13.06,
+        "points": 9,
+        "goals": 2,
+        "gp": 31,
+        "team": "CHI",
+        "position": "D"
+      },
+      "Zachary Bolduc": {
+        "price": 3.48,
+        "points": 23,
+        "goals": 10,
+        "gp": 57,
+        "team": "MTL",
+        "position": "R"
+      },
+      "Landon Slaggert": {
+        "price": 3.3,
+        "points": 5,
+        "goals": 2,
+        "gp": 30,
+        "team": "CHI",
+        "position": "L"
+      },
+      "Kyle MacLean": {
+        "price": 3.3,
+        "points": 6,
+        "goals": 2,
+        "gp": 42,
+        "team": "NYI",
+        "position": "C"
+      },
+      "Brennan Othmann": {
+        "price": 4.26,
+        "points": 1,
+        "goals": 1,
+        "gp": 16,
+        "team": "NYR",
+        "position": "L"
+      },
+      "Gavin Brindley": {
+        "price": 3.48,
+        "points": 11,
+        "goals": 5,
+        "gp": 42,
+        "team": "COL",
+        "position": "C"
+      },
+      "Bradly Nadeau": {
+        "price": 3.3,
+        "points": 2,
+        "goals": 2,
+        "gp": 8,
+        "team": "CAR",
+        "position": "L"
+      },
+      "Zack Ostapchuk": {
+        "price": 3.3,
+        "points": 4,
+        "goals": 3,
+        "gp": 32,
+        "team": "SJS",
+        "position": "C"
+      },
+      "Jason Polin": {
+        "price": 2.76,
+        "points": 0,
+        "goals": 0,
+        "gp": 2,
+        "team": "COL",
+        "position": "R"
+      },
+      "Shakir Mukhamadullin": {
+        "price": 1.9,
+        "points": 7,
+        "goals": 3,
+        "gp": 26,
+        "team": "SJS",
+        "position": "D"
+      },
+      "Cutter Gauthier": {
+        "price": 25.96,
+        "points": 49,
+        "goals": 25,
+        "gp": 55,
+        "team": "ANA",
+        "position": "L"
+      },
+      "Luca Del Bel Belluz": {
+        "price": 3.48,
+        "points": 1,
+        "goals": 0,
+        "gp": 13,
+        "team": "CBJ",
+        "position": "C"
+      },
+      "Mavrik Bourque": {
+        "price": 3.48,
+        "points": 22,
+        "goals": 11,
+        "gp": 57,
+        "team": "DAL",
+        "position": "C"
+      },
+      "Matt Rempe": {
+        "price": 3.3,
+        "points": 1,
+        "goals": 1,
+        "gp": 26,
+        "team": "NYR",
+        "position": "C"
+      },
+      "Ethan Del Mastro": {
+        "price": 2.76,
+        "points": 0,
+        "goals": 0,
+        "gp": 2,
+        "team": "CHI",
+        "position": "D"
+      },
+      "Justin Brazeau": {
+        "price": 3.48,
+        "points": 27,
+        "goals": 15,
+        "gp": 42,
+        "team": "PIT",
+        "position": "R"
+      },
+      "Collin Graf": {
+        "price": 2.82,
+        "points": 31,
+        "goals": 15,
+        "gp": 54,
+        "team": "SJS",
+        "position": "R"
+      },
+      "Scott Morrow": {
+        "price": 3.3,
+        "points": 6,
+        "goals": 0,
+        "gp": 28,
+        "team": "NYR",
+        "position": "D"
+      },
+      "Frank Nazar": {
+        "price": 25.35,
+        "points": 24,
+        "goals": 7,
+        "gp": 41,
+        "team": "CHI",
+        "position": "C"
+      },
+      "Brad Lambert": {
+        "price": 3.3,
+        "points": 1,
+        "goals": 1,
+        "gp": 4,
+        "team": "WPG",
+        "position": "C"
+      },
+      "Lane Hutson": {
+        "price": 129.06,
+        "points": 58,
+        "goals": 10,
+        "gp": 57,
+        "team": "MTL",
+        "position": "D"
+      },
+      "Arshdeep Bains": {
+        "price": 3.48,
+        "points": 5,
+        "goals": 1,
+        "gp": 28,
+        "team": "VAN",
+        "position": "L"
+      },
+      "Josh Doan": {
+        "price": 8.81,
+        "points": 39,
+        "goals": 18,
+        "gp": 57,
+        "team": "BUF",
+        "position": "R"
+      },
+      "Jack St. Ivany": {
+        "price": 3.48,
+        "points": 7,
+        "goals": 0,
+        "gp": 17,
+        "team": "PIT",
+        "position": "D"
+      },
+      "Yan Kuznetsov": {
+        "price": 2.76,
+        "points": 9,
+        "goals": 4,
+        "gp": 42,
+        "team": "CGY",
+        "position": "D"
+      },
+      "Olen Zellweger": {
+        "price": 9.54,
+        "points": 18,
+        "goals": 6,
+        "gp": 55,
+        "team": "ANA",
+        "position": "D"
+      },
+      "Marshall Rifai": {
+        "price": 3.3,
+        "points": 0,
+        "goals": 0,
+        "gp": 1,
+        "team": "TOR",
+        "position": "D"
+      },
+      "Logan Mailloux": {
+        "price": 2.76,
+        "points": 3,
+        "goals": 1,
+        "gp": 42,
+        "team": "STL",
+        "position": "D"
+      },
+      "Sam Colangelo": {
+        "price": 11.2,
+        "points": 1,
+        "goals": 1,
+        "gp": 9,
+        "team": "ANA",
+        "position": "R"
+      },
+      "Emil Lilleberg": {
+        "price": 3.48,
+        "points": 6,
+        "goals": 2,
+        "gp": 32,
+        "team": "TBL",
+        "position": "D"
+      },
+      "Marat Khusnutdinov": {
+        "price": 2.76,
+        "points": 26,
+        "goals": 12,
+        "gp": 52,
+        "team": "BOS",
+        "position": "C"
+      },
+      "Logan Stankoven": {
+        "price": 14.07,
+        "points": 25,
+        "goals": 10,
+        "gp": 57,
+        "team": "CAR",
+        "position": "C"
+      },
+      "Nikita Chibrikov": {
+        "price": 2.99,
+        "points": 0,
+        "goals": 0,
+        "gp": 8,
+        "team": "WPG",
+        "position": "R"
+      },
+      "Joshua Roy": {
+        "price": 2.76,
+        "points": 0,
+        "goals": 0,
+        "gp": 3,
+        "team": "MTL",
+        "position": "R"
+      },
+      "Gage Goncalves": {
+        "price": 1.09,
+        "points": 17,
+        "goals": 6,
+        "gp": 51,
+        "team": "TBL",
+        "position": "C"
+      },
+      "Liam Ohgren": {
+        "price": 2.76,
+        "points": 9,
+        "goals": 4,
+        "gp": 44,
+        "team": "VAN",
+        "position": "L"
+      },
+      "Macklin Celebrini": {
+        "price": 342.18,
+        "points": 81,
+        "goals": 28,
+        "gp": 55,
+        "team": "SJS",
+        "position": "C"
+      },
+      "Brian Halonen": {
+        "price": 2.76,
+        "points": 1,
+        "goals": 1,
+        "gp": 9,
+        "team": "NJD",
+        "position": "L"
+      },
+      "Ethan Cardwell": {
+        "price": 3.48,
+        "points": 1,
+        "goals": 1,
+        "gp": 7,
+        "team": "SJS",
+        "position": "R"
+      },
+      "Adam Klapka": {
+        "price": 3.3,
+        "points": 12,
+        "goals": 5,
+        "gp": 55,
+        "team": "CGY",
+        "position": "R"
+      },
+      "Oliver Kapanen": {
+        "price": 21.57,
+        "points": 31,
+        "goals": 18,
+        "gp": 57,
+        "team": "MTL",
+        "position": "C"
+      },
+      "Maxim Tsyplakov": {
+        "price": 3.48,
+        "points": 2,
+        "goals": 1,
+        "gp": 31,
+        "team": "NJD",
+        "position": "R"
+      },
+      "Victor Mancini": {
+        "price": 4.69,
+        "points": 0,
+        "goals": 0,
+        "gp": 10,
+        "team": "VAN",
+        "position": "D"
+      },
+      "Oskar Back": {
+        "price": 3.48,
+        "points": 8,
+        "goals": 4,
+        "gp": 47,
+        "team": "DAL",
+        "position": "C"
+      },
+      "Declan Carlile": {
+        "price": 3.48,
+        "points": 3,
+        "goals": 1,
+        "gp": 34,
+        "team": "TBL",
+        "position": "D"
+      },
+      "Jackson Blake": {
+        "price": 21.47,
+        "points": 33,
+        "goals": 16,
+        "gp": 57,
+        "team": "CAR",
+        "position": "R"
+      },
+      "Rutger McGroarty": {
+        "price": 4.99,
+        "points": 5,
+        "goals": 2,
+        "gp": 20,
+        "team": "PIT",
+        "position": "R"
+      },
+      "Albert Johansson": {
+        "price": 4.69,
+        "points": 7,
+        "goals": 1,
+        "gp": 58,
+        "team": "DET",
+        "position": "D"
+      },
+      "Patrick Giles": {
+        "price": 3.48,
+        "points": 1,
+        "goals": 0,
+        "gp": 3,
+        "team": "SJS",
+        "position": "R"
+      },
+      "Calum Ritchie": {
+        "price": 2.76,
+        "points": 15,
+        "goals": 7,
+        "gp": 41,
+        "team": "NYI",
+        "position": "C"
+      },
+      "Conor Geekie": {
+        "price": 2.76,
+        "points": 1,
+        "goals": 0,
+        "gp": 6,
+        "team": "TBL",
+        "position": "C"
+      },
+      "Ivan Ivan": {
+        "price": 3.48,
+        "points": 1,
+        "goals": 0,
+        "gp": 7,
+        "team": "COL",
+        "position": "C"
+      },
+      "Andre Lee": {
+        "price": 3.48,
+        "points": 2,
+        "goals": 1,
+        "gp": 7,
+        "team": "LAK",
+        "position": "L"
+      },
+      "Jett Luchanko": {
+        "price": 4.69,
+        "points": 0,
+        "goals": 0,
+        "gp": 4,
+        "team": "PHI",
+        "position": "C"
+      },
+      "Samuel Honzek": {
+        "price": 3.48,
+        "points": 4,
+        "goals": 2,
+        "gp": 18,
+        "team": "CGY",
+        "position": "L"
+      },
+      "Maveric Lamoureux": {
+        "price": 4.69,
+        "points": 1,
+        "goals": 0,
+        "gp": 5,
+        "team": "UTA",
+        "position": "D"
+      },
+      "Seamus Casey": {
+        "price": 2.76,
+        "points": 0,
+        "goals": 0,
+        "gp": 2,
+        "team": "NJD",
+        "position": "D"
+      },
+      "Matvei Michkov": {
+        "price": 20.5,
+        "points": 29,
+        "goals": 13,
+        "gp": 55,
+        "team": "PHI",
+        "position": "R"
+      },
+      "Noah Philp": {
+        "price": 4.69,
+        "points": 3,
+        "goals": 2,
+        "gp": 17,
+        "team": "CAR",
+        "position": "C"
+      },
+      "Will Smith": {
+        "price": 65.07,
+        "points": 39,
+        "goals": 17,
+        "gp": 42,
+        "team": "SJS",
+        "position": "C"
+      },
+      "Owen Pickering": {
+        "price": 3.49,
+        "points": 0,
+        "goals": 0,
+        "gp": 4,
+        "team": "PIT",
+        "position": "D"
+      },
+      "Lian Bichsel": {
+        "price": 3.48,
+        "points": 3,
+        "goals": 1,
+        "gp": 26,
+        "team": "DAL",
+        "position": "D"
+      },
+      "Brett Berard": {
+        "price": 3.48,
+        "points": 0,
+        "goals": 0,
+        "gp": 13,
+        "team": "NYR",
+        "position": "L"
+      },
+      "Jonathan Lekkerimaki": {
+        "price": 13.21,
+        "points": 3,
+        "goals": 2,
+        "gp": 13,
+        "team": "VAN",
+        "position": "R"
+      },
+      "Denton Mateychuk": {
+        "price": 13.0,
+        "points": 22,
+        "goals": 9,
+        "gp": 49,
+        "team": "CBJ",
+        "position": "D"
+      },
+      "Isaiah George": {
+        "price": 3.48,
+        "points": 1,
+        "goals": 0,
+        "gp": 2,
+        "team": "NYI",
+        "position": "D"
+      },
+      "Nikita Grebenkin": {
+        "price": 4.77,
+        "points": 12,
+        "goals": 4,
+        "gp": 42,
+        "team": "PHI",
+        "position": "R"
+      },
+      "Tyson Kozak": {
+        "price": 3.48,
+        "points": 4,
+        "goals": 2,
+        "gp": 35,
+        "team": "BUF",
+        "position": "C"
+      },
+      "Max Sasson": {
+        "price": 2.94,
+        "points": 12,
+        "goals": 10,
+        "gp": 50,
+        "team": "VAN",
+        "position": "C"
+      },
+      "Nathan Legare": {
+        "price": 3.48,
+        "points": 0,
+        "goals": 0,
+        "gp": 1,
+        "team": "NJD",
+        "position": "R"
+      },
+      "Samuel Helenius": {
+        "price": 3.48,
+        "points": 5,
+        "goals": 3,
+        "gp": 29,
+        "team": "LAK",
+        "position": "C"
+      },
+      "Adam Wilsby": {
+        "price": 3.48,
+        "points": 12,
+        "goals": 1,
+        "gp": 43,
+        "team": "NSH",
+        "position": "D"
+      },
+      "Justin Hryckowian": {
+        "price": 12.71,
+        "points": 18,
+        "goals": 8,
+        "gp": 56,
+        "team": "DAL",
+        "position": "C"
+      },
+      "Fedor Svechkov": {
+        "price": 3.48,
+        "points": 9,
+        "goals": 2,
+        "gp": 49,
+        "team": "NSH",
+        "position": "C"
+      },
+      "Matthew Coronato": {
+        "price": 5.32,
+        "points": 29,
+        "goals": 14,
+        "gp": 55,
+        "team": "CGY",
+        "position": "R"
+      },
+      "Vincent Desharnais": {
+        "price": 3.53,
+        "points": 4,
+        "goals": 1,
+        "gp": 28,
+        "team": "SJS",
+        "position": "D"
+      },
+      "Joona Koppanen": {
+        "price": 3.3,
+        "points": 1,
+        "goals": 0,
+        "gp": 10,
+        "team": "PIT",
+        "position": "L"
+      },
+      "Jakob Pelletier": {
+        "price": 14.79,
+        "points": 0,
+        "goals": 0,
+        "gp": 2,
+        "team": "TBL",
+        "position": "L"
+      },
+      "Ridly Greig": {
+        "price": 3.3,
+        "points": 25,
+        "goals": 9,
+        "gp": 52,
+        "team": "OTT",
+        "position": "C"
+      },
+      "Will Cuylle": {
+        "price": 5.06,
+        "points": 27,
+        "goals": 13,
+        "gp": 57,
+        "team": "NYR",
+        "position": "L"
+      },
+      "Owen Beck": {
+        "price": 5.1,
+        "points": 1,
+        "goals": 1,
+        "gp": 15,
+        "team": "MTL",
+        "position": "C"
+      },
+      "Brock Faber": {
+        "price": 5.1,
+        "points": 37,
+        "goals": 13,
+        "gp": 58,
+        "team": "MIN",
+        "position": "D"
+      },
+      "Drew Helleson": {
+        "price": 5.1,
+        "points": 11,
+        "goals": 2,
+        "gp": 48,
+        "team": "ANA",
+        "position": "D"
+      },
+      "Luke Evangelista": {
+        "price": 5.1,
+        "points": 42,
+        "goals": 8,
+        "gp": 56,
+        "team": "NSH",
+        "position": "R"
+      },
+      "Matthew Knies": {
+        "price": 28.07,
+        "points": 46,
+        "goals": 14,
+        "gp": 54,
+        "team": "TOR",
+        "position": "L"
+      },
+      "Vincent Iorio": {
+        "price": 4.37,
+        "points": 3,
+        "goals": 0,
+        "gp": 22,
+        "team": "NYR",
+        "position": "D"
+      },
+      "Tyson Foerster": {
+        "price": 3.3,
+        "points": 13,
+        "goals": 10,
+        "gp": 21,
+        "team": "PHI",
+        "position": "R"
+      },
+      "Simon Edvinsson": {
+        "price": 15.68,
+        "points": 17,
+        "goals": 6,
+        "gp": 48,
+        "team": "DET",
+        "position": "D"
+      },
+      "Wyatt Kaiser": {
+        "price": 4.37,
+        "points": 12,
+        "goals": 5,
+        "gp": 57,
+        "team": "CHI",
+        "position": "D"
+      },
+      "Nikita Nesterenko": {
+        "price": 3.66,
+        "points": 9,
+        "goals": 1,
+        "gp": 29,
+        "team": "ANA",
+        "position": "C"
+      },
+      "Tyler Kleven": {
+        "price": 5.1,
+        "points": 11,
+        "goals": 1,
+        "gp": 52,
+        "team": "OTT",
+        "position": "D"
+      },
+      "Henry Thrun": {
+        "price": 3.3,
+        "points": 0,
+        "goals": 0,
+        "gp": 4,
+        "team": "TOR",
+        "position": "D"
+      },
+      "Spencer Stastney": {
+        "price": 6.08,
+        "points": 10,
+        "goals": 2,
+        "gp": 57,
+        "team": "EDM",
+        "position": "D"
+      },
+      "Matthew Kessel": {
+        "price": 3.13,
+        "points": 3,
+        "goals": 2,
+        "gp": 22,
+        "team": "STL",
+        "position": "D"
+      },
+      "Marco Kasper": {
+        "price": 16.18,
+        "points": 13,
+        "goals": 6,
+        "gp": 57,
+        "team": "DET",
+        "position": "C"
+      },
+      "Adam Ginning": {
+        "price": 3.3,
+        "points": 0,
+        "goals": 0,
+        "gp": 5,
+        "team": "PHI",
+        "position": "D"
+      },
+      "Cole McWard": {
+        "price": 3.3,
+        "points": 0,
+        "goals": 0,
+        "gp": 3,
+        "team": "NYI",
+        "position": "D"
+      },
+      "Luke Hughes": {
+        "price": 14.68,
+        "points": 26,
+        "goals": 5,
+        "gp": 49,
+        "team": "NJD",
+        "position": "D"
+      },
+      "Connor Bedard": {
+        "price": 236.47,
+        "points": 53,
+        "goals": 23,
+        "gp": 44,
+        "team": "CHI",
+        "position": "C"
+      },
+      "Jackson LaCombe": {
+        "price": 3.3,
+        "points": 37,
+        "goals": 6,
+        "gp": 56,
+        "team": "ANA",
+        "position": "D"
+      },
+      "Ty Emberson": {
+        "price": 3.3,
+        "points": 11,
+        "goals": 1,
+        "gp": 53,
+        "team": "EDM",
+        "position": "D"
+      },
+      "Alex Laferriere": {
+        "price": 1.5,
+        "points": 26,
+        "goals": 13,
+        "gp": 56,
+        "team": "LAK",
+        "position": "R"
+      },
+      "Mackie Samoskevich": {
+        "price": 3.66,
+        "points": 21,
+        "goals": 6,
+        "gp": 55,
+        "team": "FLA",
+        "position": "R"
+      },
+      "Tye Kartye": {
+        "price": 5.1,
+        "points": 8,
+        "goals": 3,
+        "gp": 40,
+        "team": "SEA",
+        "position": "L"
+      },
+      "Emil Andrae": {
+        "price": 5.1,
+        "points": 11,
+        "goals": 1,
+        "gp": 40,
+        "team": "PHI",
+        "position": "D"
+      },
+      "Leo Carlsson": {
+        "price": 26.16,
+        "points": 44,
+        "goals": 18,
+        "gp": 44,
+        "team": "ANA",
+        "position": "C"
+      },
+      "Hugh McGing": {
+        "price": 3.3,
+        "points": 2,
+        "goals": 1,
+        "gp": 3,
+        "team": "STL",
+        "position": "L"
+      },
+      "Justin Sourdif": {
+        "price": 2.94,
+        "points": 26,
+        "goals": 12,
+        "gp": 55,
+        "team": "WSH",
+        "position": "R"
+      },
+      "John Beecher": {
+        "price": 5.1,
+        "points": 3,
+        "goals": 1,
+        "gp": 25,
+        "team": "CGY",
+        "position": "C"
+      },
+      "Zach Benson": {
+        "price": 3.1,
+        "points": 26,
+        "goals": 7,
+        "gp": 42,
+        "team": "BUF",
+        "position": "L"
+      },
+      "Uvis Balinskis": {
+        "price": 3.3,
+        "points": 14,
+        "goals": 5,
+        "gp": 48,
+        "team": "FLA",
+        "position": "D"
+      },
+      "Mikael Pyyhtia": {
+        "price": 3.3,
+        "points": 1,
+        "goals": 1,
+        "gp": 5,
+        "team": "CBJ",
+        "position": "L"
+      },
+      "Matthew Poitras": {
+        "price": 13.95,
+        "points": 1,
+        "goals": 1,
+        "gp": 3,
+        "team": "BOS",
+        "position": "C"
+      },
+      "Bobby McMann": {
+        "price": 5.1,
+        "points": 32,
+        "goals": 19,
+        "gp": 56,
+        "team": "TOR",
+        "position": "C"
+      },
+      "Michael Kesselring": {
+        "price": 3.13,
+        "points": 1,
+        "goals": 0,
+        "gp": 24,
+        "team": "BUF",
+        "position": "D"
+      },
+      "Fraser Minten": {
+        "price": 16.18,
+        "points": 29,
+        "goals": 14,
+        "gp": 57,
+        "team": "BOS",
+        "position": "C"
+      },
+      "Kevin Korchinski": {
+        "price": 2.93,
+        "points": 1,
+        "goals": 0,
+        "gp": 2,
+        "team": "CHI",
+        "position": "D"
+      },
+      "Pavel Mintyukov": {
+        "price": 3.3,
+        "points": 15,
+        "goals": 6,
+        "gp": 51,
+        "team": "ANA",
+        "position": "D"
+      },
+      "Ryan Shea": {
+        "price": 3.66,
+        "points": 22,
+        "goals": 3,
+        "gp": 56,
+        "team": "PIT",
+        "position": "D"
+      },
+      "Dmitri Voronkov": {
+        "price": 5.1,
+        "points": 32,
+        "goals": 17,
+        "gp": 56,
+        "team": "CBJ",
+        "position": "L"
+      },
+      "Ilya Solovyov": {
+        "price": 3.66,
+        "points": 6,
+        "goals": 1,
+        "gp": 21,
+        "team": "PIT",
+        "position": "D"
+      },
+      "Daemon Hunt": {
+        "price": 5.1,
+        "points": 5,
+        "goals": 0,
+        "gp": 26,
+        "team": "MIN",
+        "position": "D"
+      },
+      "Nikolas Matinpalo": {
+        "price": 3.3,
+        "points": 4,
+        "goals": 0,
+        "gp": 30,
+        "team": "OTT",
+        "position": "D"
+      },
+      "Connor Zary": {
+        "price": 3.3,
+        "points": 21,
+        "goals": 9,
+        "gp": 54,
+        "team": "CGY",
+        "position": "C"
+      },
+      "Mason Lohrei": {
+        "price": 3.67,
+        "points": 23,
+        "goals": 6,
+        "gp": 52,
+        "team": "BOS",
+        "position": "D"
+      },
+      "Logan Cooley": {
+        "price": 19.65,
+        "points": 23,
+        "goals": 14,
+        "gp": 29,
+        "team": "UTA",
+        "position": "C"
+      },
+      "Adam Edstrom": {
+        "price": 3.3,
+        "points": 4,
+        "goals": 2,
+        "gp": 24,
+        "team": "NYR",
+        "position": "C"
+      },
+      "Isak Rosen": {
+        "price": 5.1,
+        "points": 7,
+        "goals": 3,
+        "gp": 16,
+        "team": "BUF",
+        "position": "R"
+      },
+      "Angus Crookshank": {
+        "price": 3.66,
+        "points": 1,
+        "goals": 1,
+        "gp": 8,
+        "team": "NJD",
+        "position": "C"
+      },
+      "Ryan Winterton": {
+        "price": 3.66,
+        "points": 15,
+        "goals": 3,
+        "gp": 54,
+        "team": "SEA",
+        "position": "C"
+      },
+      "Jiri Kulich": {
+        "price": 3.3,
+        "points": 5,
+        "goals": 3,
+        "gp": 12,
+        "team": "BUF",
+        "position": "C"
+      },
+      "Adam Fantilli": {
+        "price": 23.5,
+        "points": 36,
+        "goals": 13,
+        "gp": 56,
+        "team": "CBJ",
+        "position": "C"
+      },
+      "Martin Pospisil": {
+        "price": 3.13,
+        "points": 0,
+        "goals": 0,
+        "gp": 7,
+        "team": "CGY",
+        "position": "C"
+      },
+      "Sam Malinski": {
+        "price": 12.11,
+        "points": 25,
+        "goals": 3,
+        "gp": 55,
+        "team": "COL",
+        "position": "D"
+      },
+      "Ivan Miroshnichenko": {
+        "price": 5.1,
+        "points": 0,
+        "goals": 0,
+        "gp": 4,
+        "team": "WSH",
+        "position": "L"
+      },
+      "Linus Karlsson": {
+        "price": 3.3,
+        "points": 24,
+        "goals": 11,
+        "gp": 54,
+        "team": "VAN",
+        "position": "C"
+      },
+      "Ryan Johnson": {
+        "price": 3.3,
+        "points": 0,
+        "goals": 0,
+        "gp": 3,
+        "team": "BUF",
+        "position": "D"
+      },
+      "Emil Heineman": {
+        "price": 5.1,
+        "points": 23,
+        "goals": 15,
+        "gp": 58,
+        "team": "NYI",
+        "position": "L"
+      },
+      "Louis Crevier": {
+        "price": 5.1,
+        "points": 15,
+        "goals": 4,
+        "gp": 54,
+        "team": "CHI",
+        "position": "D"
+      },
+      "Jayden Struble": {
+        "price": 13.51,
+        "points": 8,
+        "goals": 0,
+        "gp": 39,
+        "team": "MTL",
+        "position": "D"
+      },
+      "Ryker Evans": {
+        "price": 3.3,
+        "points": 12,
+        "goals": 5,
+        "gp": 41,
+        "team": "SEA",
+        "position": "D"
+      },
+      "Simon Nemec": {
+        "price": 5.1,
+        "points": 20,
+        "goals": 8,
+        "gp": 43,
+        "team": "NJD",
+        "position": "D"
+      },
+      "Georgii Merkulov": {
+        "price": 3.13,
+        "points": 0,
+        "goals": 0,
+        "gp": 1,
+        "team": "BOS",
+        "position": "C"
+      },
+      "Matt Savoie": {
+        "price": 5.1,
+        "points": 18,
+        "goals": 9,
+        "gp": 58,
+        "team": "EDM",
+        "position": "C"
+      },
+      "Matt Boldy": {
+        "price": 16.9,
+        "points": 62,
+        "goals": 32,
+        "gp": 54,
+        "team": "MIN",
+        "position": "L"
+      },
+      "Nick Blankenburg": {
+        "price": 1.46,
+        "points": 21,
+        "goals": 6,
+        "gp": 45,
+        "team": "NSH",
+        "position": "D"
+      },
+      "Jack Quinn": {
+        "price": 8.08,
+        "points": 37,
+        "goals": 12,
+        "gp": 57,
+        "team": "BUF",
+        "position": "R"
+      },
+      "Jordan Harris": {
+        "price": 5.1,
+        "points": 2,
+        "goals": 1,
+        "gp": 5,
+        "team": "BOS",
+        "position": "D"
+      },
+      "Hayden Hodgson": {
+        "price": 6.23,
+        "points": 0,
+        "goals": 0,
+        "gp": 9,
+        "team": "OTT",
+        "position": "R"
+      },
+      "Kent Johnson": {
+        "price": 3.3,
+        "points": 18,
+        "goals": 6,
+        "gp": 55,
+        "team": "CBJ",
+        "position": "C"
+      },
+      "Matty Beniers": {
+        "price": 12.85,
+        "points": 37,
+        "goals": 14,
+        "gp": 56,
+        "team": "SEA",
+        "position": "C"
+      },
+      "Braden Schneider": {
+        "price": 3.3,
+        "points": 11,
+        "goals": 2,
+        "gp": 57,
+        "team": "NYR",
+        "position": "D"
+      },
+      "Mark Kastelic": {
+        "price": 5.88,
+        "points": 17,
+        "goals": 9,
+        "gp": 57,
+        "team": "BOS",
+        "position": "C"
+      },
+      "Matias Maccelli": {
+        "price": 1.46,
+        "points": 24,
+        "goals": 10,
+        "gp": 46,
+        "team": "TOR",
+        "position": "L"
+      },
+      "Kaedan Korczak": {
+        "price": 5.1,
+        "points": 12,
+        "goals": 3,
+        "gp": 57,
+        "team": "VGK",
+        "position": "D"
+      },
+      "Jake Christiansen": {
+        "price": 11.86,
+        "points": 2,
+        "goals": 0,
+        "gp": 32,
+        "team": "CBJ",
+        "position": "D"
+      },
+      "Ben Meyers": {
+        "price": 2.15,
+        "points": 11,
+        "goals": 5,
+        "gp": 31,
+        "team": "SEA",
+        "position": "C"
+      },
+      "Jonathan Kovacevic": {
+        "price": 11.1,
+        "points": 2,
+        "goals": 0,
+        "gp": 11,
+        "team": "NJD",
+        "position": "D"
+      },
+      "Jacob Moverare": {
+        "price": 3.3,
+        "points": 0,
+        "goals": 0,
+        "gp": 14,
+        "team": "LAK",
+        "position": "D"
+      },
+      "Bobby Brink": {
+        "price": 3.3,
+        "points": 24,
+        "goals": 13,
+        "gp": 50,
+        "team": "PHI",
+        "position": "R"
+      },
+      "Owen Power": {
+        "price": 15.05,
+        "points": 17,
+        "goals": 4,
+        "gp": 56,
+        "team": "BUF",
+        "position": "D"
+      },
+      "Jack McBain": {
+        "price": 3.3,
+        "points": 19,
+        "goals": 6,
+        "gp": 57,
+        "team": "UTA",
+        "position": "C"
+      },
+      "Dylan Samberg": {
+        "price": 1.46,
+        "points": 9,
+        "goals": 0,
+        "gp": 40,
+        "team": "WPG",
+        "position": "D"
+      },
+      "Lukas Reichel": {
+        "price": 11.74,
+        "points": 5,
+        "goals": 2,
+        "gp": 19,
+        "team": "VAN",
+        "position": "L"
+      },
+      "Jordan Pence": {
+        "price": 0.99,
+        "points": 19,
+        "goals": 4,
+        "gp": 48,
+        "team": "OTT",
+        "position": "D"
+      },
+      "Vladislav Kolyachonok": {
+        "price": 10.6,
+        "points": 3,
+        "goals": 1,
+        "gp": 13,
+        "team": "DAL",
+        "position": "D"
+      },
+      "Marco Rossi": {
+        "price": 11.2,
+        "points": 15,
+        "goals": 5,
+        "gp": 25,
+        "team": "VAN",
+        "position": "C"
+      },
+      "Brayden Pachal": {
+        "price": 16.25,
+        "points": 3,
+        "goals": 0,
+        "gp": 26,
+        "team": "CGY",
+        "position": "D"
+      },
+      "Jeff Malott": {
+        "price": 16.25,
+        "points": 8,
+        "goals": 3,
+        "gp": 40,
+        "team": "LAK",
+        "position": "L"
+      },
+      "Alex Vlasic": {
+        "price": 7.14,
+        "points": 14,
+        "goals": 2,
+        "gp": 56,
+        "team": "CHI",
+        "position": "D"
+      },
+      "Noah Cates": {
+        "price": 3.3,
+        "points": 26,
+        "goals": 10,
+        "gp": 56,
+        "team": "PHI",
+        "position": "L"
+      },
+      "Juraj Slafkovsky": {
+        "price": 65.07,
+        "points": 45,
+        "goals": 21,
+        "gp": 57,
+        "team": "MTL",
+        "position": "L"
+      },
+      "Pavol Regenda": {
+        "price": 4.41,
+        "points": 9,
+        "goals": 8,
+        "gp": 16,
+        "team": "SJS",
+        "position": "L"
+      },
+      "Nils Aman": {
+        "price": 2.2,
+        "points": 0,
+        "goals": 0,
+        "gp": 2,
+        "team": "VAN",
+        "position": "C"
+      },
+      "Michael Eyssimont": {
+        "price": 2.0,
+        "points": 17,
+        "goals": 8,
+        "gp": 44,
+        "team": "BOS",
+        "position": "C"
+      },
+      "Cole Reinhardt": {
+        "price": 10.6,
+        "points": 7,
+        "goals": 3,
+        "gp": 40,
+        "team": "VGK",
+        "position": "L"
+      },
+      "Wyatt Johnston": {
+        "price": 26.07,
+        "points": 59,
+        "goals": 29,
+        "gp": 57,
+        "team": "DAL",
+        "position": "C"
+      },
+      "Dylan Holloway": {
+        "price": 9.54,
+        "points": 17,
+        "goals": 8,
+        "gp": 34,
+        "team": "STL",
+        "position": "L"
+      },
+      "Mitchell Chaffee": {
+        "price": 3.3,
+        "points": 0,
+        "goals": 0,
+        "gp": 7,
+        "team": "TBL",
+        "position": "R"
+      },
+      "Bokondji Imama": {
+        "price": 5.1,
+        "points": 0,
+        "goals": 0,
+        "gp": 2,
+        "team": "PIT",
+        "position": "L"
+      },
+      "Andrei Kuzmenko": {
+        "price": 12.85,
+        "points": 23,
+        "goals": 13,
+        "gp": 51,
+        "team": "LAK",
+        "position": "L"
+      },
+      "Jake Sanderson": {
+        "price": 12.99,
+        "points": 46,
+        "goals": 11,
+        "gp": 57,
+        "team": "OTT",
+        "position": "D"
+      },
+      "Ben Jones": {
+        "price": 10.6,
+        "points": 2,
+        "goals": 1,
+        "gp": 26,
+        "team": "MIN",
+        "position": "C"
+      },
+      "Brandt Clarke": {
+        "price": 22.42,
+        "points": 27,
+        "goals": 6,
+        "gp": 56,
+        "team": "LAK",
+        "position": "D"
+      },
+      "David Jiricek": {
+        "price": 2.85,
+        "points": 0,
+        "goals": 0,
+        "gp": 25,
+        "team": "MIN",
+        "position": "D"
+      },
+      "Olle Lycksell": {
+        "price": 10.6,
+        "points": 2,
+        "goals": 1,
+        "gp": 7,
+        "team": "OTT",
+        "position": "R"
+      },
+      "Shane Wright": {
+        "price": 16.78,
+        "points": 22,
+        "goals": 11,
+        "gp": 56,
+        "team": "SEA",
+        "position": "C"
+      },
+      "Filip Hallander": {
+        "price": 3.3,
+        "points": 4,
+        "goals": 1,
+        "gp": 13,
+        "team": "PIT",
+        "position": "C"
+      },
+      "Nick Perbix": {
+        "price": 5.1,
+        "points": 9,
+        "goals": 3,
+        "gp": 54,
+        "team": "NSH",
+        "position": "D"
+      },
+      "Kaiden Guhle": {
+        "price": 10.64,
+        "points": 4,
+        "goals": 1,
+        "gp": 17,
+        "team": "MTL",
+        "position": "D"
+      },
+      "Cole Koepke": {
+        "price": 1.5,
+        "points": 11,
+        "goals": 5,
+        "gp": 40,
+        "team": "WPG",
+        "position": "L"
+      },
+      "Declan Chisholm": {
+        "price": 10.6,
+        "points": 4,
+        "goals": 1,
+        "gp": 21,
+        "team": "WSH",
+        "position": "D"
+      },
+      "Elmer Soderblom": {
+        "price": 2.56,
+        "points": 3,
+        "goals": 2,
+        "gp": 38,
+        "team": "DET",
+        "position": "L"
+      },
+      "Arber Xhekaj": {
+        "price": 11.37,
+        "points": 2,
+        "goals": 1,
+        "gp": 50,
+        "team": "MTL",
+        "position": "D"
+      },
+      "Michael Carcone": {
+        "price": 3.3,
+        "points": 21,
+        "goals": 11,
+        "gp": 55,
+        "team": "UTA",
+        "position": "L"
+      },
+      "Dylan Guenther": {
+        "price": 19.09,
+        "points": 47,
+        "goals": 25,
+        "gp": 55,
+        "team": "UTA",
+        "position": "R"
+      },
+      "Nick DeSimone": {
+        "price": 1.99,
+        "points": 5,
+        "goals": 2,
+        "gp": 32,
+        "team": "UTA",
+        "position": "D"
+      },
+      "Jonatan Berggren": {
+        "price": 21.23,
+        "points": 14,
+        "goals": 7,
+        "gp": 35,
+        "team": "STL",
+        "position": "R"
+      },
+      "Juuso Parssinen": {
+        "price": 5.1,
+        "points": 3,
+        "goals": 2,
+        "gp": 14,
+        "team": "NYR",
+        "position": "C"
+      },
+      "Pontus Holmberg": {
+        "price": 3.67,
+        "points": 17,
+        "goals": 9,
+        "gp": 48,
+        "team": "TBL",
+        "position": "R"
+      },
+      "Tyler Tucker": {
+        "price": 2.57,
+        "points": 13,
+        "goals": 3,
+        "gp": 52,
+        "team": "STL",
+        "position": "D"
+      },
+      "Simon Holmstrom": {
+        "price": 16.5,
+        "points": 29,
+        "goals": 13,
+        "gp": 56,
+        "team": "NYI",
+        "position": "R"
+      },
+      "Kirill Marchenko": {
+        "price": 15.98,
+        "points": 46,
+        "goals": 19,
+        "gp": 50,
+        "team": "CBJ",
+        "position": "R"
+      },
+      "Justin Kirkland": {
+        "price": 3.0,
+        "points": 2,
+        "goals": 1,
+        "gp": 20,
+        "team": "CGY",
+        "position": "C"
+      },
+      "Parker Wotherspoon": {
+        "price": 4.4,
+        "points": 19,
+        "goals": 3,
+        "gp": 56,
+        "team": "PIT",
+        "position": "D"
+      },
+      "Aatu Raty": {
+        "price": 16.5,
+        "points": 12,
+        "goals": 3,
+        "gp": 45,
+        "team": "VAN",
+        "position": "C"
+      },
+      "Cole Caufield": {
+        "price": 50.92,
+        "points": 57,
+        "goals": 32,
+        "gp": 57,
+        "team": "MTL",
+        "position": "R"
+      },
+      "Dakota Joshua": {
+        "price": 2.2,
+        "points": 10,
+        "goals": 6,
+        "gp": 36,
+        "team": "TOR",
+        "position": "C"
+      },
+      "Jamie Drysdale": {
+        "price": 3.67,
+        "points": 23,
+        "goals": 5,
+        "gp": 53,
+        "team": "PHI",
+        "position": "D"
+      },
+      "Keaton Middleton": {
+        "price": 3.67,
+        "points": 1,
+        "goals": 0,
+        "gp": 3,
+        "team": "COL",
+        "position": "D"
+      },
+      "Joe Veleno": {
+        "price": 4.07,
+        "points": 4,
+        "goals": 2,
+        "gp": 49,
+        "team": "MTL",
+        "position": "C"
+      },
+      "Morgan Barron": {
+        "price": 3.3,
+        "points": 17,
+        "goals": 7,
+        "gp": 47,
+        "team": "WPG",
+        "position": "C"
+      },
+      "Jack Ahcan": {
+        "price": 3.3,
+        "points": 2,
+        "goals": 0,
+        "gp": 9,
+        "team": "COL",
+        "position": "D"
+      },
+      "Joshua Dunne": {
+        "price": 4.37,
+        "points": 4,
+        "goals": 1,
+        "gp": 28,
+        "team": "BUF",
+        "position": "C"
+      },
+      "Tanner Jeannot": {
+        "price": 4.37,
+        "points": 20,
+        "goals": 6,
+        "gp": 53,
+        "team": "BOS",
+        "position": "L"
+      },
+      "Ross Colton": {
+        "price": 4.37,
+        "points": 22,
+        "goals": 7,
+        "gp": 52,
+        "team": "COL",
+        "position": "C"
+      },
+      "Simon Benoit": {
+        "price": 3.3,
+        "points": 3,
+        "goals": 0,
+        "gp": 49,
+        "team": "TOR",
+        "position": "D"
+      },
+      "Mattias Samuelsson": {
+        "price": 3.3,
+        "points": 34,
+        "goals": 11,
+        "gp": 55,
+        "team": "BUF",
+        "position": "D"
+      },
+      "Trevor Zegras": {
+        "price": 20.21,
+        "points": 49,
+        "goals": 20,
+        "gp": 56,
+        "team": "PHI",
+        "position": "C"
+      },
+      "Jeffrey Viel": {
+        "price": 3.67,
+        "points": 3,
+        "goals": 2,
+        "gp": 19,
+        "team": "ANA",
+        "position": "L"
+      },
+      "Lane Pederson": {
+        "price": 4.37,
+        "points": 0,
+        "goals": 0,
+        "gp": 5,
+        "team": "PHI",
+        "position": "C"
+      },
+      "Tanner Laczynski": {
+        "price": 10.81,
+        "points": 2,
+        "goals": 0,
+        "gp": 9,
+        "team": "VGK",
+        "position": "C"
+      },
+      "Parker Kelly": {
+        "price": 4.37,
+        "points": 21,
+        "goals": 12,
+        "gp": 55,
+        "team": "COL",
+        "position": "C"
+      },
+      "Alex Barre-Boulet": {
+        "price": 4.37,
+        "points": 1,
+        "goals": 0,
+        "gp": 1,
+        "team": "COL",
+        "position": "C"
+      },
+      "Cam York": {
+        "price": 10.83,
+        "points": 22,
+        "goals": 4,
+        "gp": 49,
+        "team": "PHI",
+        "position": "D"
+      },
+      "Matt Kiersted": {
+        "price": 4.37,
+        "points": 1,
+        "goals": 0,
+        "gp": 4,
+        "team": "MIN",
+        "position": "D"
+      },
+      "Shane Pinto": {
+        "price": 11.67,
+        "points": 29,
+        "goals": 15,
+        "gp": 47,
+        "team": "OTT",
+        "position": "C"
+      },
+      "Jacob Bryson": {
+        "price": 4.37,
+        "points": 5,
+        "goals": 2,
+        "gp": 35,
+        "team": "BUF",
+        "position": "D"
+      },
+      "Mason McTavish": {
+        "price": 3.67,
+        "points": 30,
+        "goals": 13,
+        "gp": 51,
+        "team": "ANA",
+        "position": "C"
+      },
+      "Taylor Raddysh": {
+        "price": 4.4,
+        "points": 13,
+        "goals": 8,
+        "gp": 54,
+        "team": "NYR",
+        "position": "R"
+      },
+      "Nils Lundkvist": {
+        "price": 14.99,
+        "points": 7,
+        "goals": 3,
+        "gp": 30,
+        "team": "DAL",
+        "position": "D"
+      },
+      "Dawson Mercer": {
+        "price": 11.92,
+        "points": 30,
+        "goals": 13,
+        "gp": 57,
+        "team": "NJD",
+        "position": "C"
+      },
+      "Jonas Rondbjerg": {
+        "price": 5.1,
+        "points": 1,
+        "goals": 0,
+        "gp": 4,
+        "team": "VGK",
+        "position": "R"
+      },
+      "Alex Newhook": {
+        "price": 11.87,
+        "points": 12,
+        "goals": 6,
+        "gp": 17,
+        "team": "MTL",
+        "position": "C"
+      },
+      "Lucas Raymond": {
+        "price": 25.35,
+        "points": 60,
+        "goals": 19,
+        "gp": 56,
+        "team": "DET",
+        "position": "L"
+      },
+      "Cole Perfetti": {
+        "price": 11.01,
+        "points": 18,
+        "goals": 6,
+        "gp": 42,
+        "team": "WPG",
+        "position": "C"
+      },
+      "Jake Neighbours": {
+        "price": 3.67,
+        "points": 25,
+        "goals": 14,
+        "gp": 44,
+        "team": "STL",
+        "position": "L"
+      },
+      "Moritz Seider": {
+        "price": 44.68,
+        "points": 38,
+        "goals": 7,
+        "gp": 58,
+        "team": "DET",
+        "position": "D"
+      },
+      "Mason Geertsen": {
+        "price": 1.47,
+        "points": 0,
+        "goals": 0,
+        "gp": 5,
+        "team": "BUF",
+        "position": "L"
+      },
+      "Yegor Chinakhov": {
+        "price": 3.3,
+        "points": 18,
+        "goals": 11,
+        "gp": 47,
+        "team": "PIT",
+        "position": "R"
+      },
+      "Hendrix Lapierre": {
+        "price": 3.67,
+        "points": 9,
+        "goals": 2,
+        "gp": 56,
+        "team": "WSH",
+        "position": "C"
+      },
+      "Brandon Duhaime": {
+        "price": 3.3,
+        "points": 6,
+        "goals": 4,
+        "gp": 59,
+        "team": "WSH",
+        "position": "R"
+      },
+      "William Eklund": {
+        "price": 11.93,
+        "points": 35,
+        "goals": 11,
+        "gp": 51,
+        "team": "SJS",
+        "position": "L"
+      },
+      "Dysin Mayo": {
+        "price": 5.1,
+        "points": 1,
+        "goals": 0,
+        "gp": 3,
+        "team": "CBJ",
+        "position": "D"
+      },
+      "Vasily Podkolzin": {
+        "price": 3.3,
+        "points": 25,
+        "goals": 12,
+        "gp": 58,
+        "team": "EDM",
+        "position": "R"
+      },
+      "Quinton Byfield": {
+        "price": 12.77,
+        "points": 30,
+        "goals": 11,
+        "gp": 55,
+        "team": "LAK",
+        "position": "R"
+      },
+      "Anton Lundell": {
+        "price": 2.86,
+        "points": 40,
+        "goals": 16,
+        "gp": 54,
+        "team": "FLA",
+        "position": "C"
+      },
+      "Jacob Bernard-Docker": {
+        "price": 3.3,
+        "points": 4,
+        "goals": 0,
+        "gp": 42,
+        "team": "DET",
+        "position": "D"
+      },
+      "Pavel Dorofeyev": {
+        "price": 11.79,
+        "points": 44,
+        "goals": 26,
+        "gp": 57,
+        "team": "VGK",
+        "position": "R"
+      },
+      "Cole Sillinger": {
+        "price": 11.2,
+        "points": 26,
+        "goals": 6,
+        "gp": 55,
+        "team": "CBJ",
+        "position": "C"
+      },
+      "Jonah Gadjovich": {
+        "price": 3.3,
+        "points": 3,
+        "goals": 0,
+        "gp": 10,
+        "team": "FLA",
+        "position": "L"
+      },
+      "Alexander Holtz": {
+        "price": 3.3,
+        "points": 8,
+        "goals": 3,
+        "gp": 26,
+        "team": "VGK",
+        "position": "R"
+      },
+      "Connor Dewar": {
+        "price": 4.37,
+        "points": 24,
+        "goals": 13,
+        "gp": 56,
+        "team": "PIT",
+        "position": "C"
+      },
+      "Brett Leason": {
+        "price": 4.37,
+        "points": 0,
+        "goals": 0,
+        "gp": 6,
+        "team": "WSH",
+        "position": "R"
+      },
+      "Aliaksei Protas": {
+        "price": 3.67,
+        "points": 38,
+        "goals": 19,
+        "gp": 56,
+        "team": "WSH",
+        "position": "C"
+      },
+      "Riley Tufte": {
+        "price": 3.67,
+        "points": 1,
+        "goals": 1,
+        "gp": 4,
+        "team": "BOS",
+        "position": "L"
+      },
+      "Alex Turcotte": {
+        "price": 5.84,
+        "points": 12,
+        "goals": 3,
+        "gp": 49,
+        "team": "LAK",
+        "position": "C"
+      },
+      "Paul Cotter": {
+        "price": 4.37,
+        "points": 10,
+        "goals": 5,
+        "gp": 54,
+        "team": "NJD",
+        "position": "L"
+      },
+      "Cole Schwindt": {
+        "price": 4.37,
+        "points": 4,
+        "goals": 3,
+        "gp": 21,
+        "team": "FLA",
+        "position": "R"
+      },
+      "Sean Durzi": {
+        "price": 5.1,
+        "points": 19,
+        "goals": 5,
+        "gp": 36,
+        "team": "UTA",
+        "position": "D"
+      },
+      "Fabian Zetterlund": {
+        "price": 5.1,
+        "points": 22,
+        "goals": 12,
+        "gp": 57,
+        "team": "OTT",
+        "position": "L"
+      },
+      "Jack Drury": {
+        "price": 7.31,
+        "points": 19,
+        "goals": 8,
+        "gp": 55,
+        "team": "COL",
+        "position": "C"
+      },
+      "Isaak Phillips": {
+        "price": 4.37,
+        "points": 0,
+        "goals": 0,
+        "gp": 2,
+        "team": "WPG",
+        "position": "D"
+      },
+      "Daniil Miromanov": {
+        "price": 5.1,
+        "points": 0,
+        "goals": 0,
+        "gp": 1,
+        "team": "CGY",
+        "position": "D"
+      },
+      "Alexey Toropchenko": {
+        "price": 3.67,
+        "points": 7,
+        "goals": 3,
+        "gp": 41,
+        "team": "STL",
+        "position": "R"
+      },
+      "Alex Steeves": {
+        "price": 3.3,
+        "points": 16,
+        "goals": 9,
+        "gp": 38,
+        "team": "BOS",
+        "position": "C"
+      },
+      "Justin Danforth": {
+        "price": 3.67,
+        "points": 0,
+        "goals": 0,
+        "gp": 4,
+        "team": "BUF",
+        "position": "R"
+      },
+      "Justin Barron": {
+        "price": 3.67,
+        "points": 5,
+        "goals": 0,
+        "gp": 32,
+        "team": "NSH",
+        "position": "D"
+      },
+      "Seth Jarvis": {
+        "price": 30.49,
+        "points": 43,
+        "goals": 25,
+        "gp": 49,
+        "team": "CAR",
+        "position": "C"
+      },
+      "Alexis Lafreniere": {
+        "price": 23.13,
+        "points": 32,
+        "goals": 12,
+        "gp": 57,
+        "team": "NYR",
+        "position": "L"
+      },
+      "Philip Broberg": {
+        "price": 3.67,
+        "points": 19,
+        "goals": 3,
+        "gp": 56,
+        "team": "STL",
+        "position": "D"
+      },
+      "Bowen Byram": {
+        "price": 3.3,
+        "points": 28,
+        "goals": 10,
+        "gp": 57,
+        "team": "BUF",
+        "position": "D"
+      },
+      "Joel Kiviranta": {
+        "price": 3.67,
+        "points": 7,
+        "goals": 2,
+        "gp": 28,
+        "team": "COL",
+        "position": "L"
+      },
+      "Josh Norris": {
+        "price": 3.3,
+        "points": 17,
+        "goals": 6,
+        "gp": 19,
+        "team": "BUF",
+        "position": "C"
+      },
+      "Morgan Geekie": {
+        "price": 20.39,
+        "points": 54,
+        "goals": 32,
+        "gp": 56,
+        "team": "BOS",
+        "position": "C"
+      },
+      "Ty Dellandrea": {
+        "price": 3.3,
+        "points": 11,
+        "goals": 2,
+        "gp": 42,
+        "team": "SJS",
+        "position": "C"
+      },
+      "Dylan Coghlan": {
+        "price": 2.04,
+        "points": 0,
+        "goals": 0,
+        "gp": 2,
+        "team": "VGK",
+        "position": "D"
+      },
+      "Gabe Vilardi": {
+        "price": 3.3,
+        "points": 50,
+        "goals": 21,
+        "gp": 56,
+        "team": "WPG",
+        "position": "C"
+      },
+      "Pierre-Olivier Joseph": {
+        "price": 3.3,
+        "points": 4,
+        "goals": 1,
+        "gp": 21,
+        "team": "VAN",
+        "position": "D"
+      },
+      "Victor Soderstrom": {
+        "price": 2.04,
+        "points": 1,
+        "goals": 0,
+        "gp": 8,
+        "team": "BOS",
+        "position": "D"
+      },
+      "Thomas Harley": {
+        "price": 3.67,
+        "points": 23,
+        "goals": 5,
+        "gp": 45,
+        "team": "DAL",
+        "position": "D"
+      },
+      "Jansen Harkins": {
+        "price": 3.3,
+        "points": 5,
+        "goals": 3,
+        "gp": 31,
+        "team": "ANA",
+        "position": "C"
+      },
+      "Ryan McLeod": {
+        "price": 3.3,
+        "points": 41,
+        "goals": 11,
+        "gp": 57,
+        "team": "BUF",
+        "position": "C"
+      },
+      "Egor Zamula": {
+        "price": 3.3,
+        "points": 2,
+        "goals": 0,
+        "gp": 23,
+        "team": "CBJ",
+        "position": "D"
+      },
+      "Mikey Anderson": {
+        "price": 3.3,
+        "points": 9,
+        "goals": 2,
+        "gp": 54,
+        "team": "LAK",
+        "position": "D"
+      },
+      "Connor McMichael": {
+        "price": 3.3,
+        "points": 31,
+        "goals": 8,
+        "gp": 55,
+        "team": "WSH",
+        "position": "C"
+      },
+      "Jason Robertson": {
+        "price": 22.03,
+        "points": 66,
+        "goals": 32,
+        "gp": 57,
+        "team": "DAL",
+        "position": "L"
+      },
+      "Philipp Kurashev": {
+        "price": 3.38,
+        "points": 17,
+        "goals": 7,
+        "gp": 34,
+        "team": "SJS",
+        "position": "C"
+      },
+      "Peyton Krebs": {
+        "price": 2.04,
+        "points": 25,
+        "goals": 7,
+        "gp": 57,
+        "team": "BUF",
+        "position": "C"
+      },
+      "Jake Evans": {
+        "price": 3.67,
+        "points": 13,
+        "goals": 7,
+        "gp": 43,
+        "team": "MTL",
+        "position": "C"
+      },
+      "Timothy Liljegren": {
+        "price": 3.85,
+        "points": 11,
+        "goals": 1,
+        "gp": 42,
+        "team": "SJS",
+        "position": "D"
+      },
+      "Kirill Kaprizov": {
+        "price": 195.0,
+        "points": 70,
+        "goals": 32,
+        "gp": 58,
+        "team": "MIN",
+        "position": "L"
+      },
+      "Jalen Chatfield": {
+        "price": 10.13,
+        "points": 13,
+        "goals": 1,
+        "gp": 50,
+        "team": "CAR",
+        "position": "D"
+      },
+      "Alexander Romanov": {
+        "price": 3.67,
+        "points": 1,
+        "goals": 0,
+        "gp": 15,
+        "team": "NYI",
+        "position": "D"
+      },
+      "Mason Marchment": {
+        "price": 2.04,
+        "points": 26,
+        "goals": 13,
+        "gp": 43,
+        "team": "CBJ",
+        "position": "L"
+      },
+      "Nils Hoglander": {
+        "price": 3.3,
+        "points": 2,
+        "goals": 0,
+        "gp": 18,
+        "team": "VAN",
+        "position": "L"
+      },
+      "K'Andre Miller": {
+        "price": 2.85,
+        "points": 23,
+        "goals": 4,
+        "gp": 49,
+        "team": "CAR",
+        "position": "D"
+      },
+      "Niko Mikkola": {
+        "price": 3.3,
+        "points": 9,
+        "goals": 1,
+        "gp": 57,
+        "team": "FLA",
+        "position": "D"
+      },
+      "John Leonard": {
+        "price": 3.67,
+        "points": 4,
+        "goals": 2,
+        "gp": 9,
+        "team": "DET",
+        "position": "L"
+      },
+      "Keegan Kolesar": {
+        "price": 3.38,
+        "points": 15,
+        "goals": 5,
+        "gp": 57,
+        "team": "VGK",
+        "position": "R"
+      },
+      "Alec Regula": {
+        "price": 3.38,
+        "points": 3,
+        "goals": 0,
+        "gp": 29,
+        "team": "EDM",
+        "position": "D"
+      },
+      "Cole Smith": {
+        "price": 2.04,
+        "points": 10,
+        "goals": 6,
+        "gp": 38,
+        "team": "NSH",
+        "position": "R"
+      },
+      "Tim Stutzle": {
+        "price": 56.04,
+        "points": 61,
+        "goals": 28,
+        "gp": 57,
+        "team": "OTT",
+        "position": "C"
+      },
+      "Darren Raddysh": {
+        "price": 3.57,
+        "points": 52,
+        "goals": 17,
+        "gp": 49,
+        "team": "TBL",
+        "position": "D"
+      },
+      "Pius Suter": {
+        "price": 2.93,
+        "points": 15,
+        "goals": 7,
+        "gp": 40,
+        "team": "STL",
+        "position": "C"
+      },
+      "Yegor Sharangovich": {
+        "price": 3.12,
+        "points": 20,
+        "goals": 11,
+        "gp": 52,
+        "team": "CGY",
+        "position": "C"
+      },
+      "Brandon Hagel": {
+        "price": 2.04,
+        "points": 54,
+        "goals": 27,
+        "gp": 50,
+        "team": "TBL",
+        "position": "L"
+      },
+      "Steven Lorentz": {
+        "price": 3.67,
+        "points": 14,
+        "goals": 4,
+        "gp": 50,
+        "team": "TOR",
+        "position": "C"
+      },
+      "Dylan Cozens": {
+        "price": 3.67,
+        "points": 43,
+        "goals": 18,
+        "gp": 57,
+        "team": "OTT",
+        "position": "C"
+      },
+      "Arthur Kaliyev": {
+        "price": 3.3,
+        "points": 1,
+        "goals": 0,
+        "gp": 2,
+        "team": "OTT",
+        "position": "R"
+      },
+      "Logan Stanley": {
+        "price": 3.3,
+        "points": 18,
+        "goals": 9,
+        "gp": 55,
+        "team": "WPG",
+        "position": "D"
+      },
+      "Artem Zub": {
+        "price": 3.3,
+        "points": 19,
+        "goals": 4,
+        "gp": 56,
+        "team": "OTT",
+        "position": "D"
+      },
+      "Kevin Bahl": {
+        "price": 3.3,
+        "points": 13,
+        "goals": 3,
+        "gp": 55,
+        "team": "CGY",
+        "position": "D"
+      },
+      "Michael Bunting": {
+        "price": 1.83,
+        "points": 30,
+        "goals": 12,
+        "gp": 57,
+        "team": "NSH",
+        "position": "L"
+      },
+      "Drew O'Connor": {
+        "price": 3.3,
+        "points": 21,
+        "goals": 13,
+        "gp": 57,
+        "team": "VAN",
+        "position": "L"
+      },
+      "Nikita Tolopilo": {
+        "price": 12.77,
+        "wins": 3,
+        "svpct": 0.9097,
+        "team": "VAN",
+        "position": "G"
+      },
+      "Jesper Wallstedt": {
+        "price": 10.28,
+        "wins": 14,
+        "svpct": 0.9145,
+        "team": "MIN",
+        "position": "G"
+      },
+      "Devin Cooley": {
+        "price": 14.6,
+        "wins": 7,
+        "svpct": 0.9214,
+        "team": "CGY",
+        "position": "G"
+      },
+      "Drew Commesso": {
+        "price": 2.76,
+        "wins": 1,
+        "svpct": 0.9167,
+        "team": "CHI",
+        "position": "G"
+      },
+      "Aleksei Kolosov": {
+        "price": 2.76,
+        "wins": 0,
+        "svpct": 0.8298,
+        "team": "PHI",
+        "position": "G"
+      },
+      "Brandon Bussi": {
+        "price": 22.35,
+        "wins": 23,
+        "svpct": 0.9081,
+        "team": "CAR",
+        "position": "G"
+      },
+      "Trent Miner": {
+        "price": 12.88,
+        "wins": 1,
+        "svpct": 0.9327,
+        "team": "COL",
+        "position": "G"
+      },
+      "Jakub Dobes": {
+        "price": 21.3,
+        "wins": 18,
+        "svpct": 0.8915,
+        "team": "MTL",
+        "position": "G"
+      },
+      "Yaroslav Askarov": {
+        "price": 13.0,
+        "wins": 17,
+        "svpct": 0.8888,
+        "team": "SJS",
+        "position": "G"
+      },
+      "Dustin Wolf": {
+        "price": 10.5,
+        "wins": 16,
+        "svpct": 0.8963,
+        "team": "CGY",
+        "position": "G"
+      },
+      "Jiri Patera": {
+        "price": 3.3,
+        "wins": 0,
+        "svpct": 0.825,
+        "team": "VAN",
+        "position": "G"
+      },
+      "Jet Greaves": {
+        "price": 16.18,
+        "wins": 18,
+        "svpct": 0.91,
+        "team": "CBJ",
+        "position": "G"
+      },
+      "Leevi Merilainen": {
+        "price": 3.3,
+        "wins": 8,
+        "svpct": 0.86,
+        "team": "OTT",
+        "position": "G"
+      },
+      "Clay Stevenson": {
+        "price": 5.1,
+        "wins": 2,
+        "svpct": 0.9041,
+        "team": "WSH",
+        "position": "G"
+      },
+      "Matt Murray": {
+        "price": 5.1,
+        "wins": 0,
+        "svpct": 0.9216,
+        "team": "SEA",
+        "position": "G"
+      },
+      "Arturs Silovs": {
+        "price": 3.3,
+        "wins": 11,
+        "svpct": 0.8959,
+        "team": "PIT",
+        "position": "G"
+      },
+      "Hunter Shepard": {
+        "price": 2.71,
+        "wins": 0,
+        "svpct": 0.8333,
+        "team": "OTT",
+        "position": "G"
+      },
+      "Dennis Hildeby": {
+        "price": 9.21,
+        "wins": 5,
+        "svpct": 0.9119,
+        "team": "TOR",
+        "position": "G"
+      },
+      "Lukas Dostal": {
+        "price": 20.21,
+        "wins": 21,
+        "svpct": 0.8975,
+        "team": "ANA",
+        "position": "G"
+      },
+      "Pyotr Kochetkov": {
+        "price": 3.0,
+        "wins": 6,
+        "svpct": 0.8995,
+        "team": "CAR",
+        "position": "G"
+      },
+      "Mads Sogaard": {
+        "price": 10.63,
+        "wins": 1,
+        "svpct": 0.8333,
+        "team": "OTT",
+        "position": "G"
+      },
+      "Samuel Ersson": {
+        "price": 24.97,
+        "wins": 8,
+        "svpct": 0.8561,
+        "team": "PHI",
+        "position": "G"
+      },
+      "Ukko-Pekka Luukkonen": {
+        "price": 3.67,
+        "wins": 11,
+        "svpct": 0.9025,
+        "team": "BUF",
+        "position": "G"
+      },
+      "Logan Thompson": {
+        "price": 14.99,
+        "wins": 19,
+        "svpct": 0.9122,
+        "team": "WSH",
+        "position": "G"
+      },
+      "Spencer Knight": {
+        "price": 11.42,
+        "wins": 16,
+        "svpct": 0.9076,
+        "team": "CHI",
+        "position": "G"
+      },
+      "Filip Gustavsson": {
+        "price": 11.2,
+        "wins": 20,
+        "svpct": 0.9074,
+        "team": "MIN",
+        "position": "G"
+      },
+      "Jeremy Swayman": {
+        "price": 6.98,
+        "wins": 22,
+        "svpct": 0.9034,
+        "team": "BOS",
+        "position": "G"
+      },
+      "Karel Vejmelka": {
+        "price": 11.79,
+        "wins": 27,
+        "svpct": 0.9027,
+        "team": "UTA",
+        "position": "G"
+      },
+      "Justus Annunen": {
+        "price": 3.67,
+        "wins": 5,
+        "svpct": 0.8863,
+        "team": "NSH",
+        "position": "G"
+      },
+      "Akira Schmid": {
+        "price": 3.3,
+        "wins": 16,
+        "svpct": 0.8948,
+        "team": "VGK",
+        "position": "G"
+      },
+      "Arvid Soderblom": {
+        "price": 11.2,
+        "wins": 5,
+        "svpct": 0.8738,
+        "team": "CHI",
+        "position": "G"
+      },
+      "Daniil Tarasov": {
+        "price": 3.5,
+        "wins": 8,
+        "svpct": 0.8992,
+        "team": "FLA",
+        "position": "G"
+      },
+      "Nico Daws": {
+        "price": 3.67,
+        "wins": 1,
+        "svpct": 0.9677,
+        "team": "NJD",
+        "position": "G"
+      },
+      "Joseph Woll": {
+        "price": 36.71,
+        "wins": 13,
+        "svpct": 0.9098,
+        "team": "TOR",
+        "position": "G"
+      },
+      "Vitek Vanecek": {
+        "price": 10.28,
+        "wins": 3,
+        "svpct": 0.8844,
+        "team": "UTA",
+        "position": "G"
+      },
+      "Connor Ingram": {
+        "price": 3.67,
+        "wins": 6,
+        "svpct": 0.8968,
+        "team": "EDM",
+        "position": "G"
+      },
+      "Jonas Johansson": {
+        "price": 2.04,
+        "wins": 10,
+        "svpct": 0.8903,
+        "team": "TBL",
+        "position": "G"
+      },
+      "Jake Oettinger": {
+        "price": 13.26,
+        "wins": 23,
+        "svpct": 0.897,
+        "team": "DAL",
+        "position": "G"
+      },
+      "Ilya Sorokin": {
+        "price": 3.67,
+        "wins": 20,
+        "svpct": 0.916,
+        "team": "NYI",
+        "position": "G"
+      },
+      "Stuart Skinner": {
+        "price": 3.67,
+        "wins": 19,
+        "svpct": 0.8898,
+        "team": "PIT",
+        "position": "G"
+      },
+      "Kevin Lankinen": {
+        "price": 3.67,
+        "wins": 7,
+        "svpct": 0.8756,
+        "team": "VAN",
+        "position": "G"
+      },
+      "Joel Hofer": {
+        "price": 2.93,
+        "wins": 12,
+        "svpct": 0.8951,
+        "team": "STL",
+        "position": "G"
+      }
+    }
+  },
+  "2026-02-16": {
+    "meta": {
+      "timestamp": "2026-02-16 00:47",
       "matched_players": 390,
       "skaters_with_price": 348,
       "goalies_with_price": 42

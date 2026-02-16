@@ -40,14 +40,14 @@ RESULTS_JSON_PATH = os.path.join(SCRIPT_DIR, "card_prices_results.json")
 HISTORY_PATH = os.path.join(SCRIPT_DIR, "price_history.json")
 BACKUP_DIR = os.path.join(SCRIPT_DIR, "backups")
 ARCHIVE_PATH = os.path.join(SCRIPT_DIR, "card_archive.csv")
-MONEY_COLS = ['Fair Value', 'Median (All)', 'Min', 'Max']
+MONEY_COLS = ['Fair Value', 'Median (All)', 'Min', 'Max', 'Cost Basis']
 
 # Master DB paths (shared across all users)
 MASTER_DB_DIR = os.path.join(SCRIPT_DIR, "data", "master_db")
 MASTER_DB_PATH = os.path.join(MASTER_DB_DIR, "young_guns.csv")
 
 # Empty CSV columns for new users
-EMPTY_CSV_COLS = ['Card Name', 'Fair Value', 'Trend', 'Top 3 Prices', 'Median (All)', 'Min', 'Max', 'Num Sales', 'Tags']
+EMPTY_CSV_COLS = ['Card Name', 'Fair Value', 'Trend', 'Top 3 Prices', 'Median (All)', 'Min', 'Max', 'Num Sales', 'Tags', 'Cost Basis', 'Purchase Date']
 
 
 # ── User management ──────────────────────────────────────────────
@@ -717,6 +717,23 @@ def get_player_stats_for_card(player_name, path=None):
     return result
 
 
+def get_player_bio_for_card(player_name, path=None):
+    """Get bio data (nationality, draft) for a card's player."""
+    stats = load_nhl_player_stats(player_name, path=path)
+    if not stats or not stats.get('bio'):
+        return None
+    return stats['bio']
+
+
+def get_all_player_bios(path=None):
+    """Get all player bios as a dict keyed by player name."""
+    data = load_nhl_player_stats(path=path)
+    if not data:
+        return {}
+    players = data.get('players', {})
+    return {name: entry['bio'] for name, entry in players.items() if entry.get('bio')}
+
+
 def compute_correlation_snapshot(cards_df, nhl_players, nhl_standings):
     """Compute a price-vs-performance correlation snapshot.
 
@@ -1193,6 +1210,13 @@ def load_master_db(path=MASTER_DB_PATH):
     df = pd.read_csv(path)
     df['Team'] = df['Team'].fillna('').str.strip()
     df['Position'] = df['Position'].fillna('').str.strip()
+    # Ensure cost basis / ownership columns exist
+    for col, default in [('Owned', 0), ('CostBasis', 0), ('PurchaseDate', '')]:
+        if col not in df.columns:
+            df[col] = default
+    df['Owned'] = pd.to_numeric(df['Owned'], errors='coerce').fillna(0).astype(int)
+    df['CostBasis'] = pd.to_numeric(df['CostBasis'], errors='coerce').fillna(0)
+    df['PurchaseDate'] = df['PurchaseDate'].fillna('').astype(str)
     return df
 
 

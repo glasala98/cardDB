@@ -17,6 +17,7 @@ try:
         load_master_db, save_master_db,
         load_yg_price_history, load_yg_portfolio_history, load_yg_raw_sales, load_yg_market_timeline,
         load_nhl_player_stats, load_nhl_standings, get_player_stats_for_card,
+        get_player_bio_for_card, get_all_player_bios,
         load_correlation_history, CANADIAN_TEAM_ABBREVS,
         TEAM_ABBREV_TO_NAME,
         CSV_PATH, MONEY_COLS, PARSED_COLS
@@ -470,6 +471,8 @@ if page == "Card Ledger" and not public_view:
             variant = st.text_input("Subset / Variant", value=scanned.get('variant', ''), placeholder="e.g. Young Guns, Marquee Rookie, Violet Pixel")
             serial = st.text_input("Serial #", placeholder="e.g. 70/99, 1/250 (optional)")
             grade = st.text_input("Grade", value=scanned.get('grade', ''), placeholder="e.g. PSA 10 (optional)")
+            cost_basis = st.number_input("Cost Basis ($)", min_value=0.0, step=0.01, value=0.0, help="What you paid (optional)")
+            purchase_date = st.date_input("Purchase Date", value=None, help="When you bought it (optional)")
             scrape_prices = st.checkbox("Scrape eBay for prices", value=True)
             add_submitted = st.form_submit_button("Add Card")
 
@@ -515,20 +518,26 @@ if page == "Card Ledger" and not public_view:
                         'Median (All)': stats['median_all'],
                         'Min': stats['min'],
                         'Max': stats['max'],
-                        'Num Sales': stats['num_sales']
+                        'Num Sales': stats['num_sales'],
+                        'Cost Basis': cost_basis if cost_basis > 0 else None,
+                        'Purchase Date': purchase_date.strftime('%Y-%m-%d') if purchase_date else '',
                     }])
                     append_price_history(card_name, stats['fair_price'], stats['num_sales'], history_path=_history_path)
                     st.sidebar.success(f"Found {stats['num_sales']} sales! Fair value: ${stats['fair_price']:.2f}")
                 else:
                     new_row = pd.DataFrame([{
                         'Card Name': card_name, 'Fair Value': 5.0, 'Trend': 'no data',
-                        'Top 3 Prices': '', 'Median (All)': 5.0, 'Min': 5.0, 'Max': 5.0, 'Num Sales': 0
+                        'Top 3 Prices': '', 'Median (All)': 5.0, 'Min': 5.0, 'Max': 5.0, 'Num Sales': 0,
+                        'Cost Basis': cost_basis if cost_basis > 0 else None,
+                        'Purchase Date': purchase_date.strftime('%Y-%m-%d') if purchase_date else '',
                     }])
                     st.sidebar.warning("No sales found. Defaulted to $5.00.")
             else:
                 new_row = pd.DataFrame([{
                     'Card Name': card_name, 'Fair Value': 5.0, 'Trend': 'no data',
-                    'Top 3 Prices': '', 'Median (All)': 5.0, 'Min': 5.0, 'Max': 5.0, 'Num Sales': 0
+                    'Top 3 Prices': '', 'Median (All)': 5.0, 'Min': 5.0, 'Max': 5.0, 'Num Sales': 0,
+                    'Cost Basis': cost_basis if cost_basis > 0 else None,
+                    'Purchase Date': purchase_date.strftime('%Y-%m-%d') if purchase_date else '',
                 }])
 
             st.session_state.df = pd.concat([st.session_state.df, new_row], ignore_index=True)
@@ -631,6 +640,22 @@ if page == "Dashboard":
     dc4, dc5 = st.columns(2)
     dc4.metric("Trending Up", cards_up)
     dc5.metric("Trending Down", cards_down)
+
+    # Portfolio P&L (if any cards have cost basis)
+    if 'Cost Basis' in df.columns:
+        invested_df = df[df['Cost Basis'].notna() & (df['Cost Basis'] > 0)]
+        if len(invested_df) > 0:
+            total_cost_basis = invested_df['Cost Basis'].sum()
+            total_current = invested_df['Fair Value'].sum()
+            total_pnl = total_current - total_cost_basis
+            pnl_pct = (total_pnl / total_cost_basis * 100) if total_cost_basis > 0 else 0
+            st.markdown("---")
+            st.markdown("**Portfolio P&L**")
+            pc1, pc2, pc3, pc4 = st.columns(4)
+            pc1.metric("Invested", f"${total_cost_basis:,.2f}")
+            pc2.metric("Current Value", f"${total_current:,.2f}")
+            pc3.metric("Unrealized P&L", f"${total_pnl:+,.2f}", delta=f"{pnl_pct:+.1f}%")
+            pc4.metric("Cards Tracked", len(invested_df))
 
     st.markdown("---")
 
@@ -875,7 +900,7 @@ elif page == "Card Ledger":
         mask &= df['Tags'].str.contains(tag_filter, case=False, na=False)
     filtered_df = df[mask].copy()
 
-    display_cols = ['Player', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Tags', 'Fair Value', 'Trend', 'Num Sales', 'Min', 'Max', 'Top 3 Prices', 'Last Scraped']
+    display_cols = ['Player', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Tags', 'Fair Value', 'Cost Basis', 'Trend', 'Num Sales', 'Min', 'Max', 'Top 3 Prices', 'Last Scraped']
     edit_df = filtered_df[display_cols].copy()
     edit_df['Top 3 Prices'] = edit_df['Top 3 Prices'].fillna('')
     edit_df['Last Scraped'] = edit_df['Last Scraped'].fillna('')
@@ -1412,13 +1437,15 @@ elif page == "Young Guns DB":
         seasons = sorted(master_df['Season'].unique().tolist(), reverse=True)
         teams = sorted([t for t in master_df['Team'].unique().tolist() if t])
 
-        sf1, sf2, sf3 = st.columns([3, 1, 1])
+        sf1, sf2, sf3, sf4 = st.columns([3, 1, 1, 1])
         with sf1:
             master_search = st.text_input("Search", placeholder="Search by player, team, season...", key="master_search", label_visibility="collapsed")
         with sf2:
             season_filter = st.selectbox("Season", ["All Seasons"] + seasons, key="master_season", label_visibility="collapsed")
         with sf3:
             team_filter = st.selectbox("Team", ["All Teams"] + teams, key="master_team", label_visibility="collapsed")
+        with sf4:
+            owned_only = st.checkbox("My Cards", key="owned_filter")
         # Unused filters — keep defaults
         positions = sorted([p for p in master_df['Position'].unique().tolist() if p])
         pos_filter = "All Positions"
@@ -1440,6 +1467,20 @@ elif page == "Young Guns DB":
             searchable = (filtered['PlayerName'].fillna('') + ' ' + filtered['Team'].fillna('') + ' ' + filtered['Season'].fillna('')).str.lower()
             search_mask = searchable.apply(lambda x: all(t in x for t in terms))
             filtered = filtered[search_mask]
+        if owned_only:
+            filtered = filtered[filtered['Owned'] == 1]
+
+        # Portfolio summary for owned cards
+        if owned_only and len(filtered) > 0:
+            _owned_invested = filtered['CostBasis'].sum()
+            _owned_fair = filtered[filtered['FairValue'].notna() & (filtered['FairValue'] > 0)]['FairValue'].sum()
+            _owned_pnl = _owned_fair - _owned_invested if _owned_invested > 0 else 0
+            _owned_pct = (_owned_pnl / _owned_invested * 100) if _owned_invested > 0 else 0
+            pm1, pm2, pm3, pm4 = st.columns(4)
+            pm1.metric("Cards Owned", len(filtered))
+            pm2.metric("Total Invested", f"${_owned_invested:,.2f}")
+            pm3.metric("Current Value", f"${_owned_fair:,.2f}")
+            pm4.metric("P&L", f"${_owned_pnl:+,.2f}", delta=f"{_owned_pct:+.1f}%")
 
         # Sort
         filtered = filtered.sort_values(['Season', 'CardNumber'], ascending=[False, True])
@@ -1699,6 +1740,18 @@ elif page == "Young Guns DB":
                     _nhl_team = TEAM_ABBREV_TO_NAME.get(_nhl_stats['current_team'], _nhl_stats['current_team'])
                     _nhl_pos = _nhl_stats['position']
                     st.markdown(f"**NHL Stats** — {_nhl_team} ({_nhl_pos})")
+                    _bio = get_player_bio_for_card(_player)
+                    if _bio:
+                        _bio_parts = []
+                        if _bio.get('birth_country'):
+                            city = _bio.get('birth_city', '')
+                            _bio_parts.append(f"Born: {city + ', ' if city else ''}{_bio['birth_country']}")
+                        if _bio.get('draft_year'):
+                            _bio_parts.append(f"Draft: {_bio['draft_year']} Rd {_bio['draft_round']}, #{_bio['draft_overall']}")
+                        else:
+                            _bio_parts.append("Undrafted")
+                        if _bio_parts:
+                            st.caption(" | ".join(_bio_parts))
 
                     if _nhl_stats['type'] == 'skater':
                         nc1, nc2, nc3, nc4, nc5, nc6 = st.columns(6)
@@ -1736,6 +1789,75 @@ elif page == "Young Guns DB":
                             )
                         fig_nhl.update_layout(template="plotly_dark", height=250)
                         st.plotly_chart(fig_nhl, use_container_width=True)
+
+                    # ── Player Trajectory: Price + Stats Combined ──
+                    if _has_history and len(_nhl_history) >= 2:
+                        from plotly.subplots import make_subplots
+                        st.markdown("**Player Trajectory** — Card Value vs On-Ice Performance")
+                        traj_price_df = pd.DataFrame(card_history)
+                        traj_price_df['date'] = pd.to_datetime(traj_price_df['date'])
+                        traj_price_df = traj_price_df.sort_values('date')
+
+                        traj_stats_df = pd.DataFrame(_nhl_history)
+                        traj_stats_df['date'] = pd.to_datetime(traj_stats_df['date'])
+                        traj_stats_df = traj_stats_df.sort_values('date')
+
+                        if _nhl_stats['type'] == 'skater':
+                            _stat_col, _stat_label = 'points', 'NHL Points'
+                        else:
+                            _stat_col, _stat_label = 'wins', 'Wins'
+
+                        fig_traj = make_subplots(specs=[[{"secondary_y": True}]])
+                        fig_traj.add_trace(
+                            go.Scatter(
+                                x=traj_price_df['date'], y=traj_price_df['fair_value'],
+                                mode='lines+markers', name='Card Price ($)',
+                                line=dict(color='#636EFA', width=2), marker=dict(size=5),
+                            ), secondary_y=False,
+                        )
+                        fig_traj.add_trace(
+                            go.Scatter(
+                                x=traj_stats_df['date'], y=traj_stats_df[_stat_col],
+                                mode='lines+markers', name=_stat_label,
+                                line=dict(color='#00CC96', width=2), marker=dict(size=5),
+                            ), secondary_y=True,
+                        )
+                        fig_traj.update_layout(
+                            template="plotly_dark", height=350,
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                        )
+                        fig_traj.update_yaxes(title_text="Card Price ($)", secondary_y=False)
+                        fig_traj.update_yaxes(title_text=_stat_label, secondary_y=True)
+                        st.plotly_chart(fig_traj, use_container_width=True)
+
+                # ── Ownership / Cost Basis ──
+                if not public_view:
+                    st.markdown("---")
+                    st.markdown("**Ownership**")
+                    _cur_owned = bool(card_row_master.get('Owned', 0))
+                    _cur_cost = float(card_row_master.get('CostBasis', 0) or 0)
+                    _cur_pdate = str(card_row_master.get('PurchaseDate', '') or '')
+                    if _cur_pdate == 'nan':
+                        _cur_pdate = ''
+
+                    oc1, oc2, oc3, oc4 = st.columns([1, 2, 2, 1])
+                    with oc1:
+                        owned = st.checkbox("I own this", value=_cur_owned, key="own_card_yg")
+                    with oc2:
+                        cost_input = st.number_input("Cost Basis ($)", value=_cur_cost,
+                                                      min_value=0.0, step=0.01, key="cost_basis_yg")
+                    with oc3:
+                        pdate_input = st.text_input("Purchase Date", value=_cur_pdate,
+                                                     placeholder="YYYY-MM-DD", key="pdate_yg")
+                    with oc4:
+                        st.markdown("")
+                        if st.button("Save", key="save_ownership_yg"):
+                            master_df.at[viewed_idx, 'Owned'] = 1 if owned else 0
+                            master_df.at[viewed_idx, 'CostBasis'] = cost_input if cost_input > 0 else 0
+                            master_df.at[viewed_idx, 'PurchaseDate'] = pdate_input
+                            save_master_db(master_df)
+                            st.success("Ownership saved!")
+                            st.rerun()
 
                 # ── eBay Scrape Button (admin only) ──
                 if not public_view:
@@ -2309,11 +2431,127 @@ elif page == "Young Guns DB":
                                             st.caption("No cards with both PSA 10 and BGS 10 data yet")
 
                 # ============================================================
-                # PRICE vs PERFORMANCE CORRELATION ANALYTICS
+                # NHL DATA LOAD (shared by Compare Tool + Correlation Analytics)
                 # ============================================================
                 nhl_data = load_nhl_player_stats()
                 nhl_players = nhl_data.get('players', {}) if nhl_data else {}
                 nhl_standings = nhl_data.get('standings', {}) if nhl_data else {}
+
+                # ============================================================
+                # PLAYER COMPARE TOOL
+                # ============================================================
+                if nhl_players and len(analytics_df) > 0:
+                    with st.expander("Player Compare Tool", expanded=False):
+                        compare_players = sorted([
+                            p for p in analytics_df['PlayerName'].unique()
+                            if p in nhl_players
+                        ])
+                        if len(compare_players) >= 2:
+                            cc1, cc2 = st.columns(2)
+                            with cc1:
+                                player_a = st.selectbox("Player A", compare_players, index=0, key="compare_a")
+                            with cc2:
+                                player_b = st.selectbox("Player B", compare_players, index=min(1, len(compare_players)-1), key="compare_b")
+
+                            if player_a and player_b and player_a != player_b:
+                                card_a = analytics_df[analytics_df['PlayerName'] == player_a].iloc[0]
+                                card_b = analytics_df[analytics_df['PlayerName'] == player_b].iloc[0]
+                                nhl_a = nhl_players[player_a]
+                                nhl_b = nhl_players[player_b]
+                                cs_a = nhl_a.get('current_season', {})
+                                cs_b = nhl_b.get('current_season', {})
+
+                                # Card price comparison
+                                cmp1, cmp_mid, cmp2 = st.columns([2, 1, 2])
+                                with cmp1:
+                                    st.metric(player_a, f"${card_a[price_col]:.2f}")
+                                    st.caption(f"{card_a.get('Season', '')} | {TEAM_ABBREV_TO_NAME.get(nhl_a.get('current_team', ''), '')}")
+                                with cmp_mid:
+                                    st.markdown("<div style='text-align:center;padding-top:20px;font-size:1.5rem;'>vs</div>", unsafe_allow_html=True)
+                                with cmp2:
+                                    st.metric(player_b, f"${card_b[price_col]:.2f}")
+                                    st.caption(f"{card_b.get('Season', '')} | {TEAM_ABBREV_TO_NAME.get(nhl_b.get('current_team', ''), '')}")
+
+                                # NHL stats comparison (skaters)
+                                if nhl_a.get('type') == 'skater' and nhl_b.get('type') == 'skater':
+                                    st.markdown("**NHL Stats**")
+                                    stat_pairs = [('GP', 'games_played'), ('Goals', 'goals'), ('Assists', 'assists'),
+                                                  ('Points', 'points'), ('+/-', 'plus_minus'), ('PPG', 'powerplay_goals')]
+                                    compare_rows = []
+                                    for label, key in stat_pairs:
+                                        va = cs_a.get(key, 0)
+                                        vb = cs_b.get(key, 0)
+                                        compare_rows.append({'Stat': label, player_a: va, player_b: vb})
+                                    compare_df = pd.DataFrame(compare_rows)
+                                    st.dataframe(compare_df, use_container_width=True, hide_index=True)
+
+                                elif nhl_a.get('type') == 'goalie' and nhl_b.get('type') == 'goalie':
+                                    st.markdown("**Goalie Stats**")
+                                    stat_pairs = [('GP', 'games_played'), ('Wins', 'wins'), ('Losses', 'losses'),
+                                                  ('SV%', 'save_pct'), ('GAA', 'gaa'), ('SO', 'shutouts')]
+                                    compare_rows = []
+                                    for label, key in stat_pairs:
+                                        va = cs_a.get(key, 0)
+                                        vb = cs_b.get(key, 0)
+                                        compare_rows.append({'Stat': label, player_a: va, player_b: vb})
+                                    compare_df = pd.DataFrame(compare_rows)
+                                    st.dataframe(compare_df, use_container_width=True, hide_index=True)
+
+                                # Price history overlay
+                                card_name_a = card_a.get('CardName', '')
+                                card_name_b = card_b.get('CardName', '')
+                                hist_a = load_yg_price_history(card_name_a) if card_name_a else None
+                                hist_b = load_yg_price_history(card_name_b) if card_name_b else None
+
+                                if hist_a and hist_b:
+                                    st.markdown("**Price History Overlay**")
+                                    fig_compare = go.Figure()
+                                    df_ha = pd.DataFrame(hist_a)
+                                    df_ha['date'] = pd.to_datetime(df_ha['date'])
+                                    fig_compare.add_trace(go.Scatter(
+                                        x=df_ha['date'], y=df_ha['fair_value'],
+                                        mode='lines+markers', name=player_a,
+                                        line=dict(color='#636EFA', width=2),
+                                    ))
+                                    df_hb = pd.DataFrame(hist_b)
+                                    df_hb['date'] = pd.to_datetime(df_hb['date'])
+                                    fig_compare.add_trace(go.Scatter(
+                                        x=df_hb['date'], y=df_hb['fair_value'],
+                                        mode='lines+markers', name=player_b,
+                                        line=dict(color='#EF553B', width=2),
+                                    ))
+                                    fig_compare.update_layout(
+                                        template="plotly_dark", height=350,
+                                        yaxis_title="Fair Value ($)", xaxis_title="Date",
+                                    )
+                                    st.plotly_chart(fig_compare, use_container_width=True)
+
+                                # Graded values comparison
+                                graded_cols = ['PSA10_Value', 'PSA9_Value', 'PSA8_Value', 'BGS10_Value', 'BGS9_5_Value', 'BGS9_Value']
+                                graded_data = []
+                                for gc in graded_cols:
+                                    if gc in card_a.index and gc in card_b.index:
+                                        va = float(card_a.get(gc, 0) or 0)
+                                        vb = float(card_b.get(gc, 0) or 0)
+                                        if va > 0 or vb > 0:
+                                            label = gc.replace('_Value', '').replace('PSA', 'PSA ').replace('BGS', 'BGS ').replace('9_5', '9.5')
+                                            graded_data.append({
+                                                'Grade': label,
+                                                player_a: f"${va:.2f}" if va > 0 else "N/A",
+                                                player_b: f"${vb:.2f}" if vb > 0 else "N/A",
+                                            })
+                                if graded_data:
+                                    st.markdown("**Graded Values**")
+                                    st.dataframe(pd.DataFrame(graded_data), use_container_width=True, hide_index=True)
+
+                            elif player_a == player_b:
+                                st.warning("Select two different players to compare.")
+                        else:
+                            st.info("Need at least 2 players with NHL data.")
+
+                # ============================================================
+                # PRICE vs PERFORMANCE CORRELATION ANALYTICS
+                # ============================================================
 
                 if nhl_players:
                     # Build a DataFrame merging card prices with NHL stats
@@ -2399,8 +2637,8 @@ elif page == "Young Guns DB":
                                     st.metric("Goalies", f"{len(goalies_df)}")
 
                             # --- 7 Tabs ---
-                            tab_corr, tab_tiers, tab_teams, tab_pos, tab_value, tab_goalies, tab_trends = st.tabs([
-                                "Correlation", "Price Tiers", "Teams", "Positions", "Value Finder", "Goalies", "Trends"
+                            tab_corr, tab_tiers, tab_teams, tab_pos, tab_value, tab_goalies, tab_nationality, tab_draft, tab_trends = st.tabs([
+                                "Correlation", "Price Tiers", "Teams", "Positions", "Value Finder", "Goalies", "Nationality", "Draft", "Trends"
                             ])
 
                             # ========== TAB 1: CORRELATION ==========
@@ -2721,7 +2959,163 @@ elif page == "Young Guns DB":
                                 else:
                                     st.info("No goalie data available.")
 
-                            # ========== TAB 7: TRENDS ==========
+                            # ========== TAB 7: NATIONALITY ==========
+                            with tab_nationality:
+                                all_bios = get_all_player_bios()
+                                if all_bios:
+                                    nat_rows = []
+                                    for _, row in nhl_df.iterrows():
+                                        pname = row['PlayerName']
+                                        bio = all_bios.get(pname)
+                                        if bio and bio.get('birth_country'):
+                                            nat_rows.append({
+                                                'PlayerName': pname,
+                                                'Country': bio['birth_country'],
+                                                'FairValue': row['FairValue'],
+                                                'Position': row.get('Position', ''),
+                                                'Type': row.get('Type', 'skater'),
+                                                'CurrentTeam': row.get('CurrentTeam', ''),
+                                            })
+                                    if nat_rows:
+                                        nat_df = pd.DataFrame(nat_rows)
+                                        nc1, nc2 = st.columns(2)
+                                        with nc1:
+                                            st.markdown("**Player Nationality Distribution**")
+                                            country_counts = nat_df['Country'].value_counts().reset_index()
+                                            country_counts.columns = ['Country', 'Count']
+                                            fig_nat_pie = px.pie(
+                                                country_counts, names='Country', values='Count',
+                                                hole=0.4,
+                                            )
+                                            fig_nat_pie.update_layout(template="plotly_dark", height=350)
+                                            st.plotly_chart(fig_nat_pie, use_container_width=True)
+
+                                        with nc2:
+                                            st.markdown("**Avg Card Price by Country** (3+ players)")
+                                            country_avg = nat_df.groupby('Country').agg(
+                                                AvgPrice=('FairValue', 'mean'),
+                                                Count=('PlayerName', 'count')
+                                            ).reset_index().sort_values('AvgPrice', ascending=False)
+                                            country_sig = country_avg[country_avg['Count'] >= 3]
+                                            fig_nat_bar = px.bar(
+                                                country_sig, x='Country', y='AvgPrice',
+                                                text='Count', color='AvgPrice',
+                                                color_continuous_scale='Blues',
+                                                labels={'AvgPrice': 'Avg Card Price ($)', 'Count': 'Players'},
+                                            )
+                                            fig_nat_bar.update_traces(texttemplate='%{text} cards', textposition='outside')
+                                            fig_nat_bar.update_layout(template="plotly_dark", height=350, coloraxis_showscale=False)
+                                            st.plotly_chart(fig_nat_bar, use_container_width=True)
+
+                                        # Nationality scatter
+                                        st.markdown("**Card Value by Country (All Players)**")
+                                        fig_nat_scatter = px.strip(
+                                            nat_df, x='Country', y='FairValue',
+                                            hover_name='PlayerName',
+                                            color='Country',
+                                            labels={'FairValue': f'{price_mode} Value ($)'},
+                                        )
+                                        fig_nat_scatter.update_layout(template="plotly_dark", height=400, showlegend=False)
+                                        st.plotly_chart(fig_nat_scatter, use_container_width=True)
+
+                                        # Full table
+                                        st.dataframe(
+                                            country_avg.rename(columns={'AvgPrice': 'Avg Price', 'Count': 'Players'}),
+                                            use_container_width=True, hide_index=True,
+                                            column_config={
+                                                'Avg Price': st.column_config.NumberColumn(format="$%.2f"),
+                                            },
+                                        )
+                                    else:
+                                        st.info("No nationality data found. Run `python scrape_nhl_stats.py --fetch-bios`")
+                                else:
+                                    st.info("Run `python scrape_nhl_stats.py --fetch-bios` to fetch nationality data.")
+
+                            # ========== TAB 8: DRAFT ==========
+                            with tab_draft:
+                                all_bios_d = get_all_player_bios()
+                                if all_bios_d:
+                                    draft_rows = []
+                                    undrafted_count = 0
+                                    for _, row in nhl_df.iterrows():
+                                        pname = row['PlayerName']
+                                        bio = all_bios_d.get(pname)
+                                        if not bio:
+                                            continue
+                                        if bio.get('draft_overall'):
+                                            draft_rows.append({
+                                                'PlayerName': pname,
+                                                'DraftYear': bio['draft_year'],
+                                                'DraftRound': bio['draft_round'],
+                                                'DraftOverall': bio['draft_overall'],
+                                                'DraftTeam': bio.get('draft_team', ''),
+                                                'FairValue': row['FairValue'],
+                                                'Position': row.get('Position', ''),
+                                                'CurrentTeam': row.get('CurrentTeam', ''),
+                                            })
+                                        else:
+                                            undrafted_count += 1
+                                    if draft_rows:
+                                        draft_df = pd.DataFrame(draft_rows)
+
+                                        st.markdown("**Draft Position vs Card Value**")
+                                        st.caption("Lower pick # = higher draft pick. Do top picks hold more card value?")
+                                        fig_draft = px.scatter(
+                                            draft_df, x='DraftOverall', y='FairValue',
+                                            hover_name='PlayerName',
+                                            color='DraftRound',
+                                            size_max=12,
+                                            hover_data={'DraftYear': True, 'CurrentTeam': True, 'DraftTeam': True},
+                                            labels={'DraftOverall': 'Overall Pick #', 'FairValue': f'{price_mode} Value ($)', 'DraftRound': 'Round'},
+                                        )
+                                        fig_draft.update_layout(template="plotly_dark", height=450)
+                                        st.plotly_chart(fig_draft, use_container_width=True)
+
+                                        dc1, dc2 = st.columns(2)
+                                        with dc1:
+                                            st.markdown("**Avg Price by Draft Round**")
+                                            round_avg = draft_df.groupby('DraftRound').agg(
+                                                AvgPrice=('FairValue', 'mean'),
+                                                Count=('PlayerName', 'count')
+                                            ).reset_index().sort_values('DraftRound')
+                                            fig_round = px.bar(
+                                                round_avg, x='DraftRound', y='AvgPrice',
+                                                text='Count', color='AvgPrice',
+                                                color_continuous_scale='Greens',
+                                                labels={'DraftRound': 'Round', 'AvgPrice': 'Avg Price ($)'},
+                                            )
+                                            fig_round.update_traces(texttemplate='%{text} cards', textposition='outside')
+                                            fig_round.update_layout(template="plotly_dark", height=350, coloraxis_showscale=False)
+                                            st.plotly_chart(fig_round, use_container_width=True)
+
+                                        with dc2:
+                                            st.markdown("**Draft Category Comparison**")
+                                            draft_df['Category'] = draft_df['DraftOverall'].apply(
+                                                lambda x: 'Top 5' if x <= 5 else 'Top 15' if x <= 15 else '1st Round' if x <= 32 else 'Later Rounds'
+                                            )
+                                            cat_order = ['Top 5', 'Top 15', '1st Round', 'Later Rounds']
+                                            cat_avg = draft_df.groupby('Category').agg(
+                                                AvgPrice=('FairValue', 'mean'),
+                                                Count=('PlayerName', 'count')
+                                            ).reindex(cat_order).reset_index()
+                                            fig_cat = px.bar(
+                                                cat_avg, x='Category', y='AvgPrice',
+                                                text='Count', color='AvgPrice',
+                                                color_continuous_scale='Blues',
+                                                labels={'AvgPrice': 'Avg Price ($)'},
+                                            )
+                                            fig_cat.update_traces(texttemplate='%{text} cards', textposition='outside')
+                                            fig_cat.update_layout(template="plotly_dark", height=350, coloraxis_showscale=False)
+                                            st.plotly_chart(fig_cat, use_container_width=True)
+
+                                        if undrafted_count > 0:
+                                            st.caption(f"{undrafted_count} undrafted players not shown in chart")
+                                    else:
+                                        st.info("No draft data found. Run `python scrape_nhl_stats.py --fetch-bios`")
+                                else:
+                                    st.info("Run `python scrape_nhl_stats.py --fetch-bios` to fetch draft data.")
+
+                            # ========== TAB 9: TRENDS ==========
                             with tab_trends:
                                 if len(corr_history) > 1:
                                     dates = sorted(corr_history.keys())
