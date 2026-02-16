@@ -1419,7 +1419,7 @@ def compute_impact_scores(master_df, nhl_players, team_multipliers=None):
         pts_pace = cs.get('points', 0) / gp
         shooting = cs.get('shooting_pct', 0) * 100 if cs.get('shooting_pct', 0) < 1 else cs.get('shooting_pct', 0)
         pm_rate = cs.get('plus_minus', 0) / gp
-        draft_pick = bio.get('draft_overall', 300)  # undrafted = 300
+        draft_pick = bio.get('draft_overall') or 300  # undrafted = 300
         team = nhl.get('current_team', '')
 
         # Team multiplier score
