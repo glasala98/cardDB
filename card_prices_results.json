@@ -22020,5 +22020,16 @@
       }
     ],
     "search_url": "https://www.ebay.com/sch/i.html?_nkw=Lian%20Bichsel%20%23R-LB%202024-25%20-PSA%20-BGS%20-SGC%20-graded&_sacat=0&LH_Complete=1&LH_Sold=1&_sop=13&_ipg=240"
+  },
+  "Test Card": {
+    "raw_sales": [
+      {
+        "title": "Card",
+        "price_val": 100
+      }
+    ],
+    "fair_price": 100,
+    "num_sales": 1,
+    "scraped_at": "2026-02-14 17:29:45"
   }
 }
