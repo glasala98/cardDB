@@ -374,7 +374,6 @@ CHART_LAYOUT = dict(
 
 MONEY_COLS = ['Fair Value', 'Median (All)', 'Min', 'Max']
 
-@st.cache_data
 def load_data():
     df = pd.read_csv(CSV_PATH)
     for col in MONEY_COLS:
@@ -389,7 +388,6 @@ def save_data(df):
     for col in MONEY_COLS:
         save_df[col] = save_df[col].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "$0.00")
     save_df.to_csv(CSV_PATH, index=False)
-    load_data.clear()
 
 # --- Load or initialize data ---
 if 'df' not in st.session_state:
@@ -748,7 +746,6 @@ with tab_table:
 
     with bcol2:
         if st.button("Reload from File"):
-            load_data.clear()
             st.session_state.df = load_data()
             st.rerun()
 
