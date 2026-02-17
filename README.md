@@ -41,7 +41,11 @@ export ANTHROPIC_API_KEY="your_api_key_here"
 ### Running the Dashboard
 
 ```bash
-streamlit run dashboard_prod.py
+# Run locally (defaults to PROD environment)
+streamlit run dashboard.py
+
+# Run in specific environment
+APP_ENV=uat streamlit run dashboard.py
 ```
 
 Opens at `http://localhost:8501` with three pages:
@@ -106,7 +110,11 @@ Set up as a cron job on the server:
 
 ## Deployment
 
-The dashboard is deployed to a DigitalOcean VPS running Ubuntu, served via Nginx with SSL.
+The dashboard is deployed to a DigitalOcean VPS running Ubuntu, served via Nginx with SSL. It supports three isolated environments:
+
+- **PROD**: `https://southwestsportscards.ca/`
+- **UAT**: `https://southwestsportscards.ca/uat/`
+- **DEV**: `https://southwestsportscards.ca/dev/`
 
 ### Initial Setup
 
@@ -122,7 +130,7 @@ The dashboard is deployed to a DigitalOcean VPS running Ubuntu, served via Nginx
    sudo bash deploy/setup.sh southwestsportscards.ca
    ```
 
-   This installs Python, Chrome, Nginx, obtains an SSL certificate, and starts the dashboard as a systemd service.
+   This installs dependencies, creates the `cardapp` user, sets up Nginx routing for all environments, and installs systemd services (`card-dashboard-prod`, `card-dashboard-uat`, `card-dashboard-dev`).
 
 3. Edit the API key:
    ```bash
@@ -136,19 +144,28 @@ The dashboard is deployed to a DigitalOcean VPS running Ubuntu, served via Nginx
 cd /root/cardDB && git pull
 
 # Copy updated files to the app directory:
-sudo cp dashboard_prod.py dashboard_utils.py scrape_card_prices.py daily_scrape.py card_prices_summary.csv /opt/card-dashboard/
-sudo cp -f card_prices_results.json price_history.json /opt/card-dashboard/ 2>/dev/null; true
+sudo cp dashboard.py dashboard_utils.py scrape_card_prices.py daily_scrape.py scrape_master_db.py scrape_nhl_stats.py /opt/card-dashboard/
 sudo chown -R cardapp:cardapp /opt/card-dashboard/
-sudo systemctl restart card-dashboard
+
+# Restart services
+sudo systemctl restart card-dashboard-prod
+sudo systemctl restart card-dashboard-uat
+sudo systemctl restart card-dashboard-dev
 ```
 
 ### Useful Commands
 
 ```bash
-sudo systemctl status card-dashboard      # Check status
-sudo systemctl restart card-dashboard     # Restart
-sudo journalctl -u card-dashboard -f      # View logs
-tail -f /var/log/daily_scrape.log         # Daily scrape logs
+# Check status
+sudo systemctl status card-dashboard-prod
+sudo systemctl status card-dashboard-uat
+sudo systemctl status card-dashboard-dev
+
+# Restart specific environment
+sudo systemctl restart card-dashboard-dev
+
+# View logs
+sudo journalctl -u card-dashboard-prod -f
 ```
 
 ## Running Tests
