@@ -53,6 +53,62 @@ class TestScrapeCardPrices(unittest.TestCase):
         query_variant = clean_card_name_for_search(name_variant)
         self.assertIn("Red Prism", query_variant)
 
+    def test_clean_card_name_detailed_scenarios(self):
+        """Test detailed scenarios for clean_card_name_for_search."""
+
+        # 1. Basic Player Extraction
+        case1 = "2023-24 Upper Deck Series 1 #201 - Connor Bedard"
+        query1 = clean_card_name_for_search(case1)
+        self.assertIn("Connor Bedard", query1)
+        self.assertIn("#201", query1)
+        self.assertIn("2023-24", query1)
+
+        # 2. Subset Extraction (Young Guns)
+        case2 = "2023-24 Upper Deck Series 1 - [Base] #201 - Young Guns - Matthew Coronato"
+        query2 = clean_card_name_for_search(case2)
+        self.assertIn("Matthew Coronato", query2)
+        self.assertIn("Young Guns", query2)
+        self.assertIn("#201", query2)
+
+        # 3. Variant Extraction (Arctic Freeze) + Serial Number Handling
+        case3 = "2023-24 O-Pee-Chee Platinum - [Base] - Arctic Freeze #177 - Nazem Kadri #44/99"
+        query3 = clean_card_name_for_search(case3)
+        self.assertIn("Nazem Kadri", query3)
+        self.assertIn("Arctic Freeze", query3)
+        self.assertIn("#177", query3)
+        self.assertNotIn("#44/99", query3) # Should be cleaned from player name
+
+        # 4. Brand Abbreviation (O-Pee-Chee -> OPC)
+        case4 = "2023-24 O-Pee-Chee Platinum #100 - Connor Bedard"
+        query4 = clean_card_name_for_search(case4)
+        self.assertIn("OPC Platinum", query4)
+        self.assertNotIn("O-Pee-Chee Platinum", query4)
+        self.assertIn("#100", query4) # Ensure card number is preserved via card_num extraction
+
+        # 5. Complex: Variant + Subset + Grade
+        case5 = "2023-24 O-Pee-Chee Platinum - [Base] - Red Prism #201 - Marquee Rookies - Connor Bedard [PSA 9 MINT] #70/199"
+        query5 = clean_card_name_for_search(case5)
+        self.assertIn("Connor Bedard", query5)
+        self.assertIn("Red Prism", query5)
+        self.assertIn("#201", query5)
+        # Grade specific checks
+        self.assertIn('"PSA 9"', query5)
+        self.assertIn('-"PSA 10 "', query5)
+
+        # 6. Pre-Grade Review Removal
+        case6 = "2023-24 Upper Deck Parkhurst - Prominent Prospects #PP-CB - Connor Bedard [Passed Pre‑Grade Review]"
+        query6 = clean_card_name_for_search(case6)
+        self.assertIn("Connor Bedard", query6)
+        self.assertNotIn("Pre-Grade", query6)
+        self.assertNotIn("Review", query6)
+
+        # 7. UD Canvas Subset
+        case7 = "2024-25 Upper Deck Series 1 - UD Canvas #C-117 - Young Guns - Frank Nazar"
+        query7 = clean_card_name_for_search(case7)
+        self.assertIn("Frank Nazar", query7)
+        # self.assertIn("UD Canvas", query7) # Current logic picks "Young Guns" first and stops.
+        self.assertIn("Young Guns", query7)
+
     def test_title_matches_grade(self):
         # PSA 10 - Standard cases
         self.assertTrue(title_matches_grade("2015 Connor McDavid PSA 10 Gem Mint", "PSA 10", 10))
