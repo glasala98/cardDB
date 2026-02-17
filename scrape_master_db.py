@@ -41,9 +41,8 @@ from scrape_card_prices import (
 from dashboard_utils import (
     append_yg_portfolio_snapshot,
     batch_save_yg_raw_sales, batch_append_yg_price_history,
+    MASTER_DB_PATH,
 )
-
-MASTER_DB_PATH = os.path.join(SCRIPT_DIR, "data", "master_db", "young_guns.csv")
 
 # Grade column mappings: grade_key -> (value_col, sales_col)
 GRADE_COLUMNS = {

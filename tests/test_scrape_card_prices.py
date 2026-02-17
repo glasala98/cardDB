@@ -20,7 +20,7 @@ class TestScrapeCardPrices(unittest.TestCase):
         self.assertEqual(get_grade_info("Connor McDavid [PSA 10]"), ("PSA 10", 10))
         self.assertEqual(get_grade_info("Connor McDavid [PSA 9]"), ("PSA 9", 9))
         self.assertEqual(get_grade_info("Connor McDavid"), (None, None))
-        self.assertEqual(get_grade_info("Connor McDavid [BGS 9.5]"), (None, None)) # Only PSA supported currently
+        self.assertEqual(get_grade_info("Connor McDavid [BGS 9.5]"), ("BGS 9.5", 9.5))
 
     def test_clean_card_name_for_search(self):
         # Basic test

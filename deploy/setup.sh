@@ -34,36 +34,25 @@ id -u $APP_USER &>/dev/null || useradd --system --no-create-home --shell /bin/fa
 echo "--- Setting up app directory ---"
 mkdir -p $APP_DIR
 mkdir -p $APP_DIR/data
-cp dashboard_prod.py $APP_DIR/
+cp dashboard.py $APP_DIR/
 cp dashboard_utils.py $APP_DIR/
 cp scrape_card_prices.py $APP_DIR/
 cp card_scraper.py $APP_DIR/
 cp daily_scrape.py $APP_DIR/
-cp users.yaml $APP_DIR/
+cp scrape_master_db.py $APP_DIR/
+cp scrape_nhl_stats.py $APP_DIR/
+cp users.yaml $APP_DIR/data/prod/ 2>/dev/null || true
 cp requirements.txt $APP_DIR/
 
-# Migrate existing data to admin user directory if not already migrated
-if [ -f "$APP_DIR/card_prices_summary.csv" ] && [ ! -d "$APP_DIR/data/admin" ]; then
-    echo "--- Migrating existing data to data/admin/ ---"
-    mkdir -p $APP_DIR/data/admin/backups
-    mv $APP_DIR/card_prices_summary.csv $APP_DIR/data/admin/ 2>/dev/null || true
-    mv $APP_DIR/card_prices_results.json $APP_DIR/data/admin/ 2>/dev/null || true
-    mv $APP_DIR/price_history.json $APP_DIR/data/admin/ 2>/dev/null || true
-    mv $APP_DIR/card_archive.csv $APP_DIR/data/admin/ 2>/dev/null || true
-    mv $APP_DIR/backups/* $APP_DIR/data/admin/backups/ 2>/dev/null || true
-elif [ ! -d "$APP_DIR/data/admin" ]; then
-    # Fresh install — copy seed data into admin
-    mkdir -p $APP_DIR/data/admin/backups
-    cp -f card_prices_summary.csv $APP_DIR/data/admin/ 2>/dev/null || true
-    cp -f card_prices_results.json $APP_DIR/data/admin/ 2>/dev/null || true
-    cp -f price_history.json $APP_DIR/data/admin/ 2>/dev/null || true
-fi
-
+# Ensure environment directories exist
+mkdir -p $APP_DIR/data/prod $APP_DIR/data/uat $APP_DIR/data/dev
 chown -R $APP_USER:$APP_USER $APP_DIR
 
 # 4. Python virtual environment
 echo "--- Creating Python venv ---"
-python3 -m venv $APP_DIR/venv
+if [ ! -d "$APP_DIR/venv" ]; then
+    python3 -m venv $APP_DIR/venv
+fi
 $APP_DIR/venv/bin/pip install --upgrade pip
 $APP_DIR/venv/bin/pip install -r $APP_DIR/requirements.txt
 
@@ -76,14 +65,21 @@ if [ ! -f $APP_DIR/.env ]; then
     echo "IMPORTANT: Edit /opt/card-dashboard/.env with your real ANTHROPIC_API_KEY"
 fi
 
-# 6. Systemd service
-echo "--- Installing systemd service ---"
-cp deploy/card-dashboard.service /etc/systemd/system/
-systemctl daemon-reload
-systemctl enable card-dashboard
-systemctl start card-dashboard
+# 6. Systemd services
+echo "--- Installing systemd services ---"
+cp deploy/card-dashboard-prod.service /etc/systemd/system/
+cp deploy/card-dashboard-uat.service /etc/systemd/system/
+cp deploy/card-dashboard-dev.service /etc/systemd/system/
 
-# 6. Nginx config
+systemctl daemon-reload
+systemctl enable card-dashboard-prod
+systemctl enable card-dashboard-uat
+systemctl enable card-dashboard-dev
+systemctl restart card-dashboard-prod
+systemctl restart card-dashboard-uat
+systemctl restart card-dashboard-dev
+
+# 7. Nginx config
 echo "--- Configuring Nginx ---"
 sed "s/YOUR_DOMAIN/${DOMAIN}/g" deploy/nginx.conf > /etc/nginx/sites-available/card-dashboard
 ln -sf /etc/nginx/sites-available/card-dashboard /etc/nginx/sites-enabled/
@@ -91,22 +87,24 @@ rm -f /etc/nginx/sites-enabled/default
 nginx -t
 systemctl reload nginx
 
-# 7. Firewall
+# 8. Firewall
 echo "--- Configuring firewall ---"
 ufw allow 22/tcp
 ufw allow 80/tcp
 ufw allow 443/tcp
 ufw --force enable
 
-# 8. SSL certificate
+# 9. SSL certificate
 echo "--- Getting SSL certificate ---"
 certbot --nginx -d $DOMAIN --non-interactive --agree-tos --register-unsafely-without-email
 
 echo ""
 echo "=== DONE! ==="
-echo "Your dashboard is live at: https://${DOMAIN}"
+echo "PROD: https://${DOMAIN}"
+echo "UAT:  https://${DOMAIN}/uat"
+echo "DEV:  https://${DOMAIN}/dev"
 echo ""
 echo "Useful commands:"
-echo "  sudo systemctl status card-dashboard   # Check status"
-echo "  sudo systemctl restart card-dashboard   # Restart app"
-echo "  sudo journalctl -u card-dashboard -f    # View logs"
+echo "  sudo systemctl restart card-dashboard-prod"
+echo "  sudo systemctl restart card-dashboard-uat"
+echo "  sudo systemctl restart card-dashboard-dev"

@@ -99,7 +99,8 @@ class TestDashboardUtils(unittest.TestCase):
             'Min': [5.0],
             'Max': [15.0],
             'Top 3 Prices': ['10'],
-            'Median (All)': [10.0]
+            'Median (All)': [10.0],
+            'Cost Basis': [5.0]
         }
         df = pd.DataFrame(data)
 

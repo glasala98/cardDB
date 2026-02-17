@@ -31,19 +31,20 @@ except ImportError:
     HAS_ANTHROPIC = False
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_ROOT = os.path.join(SCRIPT_DIR, "data")
-USERS_YAML = os.path.join(SCRIPT_DIR, "users.yaml")
+APP_ENV = os.environ.get("APP_ENV", "prod")
+DATA_ROOT = os.path.join(SCRIPT_DIR, "data", APP_ENV)
+USERS_YAML = os.path.join(DATA_ROOT, "users.yaml")
 
 # Legacy global paths (used by daily_scrape.py as defaults)
-CSV_PATH = os.path.join(SCRIPT_DIR, "card_prices_summary.csv")
-RESULTS_JSON_PATH = os.path.join(SCRIPT_DIR, "card_prices_results.json")
-HISTORY_PATH = os.path.join(SCRIPT_DIR, "price_history.json")
-BACKUP_DIR = os.path.join(SCRIPT_DIR, "backups")
-ARCHIVE_PATH = os.path.join(SCRIPT_DIR, "card_archive.csv")
+CSV_PATH = os.path.join(DATA_ROOT, "card_prices_summary.csv")
+RESULTS_JSON_PATH = os.path.join(DATA_ROOT, "card_prices_results.json")
+HISTORY_PATH = os.path.join(DATA_ROOT, "price_history.json")
+BACKUP_DIR = os.path.join(DATA_ROOT, "backups")
+ARCHIVE_PATH = os.path.join(DATA_ROOT, "card_archive.csv")
 MONEY_COLS = ['Fair Value', 'Median (All)', 'Min', 'Max', 'Cost Basis']
 
 # Master DB paths (shared across all users)
-MASTER_DB_DIR = os.path.join(SCRIPT_DIR, "data", "master_db")
+MASTER_DB_DIR = os.path.join(DATA_ROOT, "master_db")
 MASTER_DB_PATH = os.path.join(MASTER_DB_DIR, "young_guns.csv")
 
 # Empty CSV columns for new users

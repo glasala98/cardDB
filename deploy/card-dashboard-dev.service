@@ -1,0 +1,21 @@
+[Unit]
+Description=Hockey Card Dashboard DEV (Streamlit)
+After=network.target
+
+[Service]
+User=cardapp
+Group=cardapp
+WorkingDirectory=/opt/card-dashboard
+ExecStart=/opt/card-dashboard/venv/bin/streamlit run dashboard.py \
+    --server.port 8503 \
+    --server.headless true \
+    --server.address 127.0.0.1 \
+    --server.baseUrlPath /dev
+Restart=on-failure
+RestartSec=5
+Environment="PATH=/opt/card-dashboard/venv/bin:/usr/bin"
+Environment="APP_ENV=dev"
+EnvironmentFile=-/opt/card-dashboard/.env
+
+[Install]
+WantedBy=multi-user.target
