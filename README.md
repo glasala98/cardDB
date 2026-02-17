@@ -106,7 +106,9 @@ Set up as a cron job on the server:
 
 ## Deployment
 
-The dashboard is deployed to a DigitalOcean VPS running Ubuntu, served via Nginx with SSL.
+For detailed deployment instructions and documentation of the configuration files, see [deploy/README.md](deploy/README.md).
+
+The dashboard is currently deployed to a DigitalOcean VPS running Ubuntu, served via Nginx with SSL.
 
 ### Initial Setup
 
@@ -156,3 +158,5 @@ tail -f /var/log/daily_scrape.log         # Daily scrape logs
 ```bash
 python run_tests.py
 ```
+
+See [tests/README.md](tests/README.md) for detailed information on the test suite, coverage, and adding new tests.
