@@ -54,11 +54,60 @@ class TestScrapeCardPrices(unittest.TestCase):
         self.assertFalse(title_matches_grade("2015 Connor McDavid BGS 9.5", None, None))
 
     def test_build_simplified_query(self):
+        # 1. Standard raw card
         name = "2015-16 Upper Deck Series 1 #201 - Connor McDavid"
         query = build_simplified_query(name)
+        # Expected: Connor McDavid #201 2015-16 -PSA -BGS -SGC -graded
         self.assertIn("Connor McDavid", query)
         self.assertIn("#201", query)
         self.assertIn("2015-16", query)
+        self.assertIn("-PSA -BGS -SGC -graded", query)
+
+        # 2. Graded card
+        name_graded = "2015-16 Upper Deck Series 1 #201 - Connor McDavid [PSA 10]"
+        query_graded = build_simplified_query(name_graded)
+        # Expected: Connor McDavid #201 2015-16 "PSA 10"
+        self.assertIn("Connor McDavid", query_graded)
+        self.assertIn("#201", query_graded)
+        self.assertIn("2015-16", query_graded)
+        self.assertIn('"PSA 10"', query_graded)
+        self.assertNotIn("-PSA", query_graded)
+
+        # 3. Serial numbered card
+        name_serial = "2023-24 O-Pee-Chee Platinum - [Base] - Red Prism #201 - Marquee Rookies - Connor Bedard [PSA 9 MINT] #70/199"
+        query_serial = build_simplified_query(name_serial)
+        # Expected: Connor Bedard #201 2023-24 "PSA 9"
+        self.assertIn("Connor Bedard", query_serial)
+        self.assertNotIn("#70/199", query_serial) # Serial should be stripped from name part
+        self.assertIn("#201", query_serial)
+        self.assertIn("2023-24", query_serial)
+        self.assertIn('"PSA 9"', query_serial)
+
+        # 4. Multi-part names (Variant handling)
+        # Test a case where the player IS the last part, even with many parts.
+        name_multipart = "2023-24 Upper Deck Series 1 - [Base] #228 - Young Guns - Simon Edvinsson"
+        query_multipart = build_simplified_query(name_multipart)
+        self.assertIn("Simon Edvinsson", query_multipart)
+        self.assertIn("#228", query_multipart)
+        self.assertIn("2023-24", query_multipart)
+
+        # 5. Edge cases
+        # No year
+        name_noyear = "Upper Deck Series 1 #201 - Connor McDavid"
+        query_noyear = build_simplified_query(name_noyear)
+        self.assertIn("Connor McDavid", query_noyear)
+        self.assertIn("#201", query_noyear)
+
+        # No card number
+        name_nonum = "2015-16 Upper Deck Series 1 - Connor McDavid"
+        query_nonum = build_simplified_query(name_nonum)
+        self.assertIn("Connor McDavid", query_nonum)
+        self.assertIn("2015-16", query_nonum)
+
+        # Only player
+        name_onlyplayer = "Connor McDavid"
+        query_onlyplayer = build_simplified_query(name_onlyplayer)
+        self.assertIn("Connor McDavid", query_onlyplayer)
 
     def test_calculate_fair_price(self):
         # Test basic calculation (stable)
