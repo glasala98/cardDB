@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import os
 import sys
+import subprocess
 from datetime import datetime
 
 # Import utils
@@ -1028,7 +1029,7 @@ elif page == "Card Ledger":
                 st.session_state.editor_reset = st.session_state.get('editor_reset', 0) + 1
                 st.rerun()
 
-    bcol1, bcol2 = st.columns([1, 1])
+    bcol1, bcol2, bcol3 = st.columns([1, 1, 1])
     with bcol1:
         if st.button("Save Changes", type="primary"):
             for i, row in edited.iterrows():
@@ -1083,6 +1084,31 @@ elif page == "Card Ledger":
     with bcol2:
         if st.button("Reload from File"):
             st.session_state.df = load_data(_csv_path, _results_path)
+            st.rerun()
+
+    with bcol3:
+        card_count = len(st.session_state.df) if 'df' in st.session_state else 0
+        if not public_view and st.button(f"Rescrape All ({card_count} cards)", type="secondary"):
+            backup_data(label="rescrape_all", csv_path=_csv_path, results_path=_results_path, backup_dir=_backup_dir)
+            script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "daily_scrape.py")
+            with st.spinner(f"Scraping all {card_count} cards from eBay — this may take several minutes..."):
+                try:
+                    result = subprocess.run(
+                        [sys.executable, script_path, "--workers", "5"],
+                        capture_output=True, text=True, timeout=1800
+                    )
+                    st.session_state.df = load_data(_csv_path, _results_path)
+                    if result.returncode == 0:
+                        st.success("All cards rescrapped! Prices updated.")
+                    else:
+                        st.warning(f"Scrape finished with warnings. Check logs.")
+                        if result.stderr:
+                            with st.expander("Scrape output"):
+                                st.code(result.stderr[-3000:])
+                except subprocess.TimeoutExpired:
+                    st.error("Scrape timed out after 30 minutes.")
+                except Exception as e:
+                    st.error(f"Scrape failed: {e}")
             st.rerun()
 
     # Rescrape action (uses the View checkbox to identify selected card)

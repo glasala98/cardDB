@@ -12,6 +12,7 @@ from datetime import datetime
 try:
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.chrome.service import Service
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
@@ -21,9 +22,16 @@ except ImportError:
     subprocess.check_call(['pip', 'install', 'selenium'])
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.chrome.service import Service
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
+
+try:
+    from webdriver_manager.chrome import ChromeDriverManager
+    _use_webdriver_manager = True
+except ImportError:
+    _use_webdriver_manager = False
 
 
 def is_graded_card(card_name):
@@ -326,17 +334,29 @@ def clean_card_name_for_search(card_name):
 def create_driver():
     """Create a headless Chrome driver."""
     options = Options()
-    options.add_argument('--headless')
+    options.add_argument('--headless=new')
     options.add_argument('--disable-gpu')
     options.add_argument('--no-sandbox')
     options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--window-size=1920,1080')
+    options.add_argument('--window-size=1280,720')
     options.add_argument('--disable-extensions')
     options.add_argument('--ignore-certificate-errors')
     options.add_argument('--allow-running-insecure-content')
     options.add_argument('--disable-blink-features=AutomationControlled')
     options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+    # Memory-saving flags for low-RAM servers
+    options.add_argument('--no-zygote')
+    options.add_argument('--disable-background-networking')
+    options.add_argument('--disable-sync')
+    options.add_argument('--disable-translate')
+    options.add_argument('--disable-default-apps')
+    options.add_argument('--disable-software-rasterizer')
+    options.add_argument('--disable-crash-reporter')
+    options.add_argument('--mute-audio')
     options.add_experimental_option('excludeSwitches', ['enable-automation'])
+    if _use_webdriver_manager:
+        service = Service(ChromeDriverManager().install())
+        return webdriver.Chrome(service=service, options=options)
     return webdriver.Chrome(options=options)
 
 
