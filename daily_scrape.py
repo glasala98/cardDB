@@ -84,6 +84,7 @@ def daily_scrape_user(csv_path, results_path, history_path, backup_dir, max_work
                         merged.append(sale)
                 merged.sort(key=lambda s: s.get('sold_date') or '0000-00-00', reverse=True)
                 result['raw_sales'] = merged[:100]
+                result['scraped_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 results[card_name] = result
 
                 # Update the dataframe row
