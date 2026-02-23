@@ -3,3 +3,14 @@ __pycache__/
 backups/
 data/*
 !data/master_db/
+
+# Personal data - keep off GitHub
+users.yaml
+hockey_cards.csv
+card_prices_summary.csv
+card_prices_results.json
+price_history.json
+portfolio_history.json
+card_archive.csv
+.env
+scrape_and_upload.bat
