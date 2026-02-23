@@ -431,7 +431,8 @@ def save_data(df, csv_path=CSV_PATH):
     # Drop display-only parsed columns before saving
     save_df = save_df.drop(columns=[c for c in PARSED_COLS if c in save_df.columns], errors='ignore')
     for col in MONEY_COLS:
-        save_df[col] = save_df[col].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "$0.00")
+        if col in save_df.columns:
+            save_df[col] = save_df[col].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "$0.00")
 
     # Sanitize string columns to prevent CSV injection
     object_cols = save_df.select_dtypes(include=['object']).columns
