@@ -923,6 +923,17 @@ elif page == "Card Ledger":
         all_tags = sorted(set(t.strip() for tags in df['Tags'].dropna() for t in tags.split(',') if t.strip()))
         tag_filter = st.selectbox("Tag", ["All Tags"] + all_tags)
 
+    # Price range filter
+    _min_price = float(df['Fair Value'].min()) if len(df) > 0 else 0.0
+    _max_price = float(df['Fair Value'].max()) if len(df) > 0 else 1000.0
+    price_range = st.slider(
+        "Price Range ($)",
+        min_value=_min_price,
+        max_value=_max_price,
+        value=(_min_price, _max_price),
+        format="$%.2f"
+    )
+
     # Apply filters
     mask = df['Trend'].isin(trend_filter)
     if set_filter != "All Sets":
@@ -933,6 +944,7 @@ elif page == "Card Ledger":
         mask &= df['Grade'] != ''
     if tag_filter != "All Tags":
         mask &= df['Tags'].str.contains(tag_filter, case=False, na=False)
+    mask &= (df['Fair Value'] >= price_range[0]) & (df['Fair Value'] <= price_range[1])
     filtered_df = df[mask].copy()
 
     display_cols = ['Player', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Tags', 'Fair Value', 'Cost Basis', 'Trend', 'Num Sales', 'Min', 'Max', 'Top 3 Prices', 'Last Scraped']
