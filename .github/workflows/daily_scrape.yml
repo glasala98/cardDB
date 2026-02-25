@@ -1,0 +1,50 @@
+name: Daily Card Price Scrape
+
+on:
+  schedule:
+    - cron: '0 8 * * *'  # 8am UTC daily (3am EST / midnight PST)
+  workflow_dispatch:       # Allow manual trigger from GitHub UI
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H southwestsportscards.ca >> ~/.ssh/known_hosts
+
+      - name: Download current data from server
+        run: |
+          mkdir -p data/admin
+          scp root@southwestsportscards.ca:/opt/card-dashboard/users.yaml .
+          scp root@southwestsportscards.ca:/opt/card-dashboard/hockey_cards.csv .
+          scp root@southwestsportscards.ca:/opt/card-dashboard/data/admin/card_prices_summary.csv data/admin/
+          scp root@southwestsportscards.ca:/opt/card-dashboard/data/admin/card_prices_results.json data/admin/
+          scp root@southwestsportscards.ca:/opt/card-dashboard/data/admin/price_history.json data/admin/ || true
+
+      - name: Run scraper
+        run: python daily_scrape.py --workers 3
+
+      - name: Upload results to server
+        run: |
+          scp data/admin/card_prices_summary.csv root@southwestsportscards.ca:/opt/card-dashboard/data/admin/card_prices_summary.csv
+          scp data/admin/card_prices_results.json root@southwestsportscards.ca:/opt/card-dashboard/data/admin/card_prices_results.json
+          scp data/admin/price_history.json root@southwestsportscards.ca:/opt/card-dashboard/data/admin/price_history.json
