@@ -12,6 +12,7 @@ const COLUMNS = [
   { key: 'assists',   label: 'A' },
   { key: 'points',    label: 'PTS' },
   { key: 'plus_minus', label: '+/-' },
+  { key: 'shots',      label: 'SOG' },
 ]
 
 export default function NHLStats() {

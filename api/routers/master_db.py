@@ -1,6 +1,5 @@
 """Master DB endpoints — Young Guns market database."""
 
-import os
 from fastapi import APIRouter, HTTPException
 
 from dashboard_utils import (
@@ -12,35 +11,38 @@ from dashboard_utils import (
 
 router = APIRouter()
 
-MASTER_DB_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "data", "master_db"
-)
-
 
 @router.get("")
 def list_young_guns(search: str = ""):
     """Return all Young Guns cards."""
     df = load_master_db()
     if search:
+        s = search.lower()
         mask = (
-            df.get("Player", df.iloc[:, 0]).str.contains(search, case=False, na=False)
-            | df.get("Year",   df.iloc[:, 0]).astype(str).str.contains(search)
-            | df.get("Set",    df.iloc[:, 0]).str.contains(search, case=False, na=False)
+            df["PlayerName"].str.lower().str.contains(s, na=False)
+            | df["Season"].astype(str).str.contains(s)
+            | df["Set"].str.lower().str.contains(s, na=False)
         )
         df = df[mask]
 
     cards = []
     for _, r in df.fillna("").iterrows():
         cards.append({
-            "player":      r.get("Player", ""),
-            "year":        r.get("Year", ""),
+            "player":      r.get("PlayerName", ""),
+            "season":      r.get("Season", ""),
             "set":         r.get("Set", ""),
-            "card_number": r.get("Card #", ""),
-            "raw_price":   r.get("Raw Price") or None,
-            "psa10_price": r.get("PSA 10") or None,
-            "bgs95_price": r.get("BGS 9.5") or None,
+            "card_number": r.get("CardNumber", ""),
+            "team":        r.get("Team", ""),
+            "position":    r.get("Position", ""),
+            "fair_value":  r.get("FairValue") or None,
+            "num_sales":   r.get("NumSales") or None,
+            "psa10_price": r.get("PSA10_Value") or None,
+            "psa10_sales": r.get("PSA10_Sales") or None,
+            "psa9_price":  r.get("PSA9_Value") or None,
+            "bgs95_price": r.get("BGS9_5_Value") or None,
             "trend":       r.get("Trend", ""),
+            "owned":       bool(r.get("Owned", 0)),
+            "cost_basis":  r.get("CostBasis") or None,
         })
     return {"cards": cards}
 
@@ -65,18 +67,20 @@ def yg_portfolio_history():
 @router.get("/nhl-stats")
 def nhl_stats():
     """Return NHL player stats for all tracked players."""
-    stats = load_nhl_player_stats()
+    raw = load_nhl_player_stats()
+    players_data = raw.get("players", {})
     players = []
-    for player, data in stats.items():
-        s = data.get("stats", {})
+    for player, data in players_data.items():
+        s = data.get("current_season", {})
         players.append({
             "player":     player,
-            "team":       data.get("team", ""),
+            "team":       data.get("current_team", ""),
             "position":   data.get("position", ""),
-            "gp":         s.get("gp", 0),
+            "gp":         s.get("games_played", 0),
             "goals":      s.get("goals", 0),
             "assists":    s.get("assists", 0),
             "points":     s.get("points", 0),
-            "plus_minus": s.get("plusMinus", 0),
+            "plus_minus": s.get("plus_minus", 0),
+            "shots":      s.get("shots", 0),
         })
     return {"players": players}

@@ -5,12 +5,14 @@ import { getYoungGuns } from '../api/masterDb'
 import styles from './Page.module.css'
 
 const COLUMNS = [
-  { key: 'player',       label: 'Player' },
-  { key: 'year',         label: 'Year' },
-  { key: 'set',          label: 'Set' },
-  { key: 'raw_price',    label: 'Raw Price',   render: v => v ? `$${Number(v).toFixed(2)}` : '—' },
-  { key: 'psa10_price',  label: 'PSA 10',      render: v => v ? `$${Number(v).toFixed(2)}` : '—' },
-  { key: 'trend',        label: 'Trend',        render: v => <TrendBadge trend={v} /> },
+  { key: 'player',      label: 'Player' },
+  { key: 'season',      label: 'Season' },
+  { key: 'team',        label: 'Team' },
+  { key: 'position',    label: 'Pos' },
+  { key: 'fair_value',  label: 'Raw Price',  render: v => v ? `$${Number(v).toFixed(2)}` : '—' },
+  { key: 'psa10_price', label: 'PSA 10',     render: v => v ? `$${Number(v).toFixed(2)}` : '—' },
+  { key: 'num_sales',   label: 'Sales' },
+  { key: 'trend',       label: 'Trend',      render: v => <TrendBadge trend={v} /> },
 ]
 
 export default function MasterDB() {
@@ -28,7 +30,8 @@ export default function MasterDB() {
 
   const filtered = cards.filter(c =>
     c.player?.toLowerCase().includes(search.toLowerCase()) ||
-    c.year?.toString().includes(search) ||
+    c.season?.toString().includes(search) ||
+    c.team?.toLowerCase().includes(search.toLowerCase()) ||
     c.set?.toLowerCase().includes(search.toLowerCase())
   )
 
