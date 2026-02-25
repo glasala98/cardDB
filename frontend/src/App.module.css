@@ -1,0 +1,19 @@
+.layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main {
+  flex: 1;
+  padding: 24px 32px;
+  overflow-x: hidden;
+}
+
+@media (max-width: 768px) {
+  .layout {
+    flex-direction: column;
+  }
+  .main {
+    padding: 16px;
+  }
+}

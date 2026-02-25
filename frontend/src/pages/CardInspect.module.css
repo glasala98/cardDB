@@ -1,0 +1,52 @@
+.back {
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: block;
+  margin-bottom: 8px;
+}
+.back:hover { color: var(--text-primary); }
+
+.metrics {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.metric {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.metricLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.metricValue {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.section {
+  margin-top: 24px;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}

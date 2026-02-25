@@ -1,0 +1,13 @@
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.up     { background: rgba(76, 175, 130, 0.2); color: #4caf82; }
+.down   { background: rgba(224, 92, 92, 0.2);  color: #e05c5c; }
+.stable { background: rgba(79, 142, 247, 0.2); color: #4f8ef7; }
+.nodata { background: rgba(154, 160, 180, 0.15); color: #9aa0b4; }
