@@ -4,8 +4,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 import os
 import sys
+import json
 import subprocess
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Import utils
 try:
@@ -23,7 +24,7 @@ try:
         TEAM_ABBREV_TO_NAME,
         get_market_alerts, get_card_of_the_day,
         compute_team_multipliers, compute_impact_scores,
-        CSV_PATH, MONEY_COLS, PARSED_COLS
+        CSV_PATH, RESULTS_JSON_PATH, MONEY_COLS, PARSED_COLS
     )
 except ImportError:
     st.error("dashboard_utils.py not found. Please ensure it exists in the same directory.")
@@ -947,10 +948,32 @@ elif page == "Card Ledger":
     mask &= (df['Fair Value'] >= price_range[0]) & (df['Fair Value'] <= price_range[1])
     filtered_df = df[mask].copy()
 
-    display_cols = ['Player', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Tags', 'Fair Value', 'Cost Basis', 'Trend', 'Num Sales', 'Min', 'Max', 'Top 3 Prices', 'Last Scraped']
+    # Compute last sale date per card for 90-day stale detection
+    _actual_results_path = _results_path or RESULTS_JSON_PATH
+    _results_data = {}
+    if os.path.exists(_actual_results_path):
+        try:
+            with open(_actual_results_path, 'r', encoding='utf-8') as _rf:
+                _results_data = json.load(_rf)
+        except Exception:
+            _results_data = {}
+    _stale_cutoff = (datetime.now() - timedelta(days=90)).strftime('%Y-%m-%d')
+
+    def _last_sale_label(card_name):
+        sales = _results_data.get(card_name, {}).get('raw_sales', [])
+        dates = [s.get('sold_date', '') for s in sales if s.get('sold_date')]
+        if not dates:
+            return ''
+        latest = max(dates)
+        return f'⚠️ {latest}' if latest < _stale_cutoff else latest
+
+    filtered_df['Last Sale'] = filtered_df['Card Name'].apply(_last_sale_label)
+
+    display_cols = ['Player', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Tags', 'Fair Value', 'Cost Basis', 'Trend', 'Num Sales', 'Min', 'Max', 'Top 3 Prices', 'Last Sale', 'Last Scraped']
     display_cols = [c for c in display_cols if c in filtered_df.columns]
     edit_df = filtered_df[display_cols].copy()
     edit_df['Top 3 Prices'] = edit_df['Top 3 Prices'].fillna('')
+    edit_df['Last Sale'] = edit_df['Last Sale'].fillna('')
     edit_df['Last Scraped'] = edit_df['Last Scraped'].fillna('')
     edit_df['Tags'] = edit_df['Tags'].fillna('')
 
@@ -998,6 +1021,7 @@ elif page == "Card Ledger":
             "Max": st.column_config.NumberColumn("Max ($)", format="$%.2f", disabled=True),
             "Trend": st.column_config.TextColumn("Trend", disabled=True),
             "Top 3 Prices": st.column_config.TextColumn("Top 3 Prices", disabled=True),
+            "Last Sale": st.column_config.TextColumn("Last Sale", disabled=True, help="Most recent eBay sold date. ⚠️ = older than 90 days (outside eBay window)"),
             "Last Scraped": st.column_config.TextColumn("Last Scraped", disabled=True),
             "View": st.column_config.CheckboxColumn("View", width="small", default=False),
             "Remove": st.column_config.CheckboxColumn("Remove", width="small", default=False),
