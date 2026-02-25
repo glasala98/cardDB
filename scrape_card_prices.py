@@ -615,6 +615,18 @@ def search_ebay_sold(driver, card_name, max_results=240, search_query=None):
                 except Exception:
                     pass
 
+                # Grab thumbnail image — best-effort, eBay lazy-loads some images
+                item_image_url = ''
+                try:
+                    img_elem = item.find_element(By.CSS_SELECTOR, 'img')
+                    for attr in ('src', 'data-src', 'data-defer-img'):
+                        val = img_elem.get_attribute(attr) or ''
+                        if val and 'ebayimg.com' in val and '.gif' not in val:
+                            item_image_url = val
+                            break
+                except Exception:
+                    pass
+
                 sales.append({
                     'title': title,
                     'item_price': price_str,
@@ -623,7 +635,8 @@ def search_ebay_sold(driver, card_name, max_results=240, search_query=None):
                     'sold_date': sold_date.strftime('%Y-%m-%d') if sold_date else None,
                     'days_ago': (datetime.now() - sold_date).days if sold_date else None,
                     'listing_url': listing_url,
-                    'search_url': url
+                    'search_url': url,
+                    'image_url': item_image_url,
                 })
 
                 if len(sales) >= max_results:
@@ -951,12 +964,18 @@ def process_card(card):
     if pricing_sales:
         fair_price, stats = calculate_fair_price(pricing_sales, target_serial=target_serial)
         stats['confidence'] = confidence
+        # Pick the first real image URL from direct sales (best-confidence listings)
+        image_url = next(
+            (s.get('image_url') for s in direct_sales if s.get('image_url')),
+            None
+        )
         return card, {
             'estimated_value': f"${fair_price}",
             'confidence': confidence,
             'stats': stats,
             'raw_sales': direct_sales,
-            'search_url': pricing_sales[0].get('search_url', '')
+            'search_url': pricing_sales[0].get('search_url', ''),
+            'image_url': image_url,
         }
     else:
         return card, {

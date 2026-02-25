@@ -140,6 +140,7 @@ def card_detail(card_name: str, user: str = DEFAULT_USER):
         card_result = results.get(card_name, {})
         confidence  = card_result.get("confidence", "unknown") or "unknown"
         search_url  = card_result.get("search_url")
+        image_url   = card_result.get("image_url")
         raw_sales = [
             {
                 "sold_date":   s.get("sold_date", ""),
@@ -157,6 +158,7 @@ def card_detail(card_name: str, user: str = DEFAULT_USER):
         "raw_sales":     raw_sales,
         "confidence":    confidence,
         "search_url":    search_url,
+        "image_url":     image_url,
     }
 
 

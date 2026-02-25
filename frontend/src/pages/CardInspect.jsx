@@ -47,7 +47,7 @@ export default function CardInspect() {
   if (error)   return <p className={pageStyles.error}>Error: {error}</p>
   if (!data)   return <p className={pageStyles.status}>Card not found.</p>
 
-  const { card, price_history, raw_sales, confidence, search_url } = data
+  const { card, price_history, raw_sales, confidence, search_url, image_url } = data
 
   const gain     = (card.fair_value ?? 0) - (card.cost_basis ?? 0)
   const hasValue = card.fair_value != null && card.fair_value > 0
@@ -62,6 +62,14 @@ export default function CardInspect() {
       <Link to="/ledger" className={styles.back}>← Back to Ledger</Link>
 
       <div className={styles.cardHeader}>
+        {image_url && (
+          <img
+            src={image_url}
+            alt={name}
+            className={styles.cardImage}
+            onError={e => { e.currentTarget.style.display = 'none' }}
+          />
+        )}
         <div className={styles.titleRow}>
           <h1 className={styles.cardTitle}>{name}</h1>
           <div className={styles.headerActions}>

@@ -10,6 +10,18 @@
 /* ── Card header ─────────────────────────────────────────────── */
 .cardHeader  { margin-bottom: 20px; }
 
+.cardImage {
+  display: block;
+  height: 180px;
+  width: auto;
+  max-width: 100%;
+  border-radius: 10px;
+  object-fit: contain;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
 .titleRow {
   display: flex;
   align-items: flex-start;

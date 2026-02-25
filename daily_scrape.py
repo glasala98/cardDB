@@ -85,6 +85,9 @@ def daily_scrape_user(csv_path, results_path, history_path, backup_dir, max_work
                 merged.sort(key=lambda s: s.get('sold_date') or '0000-00-00', reverse=True)
                 result['raw_sales'] = merged
                 result['scraped_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                # Preserve existing image_url — only fetch once (first scrape that finds one)
+                if not result.get('image_url'):
+                    result['image_url'] = results.get(card_name, {}).get('image_url')
                 results[card_name] = result
 
                 # Update the dataframe row
