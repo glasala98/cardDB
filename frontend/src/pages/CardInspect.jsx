@@ -5,6 +5,7 @@ import ConfidenceBadge from '../components/ConfidenceBadge'
 import TrendBadge from '../components/TrendBadge'
 import { getCardDetail, scrapeCard } from '../api/cards'
 import { useCurrency } from '../context/CurrencyContext'
+import CurrencySelect from '../components/CurrencySelect'
 import pageStyles from './Page.module.css'
 import styles from './CardInspect.module.css'
 
@@ -61,7 +62,10 @@ export default function CardInspect() {
 
       {toast && <div className={`${styles.toast} ${styles[toast.type]}`}>{toast.msg}</div>}
 
-      <Link to="/ledger" className={styles.back}>← Back to Ledger</Link>
+      <div className={styles.topBar}>
+        <Link to="/ledger" className={styles.back}>← Back to Ledger</Link>
+        <CurrencySelect />
+      </div>
 
       <div className={styles.cardHeader}>
         {image_url && (

@@ -65,34 +65,6 @@
   text-align: center;
 }
 
-/* ── Currency toggle ─────────────────────────────────────────── */
-.currencyToggle {
-  display: flex;
-  gap: 0;
-  margin: 12px 10px 0;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.currencyBtn {
-  flex: 1;
-  background: none;
-  border: none;
-  padding: 7px 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-.currencyBtn:hover { background: var(--bg-card); color: var(--text-primary); }
-.currencyActive {
-  background: var(--accent) !important;
-  color: #fff !important;
-  cursor: default;
-}
-
 /* ── User / logout area ──────────────────────────────────────── */
 .userArea {
   margin-top: auto;
@@ -150,9 +122,6 @@
   }
   .label {
     display: none;
-  }
-  .currencyToggle {
-    margin: 0 0 0 8px;
   }
   .userArea {
     margin-top: 0;

@@ -1,6 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { useCurrency } from '../context/CurrencyContext'
 import styles from './Navbar.module.css'
 
 const NAV_ITEMS = [
@@ -12,7 +11,6 @@ const NAV_ITEMS = [
 
 export default function Navbar() {
   const { user, logout } = useAuth()
-  const { currency, toggle: toggleCurrency } = useCurrency()
   const navigate = useNavigate()
 
   const handleLogout = async () => {
@@ -42,17 +40,6 @@ export default function Navbar() {
           </li>
         ))}
       </ul>
-
-      <div className={styles.currencyToggle}>
-        <button
-          className={`${styles.currencyBtn} ${currency === 'CAD' ? styles.currencyActive : ''}`}
-          onClick={() => currency !== 'CAD' && toggleCurrency()}
-        >CAD</button>
-        <button
-          className={`${styles.currencyBtn} ${currency === 'USD' ? styles.currencyActive : ''}`}
-          onClick={() => currency !== 'USD' && toggleCurrency()}
-        >USD</button>
-      </div>
 
       {user && (
         <div className={styles.userArea}>

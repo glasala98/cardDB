@@ -5,6 +5,7 @@ import PriceChart from '../components/PriceChart'
 import TrendBadge from '../components/TrendBadge'
 import { getPortfolioHistory, getCards } from '../api/cards'
 import { useCurrency } from '../context/CurrencyContext'
+import CurrencySelect from '../components/CurrencySelect'
 import pageStyles from './Page.module.css'
 import styles from './Portfolio.module.css'
 
@@ -63,6 +64,7 @@ export default function Portfolio() {
     <div className={pageStyles.page}>
       <div className={pageStyles.header}>
         <h1 className={pageStyles.title}>Portfolio</h1>
+        <CurrencySelect />
       </div>
 
       {loading && <p className={pageStyles.status}>Loading…</p>}

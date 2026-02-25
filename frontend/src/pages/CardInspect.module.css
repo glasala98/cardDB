@@ -1,8 +1,14 @@
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
 .back {
   display: inline-block;
   font-size: 13px;
   color: var(--text-secondary);
-  margin-bottom: 12px;
   transition: color 0.15s;
 }
 .back:hover { color: var(--text-primary); }

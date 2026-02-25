@@ -7,6 +7,7 @@ import AddCardModal from '../components/AddCardModal'
 import { getCards, archiveCard, scrapeCard } from '../api/cards'
 import { triggerScrape } from '../api/stats'
 import { useCurrency } from '../context/CurrencyContext'
+import CurrencySelect from '../components/CurrencySelect'
 import styles from './CardLedger.module.css'
 import pageStyles from './Page.module.css'
 
@@ -162,6 +163,7 @@ export default function CardLedger() {
           </span>
         )}
         <button className={styles.addBtn} onClick={() => setShowAdd(true)}>+ Add Card</button>
+        <CurrencySelect />
       </div>
 
       {!loading && !error && (
