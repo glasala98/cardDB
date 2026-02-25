@@ -1,8 +1,8 @@
-name: Master DB Weekly Scrape (Graded + Bios)
+name: Master DB Daily Scrape (Graded + Bios)
 
 on:
   schedule:
-    - cron: '0 7 * * 0'  # 7am UTC every Sunday (2am EST / 11pm PST Saturday)
+    - cron: '0 7 * * *'  # 7am UTC daily (2am EST / 11pm PST)
   workflow_dispatch:       # Allow manual trigger from GitHub UI
 
 jobs:
