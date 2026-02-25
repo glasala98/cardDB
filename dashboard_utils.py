@@ -178,8 +178,8 @@ If you can't determine a field, use your best guess based on card design, logos,
         return None, str(e)
 
 
-def _merge_sales(new_sales, existing_sales, max_sales=100):
-    """Merge new sales with existing, deduplicating by (sold_date, title). Cap at max_sales."""
+def _merge_sales(new_sales, existing_sales):
+    """Merge new sales with existing, deduplicating by (sold_date, title)."""
     seen = set()
     merged = []
     for sale in new_sales + existing_sales:
@@ -189,7 +189,7 @@ def _merge_sales(new_sales, existing_sales, max_sales=100):
             merged.append(sale)
     # Sort by date descending (newest first), undated last
     merged.sort(key=lambda s: s.get('sold_date') or '0000-00-00', reverse=True)
-    return merged[:max_sales]
+    return merged
 
 
 def scrape_single_card(card_name, results_json_path=None):
@@ -1156,7 +1156,7 @@ def batch_save_yg_raw_sales(all_sales_dict, path=None):
                 existing.append(s)
                 seen.add(key)
         existing.sort(key=lambda x: x['sold_date'], reverse=True)
-        data[card_name] = existing[:200]
+        data[card_name] = existing
 
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)

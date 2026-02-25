@@ -445,7 +445,7 @@ def build_simplified_query(card_name):
     return search_term.strip()
 
 
-def search_ebay_sold(driver, card_name, max_results=50):
+def search_ebay_sold(driver, card_name, max_results=240):
     """Search eBay sold listings for a card and return recent sale prices with dates."""
 
     search_query = clean_card_name_for_search(card_name)
@@ -769,7 +769,7 @@ def process_card(card):
     # Small random delay to stagger requests across workers
     time.sleep(random.uniform(0.5, 1.5))
 
-    sales = search_ebay_sold(driver, card, max_results=50)
+    sales = search_ebay_sold(driver, card)
 
     # Retry with simplified query if no results
     if not sales:
