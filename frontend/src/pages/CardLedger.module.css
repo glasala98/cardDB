@@ -1,0 +1,249 @@
+/* ── Stats bar ────────────────────────────────────────────────── */
+.stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.stat {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 130px;
+}
+
+.statLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.statValue {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.gain { color: var(--success); }
+.loss { color: var(--danger);  }
+
+/* ── Filters ─────────────────────────────────────────────────── */
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.trendBtns {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.trendBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: opacity 0.15s, border-color 0.15s;
+}
+
+.trendBtn.on  { opacity: 1; border-color: transparent; }
+.trendBtn.off { opacity: 0.35; }
+.trendBtn.off:hover { opacity: 0.6; }
+
+.priceRange {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.priceInput {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  width: 110px;
+  transition: border-color 0.15s;
+}
+.priceInput:focus { border-color: var(--accent); }
+.priceInput::placeholder { color: var(--text-secondary); font-size: 11px; }
+/* hide number spinners */
+.priceInput::-webkit-inner-spin-button,
+.priceInput::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+.priceSep {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.clearBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.clearBtn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+
+/* ── Add button ──────────────────────────────────────────────── */
+.addBtn {
+  margin-left: auto;
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.addBtn:hover { background: var(--accent-hover); }
+
+/* ── Table ───────────────────────────────────────────────────── */
+.tableWrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.th {
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.th:hover { color: var(--text-primary); }
+
+.arrow { color: var(--accent); }
+
+.td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+
+.tr:last-child .td { border-bottom: none; }
+.tr:hover .td { background: var(--bg-secondary); }
+
+.nameCell {
+  cursor: pointer;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--accent);
+}
+.nameCell:hover { color: var(--accent-hover); text-decoration: underline; }
+
+.tags {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.empty {
+  text-align: center;
+  padding: 32px;
+  color: var(--text-secondary);
+}
+
+/* ── Action buttons ──────────────────────────────────────────── */
+.actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.btnEdit, .btnScrape, .btnArchive {
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  padding: 5px 10px;
+}
+
+.btnEdit {
+  background: rgba(79, 142, 247, 0.15);
+  color: var(--accent);
+}
+.btnEdit:hover { background: rgba(79, 142, 247, 0.28); }
+
+.btnScrape {
+  background: rgba(154, 160, 180, 0.12);
+  color: var(--text-secondary);
+  font-size: 14px;
+  padding: 4px 8px;
+}
+.btnScrape:hover:not(:disabled) { background: rgba(154, 160, 180, 0.24); color: var(--text-primary); }
+.btnScrape:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btnArchive {
+  background: rgba(224, 92, 92, 0.12);
+  color: var(--danger);
+}
+.btnArchive:hover { background: rgba(224, 92, 92, 0.24); }
+
+/* ── Toast ───────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 300;
+  max-width: 380px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  animation: slideIn 0.2s ease;
+}
+
+.toast.success {
+  background: rgba(76, 175, 130, 0.15);
+  border: 1px solid rgba(76, 175, 130, 0.4);
+  color: var(--success);
+}
+
+.toast.error {
+  background: rgba(224, 92, 92, 0.15);
+  border: 1px solid rgba(224, 92, 92, 0.4);
+  color: var(--danger);
+}
+
+@keyframes slideIn {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}

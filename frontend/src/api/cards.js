@@ -1,15 +1,12 @@
 import client from './client'
 
-/** Get all cards for the current user (summary table). */
-export const getCards = () => client.get('/cards')
+export const getCards            = ()           => client.get('/cards')
+export const getCardDetail       = (name)       => client.get(`/cards/${encodeURIComponent(name)}`)
+export const getPortfolioHistory = ()           => client.get('/cards/portfolio-history')
+export const getArchive          = ()           => client.get('/cards/archive')
 
-/** Get full detail for a single card (price history, raw sales, confidence). */
-export const getCardDetail = (cardName) =>
-  client.get(`/cards/${encodeURIComponent(cardName)}`)
-
-/** Trigger a re-scrape for a single card. */
-export const scrapeCard = (cardName) =>
-  client.post(`/cards/${encodeURIComponent(cardName)}/scrape`)
-
-/** Get portfolio history snapshots. */
-export const getPortfolioHistory = () => client.get('/cards/portfolio-history')
+export const addCard     = (data)       => client.post('/cards', data)
+export const updateCard  = (name, data) => client.patch(`/cards/${encodeURIComponent(name)}`, data)
+export const archiveCard = (name)       => client.delete(`/cards/${encodeURIComponent(name)}`)
+export const restoreCard = (name)       => client.post(`/cards/restore/${encodeURIComponent(name)}`)
+export const scrapeCard  = (name)       => client.post(`/cards/${encodeURIComponent(name)}/scrape`)

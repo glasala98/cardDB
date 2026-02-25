@@ -1,78 +1,268 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import CardTable from '../components/CardTable'
 import TrendBadge from '../components/TrendBadge'
-import { getCards } from '../api/cards'
-import styles from './Page.module.css'
+import ConfirmDialog from '../components/ConfirmDialog'
+import EditCardModal from '../components/EditCardModal'
+import AddCardModal from '../components/AddCardModal'
+import { getCards, archiveCard, scrapeCard } from '../api/cards'
+import styles from './CardLedger.module.css'
+import pageStyles from './Page.module.css'
 
-const COLUMNS = [
-  { key: 'card_name',   label: 'Card Name' },
-  { key: 'fair_value',  label: 'Fair Value',  render: v => v ? `$${Number(v).toFixed(2)}` : '—' },
-  { key: 'cost_basis',  label: 'Cost Basis',  render: v => v ? `$${Number(v).toFixed(2)}` : '—' },
-  { key: 'trend',       label: 'Trend',       render: v => <TrendBadge trend={v} /> },
-  { key: 'num_sales',   label: 'Sales' },
-  { key: 'last_sale',   label: 'Last Sale' },
-]
+const TRENDS = ['up', 'stable', 'down', 'no data']
 
 export default function CardLedger() {
   const navigate = useNavigate()
-  const [cards, setCards] = useState([])
+
+  const [cards,   setCards]   = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [search, setSearch] = useState('')
+  const [error,   setError]   = useState(null)
+
+  const [search,      setSearch]      = useState('')
+  const [trendFilter, setTrendFilter] = useState(new Set(TRENDS))
+  const [minPrice,    setMinPrice]    = useState('')
+  const [maxPrice,    setMaxPrice]    = useState('')
+
   const [sortKey, setSortKey] = useState('card_name')
   const [sortDir, setSortDir] = useState('asc')
 
-  useEffect(() => {
+  const [editTarget,    setEditTarget]    = useState(null)
+  const [archiveTarget, setArchiveTarget] = useState(null)
+  const [scraping,      setScraping]      = useState({})
+  const [showAdd,       setShowAdd]       = useState(false)
+  const [toast,         setToast]         = useState(null)
+
+  const load = () => {
+    setLoading(true)
     getCards()
-      .then(data => setCards(data.cards || []))
+      .then(data => { setCards(data.cards || []); setError(null) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [])
+  }
+  useEffect(load, [])
 
-  const handleSort = (key) => {
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3500)
+  }
+
+  const filtered = useMemo(() => {
+    const s = search.toLowerCase()
+    return cards
+      .filter(c => {
+        if (s && !c.card_name?.toLowerCase().includes(s)) return false
+        const trend = (c.trend || 'no data').toLowerCase()
+        if (!trendFilter.has(trend)) return false
+        if (minPrice !== '' && (c.fair_value ?? 0) < Number(minPrice)) return false
+        if (maxPrice !== '' && (c.fair_value ?? 0) > Number(maxPrice)) return false
+        return true
+      })
+      .sort((a, b) => {
+        const av = a[sortKey] ?? ''
+        const bv = b[sortKey] ?? ''
+        const cmp = typeof av === 'number' && typeof bv === 'number'
+          ? av - bv
+          : String(av).localeCompare(String(bv), undefined, { numeric: true })
+        return sortDir === 'asc' ? cmp : -cmp
+      })
+  }, [cards, search, trendFilter, minPrice, maxPrice, sortKey, sortDir])
+
+  const totalValue = cards.reduce((s, c) => s + (c.fair_value ?? 0), 0)
+  const totalCost  = cards.reduce((s, c) => s + (c.cost_basis ?? 0), 0)
+  const totalGain  = totalValue - totalCost
+  const priceMin   = Math.floor(Math.min(...cards.map(c => c.fair_value ?? 0).filter(v => v > 0)) || 0)
+  const priceMax   = Math.ceil(Math.max(...cards.map(c => c.fair_value ?? 0)) || 0)
+
+  const handleSort = key => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('asc') }
   }
 
-  const filtered = cards
-    .filter(c => c.card_name?.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => {
-      const av = a[sortKey] ?? ''
-      const bv = b[sortKey] ?? ''
-      const cmp = String(av).localeCompare(String(bv), undefined, { numeric: true })
-      return sortDir === 'asc' ? cmp : -cmp
+  const toggleTrend = trend => {
+    setTrendFilter(prev => {
+      const next = new Set(prev)
+      next.has(trend) ? next.delete(trend) : next.add(trend)
+      return next
     })
+  }
+
+  const handleArchive = async () => {
+    try {
+      await archiveCard(archiveTarget)
+      setCards(prev => prev.filter(c => c.card_name !== archiveTarget))
+      showToast(`Archived successfully`)
+    } catch (e) {
+      showToast(e.message, 'error')
+    } finally {
+      setArchiveTarget(null)
+    }
+  }
+
+  const handleScrape = async cardName => {
+    setScraping(prev => ({ ...prev, [cardName]: true }))
+    try {
+      await scrapeCard(cardName)
+      showToast('Scrape queued — refresh in ~30s to see updated price')
+    } catch (e) {
+      showToast(e.message, 'error')
+    } finally {
+      setScraping(prev => ({ ...prev, [cardName]: false }))
+    }
+  }
+
+  const SortTh = ({ col, label }) => (
+    <th className={styles.th} onClick={() => handleSort(col)}>
+      {label}
+      {sortKey === col && <span className={styles.arrow}>{sortDir === 'asc' ? ' ↑' : ' ↓'}</span>}
+    </th>
+  )
+
+  const fmt = v => v != null && v !== '' ? `$${Number(v).toFixed(2)}` : '—'
+  const filtersActive = search || minPrice || maxPrice || trendFilter.size < TRENDS.length
 
   return (
-    <div className={styles.page}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>Card Ledger</h1>
-        <span className={styles.count}>{cards.length} cards</span>
+    <div className={pageStyles.page}>
+
+      {toast && <div className={`${styles.toast} ${styles[toast.type]}`}>{toast.msg}</div>}
+
+      <div className={pageStyles.header}>
+        <h1 className={pageStyles.title}>Card Ledger</h1>
+        <span className={pageStyles.count}>{cards.length} cards</span>
+        <button className={styles.addBtn} onClick={() => setShowAdd(true)}>+ Add Card</button>
       </div>
 
-      <div className={styles.toolbar}>
+      {!loading && !error && (
+        <div className={styles.stats}>
+          <Stat label="Total Value"  value={`$${totalValue.toLocaleString('en-CA', { minimumFractionDigits: 2 })}`} />
+          <Stat label="Total Cost"   value={`$${totalCost.toLocaleString('en-CA',  { minimumFractionDigits: 2 })}`} />
+          <Stat label="Gain / Loss"  value={`${totalGain >= 0 ? '+' : ''}$${Math.abs(totalGain).toLocaleString('en-CA', { minimumFractionDigits: 2 })}`} gain={totalGain} />
+          <Stat label="Showing"      value={`${filtered.length} / ${cards.length}`} />
+        </div>
+      )}
+
+      <div className={styles.filters}>
         <input
-          className={styles.search}
+          className={pageStyles.search}
           placeholder="Search cards..."
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
+
+        <div className={styles.trendBtns}>
+          {TRENDS.map(t => (
+            <button
+              key={t}
+              className={`${styles.trendBtn} ${trendFilter.has(t) ? styles.on : styles.off}`}
+              onClick={() => toggleTrend(t)}
+            >
+              <TrendBadge trend={t} />
+            </button>
+          ))}
+        </div>
+
+        <div className={styles.priceRange}>
+          <input
+            className={styles.priceInput}
+            type="number" min={0}
+            placeholder={`Min $${priceMin}`}
+            value={minPrice}
+            onChange={e => setMinPrice(e.target.value)}
+          />
+          <span className={styles.priceSep}>–</span>
+          <input
+            className={styles.priceInput}
+            type="number" min={0}
+            placeholder={`Max $${priceMax}`}
+            value={maxPrice}
+            onChange={e => setMaxPrice(e.target.value)}
+          />
+        </div>
+
+        {filtersActive && (
+          <button className={styles.clearBtn} onClick={() => {
+            setSearch(''); setMinPrice(''); setMaxPrice(''); setTrendFilter(new Set(TRENDS))
+          }}>
+            Clear filters
+          </button>
+        )}
       </div>
 
-      {loading && <p className={styles.status}>Loading...</p>}
-      {error && <p className={styles.error}>Error: {error}</p>}
+      {loading && <p className={pageStyles.status}>Loading…</p>}
+      {error   && <p className={pageStyles.error}>Error: {error}</p>}
 
       {!loading && !error && (
-        <CardTable
-          columns={COLUMNS}
-          rows={filtered}
-          sortKey={sortKey}
-          sortDir={sortDir}
-          onSort={handleSort}
-          onRowClick={row => navigate(`/ledger/${encodeURIComponent(row.card_name)}`)}
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <SortTh col="card_name"  label="Card Name" />
+                <SortTh col="fair_value" label="Fair Value" />
+                <SortTh col="cost_basis" label="Cost Basis" />
+                <SortTh col="trend"      label="Trend" />
+                <SortTh col="num_sales"  label="Sales" />
+                <th className={styles.th}>Tags</th>
+                <th className={styles.th}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr><td colSpan={7} className={styles.empty}>No cards match the current filters.</td></tr>
+              )}
+              {filtered.map(card => (
+                <tr key={card.card_name} className={styles.tr}>
+                  <td
+                    className={`${styles.td} ${styles.nameCell}`}
+                    onClick={() => navigate(`/ledger/${encodeURIComponent(card.card_name)}`)}
+                    title={card.card_name}
+                  >
+                    {card.card_name}
+                  </td>
+                  <td className={styles.td}>{fmt(card.fair_value)}</td>
+                  <td className={styles.td}>{fmt(card.cost_basis)}</td>
+                  <td className={styles.td}><TrendBadge trend={card.trend} /></td>
+                  <td className={styles.td}>{card.num_sales || '—'}</td>
+                  <td className={styles.td}><span className={styles.tags}>{card.tags || '—'}</span></td>
+                  <td className={styles.td}>
+                    <div className={styles.actions}>
+                      <button className={styles.btnEdit}    onClick={() => setEditTarget(card)}>Edit</button>
+                      <button
+                        className={styles.btnScrape}
+                        onClick={() => handleScrape(card.card_name)}
+                        disabled={scraping[card.card_name]}
+                        title="Re-scrape eBay price"
+                      >
+                        {scraping[card.card_name] ? '…' : '⟳'}
+                      </button>
+                      <button className={styles.btnArchive} onClick={() => setArchiveTarget(card.card_name)}>Archive</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {showAdd      && <AddCardModal  onClose={() => setShowAdd(false)}    onAdded={handleAdded} />}
+      {editTarget   && <EditCardModal card={editTarget} onClose={() => setEditTarget(null)} onSaved={() => { setEditTarget(null); load() }} />}
+      {archiveTarget && (
+        <ConfirmDialog
+          message={`Archive "${archiveTarget.length > 80 ? archiveTarget.slice(0, 80) + '…' : archiveTarget}"? It can be restored from the archive later.`}
+          confirmLabel="Archive"
+          danger
+          onConfirm={handleArchive}
+          onCancel={() => setArchiveTarget(null)}
         />
       )}
+    </div>
+  )
+}
+
+function Stat({ label, value, gain }) {
+  const cls = gain == null ? '' : gain >= 0 ? styles.gain : styles.loss
+  return (
+    <div className={styles.stat}>
+      <span className={styles.statLabel}>{label}</span>
+      <span className={`${styles.statValue} ${cls}`}>{value}</span>
     </div>
   )
 }
