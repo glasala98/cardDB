@@ -452,10 +452,72 @@ def build_simplified_query(card_name):
     return search_term.strip()
 
 
-def search_ebay_sold(driver, card_name, max_results=240):
+def build_set_query(card_name):
+    """Stage 2 fallback: player + card# + serial + set + year. Drops parallel/subset name."""
+    grade_str, grade_num = get_grade_info(card_name)
+
+    clean = re.sub(r'\[.*?\]', '', card_name)
+    clean = re.sub(r'\bPSA\s+\d+\b', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\bBGS\s+\d+(?:\.\d+)?\b', '', clean, flags=re.IGNORECASE)
+    parts = [p.strip() for p in clean.split(' - ')]
+
+    year = ""
+    year_match = re.search(r'(\d{4}(?:-\d{2})?)', parts[0] if parts else '')
+    if year_match:
+        year = year_match.group(1)
+
+    card_num = ""
+    num_match = re.search(r'#(\S+)', clean)
+    if num_match:
+        raw = num_match.group(1)
+        if '/' not in raw:
+            card_num = '#' + raw
+
+    serial = extract_serial_run(clean)
+    serial_str = f'/{serial}' if serial else ''
+
+    player = ""
+    if parts:
+        last = parts[-1]
+        last = re.sub(r'#\d+/\d+', '', last).strip()
+        last = re.sub(r'\(.*?\)', '', last).strip()
+        if last:
+            player = last
+
+    # Extract short brand/set (same mapping as clean_card_name_for_search)
+    brand = parts[0] if parts else ""
+    brand = re.sub(r'^\d{4}(?:-\d{2})?\s*', '', brand).strip()
+    brand = re.sub(r'#\S+', '', brand).strip()
+    brand_map = {
+        'O-Pee-Chee Platinum': 'OPC Platinum',
+        'O-Pee-Chee': 'OPC',
+        'Upper Deck Extended Series': 'UD Extended',
+        'Upper Deck Series 1': 'Upper Deck Series 1',
+        'Upper Deck Series 2': 'Upper Deck Series 2',
+    }
+    brand = brand_map.get(brand, brand)
+
+    # Player + card# + serial + year + set — no parallel/subset
+    query_parts = [p for p in [player, card_num, serial_str, year, brand] if p]
+    search_term = ' '.join(query_parts)
+
+    if grade_str:
+        search_term = f"{search_term} \"{grade_str}\""
+        if grade_str.upper().startswith('BGS'):
+            search_term += ' -PSA -SGC'
+        else:
+            search_term += ' -BGS -SGC'
+    else:
+        search_term = f"{search_term} -PSA -BGS -SGC -graded"
+
+    return search_term.strip()
+
+
+def search_ebay_sold(driver, card_name, max_results=240, search_query=None):
     """Search eBay sold listings for a card and return recent sale prices with dates."""
 
-    search_query = clean_card_name_for_search(card_name)
+    if search_query is None:
+        search_query = clean_card_name_for_search(card_name)
     grade_str, grade_num = get_grade_info(card_name)
     encoded_query = urllib.parse.quote(search_query)
 
@@ -771,104 +833,24 @@ DEFAULT_PRICE = 5.00
 
 
 def process_card(card):
-    """Search and price a single card. Retries with simplified query if needed."""
+    """Search and price a single card. 3-stage retry dropping specificity each time."""
     driver = get_driver()
 
     # Small random delay to stagger requests across workers
     time.sleep(random.uniform(0.5, 1.5))
 
+    # Stage 1: full query — variant + subset + serial + set
     sales = search_ebay_sold(driver, card)
 
-    # Retry with simplified query if no results
+    # Stage 2: drop parallel/subset name, keep serial + set
     if not sales:
         time.sleep(random.uniform(0.5, 1.0))
-        simplified = build_simplified_query(card)
-        grade_str, grade_num = get_grade_info(card)
-        encoded = urllib.parse.quote(simplified)
-        url = f"https://www.ebay.com/sch/i.html?_nkw={encoded}&_sacat=0&LH_Complete=1&LH_Sold=1&_sop=13&_ipg=240"
+        sales = search_ebay_sold(driver, card, search_query=build_set_query(card))
 
-        try:
-            driver.get(url)
-            WebDriverWait(driver, 15).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, '.s-card'))
-            )
-            items = driver.find_elements(By.CSS_SELECTOR, '.s-card')
-            for item in items:
-                try:
-                    title_elem = item.find_element(By.CSS_SELECTOR, '.s-card__title')
-                    title = title_elem.text.strip()
-                    if not title:
-                        continue
-                    if not title_matches_grade(title, grade_str, grade_num):
-                        continue
-
-                    listing_url = ''
-                    try:
-                        link_elem = title_elem.find_element(By.XPATH, './ancestor::a[@class="s-card__link"]')
-                        listing_url = link_elem.get_attribute('href') or ''
-                    except Exception:
-                        try:
-                            link_elem = item.find_element(By.CSS_SELECTOR, 'a.s-card__link[href*="/itm/"]')
-                            listing_url = link_elem.get_attribute('href') or ''
-                        except Exception:
-                            pass
-                    if listing_url:
-                        for param in ['epid', 'itmprp', '_skw']:
-                            listing_url = re.sub(rf'[&?]{param}=[^&]*', '', listing_url)
-
-                    price_elem = item.find_element(By.CSS_SELECTOR, '.s-card__price')
-                    price_text = price_elem.text.strip().replace('Opens in a new window', '')
-                    price_match = re.search(r'\$([\d,]+\.?\d*)', price_text)
-                    if not price_match:
-                        continue
-
-                    price_val = float(price_match.group(1).replace(',', ''))
-                    shipping_val = 0.0
-                    try:
-                        ship_elems = item.find_elements(By.XPATH,
-                            './/*[contains(text(),"delivery") or contains(text(),"shipping")]')
-                        for se in ship_elems:
-                            se_text = se.text.strip().lower()
-                            if 'free' in se_text:
-                                break
-                            sm = re.search(r'\$([\d,]+\.?\d*)', se_text)
-                            if sm:
-                                shipping_val = float(sm.group(1).replace(',', ''))
-                                break
-                    except Exception:
-                        pass
-
-                    sold_date = None
-                    try:
-                        caption = item.find_element(By.CSS_SELECTOR, '.s-card__caption')
-                        dm = re.search(r'Sold\s+(\w+\s+\d+,?\s*\d*)', caption.text.strip())
-                        if dm:
-                            try:
-                                sold_date = datetime.strptime(dm.group(1), '%b %d, %Y')
-                            except ValueError:
-                                try:
-                                    sold_date = datetime.strptime(dm.group(1) + f', {datetime.now().year}', '%b %d, %Y')
-                                except ValueError:
-                                    pass
-                    except Exception:
-                        pass
-
-                    sales.append({
-                        'title': title,
-                        'item_price': price_match.group(0),
-                        'shipping': f"${shipping_val}" if shipping_val > 0 else 'Free',
-                        'price_val': round(price_val + shipping_val, 2),
-                        'sold_date': sold_date.strftime('%Y-%m-%d') if sold_date else None,
-                        'days_ago': (datetime.now() - sold_date).days if sold_date else None,
-                        'listing_url': listing_url,
-                        'search_url': url
-                    })
-                    if len(sales) >= 50:
-                        break
-                except Exception:
-                    continue
-        except Exception:
-            pass
+    # Stage 3: drop set too — just player + card# + serial + year
+    if not sales:
+        time.sleep(random.uniform(0.5, 1.0))
+        sales = search_ebay_sold(driver, card, search_query=build_simplified_query(card))
 
     if sales:
         # Extract target serial for price adjustment (e.g. /99 from "#70/99")
