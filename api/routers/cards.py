@@ -119,34 +119,45 @@ def card_detail(card_name: str, user: str = DEFAULT_USER):
 
     card = _normalise_row(match.iloc[0].fillna("").to_dict())
 
-    # Price history
+    # Price history — deduplicated by date (keep latest value per date)
     price_history = []
     if os.path.exists(paths["history"]):
-        raw = load_price_history(history_path=paths["history"])
-        price_history = [
-            {"date": e.get("date", ""), "price": e.get("fair_price", 0)}
-            for e in raw.get(card_name, [])
-            if e.get("fair_price")
-        ]
+        entries = load_price_history(card_name, history_path=paths["history"])
+        seen_dates = {}
+        for e in entries:
+            d = e.get("date", "")
+            if d and e.get("fair_value"):
+                seen_dates[d] = e["fair_value"]   # last write wins
+        price_history = [{"date": d, "price": p} for d, p in sorted(seen_dates.items())]
 
     # Raw sales + confidence
     raw_sales = []
     confidence = "unknown"
+    search_url = None
     if os.path.exists(paths["results"]):
         with open(paths["results"], "r", encoding="utf-8") as f:
             results = json.load(f)
         card_result = results.get(card_name, {})
-        confidence = card_result.get("confidence", "unknown")
+        confidence  = card_result.get("confidence", "unknown") or "unknown"
+        search_url  = card_result.get("search_url")
         raw_sales = [
             {
-                "sold_date": s.get("sold_date", ""),
-                "title":     s.get("title", ""),
-                "price":     s.get("price_val") or s.get("price"),
+                "sold_date":   s.get("sold_date", ""),
+                # Strip eBay's appended "Opens in a new window or tab" text
+                "title":       s.get("title", "").split("\n")[0].strip(),
+                "price":       s.get("price_val") or s.get("price"),
+                "listing_url": s.get("listing_url"),
             }
             for s in card_result.get("raw_sales", [])
         ]
 
-    return {"card": card, "price_history": price_history, "raw_sales": raw_sales, "confidence": confidence}
+    return {
+        "card":          card,
+        "price_history": price_history,
+        "raw_sales":     raw_sales,
+        "confidence":    confidence,
+        "search_url":    search_url,
+    }
 
 
 # ── Write endpoints ───────────────────────────────────────────────────────────

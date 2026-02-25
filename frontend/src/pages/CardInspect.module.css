@@ -1,31 +1,94 @@
 .back {
+  display: inline-block;
   font-size: 13px;
   color: var(--text-secondary);
-  display: block;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  transition: color 0.15s;
 }
 .back:hover { color: var(--text-primary); }
 
+/* ── Card header ─────────────────────────────────────────────── */
+.cardHeader  { margin-bottom: 20px; }
+
+.titleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.cardTitle {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.scrapeBtn {
+  background: rgba(154, 160, 180, 0.12);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.scrapeBtn:hover:not(:disabled) { background: rgba(154,160,180,0.24); color: var(--text-primary); }
+.scrapeBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.ebayLink {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--accent);
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.ebayLink:hover { background: rgba(79,142,247,0.1); }
+
+.lastScraped {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* ── Metrics bar ─────────────────────────────────────────────── */
 .metrics {
   display: flex;
-  gap: 16px;
+  gap: 10px;
   flex-wrap: wrap;
-  margin-bottom: 24px;
+  margin-bottom: 12px;
 }
 
 .metric {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 16px 20px;
-  min-width: 120px;
+  padding: 12px 16px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  min-width: 90px;
 }
 
 .metricLabel {
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--text-secondary);
@@ -33,20 +96,116 @@
 }
 
 .metricValue {
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-primary);
 }
+.metricValue.large { font-size: 22px; }
+.success { color: var(--success); }
+.danger  { color: var(--danger);  }
 
-.section {
-  margin-top: 24px;
+/* ── Top 3 ───────────────────────────────────────────────────── */
+.top3 {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+.top3Label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ── Section ─────────────────────────────────────────────────── */
+.section { margin-top: 24px; }
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .sectionTitle {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 12px;
+}
+
+.sectionCount {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+.empty {
+  color: var(--text-secondary);
+  font-size: 13px;
+  padding: 20px 0;
+}
+
+/* ── Sales table ─────────────────────────────────────────────── */
+.salesWrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.salesTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.th {
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.td {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  vertical-align: top;
+}
+
+.salesRow:last-child .td { border-bottom: none; }
+.salesRow:hover .td { background: var(--bg-secondary); }
+
+.dateCell  { white-space: nowrap; color: var(--text-secondary); min-width: 95px; }
+.priceCell { white-space: nowrap; font-weight: 600; min-width: 80px; }
+.titleCell { word-break: break-word; max-width: 480px; }
+
+.saleLink { color: var(--accent); }
+.saleLink:hover { text-decoration: underline; }
+
+/* ── Toast ───────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 300;
+  max-width: 380px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  animation: slideIn 0.2s ease;
+}
+.toast.success { background: rgba(76,175,130,0.15); border: 1px solid rgba(76,175,130,0.4); color: var(--success); }
+.toast.error   { background: rgba(224,92,92,0.15);  border: 1px solid rgba(224,92,92,0.4);  color: var(--danger);  }
+
+@keyframes slideIn {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
 }
