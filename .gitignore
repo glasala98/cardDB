@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
+*.pyo
 backups/
 data/*
 !data/master_db/
@@ -14,3 +15,14 @@ portfolio_history.json
 card_archive.csv
 .env
 scrape_and_upload.bat
+
+# IDE / tooling
+.claude/
+.vscode/
+.idea/
+
+# React / Node
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
