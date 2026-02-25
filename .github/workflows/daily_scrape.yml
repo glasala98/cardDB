@@ -35,7 +35,6 @@ jobs:
         run: |
           mkdir -p data/admin
           scp root@southwestsportscards.ca:/opt/card-dashboard/users.yaml .
-          scp root@southwestsportscards.ca:/opt/card-dashboard/hockey_cards.csv .
           scp root@southwestsportscards.ca:/opt/card-dashboard/data/admin/card_prices_summary.csv data/admin/
           scp root@southwestsportscards.ca:/opt/card-dashboard/data/admin/card_prices_results.json data/admin/
           scp root@southwestsportscards.ca:/opt/card-dashboard/data/admin/price_history.json data/admin/ || true
