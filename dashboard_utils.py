@@ -1105,9 +1105,8 @@ def save_yg_raw_sales(card_name, sales, path=None):
             existing.append(s)
             seen.add(key)
 
-    # Cap at 200 most recent (allows history beyond 90-day eBay window)
     existing.sort(key=lambda x: x['sold_date'], reverse=True)
-    data[card_name] = existing[:200]
+    data[card_name] = existing
 
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
