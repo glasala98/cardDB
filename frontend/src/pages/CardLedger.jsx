@@ -102,6 +102,8 @@ export default function CardLedger() {
     }
   }
 
+  const handleAdded = () => { setShowAdd(false); load() }
+
   const handleScrapeAll = async () => {
     setScrapeAll(true)
     setScrapeEta(null)

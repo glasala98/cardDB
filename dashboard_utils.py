@@ -596,6 +596,8 @@ def archive_card(df, card_name, archive_path=None):
     archive_row = archive_row.drop(columns=[c for c in PARSED_COLS if c in archive_row.columns], errors='ignore')
     archive_row['Archived Date'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     for col in MONEY_COLS:
+        if col not in archive_row.columns:
+            continue
         archive_row[col] = archive_row[col].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "$0.00")
 
     # Sanitize string columns
