@@ -18,7 +18,7 @@ if ROOT not in sys.path:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import cards, master_db, stats
+from api.routers import cards, master_db, stats, auth
 
 app = FastAPI(title="Card Dashboard API", version="0.1.0")
 
@@ -35,6 +35,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router,      prefix="/api/auth",      tags=["auth"])
 app.include_router(cards.router,     prefix="/api/cards",     tags=["cards"])
 app.include_router(master_db.router, prefix="/api/master-db", tags=["master-db"])
 app.include_router(stats.router,     prefix="/api/stats",     tags=["stats"])

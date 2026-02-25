@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import styles from './Navbar.module.css'
 
 const NAV_ITEMS = [
@@ -9,6 +10,14 @@ const NAV_ITEMS = [
 ]
 
 export default function Navbar() {
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login', { replace: true })
+  }
+
   return (
     <nav className={styles.nav}>
       <div className={styles.logo}>
@@ -31,6 +40,15 @@ export default function Navbar() {
           </li>
         ))}
       </ul>
+
+      {user && (
+        <div className={styles.userArea}>
+          <span className={styles.userName}>{user.display_name || user.username}</span>
+          <button className={styles.logoutBtn} onClick={handleLogout} title="Sign out">
+            ↩ Sign out
+          </button>
+        </div>
+      )}
     </nav>
   )
 }

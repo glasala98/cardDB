@@ -65,6 +65,41 @@
   text-align: center;
 }
 
+/* ── User / logout area ──────────────────────────────────────── */
+.userArea {
+  margin-top: auto;
+  padding: 16px 10px 0;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.userName {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logoutBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.15s, border-color 0.15s;
+}
+.logoutBtn:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
 @media (max-width: 768px) {
   .nav {
     width: 100%;
@@ -88,4 +123,13 @@
   .label {
     display: none;
   }
+  .userArea {
+    margin-top: 0;
+    margin-left: auto;
+    padding: 0;
+    border-top: none;
+    flex-direction: row;
+    align-items: center;
+  }
+  .userName { display: none; }
 }
