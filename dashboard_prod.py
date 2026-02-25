@@ -1301,6 +1301,26 @@ elif page == "Card Inspect":
         with vc3:
             st.metric("Range", f"${card_row['Min']:.2f} — ${card_row['Max']:.2f}")
 
+        # Confidence indicator
+        _rp = _results_path or RESULTS_JSON_PATH
+        _conf = 'unknown'
+        if os.path.exists(_rp):
+            try:
+                with open(_rp, 'r', encoding='utf-8') as _cf:
+                    _conf = json.load(_cf).get(selected_card, {}).get('confidence', 'unknown')
+            except Exception:
+                pass
+        _conf_map = {
+            'high':      ('✅ High',      'Direct match — exact parallel and serial found'),
+            'medium':    ('🟡 Medium',    'Set match — parallel name dropped, serial exact'),
+            'low':       ('🟠 Low',       'Broad match — only player, card#, serial used'),
+            'estimated': ('🔴 Estimated', 'No direct sales — price extrapolated from nearby serial comps'),
+            'none':      ('⬜ No data',   'No sales found at any stage'),
+            'unknown':   ('⬜ Unknown',   'Not yet scraped'),
+        }
+        _conf_label, _conf_help = _conf_map.get(_conf, ('⬜ Unknown', ''))
+        st.caption(f"Price confidence: **{_conf_label}** — {_conf_help}")
+
         # Rescrape button (hidden in public view)
         if not public_view and st.button("Rescrape Price", type="primary"):
             backup_data(label="rescrape", csv_path=_csv_path, results_path=_results_path, backup_dir=_backup_dir)

@@ -655,6 +655,69 @@ SERIAL_VALUE = {
 }
 
 
+def get_nearby_serials(serial, n=4):
+    """Return the n closest serial print runs to use as comps when exact not found."""
+    all_serials = sorted(SERIAL_VALUE.keys())
+    distances = sorted((abs(s - serial), s) for s in all_serials if s != serial)
+    return [s for _, s in distances[:n]]
+
+
+def build_serial_comp_query(card_name, comp_serial):
+    """Build a search query for a nearby serial comp (e.g. /75 instead of /99)."""
+    grade_str, grade_num = get_grade_info(card_name)
+
+    clean = re.sub(r'\[.*?\]', '', card_name)
+    clean = re.sub(r'\bPSA\s+\d+\b', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\bBGS\s+\d+(?:\.\d+)?\b', '', clean, flags=re.IGNORECASE)
+    parts = [p.strip() for p in clean.split(' - ')]
+
+    year = ""
+    year_match = re.search(r'(\d{4}(?:-\d{2})?)', parts[0] if parts else '')
+    if year_match:
+        year = year_match.group(1)
+
+    card_num = ""
+    num_match = re.search(r'#(\S+)', clean)
+    if num_match:
+        raw = num_match.group(1)
+        if '/' not in raw:
+            card_num = '#' + raw
+
+    player = ""
+    if parts:
+        last = parts[-1]
+        last = re.sub(r'#\d+/\d+', '', last).strip()
+        last = re.sub(r'\(.*?\)', '', last).strip()
+        if last:
+            player = last
+
+    brand = parts[0] if parts else ""
+    brand = re.sub(r'^\d{4}(?:-\d{2})?\s*', '', brand).strip()
+    brand = re.sub(r'#\S+', '', brand).strip()
+    brand_map = {
+        'O-Pee-Chee Platinum': 'OPC Platinum',
+        'O-Pee-Chee': 'OPC',
+        'Upper Deck Extended Series': 'UD Extended',
+        'Upper Deck Series 1': 'Upper Deck Series 1',
+        'Upper Deck Series 2': 'Upper Deck Series 2',
+    }
+    brand = brand_map.get(brand, brand)
+
+    query_parts = [p for p in [player, card_num, f'/{comp_serial}', year, brand] if p]
+    search_term = ' '.join(query_parts)
+
+    if grade_str:
+        search_term = f"{search_term} \"{grade_str}\""
+        if grade_str.upper().startswith('BGS'):
+            search_term += ' -PSA -SGC'
+        else:
+            search_term += ' -BGS -SGC'
+    else:
+        search_term = f"{search_term} -PSA -BGS -SGC -graded"
+
+    return search_term.strip()
+
+
 def serial_multiplier(from_serial, to_serial):
     """Get price multiplier to convert a from_serial price to a to_serial estimate.
     E.g. serial_multiplier(10, 99) returns ~0.17 (a /10 is worth ~6x a /99, so divide)."""
@@ -833,41 +896,75 @@ DEFAULT_PRICE = 5.00
 
 
 def process_card(card):
-    """Search and price a single card. 3-stage retry dropping specificity each time."""
-    driver = get_driver()
+    """Search and price a single card.
 
-    # Small random delay to stagger requests across workers
+    4-stage search with decreasing confidence:
+      1. Exact: variant + subset + serial + set         → confidence: high
+      2. Set:   serial + set (no parallel name)         → confidence: medium
+      3. Broad: player + card# + serial + year          → confidence: low
+      4. Comps: nearby serial print runs (adjusted)     → confidence: estimated
+         (stage 4 results are NOT stored as historical sales)
+    """
+    driver = get_driver()
     time.sleep(random.uniform(0.5, 1.5))
 
+    target_serial = extract_serial_run(card)
+    confidence = 'high'
+    pricing_sales = []   # used for fair value calculation
+    direct_sales = []    # stored historically (direct comps only)
+
     # Stage 1: full query — variant + subset + serial + set
-    sales = search_ebay_sold(driver, card)
+    pricing_sales = search_ebay_sold(driver, card)
 
-    # Stage 2: drop parallel/subset name, keep serial + set
-    if not sales:
+    if not pricing_sales:
+        # Stage 2: drop parallel/subset name, keep serial + set
         time.sleep(random.uniform(0.5, 1.0))
-        sales = search_ebay_sold(driver, card, search_query=build_set_query(card))
+        confidence = 'medium'
+        pricing_sales = search_ebay_sold(driver, card, search_query=build_set_query(card))
 
-    # Stage 3: drop set too — just player + card# + serial + year
-    if not sales:
+    if not pricing_sales:
+        # Stage 3: drop set — player + card# + serial + year only
         time.sleep(random.uniform(0.5, 1.0))
-        sales = search_ebay_sold(driver, card, search_query=build_simplified_query(card))
+        confidence = 'low'
+        pricing_sales = search_ebay_sold(driver, card, search_query=build_simplified_query(card))
 
-    if sales:
-        # Extract target serial for price adjustment (e.g. /99 from "#70/99")
-        target_serial = extract_serial_run(card)
-        fair_price, stats = calculate_fair_price(sales, target_serial=target_serial)
+    if pricing_sales:
+        # Stages 1-3: these are direct comps — store historically
+        direct_sales = list(pricing_sales)
+    elif target_serial:
+        # Stage 4: no direct results found — search nearby serial print runs as comps
+        confidence = 'estimated'
+        nearby = get_nearby_serials(target_serial)
+        for comp_serial in nearby:
+            comp_query = build_serial_comp_query(card, comp_serial)
+            comp_raw = search_ebay_sold(driver, card, search_query=comp_query)
+            if comp_raw:
+                for s in comp_raw:
+                    adj = dict(s)
+                    adj['price_val'] = round(s['price_val'] * serial_multiplier(comp_serial, target_serial), 2)
+                    adj['_serial_adjusted'] = True
+                    adj['_original_serial'] = comp_serial
+                    pricing_sales.append(adj)
+                break  # Use first nearby serial that has results
+        # direct_sales stays empty — stage 4 comps are NOT stored historically
+
+    if pricing_sales:
+        fair_price, stats = calculate_fair_price(pricing_sales, target_serial=target_serial)
+        stats['confidence'] = confidence
         return card, {
             'estimated_value': f"${fair_price}",
+            'confidence': confidence,
             'stats': stats,
-            'raw_sales': sales,
-            'search_url': sales[0]['search_url']
+            'raw_sales': direct_sales,
+            'search_url': pricing_sales[0].get('search_url', '')
         }
     else:
-        # Default to $5 if no sales found anywhere
         return card, {
             'estimated_value': f"${DEFAULT_PRICE}",
+            'confidence': 'none',
             'stats': {
                 'fair_price': DEFAULT_PRICE,
+                'confidence': 'none',
                 'chosen_sale': 'No sales found - default estimate',
                 'chosen_date': 'N/A',
                 'trend': 'unknown',
