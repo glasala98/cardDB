@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { CurrencyProvider } from './context/CurrencyContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Navbar from './components/Navbar'
 import Login from './pages/Login'
@@ -32,10 +33,12 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/*"     element={<AppShell />} />
-        </Routes>
+        <CurrencyProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/*"     element={<AppShell />} />
+          </Routes>
+        </CurrencyProvider>
       </AuthProvider>
     </BrowserRouter>
   )

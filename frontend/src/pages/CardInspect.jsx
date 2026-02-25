@@ -4,6 +4,7 @@ import PriceChart from '../components/PriceChart'
 import ConfidenceBadge from '../components/ConfidenceBadge'
 import TrendBadge from '../components/TrendBadge'
 import { getCardDetail, scrapeCard } from '../api/cards'
+import { useCurrency } from '../context/CurrencyContext'
 import pageStyles from './Page.module.css'
 import styles from './CardInspect.module.css'
 
@@ -49,10 +50,11 @@ export default function CardInspect() {
 
   const { card, price_history, raw_sales, confidence, search_url, image_url } = data
 
+  const { fmtPrice } = useCurrency()
   const gain     = (card.fair_value ?? 0) - (card.cost_basis ?? 0)
   const hasValue = card.fair_value != null && card.fair_value > 0
   const hasCost  = card.cost_basis != null && card.cost_basis > 0
-  const fmt      = v => (v != null && v !== '' && v !== 0) ? `$${Number(v).toFixed(2)}` : '—'
+  const fmt      = v => fmtPrice(v)
 
   return (
     <div className={pageStyles.page}>
@@ -154,7 +156,7 @@ export default function CardInspect() {
                   <tr key={i} className={styles.salesRow}>
                     <td className={`${styles.td} ${styles.dateCell}`}>{s.sold_date || '—'}</td>
                     <td className={`${styles.td} ${styles.priceCell}`}>
-                      {s.price != null ? `$${Number(s.price).toFixed(2)}` : '—'}
+                      {s.price != null ? fmtPrice(s.price) : '—'}
                     </td>
                     <td className={`${styles.td} ${styles.titleCell}`}>
                       {s.listing_url ? (

@@ -5,6 +5,8 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import EditCardModal from '../components/EditCardModal'
 import AddCardModal from '../components/AddCardModal'
 import { getCards, archiveCard, scrapeCard } from '../api/cards'
+import { triggerScrape } from '../api/stats'
+import { useCurrency } from '../context/CurrencyContext'
 import styles from './CardLedger.module.css'
 import pageStyles from './Page.module.css'
 
@@ -12,6 +14,7 @@ const TRENDS = ['up', 'stable', 'down', 'no data']
 
 export default function CardLedger() {
   const navigate = useNavigate()
+  const { fmtPrice } = useCurrency()
 
   const [cards,   setCards]   = useState([])
   const [loading, setLoading] = useState(true)
@@ -30,6 +33,8 @@ export default function CardLedger() {
   const [scraping,      setScraping]      = useState({})
   const [showAdd,       setShowAdd]       = useState(false)
   const [toast,         setToast]         = useState(null)
+  const [scrapeAll,     setScrapeAll]     = useState(false)   // loading state
+  const [scrapeEta,     setScrapeEta]     = useState(null)    // { mins, cards } after dispatch
 
   const load = () => {
     setLoading(true)
@@ -97,6 +102,20 @@ export default function CardLedger() {
     }
   }
 
+  const handleScrapeAll = async () => {
+    setScrapeAll(true)
+    setScrapeEta(null)
+    try {
+      const res = await triggerScrape()
+      setScrapeEta({ mins: res.estimated_minutes, cards: res.card_count })
+      showToast(`Scrape dispatched — ~${res.estimated_minutes} min for ${res.card_count} cards`)
+    } catch (e) {
+      showToast(e.message, 'error')
+    } finally {
+      setScrapeAll(false)
+    }
+  }
+
   const handleScrape = async cardName => {
     setScraping(prev => ({ ...prev, [cardName]: true }))
     try {
@@ -116,7 +135,7 @@ export default function CardLedger() {
     </th>
   )
 
-  const fmt = v => v != null && v !== '' ? `$${Number(v).toFixed(2)}` : '—'
+  const fmt = v => fmtPrice(v)
   const filtersActive = search || minPrice || maxPrice || trendFilter.size < TRENDS.length
 
   return (
@@ -127,14 +146,27 @@ export default function CardLedger() {
       <div className={pageStyles.header}>
         <h1 className={pageStyles.title}>Card Ledger</h1>
         <span className={pageStyles.count}>{cards.length} cards</span>
+        <button
+          className={styles.scrapeAllBtn}
+          onClick={handleScrapeAll}
+          disabled={scrapeAll}
+          title="Trigger a full rescrape via GitHub Actions"
+        >
+          {scrapeAll ? 'Dispatching…' : '⟳ Rescrape All'}
+        </button>
+        {scrapeEta && (
+          <span className={styles.scrapeEta}>
+            ~{scrapeEta.mins} min ({scrapeEta.cards} cards)
+          </span>
+        )}
         <button className={styles.addBtn} onClick={() => setShowAdd(true)}>+ Add Card</button>
       </div>
 
       {!loading && !error && (
         <div className={styles.stats}>
-          <Stat label="Total Value"  value={`$${totalValue.toLocaleString('en-CA', { minimumFractionDigits: 2 })}`} />
-          <Stat label="Total Cost"   value={`$${totalCost.toLocaleString('en-CA',  { minimumFractionDigits: 2 })}`} />
-          <Stat label="Gain / Loss"  value={`${totalGain >= 0 ? '+' : ''}$${Math.abs(totalGain).toLocaleString('en-CA', { minimumFractionDigits: 2 })}`} gain={totalGain} />
+          <Stat label="Total Value"  value={fmtPrice(totalValue)} />
+          <Stat label="Total Cost"   value={fmtPrice(totalCost)} />
+          <Stat label="Gain / Loss"  value={`${totalGain >= 0 ? '+' : ''}${fmtPrice(Math.abs(totalGain))}`} gain={totalGain} />
           <Stat label="Showing"      value={`${filtered.length} / ${cards.length}`} />
         </div>
       )}

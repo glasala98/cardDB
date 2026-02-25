@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 
 import PriceChart from '../components/PriceChart'
 import TrendBadge from '../components/TrendBadge'
 import { getPortfolioHistory, getCards } from '../api/cards'
+import { useCurrency } from '../context/CurrencyContext'
 import pageStyles from './Page.module.css'
 import styles from './Portfolio.module.css'
 
@@ -55,8 +56,8 @@ export default function Portfolio() {
     return { totalValue, totalCost, gainLoss, avgValue, withSales, trendCounts, top10 }
   }, [cards])
 
+  const { fmtPrice } = useCurrency()
   const trendBarData = Object.entries(stats.trendCounts).map(([trend, count]) => ({ trend, count }))
-  const fmt = v => `$${Number(v).toLocaleString('en-CA', { minimumFractionDigits: 2 })}`
 
   return (
     <div className={pageStyles.page}>
@@ -71,14 +72,14 @@ export default function Portfolio() {
 
         {/* ── Summary stats ── */}
         <div className={styles.stats}>
-          <StatCard label="Total Value"   value={fmt(stats.totalValue)} large />
-          <StatCard label="Total Cost"    value={fmt(stats.totalCost)} />
+          <StatCard label="Total Value"   value={fmtPrice(stats.totalValue)} large />
+          <StatCard label="Total Cost"    value={fmtPrice(stats.totalCost)} />
           <StatCard
             label="Gain / Loss"
-            value={`${stats.gainLoss >= 0 ? '+' : ''}${fmt(stats.gainLoss)}`}
+            value={`${stats.gainLoss >= 0 ? '+' : ''}${fmtPrice(stats.gainLoss)}`}
             color={stats.gainLoss >= 0 ? 'success' : 'danger'}
           />
-          <StatCard label="Avg per Card"  value={`$${stats.avgValue.toFixed(2)}`} />
+          <StatCard label="Avg per Card"  value={fmtPrice(stats.avgValue)} />
           <StatCard label="Cards"         value={cards.length} />
           <StatCard label="With Sales"    value={stats.withSales} />
         </div>
@@ -89,7 +90,7 @@ export default function Portfolio() {
             <div className={styles.chartPlaceholder}>
               <p className={styles.placeholderMsg}>
                 Portfolio value chart will build up as daily scrapes run.<br />
-                {latest && <span>Current snapshot: <strong>{fmt(latest.total_value)}</strong> on {latest.date}</span>}
+                {latest && <span>Current snapshot: <strong>{fmtPrice(latest.total_value)}</strong> on {latest.date}</span>}
               </p>
             </div>
           ) : (
@@ -163,7 +164,7 @@ export default function Portfolio() {
                   >
                     <td className={`${styles.topTd} ${styles.rankCell}`}>{i + 1}</td>
                     <td className={`${styles.topTd} ${styles.nameCell}`}>{card.card_name}</td>
-                    <td className={`${styles.topTd} ${styles.valueCell}`}>${Number(card.fair_value).toFixed(2)}</td>
+                    <td className={`${styles.topTd} ${styles.valueCell}`}>{fmtPrice(card.fair_value)}</td>
                     <td className={styles.topTd}><TrendBadge trend={card.trend} /></td>
                   </tr>
                 ))}

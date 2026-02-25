@@ -103,6 +103,31 @@
 }
 .clearBtn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
 
+/* ── Rescrape All button + ETA ───────────────────────────────── */
+.scrapeAllBtn {
+  background: rgba(154, 160, 180, 0.12);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 14px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.scrapeAllBtn:hover:not(:disabled) {
+  background: rgba(154, 160, 180, 0.24);
+  color: var(--text-primary);
+}
+.scrapeAllBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.scrapeEta {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
 /* ── Add button ──────────────────────────────────────────────── */
 .addBtn {
   margin-left: auto;
