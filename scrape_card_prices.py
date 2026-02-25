@@ -289,9 +289,12 @@ def clean_card_name_for_search(card_name):
     if card_num:
         query_parts.append(card_num)
 
-    # Note: serial number (/99, /10 etc.) is intentionally NOT added to the search
-    # query. We want all serializations so we can use them as comps when exact
-    # matches are scarce. The calculate_fair_price function handles serial adjustment.
+    # Add serial number to search for numbered cards (/99, /25, etc.)
+    # Sellers consistently include this in titles, so it filters out base cards and lots.
+    # Falls back to broader search automatically if no results found.
+    serial = extract_serial_run(clean)
+    if serial:
+        query_parts.append(f'/{serial}')
 
     # Variant is critical for parallels (Red Prism vs base are very different values)
     if variant:
@@ -633,8 +636,9 @@ def adjust_sales_for_serial(sales, target_serial):
             adjusted['_original_serial'] = sale_serial
             others.append(adjusted)
         else:
-            # No serial in title — could be base/non-numbered, include as-is
-            others.append(s)
+            # No serial in title — base/non-numbered card.
+            # Skip as comp for serial-numbered cards (different product entirely).
+            pass
 
     # If we have exact matches, use only those
     if exact:
