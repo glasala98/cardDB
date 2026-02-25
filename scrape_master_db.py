@@ -101,7 +101,13 @@ def _create_fast_driver():
     opts.add_experimental_option('excludeSwitches', ['enable-automation'])
     opts.page_load_strategy = 'eager'  # Don't wait for images/subresources
     from selenium import webdriver
-    driver = webdriver.Chrome(options=opts)
+    try:
+        from webdriver_manager.chrome import ChromeDriverManager
+        from selenium.webdriver.chrome.service import Service
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=opts)
+    except Exception:
+        driver = webdriver.Chrome(options=opts)
     driver.set_page_load_timeout(15)
     driver.set_script_timeout(10)
     return driver

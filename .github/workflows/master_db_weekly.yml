@@ -1,0 +1,64 @@
+name: Master DB Weekly Scrape (Graded + Bios)
+
+on:
+  schedule:
+    - cron: '0 7 * * 0'  # 7am UTC every Sunday (2am EST / 11pm PST Saturday)
+  workflow_dispatch:       # Allow manual trigger from GitHub UI
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H southwestsportscards.ca >> ~/.ssh/known_hosts
+          echo "Host southwestsportscards.ca" >> ~/.ssh/config
+          echo "  IdentityFile ~/.ssh/id_ed25519" >> ~/.ssh/config
+          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+          chmod 600 ~/.ssh/config
+
+      - name: Download current data from server
+        run: |
+          mkdir -p data/master_db
+          scp root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/young_guns.csv data/master_db/
+          scp root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/nhl_player_stats.json data/master_db/ || true
+          scp root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/yg_price_history.json data/master_db/ || true
+          scp root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/yg_portfolio_history.json data/master_db/ || true
+          scp root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/yg_raw_sales.json data/master_db/ || true
+          scp root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/yg_correlation_history.json data/master_db/ || true
+
+      - name: Scrape raw card prices
+        run: python -u scrape_master_db.py --workers 5
+
+      - name: Scrape graded prices (PSA/BGS)
+        run: python -u scrape_master_db.py --graded --workers 5
+
+      - name: Scrape NHL stats + player bios
+        run: python -u scrape_nhl_stats.py --fetch-bios
+
+      - name: Upload results to server
+        run: |
+          scp data/master_db/young_guns.csv root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/young_guns.csv
+          scp data/master_db/nhl_player_stats.json root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/nhl_player_stats.json
+          scp data/master_db/yg_price_history.json root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/yg_price_history.json || true
+          scp data/master_db/yg_portfolio_history.json root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/yg_portfolio_history.json || true
+          scp data/master_db/yg_raw_sales.json root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/yg_raw_sales.json || true
+          scp data/master_db/yg_correlation_history.json root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/yg_correlation_history.json || true
