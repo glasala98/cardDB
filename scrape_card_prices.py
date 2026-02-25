@@ -423,6 +423,10 @@ def build_simplified_query(card_name):
         if '/' not in raw:
             card_num = '#' + raw
 
+    # Serial number — keep in fallback so /99 comps from other parallels are used
+    serial = extract_serial_run(clean)
+    serial_str = f'/{serial}' if serial else ''
+
     # Player (last segment)
     player = ""
     if parts:
@@ -432,8 +436,8 @@ def build_simplified_query(card_name):
         if last:
             player = last
 
-    # Player + card# + year only - minimal query
-    query_parts = [p for p in [player, card_num, year] if p]
+    # Player + card# + serial + year — drop parallel name but keep serial
+    query_parts = [p for p in [player, card_num, serial_str, year] if p]
     search_term = ' '.join(query_parts)
 
     if grade_str:
