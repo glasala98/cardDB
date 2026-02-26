@@ -1,11 +1,16 @@
 """Card ledger endpoints — personal collection CRUD."""
 
+import io
 import os
 import json
+import re
+import datetime
+import hashlib
+import urllib.request
 from typing import Optional
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, UploadFile, File
 from pydantic import BaseModel
 
 from dashboard_utils import (
@@ -50,6 +55,15 @@ def _normalise_row(r: dict) -> dict:
         "max":          r.get("Max") or None,
         "top3":         r.get("Top 3 Prices", ""),
         "last_scraped": r.get("Last Scraped", ""),
+        # Parsed from card name
+        "player":       r.get("Player", "") or "",
+        "year":         r.get("Year", "") or "",
+        "set_name":     r.get("Set", "") or "",
+        "subset":       r.get("Subset", "") or "",
+        "card_number":  r.get("Card #", "") or "",
+        "serial":       r.get("Serial", "") or "",
+        "grade":        r.get("Grade", "") or "",
+        "confidence":   r.get("Confidence", "") or "",
     }
 
 
@@ -107,9 +121,10 @@ def list_archive(user: str = DEFAULT_USER):
         return {"cards": []}
 
 
-@router.get("/{card_name}")
-def card_detail(card_name: str, user: str = DEFAULT_USER):
+@router.get("/detail")
+def card_detail(name: str, user: str = DEFAULT_USER):
     """Return full detail for a single card (price history, sales, confidence)."""
+    card_name = name
     paths = _get_paths(user)
     df = load_data(paths["csv"], paths["results"])
 
@@ -138,9 +153,12 @@ def card_detail(card_name: str, user: str = DEFAULT_USER):
         with open(paths["results"], "r", encoding="utf-8") as f:
             results = json.load(f)
         card_result = results.get(card_name, {})
-        confidence  = card_result.get("confidence", "unknown") or "unknown"
-        search_url  = card_result.get("search_url")
-        image_url   = card_result.get("image_url")
+        confidence     = card_result.get("confidence", "unknown") or "unknown"
+        search_url     = card_result.get("search_url")
+        image_url      = card_result.get("image_url")
+        image_url_back = card_result.get("image_url_back")
+        is_estimated   = bool(card_result.get("is_estimated", False))
+        price_source   = card_result.get("price_source", "direct") or "direct"
         raw_sales = [
             {
                 "sold_date":   s.get("sold_date", ""),
@@ -153,12 +171,15 @@ def card_detail(card_name: str, user: str = DEFAULT_USER):
         ]
 
     return {
-        "card":          card,
-        "price_history": price_history,
-        "raw_sales":     raw_sales,
-        "confidence":    confidence,
-        "search_url":    search_url,
-        "image_url":     image_url,
+        "card":           card,
+        "price_history":  price_history,
+        "raw_sales":      raw_sales,
+        "confidence":     confidence,
+        "search_url":     search_url,
+        "image_url":      image_url,
+        "image_url_back": image_url_back,
+        "is_estimated":   is_estimated,
+        "price_source":   price_source,
     }
 
 
@@ -191,8 +212,9 @@ def add_card(body: CardCreate, user: str = DEFAULT_USER):
     return {"status": "ok", "card_name": body.card_name}
 
 
-@router.patch("/{card_name}")
-def update_card(card_name: str, body: CardUpdate, user: str = DEFAULT_USER):
+@router.patch("/update")
+def update_card(name: str, body: CardUpdate, user: str = DEFAULT_USER):
+    card_name = name
     """Update editable fields on a card."""
     paths = _get_paths(user)
     df = load_data(paths["csv"], paths["results"])
@@ -211,8 +233,9 @@ def update_card(card_name: str, body: CardUpdate, user: str = DEFAULT_USER):
     return {"status": "ok"}
 
 
-@router.delete("/{card_name}")
-def archive_card_endpoint(card_name: str, user: str = DEFAULT_USER):
+@router.delete("/archive")
+def archive_card_endpoint(name: str, user: str = DEFAULT_USER):
+    card_name = name
     """Archive (soft-delete) a card."""
     paths = _get_paths(user)
     df = load_data(paths["csv"], paths["results"])
@@ -225,8 +248,9 @@ def archive_card_endpoint(card_name: str, user: str = DEFAULT_USER):
     return {"status": "archived"}
 
 
-@router.post("/restore/{card_name}")
-def restore_card_endpoint(card_name: str, user: str = DEFAULT_USER):
+@router.post("/restore")
+def restore_card_endpoint(name: str, user: str = DEFAULT_USER):
+    card_name = name
     """Restore a card from the archive."""
     paths = _get_paths(user)
     card_data = restore_card(card_name, archive_path=paths["archive"])
@@ -281,8 +305,174 @@ def _do_scrape(card_name: str, paths: dict):
         print(f"[scrape] Error for {card_name}: {e}")
 
 
-@router.post("/{card_name}/scrape")
-def scrape_card(card_name: str, background_tasks: BackgroundTasks, user: str = DEFAULT_USER):
+@router.get("/card-of-the-day")
+def card_of_the_day(user: str = DEFAULT_USER):
+    """Return a highlighted card for today (consistent within the day)."""
+    paths = _get_paths(user)
+    df = load_data(paths["csv"], paths["results"])
+    with_price = df[df["Fair Value"].notna() & (df["Fair Value"].astype(float) > 0)]
+    if with_price.empty:
+        return {"card": None}
+    today = datetime.date.today().isoformat()
+    records = with_price.to_dict(orient="records")
+    idx = int(hashlib.md5(today.encode()).hexdigest(), 16) % len(records)
+    return {"card": _normalise_row(records[idx]), "date": today}
+
+
+@router.post("/fetch-image")
+def fetch_image(name: str, user: str = DEFAULT_USER):
+    """Fetch front and back card images from an eBay listing.
+
+    Step 1 (fast): Extract the front image hash directly from the listing URL.
+    Step 2 (fetch): Fetch the listing page HTML to find all image hashes;
+                    the second unique hash is the back of the card.
+    """
+    paths = _get_paths(user)
+
+    if not os.path.exists(paths["results"]):
+        raise HTTPException(status_code=404, detail="No results data found")
+
+    with open(paths["results"], "r", encoding="utf-8") as f:
+        results = json.load(f)
+
+    card_result = results.get(name, {})
+    if not card_result:
+        raise HTTPException(status_code=404, detail="Card not found in results")
+
+    existing_front = card_result.get("image_url")
+    existing_back  = card_result.get("image_url_back")
+
+    # Already have both — return immediately
+    if existing_front and existing_back:
+        return {"image_url": existing_front, "image_url_back": existing_back}
+
+    # ── Step 1: extract front image hash from URL (no HTTP needed) ──────────
+    image_url = existing_front
+    first_listing_url = None
+
+    for sale in card_result.get("raw_sales", []):
+        listing_url = sale.get("listing_url", "")
+        if not listing_url:
+            continue
+        if first_listing_url is None:
+            first_listing_url = listing_url
+        if image_url is None:
+            m = re.search(r'[?&]hash=[^:]+:g:([A-Za-z0-9_-]+)', listing_url)
+            if m:
+                image_url = f"https://i.ebayimg.com/images/g/{m.group(1)}/s-l400.jpg"
+
+    # ── Step 2: fetch listing page to find back image (second gallery photo) ─
+    image_url_back = existing_back
+    if not image_url_back and first_listing_url:
+        try:
+            req = urllib.request.Request(
+                first_listing_url,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+            )
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                html = resp.read().decode("utf-8", errors="replace")
+
+            # Collect all unique eBay CDN image hashes on the page (order-preserving)
+            hashes = list(dict.fromkeys(
+                re.findall(r'i\.ebayimg\.com/images/g/([A-Za-z0-9_-]+)/s-l', html)
+            ))
+
+            # First hash → front (use as fallback if URL extraction failed)
+            if not image_url and hashes:
+                image_url = f"https://i.ebayimg.com/images/g/{hashes[0]}/s-l400.jpg"
+
+            # Second hash → back of the card
+            if len(hashes) >= 2:
+                image_url_back = f"https://i.ebayimg.com/images/g/{hashes[1]}/s-l400.jpg"
+        except Exception:
+            pass  # page fetch is best-effort
+
+    # ── Step 3: graded card fallback — use raw version's image ──────────────
+    # If still no image and the card has a grade (PSA/BGS/CGC/SGC/CSG),
+    # look for the ungraded version of the same card in the results JSON.
+    if not image_url:
+        grade_re = re.compile(r'\s+(PSA|BGS|CGC|SGC|CSG)\s+\d+(?:\.\d+)?\s*$', re.IGNORECASE)
+        raw_name = grade_re.sub('', name).strip()
+        if raw_name and raw_name != name:
+            raw_img = results.get(raw_name, {}).get("image_url")
+            if raw_img:
+                image_url = raw_img  # fallback — will be saved below
+
+    # ── Persist results ──────────────────────────────────────────────────────
+    changed = False
+    if image_url and not existing_front:
+        results[name]["image_url"] = image_url
+        changed = True
+    if image_url_back and not existing_back:
+        results[name]["image_url_back"] = image_url_back
+        changed = True
+    if changed:
+        with open(paths["results"], "w", encoding="utf-8") as f:
+            json.dump(results, f, indent=2, ensure_ascii=False)
+
+    return {"image_url": image_url, "image_url_back": image_url_back}
+
+
+@router.post("/bulk-import")
+async def bulk_import(file: UploadFile = File(...), user: str = DEFAULT_USER):
+    """Import cards from a CSV file. Must have at least a 'Card Name' column."""
+    paths = _get_paths(user)
+    df = load_data(paths["csv"], paths["results"])
+
+    content = await file.read()
+    try:
+        import_df = pd.read_csv(io.StringIO(content.decode("utf-8")))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid CSV: {e}")
+
+    # Normalise column name
+    col_map = {c.strip().lower(): c for c in import_df.columns}
+    for variant in ("card name", "card_name", "cardname", "name"):
+        if variant in col_map:
+            import_df = import_df.rename(columns={col_map[variant]: "Card Name"})
+            break
+    if "Card Name" not in import_df.columns:
+        raise HTTPException(status_code=400, detail="CSV must have a 'Card Name' column")
+
+    added, skipped = [], []
+    for _, row in import_df.iterrows():
+        name = str(row.get("Card Name", "")).strip()
+        if not name or name.lower() == "nan":
+            continue
+        if name in df["Card Name"].values:
+            skipped.append(name)
+            continue
+        new_row = {
+            "Card Name":    name,
+            "Fair Value":   _safe_float(row.get("Fair Value") or row.get("fair_value")),
+            "Cost Basis":   _safe_float(row.get("Cost Basis") or row.get("cost_basis")),
+            "Purchase Date": str(row.get("Purchase Date") or row.get("purchase_date") or ""),
+            "Tags":          str(row.get("Tags") or row.get("tags") or ""),
+            "Trend":         "",
+            "Top 3 Prices":  "",
+            "Median (All)":  0,
+            "Min":           0,
+            "Max":           0,
+            "Num Sales":     0,
+        }
+        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+        added.append(name)
+
+    if added:
+        save_data(df, paths["csv"])
+    return {"added": len(added), "skipped": len(skipped), "cards": added}
+
+
+def _safe_float(val):
+    try:
+        return float(str(val).replace("$", "").replace(",", "").strip())
+    except (ValueError, TypeError):
+        return 0.0
+
+
+@router.post("/scrape")
+def scrape_card(name: str, background_tasks: BackgroundTasks, user: str = DEFAULT_USER):
+    card_name = name
     """Trigger a background re-scrape for a single card."""
     paths = _get_paths(user)
     df = load_data(paths["csv"], paths["results"])

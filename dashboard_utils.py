@@ -192,6 +192,37 @@ def _merge_sales(new_sales, existing_sales):
     return merged
 
 
+def _filter_sales_by_variant(card_name, sales):
+    """Filter comp sales by variant/parallel keywords to reduce cross-parallel noise.
+
+    e.g. For a 'Red Prism' card, drops results that don't mention 'Prism'.
+    Falls back to the full unfiltered list if no results survive the filter.
+    """
+    if not sales:
+        return sales
+    parsed = parse_card_name(card_name)
+    subset = (parsed.get('Subset') or '').strip()
+    if not subset:
+        return sales
+    # Words too generic to distinguish one parallel from another
+    _SKIP = {
+        'marquee', 'rookie', 'rookies', 'young', 'guns', 'rc', 'base',
+        'sp', 'ssp', 'variation', 'short', 'print', 'the', 'and',
+    }
+    kws = [w for w in re.findall(r'\b[A-Za-z]{3,}\b', subset) if w.lower() not in _SKIP]
+    if not kws:
+        return sales
+    filtered = [s for s in sales if any(kw.lower() in s.get('title', '').lower() for kw in kws)]
+    return filtered if filtered else sales  # fall back to all if nothing matches
+
+
+def _strip_grade_from_name(card_name):
+    """Remove the grading label from a card name to get the raw/ungraded version."""
+    name = re.sub(r'\s*\[(?:PSA|BGS|CGC|SGC|CSG)\s+[\d.]+[^\]]*\]', '', card_name)
+    name = re.sub(r'\s+(?:PSA|BGS|CGC|SGC|CSG)\s+\d+(?:\.\d+)?\s*$', '', name, flags=re.IGNORECASE)
+    return name.strip()
+
+
 def scrape_single_card(card_name, results_json_path=None):
     """Scrape eBay for a single card and return result dict."""
     if results_json_path is None:
@@ -199,6 +230,8 @@ def scrape_single_card(card_name, results_json_path=None):
     driver = create_driver()
     try:
         sales = search_ebay_sold(driver, card_name, max_results=50)
+        # Filter to comps that match the card's specific variant/parallel
+        sales = _filter_sales_by_variant(card_name, sales)
 
         # Retry with simplified query if no results
         if not sales:
@@ -267,6 +300,43 @@ def scrape_single_card(card_name, results_json_path=None):
                         continue
             except Exception:
                 pass
+            # Apply variant filter to simplified results too
+            sales = _filter_sales_by_variant(card_name, sales)
+
+        # ── Graded card estimation fallback ──────────────────────────────────
+        # When no direct comps exist, estimate from raw or PSA-9 comps.
+        # PSA 9  ≈ raw price   (1×)
+        # PSA 10 ≈ 2.5× raw or 2.5× PSA 9
+        is_estimated = False
+        price_source = 'direct'
+        if not sales:
+            grade_str, grade_num = get_grade_info(card_name)
+            if grade_str and grade_num:
+                raw_name = _strip_grade_from_name(card_name)
+                if raw_name and raw_name != card_name:
+                    raw_sales = search_ebay_sold(driver, raw_name, max_results=30)
+                    raw_sales = _filter_sales_by_variant(raw_name, raw_sales)
+                    if raw_sales:
+                        if grade_num == 9:
+                            sales = raw_sales
+                            is_estimated = True
+                            price_source = 'raw_estimate'
+                        elif grade_num == 10:
+                            sales = [{**s, 'price_val': round(s.get('price_val', 0) * 2.5, 2)}
+                                     for s in raw_sales]
+                            is_estimated = True
+                            price_source = 'raw_estimate_psa10'
+                # PSA 10 secondary fallback: PSA 9 comps × 2.5
+                if not sales and grade_num == 10:
+                    psa9_name = re.sub(r'\bPSA\s*10\b', 'PSA 9', card_name, flags=re.IGNORECASE)
+                    if psa9_name != card_name:
+                        psa9_sales = search_ebay_sold(driver, psa9_name, max_results=30)
+                        psa9_sales = _filter_sales_by_variant(psa9_name, psa9_sales)
+                        if psa9_sales:
+                            sales = [{**s, 'price_val': round(s.get('price_val', 0) * 2.5, 2)}
+                                     for s in psa9_sales]
+                            is_estimated = True
+                            price_source = 'psa9_estimate'
 
         if sales:
             from scrape_card_prices import extract_serial_run
@@ -283,11 +353,21 @@ def scrape_single_card(card_name, results_json_path=None):
             # Merge new sales with existing ones (accumulate history)
             existing_sales = results.get(card_name, {}).get('raw_sales', [])
             merged = _merge_sales(sales, existing_sales)
+            # Preserve existing image URLs; pick up new ones if available
+            existing = results.get(card_name, {})
+            image_url = existing.get('image_url') or next(
+                (s.get('image_url') for s in sales if s.get('image_url')), None
+            )
+            image_url_back = existing.get('image_url_back')
             results[card_name] = {
                 'raw_sales': merged,
                 'fair_price': stats.get('fair_price'),
                 'num_sales': stats.get('num_sales'),
-                'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'image_url': image_url,
+                'image_url_back': image_url_back,
+                'is_estimated': is_estimated,
+                'price_source': price_source,
             }
             with open(results_json_path, 'w', encoding='utf-8') as f:
                 json.dump(results, f, indent=2, ensure_ascii=False)
@@ -401,7 +481,7 @@ def load_data(csv_path=CSV_PATH, results_json_path=None):
         for col in parse_cols:
             df[col] = pd.Series(dtype='object')
 
-    # Add Last Scraped from results JSON
+    # Add Last Scraped and Confidence from results JSON
     if os.path.exists(results_json_path):
         try:
             with open(results_json_path, 'r', encoding='utf-8') as f:
@@ -412,10 +492,15 @@ def load_data(csv_path=CSV_PATH, results_json_path=None):
             df['Last Scraped'] = df['Last Scraped'].apply(
                 lambda x: x.split(' ')[0] if isinstance(x, str) and x else ''
             )
+            df['Confidence'] = df['Card Name'].apply(
+                lambda name: results.get(name, {}).get('confidence', '') or ''
+            )
         except Exception:
             df['Last Scraped'] = ''
+            df['Confidence'] = ''
     else:
         df['Last Scraped'] = ''
+        df['Confidence'] = ''
 
     # Ensure Tags column exists (backward compat for existing CSVs)
     if 'Tags' not in df.columns:
@@ -424,7 +509,7 @@ def load_data(csv_path=CSV_PATH, results_json_path=None):
 
     return df
 
-PARSED_COLS = ['Player', 'Year', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Last Scraped']
+PARSED_COLS = ['Player', 'Year', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Last Scraped', 'Confidence']
 
 def save_data(df, csv_path=CSV_PATH):
     save_df = df.copy()

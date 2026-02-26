@@ -170,3 +170,23 @@
   white-space: nowrap;
   color: var(--success);
 }
+
+/* ── Card of the Day ───────────────────────────────────────────── */
+.cotd {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(79,142,247,0.08), rgba(124,92,191,0.08));
+  border: 1px solid rgba(79,142,247,0.3);
+  border-radius: 12px;
+  padding: 14px 20px;
+  margin-bottom: 20px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.cotd:hover { border-color: var(--accent); background: rgba(79,142,247,0.12); }
+.cotdIcon   { font-size: 28px; flex-shrink: 0; }
+.cotdBody   { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.cotdLabel  { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-secondary); font-weight: 600; }
+.cotdName   { font-size: 14px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cotdValue  { font-size: 16px; font-weight: 800; color: var(--accent); }

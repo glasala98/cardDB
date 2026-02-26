@@ -15,10 +15,17 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+# Load .env from project root for local dev (no-op if file doesn't exist)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(ROOT, ".env"))
+except ImportError:
+    pass
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routers import cards, master_db, stats, auth
+from api.routers import cards, master_db, stats, auth, scan, admin
 
 app = FastAPI(title="Card Dashboard API", version="0.1.0")
 
@@ -39,6 +46,8 @@ app.include_router(auth.router,      prefix="/api/auth",      tags=["auth"])
 app.include_router(cards.router,     prefix="/api/cards",     tags=["cards"])
 app.include_router(master_db.router, prefix="/api/master-db", tags=["master-db"])
 app.include_router(stats.router,     prefix="/api/stats",     tags=["stats"])
+app.include_router(scan.router,      prefix="/api/scan",      tags=["scan"])
+app.include_router(admin.router,     prefix="/api/admin",     tags=["admin"])
 
 
 @app.get("/api/health")

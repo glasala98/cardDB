@@ -1,0 +1,64 @@
+.toast {
+  position: fixed; bottom: 24px; right: 24px; padding: 12px 20px;
+  border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 300;
+  max-width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+.toast.success { background: rgba(76,175,130,0.15); border: 1px solid rgba(76,175,130,0.4); color: var(--success); }
+.toast.error   { background: rgba(224,92,92,0.15);  border: 1px solid rgba(224,92,92,0.4);  color: var(--danger); }
+
+.tableWrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 24px; }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.th {
+  background: var(--bg-card); color: var(--text-secondary); font-weight: 600;
+  padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border);
+}
+.td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-primary); }
+.tr:last-child .td { border-bottom: none; }
+.tr:hover .td { background: var(--bg-secondary); }
+
+.youBadge {
+  font-size: 10px; font-weight: 600; color: var(--accent);
+  background: rgba(79,142,247,0.12); padding: 2px 6px; border-radius: 10px; margin-left: 6px;
+}
+.roleBadge {
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
+  background: rgba(154,160,180,0.12); color: var(--text-secondary);
+}
+.admin { background: rgba(79,142,247,0.12); color: var(--accent); }
+
+.actions { display: flex; gap: 8px; align-items: center; }
+.pwBtn {
+  background: rgba(79,142,247,0.1); color: var(--accent); border: 1px solid rgba(79,142,247,0.3);
+  border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer;
+}
+.delBtn {
+  background: rgba(224,92,92,0.1); color: var(--danger); border: 1px solid rgba(224,92,92,0.3);
+  border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer;
+}
+
+.pwBox {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px; margin-bottom: 20px; font-size: 13px;
+}
+.pwRow { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+
+.addSection { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+.addTitle { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 14px; }
+.addForm { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+
+.input {
+  background: var(--bg-primary); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 12px; color: var(--text-primary); font-size: 13px;
+  min-width: 140px; flex: 1;
+}
+.input:focus { outline: 1px solid var(--accent); }
+
+.saveBtn, .addBtn {
+  background: var(--accent); border: none; border-radius: 8px;
+  padding: 8px 18px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.saveBtn:disabled, .addBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.cancelBtn {
+  background: transparent; border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 14px; color: var(--text-secondary); font-size: 13px; cursor: pointer;
+}

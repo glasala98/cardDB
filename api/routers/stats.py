@@ -85,3 +85,67 @@ def trigger_scrape():
         "card_count": n_cards,
         "estimated_minutes": estimated_mins,
     }
+
+
+@router.get("/scrape-status")
+def scrape_status():
+    """Poll the latest GitHub Actions workflow run for the daily scrape."""
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        raise HTTPException(status_code=503, detail="GITHUB_TOKEN not configured")
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+    # Get latest run for the workflow
+    runs_url = (
+        f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}"
+        f"/actions/workflows/{WORKFLOW_FILE}/runs?per_page=1"
+    )
+    try:
+        req = urllib.request.Request(runs_url, headers=headers)
+        with urllib.request.urlopen(req) as resp:
+            data = _json.loads(resp.read().decode())
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"GitHub API error: {e}")
+
+    runs = data.get("workflow_runs", [])
+    if not runs:
+        return {"status": "no_runs"}
+
+    run = runs[0]
+    run_id = run["id"]
+
+    # Get job steps for the run (for the log view)
+    steps = []
+    jobs_url = (
+        f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}"
+        f"/actions/runs/{run_id}/jobs"
+    )
+    try:
+        req = urllib.request.Request(jobs_url, headers=headers)
+        with urllib.request.urlopen(req) as resp:
+            jobs_data = _json.loads(resp.read().decode())
+        for job in jobs_data.get("jobs", []):
+            for step in job.get("steps", []):
+                steps.append({
+                    "name":       step.get("name", ""),
+                    "status":     step.get("status", ""),
+                    "conclusion": step.get("conclusion"),
+                    "started_at": step.get("started_at"),
+                })
+    except Exception:
+        pass  # steps are best-effort
+
+    return {
+        "status":      run["status"],          # queued | in_progress | completed
+        "conclusion":  run.get("conclusion"),  # success | failure | cancelled | None
+        "started_at":  run.get("run_started_at"),
+        "updated_at":  run.get("updated_at"),
+        "html_url":    run.get("html_url"),
+        "run_number":  run.get("run_number"),
+        "steps":       steps,
+    }

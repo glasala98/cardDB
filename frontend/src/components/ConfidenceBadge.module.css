@@ -12,3 +12,4 @@
 .low       { background: rgba(255, 152, 0, 0.15);   color: #ff9800; }
 .estimated { background: rgba(224, 92, 92, 0.15);   color: #e05c5c; }
 .none      { background: rgba(154, 160, 180, 0.1);  color: #9aa0b4; }
+.notfound  { background: rgba(80, 80, 100, 0.15);  color: #6b6d80; }

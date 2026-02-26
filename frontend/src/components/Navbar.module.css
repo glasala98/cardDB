@@ -84,6 +84,20 @@
   white-space: nowrap;
 }
 
+.helpBtn {
+  background: rgba(79,142,247,0.1);
+  border: 1px solid rgba(79,142,247,0.3);
+  border-radius: 50%;
+  width: 26px; height: 26px;
+  color: var(--accent);
+  font-size: 13px; font-weight: 700;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.helpBtn:hover { background: rgba(79,142,247,0.2); }
+
 .logoutBtn {
   background: none;
   border: 1px solid var(--border);

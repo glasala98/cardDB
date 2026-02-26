@@ -5,8 +5,9 @@ const MAP = {
   medium:    { label: '🟡 Medium',    cls: 'medium',    tip: 'Set match — parallel name dropped, serial exact' },
   low:       { label: '🟠 Low',       cls: 'low',       tip: 'Broad match — only player, card#, serial used' },
   estimated: { label: '🔴 Estimated', cls: 'estimated', tip: 'No direct sales — price extrapolated from nearby serial comps' },
-  none:      { label: '⬜ No data',   cls: 'none',      tip: 'No sales found at any stage' },
-  unknown:   { label: '⬜ Unknown',   cls: 'none',      tip: 'Not yet scraped' },
+  none:        { label: '⬜ No data',    cls: 'none',      tip: 'No sales found at any stage' },
+  'not found': { label: '⚫ Not Found', cls: 'notfound',  tip: 'Card not found on eBay' },
+  unknown:     { label: '⬜ Unknown',   cls: 'none',      tip: 'Not yet scraped' },
 }
 
 export default function ConfidenceBadge({ confidence }) {

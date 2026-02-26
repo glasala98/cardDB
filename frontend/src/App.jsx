@@ -9,6 +9,9 @@ import CardInspect from './pages/CardInspect'
 import Portfolio from './pages/Portfolio'
 import MasterDB from './pages/MasterDB'
 import NHLStats from './pages/NHLStats'
+import Archive from './pages/Archive'
+import Charts from './pages/Charts'
+import Admin from './pages/Admin'
 import styles from './App.module.css'
 
 function AppShell() {
@@ -23,6 +26,9 @@ function AppShell() {
           <Route path="/portfolio"       element={<ProtectedRoute><Portfolio /></ProtectedRoute>} />
           <Route path="/master-db"       element={<ProtectedRoute><MasterDB /></ProtectedRoute>} />
           <Route path="/nhl-stats"       element={<ProtectedRoute><NHLStats /></ProtectedRoute>} />
+          <Route path="/archive"         element={<ProtectedRoute><Archive /></ProtectedRoute>} />
+          <Route path="/charts"          element={<ProtectedRoute><Charts /></ProtectedRoute>} />
+          <Route path="/admin"           element={<ProtectedRoute><Admin /></ProtectedRoute>} />
         </Routes>
       </main>
     </div>

@@ -1,0 +1,481 @@
+/* ── Market Movers Banner ─────────────────────────────────────── */
+.moversBanner {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.moverCard {
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 140px;
+  flex: 1;
+  max-width: 200px;
+}
+
+.moverUp   { background: rgba(76, 175, 130, 0.12); border: 1px solid rgba(76,175,130,0.25); }
+.moverDown { background: rgba(224, 92, 92, 0.12);  border: 1px solid rgba(224,92,92,0.25);  }
+
+.moverName {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.moverPct {
+  font-size: 18px;
+  font-weight: 700;
+}
+.moverUp   .moverPct { color: var(--success); }
+.moverDown .moverPct { color: var(--danger); }
+
+.moverPrices {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* ── Price Mode Bar ───────────────────────────────────────────── */
+.priceModebar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.priceModeLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.priceModeBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.priceModeBtn:hover { color: var(--text-primary); }
+.pmActive {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ── Filters ─────────────────────────────────────────────────── */
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.filterSelect {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 22px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%239aa0b4' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  min-width: 130px;
+}
+.filterSelect:focus { border-color: var(--accent); }
+
+.myCardsToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.myCardsToggle input { cursor: pointer; accent-color: var(--accent); }
+
+.clearBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.clearBtn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+
+.showing {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+
+/* ── Table ───────────────────────────────────────────────────── */
+.tableWrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  margin-bottom: 24px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.th {
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.th:hover { color: var(--text-primary); }
+.activeCol { color: var(--accent) !important; }
+
+.arrow { color: var(--accent); }
+
+.td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.tr:last-child .td { border-bottom: none; }
+.tr:hover .td { background: var(--bg-secondary); }
+
+.ownedRow .td { background: rgba(79, 142, 247, 0.04); }
+.ownedRow:hover .td { background: rgba(79, 142, 247, 0.1); }
+
+.playerCell {
+  font-weight: 600;
+  min-width: 130px;
+}
+
+.priceCell {
+  font-weight: 700;
+  color: var(--success);
+}
+
+.activePriceCol {
+  color: var(--accent) !important;
+  font-weight: 700;
+}
+
+.gradeCell { color: var(--text-secondary); }
+
+.dateCell {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.empty {
+  text-align: center;
+  padding: 32px;
+  color: var(--text-secondary);
+}
+
+/* ── Analytics Panel ─────────────────────────────────────────── */
+.analytics {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.analyticsHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+
+.analyticsIcon { font-size: 18px; }
+
+.analyticsTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.analyticsModeLabel {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.analyticsMode {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(79,142,247,0.1);
+  padding: 2px 10px;
+  border-radius: 20px;
+}
+
+/* ── Accordion ───────────────────────────────────────────────── */
+.accordion {
+  border-bottom: 1px solid var(--border);
+}
+.accordion:last-child { border-bottom: none; }
+
+.accordionBtn {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 12px 18px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background 0.15s;
+}
+.accordionBtn:hover { background: var(--bg-secondary); }
+
+.accordionArrow { font-size: 12px; color: var(--text-secondary); }
+
+.accordionBody {
+  padding: 16px 18px 20px;
+  background: var(--bg-secondary);
+}
+
+/* ── Market Overview Grid ────────────────────────────────────── */
+.overviewGrid {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.statBox {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 100px;
+}
+
+.statBoxLabel {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.statBoxValue {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.statBoxSub {
+  font-size: 10px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.statSuccess { color: var(--success); }
+.statDanger  { color: var(--danger); }
+
+/* ── Price Analysis ──────────────────────────────────────────── */
+.priceAnalysis { display: flex; flex-direction: column; gap: 8px; }
+
+.analysisSubtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.bucketRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bucketLabel {
+  font-size: 11px;
+  color: var(--text-secondary);
+  width: 90px;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.bucketBar {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-card);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bucketFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.bucketCount {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 30px;
+}
+
+/* ── Grading Analytics ───────────────────────────────────────── */
+.gradingGrid {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.gradeCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 100px;
+  flex: 1;
+}
+
+.gradeLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.gradeAvg {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.gradeCount { font-size: 11px; color: var(--text-secondary); }
+
+.gradeMult {
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ── Player Compare ──────────────────────────────────────────── */
+.compareWrap { display: flex; flex-direction: column; gap: 16px; }
+
+.compareSelectors {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.compareVs {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.compareCols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 700px) {
+  .compareCols { grid-template-columns: 1fr; }
+}
+
+.compareCol {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.compareName {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.compareEmpty {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* ── Correlation Analytics ───────────────────────────────────── */
+.corrWrap { }
+.corrTabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.corrTab {
+  background: var(--bg-primary); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 14px; font-size: 12px; color: var(--text-secondary); cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.corrTab:hover { background: var(--bg-secondary); }
+.corrTabActive { background: var(--accent); color: #fff; border-color: var(--accent); }
+.corrHint { font-size: 11px; color: var(--text-secondary); margin-bottom: 12px; }

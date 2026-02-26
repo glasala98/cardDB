@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import PriceChart from '../components/PriceChart'
 import TrendBadge from '../components/TrendBadge'
-import { getPortfolioHistory, getCards } from '../api/cards'
+import { getPortfolioHistory, getCards, getCardOfTheDay } from '../api/cards'
 import { useCurrency } from '../context/CurrencyContext'
 import CurrencySelect from '../components/CurrencySelect'
 import pageStyles from './Page.module.css'
@@ -21,14 +21,16 @@ export default function Portfolio() {
 
   const [history, setHistory] = useState([])
   const [cards,   setCards]   = useState([])
+  const [cotd,    setCotd]    = useState(null)
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(null)
 
   useEffect(() => {
-    Promise.all([getPortfolioHistory(), getCards()])
-      .then(([ph, cd]) => {
+    Promise.all([getPortfolioHistory(), getCards(), getCardOfTheDay()])
+      .then(([ph, cd, cotdData]) => {
         setHistory(ph.history || [])
         setCards(cd.cards || [])
+        setCotd(cotdData)
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -54,7 +56,13 @@ export default function Portfolio() {
       .sort((a, b) => (b.fair_value ?? 0) - (a.fair_value ?? 0))
       .slice(0, 10)
 
-    return { totalValue, totalCost, gainLoss, avgValue, withSales, trendCounts, top10 }
+    // Gainers / losers — cards with both cost_basis and fair_value
+    const withBoth = cards.filter(c => c.cost_basis > 0 && c.fair_value > 0)
+    const withGain = withBoth.map(c => ({ ...c, gain: c.fair_value - c.cost_basis, roi: ((c.fair_value - c.cost_basis) / c.cost_basis) * 100 }))
+    const topGainers = [...withGain].sort((a, b) => b.gain - a.gain).slice(0, 5)
+    const topLosers  = [...withGain].sort((a, b) => a.gain - b.gain).slice(0, 5)
+
+    return { totalValue, totalCost, gainLoss, avgValue, withSales, trendCounts, top10, topGainers, topLosers }
   }, [cards])
 
   const { fmtPrice } = useCurrency()
@@ -175,7 +183,67 @@ export default function Portfolio() {
           </div>
 
         </div>
+
+        {/* ── Card of the Day ── */}
+        {cotd?.card && (
+          <div
+            className={styles.cotd}
+            onClick={() => navigate(`/ledger/${encodeURIComponent(cotd.card.card_name)}`)}
+            title="Click to inspect"
+          >
+            <span className={styles.cotdIcon}>🃏</span>
+            <div className={styles.cotdBody}>
+              <span className={styles.cotdLabel}>Card of the Day — {cotd.date}</span>
+              <span className={styles.cotdName}>{cotd.card.card_name}</span>
+              <span className={styles.cotdValue}>{fmtPrice(cotd.card.fair_value)}</span>
+            </div>
+            <TrendBadge trend={cotd.card.trend} />
+          </div>
+        )}
+
+        {/* ── Gainers / Losers ── */}
+        {(stats.topGainers.length > 0 || stats.topLosers.length > 0) && (
+          <div className={styles.lower} style={{ marginTop: 16 }}>
+            <GainLossTable title="Top Gainers" rows={stats.topGainers} navigate={navigate} fmtPrice={fmtPrice} positive />
+            <GainLossTable title="Top Losers"  rows={stats.topLosers}  navigate={navigate} fmtPrice={fmtPrice} />
+          </div>
+        )}
+
       </>)}
+    </div>
+  )
+}
+
+function GainLossTable({ title, rows, navigate, fmtPrice, positive }) {
+  return (
+    <div className={styles.card}>
+      <h2 className={styles.cardTitle}>{title}</h2>
+      <table className={styles.topTable}>
+        <thead>
+          <tr>
+            <th className={styles.topTh}>Card</th>
+            <th className={styles.topTh}>Gain/Loss</th>
+            <th className={styles.topTh}>ROI</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(card => (
+            <tr
+              key={card.card_name}
+              className={styles.topRow}
+              onClick={() => navigate(`/ledger/${encodeURIComponent(card.card_name)}`)}
+            >
+              <td className={`${styles.topTd} ${styles.nameCell}`}>{card.card_name}</td>
+              <td className={`${styles.topTd}`} style={{ color: positive ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>
+                {card.gain >= 0 ? '+' : ''}{fmtPrice(card.gain)}
+              </td>
+              <td className={`${styles.topTd}`} style={{ color: positive ? 'var(--success)' : 'var(--danger)' }}>
+                {card.roi >= 0 ? '+' : ''}{card.roi.toFixed(1)}%
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

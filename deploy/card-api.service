@@ -1,0 +1,19 @@
+[Unit]
+Description=Hockey Card Dashboard — FastAPI Backend
+After=network.target
+
+[Service]
+User=cardapp
+Group=cardapp
+WorkingDirectory=/opt/card-dashboard
+ExecStart=/opt/card-dashboard/venv/bin/uvicorn api.main:app \
+    --host 127.0.0.1 \
+    --port 8000 \
+    --workers 2
+Restart=on-failure
+RestartSec=5
+Environment="PATH=/opt/card-dashboard/venv/bin:/usr/bin"
+EnvironmentFile=-/opt/card-dashboard/.env
+
+[Install]
+WantedBy=multi-user.target
