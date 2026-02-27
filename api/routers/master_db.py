@@ -1,13 +1,18 @@
 """Master DB endpoints — Young Guns market database."""
 
-from fastapi import APIRouter, HTTPException
+import datetime
+from typing import Optional
+from fastapi import APIRouter, BackgroundTasks, HTTPException
+from pydantic import BaseModel
 
 from dashboard_utils import (
     load_master_db,
+    save_master_db,
     load_yg_price_history,
     load_yg_portfolio_history,
     load_nhl_player_stats,
     get_market_alerts,
+    scrape_single_card,
 )
 
 router = APIRouter()
@@ -66,6 +71,9 @@ def list_young_guns(search: str = ""):
             # Ownership
             "owned":        bool(r.get("Owned", 0)),
             "cost_basis":   _num(r, "CostBasis"),
+            "purchase_date": r.get("PurchaseDate", "") or "",
+            # Full name for price-history lookup
+            "card_name":    r.get("CardName", ""),
         })
 
     # Unique season + team lists for filter dropdowns
@@ -124,13 +132,17 @@ def nhl_stats():
             "psa10_price":   _num(r, "PSA10_Value"),
             "psa9_price":    _num(r, "PSA9_Value"),
             "num_sales":     _num(r, "NumSales"),
-            # Current-season stats
+            # Current-season stats (skaters)
             "games_played":  cs.get("games_played"),
             "goals":         cs.get("goals"),
             "assists":       cs.get("assists"),
             "points":        cs.get("points"),
             "plus_minus":    cs.get("plus_minus"),
             "shots":         cs.get("shots"),
+            # Goalie-specific stats
+            "wins":          cs.get("wins"),
+            "save_pct":      cs.get("save_pct"),
+            "gaa":           cs.get("gaa"),
             # Bio
             "birth_country": bio.get("birth_country", ""),
             "draft_overall": bio.get("draft_overall"),
@@ -198,23 +210,80 @@ def grading_lookup(player_name: str):
     return {"cards": cards}
 
 
-@router.get("/nhl-stats")
-def nhl_stats():
-    """Return NHL player stats for all tracked players."""
-    raw = load_nhl_player_stats()
-    players_data = raw.get("players", {})
-    players = []
-    for player, data in players_data.items():
-        s = data.get("current_season", {})
-        players.append({
-            "player":     player,
-            "team":       data.get("current_team", ""),
-            "position":   data.get("position", ""),
-            "gp":         s.get("games_played", 0),
-            "goals":      s.get("goals", 0),
-            "assists":    s.get("assists", 0),
-            "points":     s.get("points", 0),
-            "plus_minus": s.get("plus_minus", 0),
-            "shots":      s.get("shots", 0),
-        })
-    return {"players": players}
+@router.get("/yg-price-history")
+def yg_price_history_by_name(name: str):
+    """Return YG price history for a card by query param (safe for special chars)."""
+    history = load_yg_price_history()
+    entries = history.get(name)
+    if not entries:
+        return {"card": name, "history": []}
+    return {"card": name, "history": entries}
+
+
+def _do_yg_scrape(player: str, season: str):
+    """Background task: scrape one YG card and update master DB."""
+    try:
+        df = load_master_db()
+        mask = (df["PlayerName"] == player) & (df["Season"].astype(str) == str(season))
+        if not mask.any():
+            return
+        card_name = str(df.loc[mask, "CardName"].iloc[0])
+        result = scrape_single_card(card_name)
+        if not result:
+            return
+        stats = result.get("stats", {})
+        if stats.get("num_sales", 0) > 0:
+            df.loc[mask, "FairValue"]   = stats.get("fair_price", 0)
+            df.loc[mask, "Trend"]       = stats.get("trend", "")
+            df.loc[mask, "Min"]         = stats.get("min", 0)
+            df.loc[mask, "Max"]         = stats.get("max", 0)
+            df.loc[mask, "NumSales"]    = stats.get("num_sales", 0)
+            df.loc[mask, "LastScraped"] = datetime.date.today().isoformat()
+            save_master_db(df)
+    except Exception as e:
+        print(f"[yg_scrape] Error for {player} {season}: {e}")
+
+
+@router.post("/scrape")
+def scrape_yg_card(player: str, season: str, background_tasks: BackgroundTasks):
+    """Trigger a background eBay re-scrape for a single YG card."""
+    df = load_master_db()
+    if df.empty:
+        raise HTTPException(status_code=404, detail="Master DB not found")
+    mask = (df["PlayerName"] == player) & (df["Season"].astype(str) == str(season))
+    if not mask.any():
+        raise HTTPException(status_code=404, detail="Card not found")
+    card_name = str(df.loc[mask, "CardName"].iloc[0])
+    background_tasks.add_task(_do_yg_scrape, player, season)
+    return {"status": "queued", "card": card_name}
+
+
+class OwnershipUpdate(BaseModel):
+    owned: bool = False
+    cost_basis: Optional[float] = None
+    purchase_date: Optional[str] = None
+
+
+@router.patch("/ownership")
+def update_ownership(player: str, season: str, body: OwnershipUpdate):
+    """Update owned/cost_basis/purchase_date for a YG card row."""
+    df = load_master_db()
+    if df.empty:
+        raise HTTPException(status_code=404, detail="Master DB not found")
+
+    mask = (df["PlayerName"] == player) & (df["Season"].astype(str) == str(season))
+    if not mask.any():
+        raise HTTPException(status_code=404, detail="Card not found")
+
+    df.loc[mask, "Owned"] = 1 if body.owned else 0
+    if body.cost_basis is not None:
+        df.loc[mask, "CostBasis"] = body.cost_basis
+    if body.purchase_date is not None:
+        if "PurchaseDate" not in df.columns:
+            df["PurchaseDate"] = ""
+        df.loc[mask, "PurchaseDate"] = body.purchase_date
+
+    save_master_db(df)
+    return {"status": "updated"}
+
+

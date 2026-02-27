@@ -44,8 +44,39 @@
   white-space: nowrap;
 }
 
+.checkCol {
+  width: 36px;
+  text-align: center;
+  padding-left: 10px;
+  padding-right: 4px;
+}
+
+.checkbox {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+.trSelected .td { background: rgba(29, 191, 191, 0.06); }
+
+.bulkRestoreBtn {
+  background: rgba(76, 175, 130, 0.14);
+  border: 1px solid rgba(76, 175, 130, 0.35);
+  border-radius: 8px;
+  padding: 7px 16px;
+  color: var(--success);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.bulkRestoreBtn:hover    { background: rgba(76, 175, 130, 0.26); }
+.bulkRestoreBtn:disabled { opacity: 0.6; cursor: default; }
+
 .restoreBtn {
-  background: rgba(79, 142, 247, 0.12);
+  background: rgba(29, 191, 191, 0.12);
   border: none;
   border-radius: 6px;
   padding: 5px 12px;
@@ -55,7 +86,7 @@
   cursor: pointer;
   transition: background 0.15s;
 }
-.restoreBtn:hover { background: rgba(79, 142, 247, 0.26); }
+.restoreBtn:hover { background: rgba(29, 191, 191, 0.26); }
 
 /* ── Toast ───────────────────────────────────────────────────── */
 .toast {

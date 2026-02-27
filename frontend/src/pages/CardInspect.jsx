@@ -124,6 +124,14 @@ export default function CardInspect() {
   const hasCost  = card.cost_basis != null && card.cost_basis > 0
   const fmt      = v => fmtPrice(v)
 
+  const priceTier = (() => {
+    const v = card.fair_value ?? 0
+    if (v >= 100) return { label: 'GOLD',   cls: styles.tierGold }
+    if (v >= 25)  return { label: 'SILVER', cls: styles.tierSilver }
+    if (v >= 10)  return { label: 'BRONZE', cls: styles.tierBronze }
+    return null
+  })()
+
   return (
     <div className={pageStyles.page}>
 
@@ -169,6 +177,9 @@ export default function CardInspect() {
           <h1 className={styles.cardTitle}>{name}</h1>
           <div className={styles.headerActions}>
             <ConfidenceBadge confidence={confidence} />
+            {priceTier && (
+              <span className={`${styles.tierBadge} ${priceTier.cls}`}>{priceTier.label}</span>
+            )}
             <button
               className={styles.scrapeBtn}
               onClick={handleScrape}

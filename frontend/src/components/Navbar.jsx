@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { usePublicMode } from '../context/PublicModeContext'
 import HelpModal from './HelpModal'
 import styles from './Navbar.module.css'
 
@@ -16,6 +17,7 @@ const NAV_ITEMS = [
 export default function Navbar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const isPublic = usePublicMode()
   const [showHelp, setShowHelp] = useState(false)
 
   const handleLogout = async () => {
@@ -30,6 +32,7 @@ export default function Navbar() {
       <div className={styles.logo}>
         <span className={styles.logoIcon}>🃏</span>
         <span className={styles.logoText}>Card DB</span>
+        {isPublic && <span className={styles.publicBadge}>View Only</span>}
       </div>
 
       <ul className={styles.links}>
@@ -46,7 +49,7 @@ export default function Navbar() {
             </NavLink>
           </li>
         ))}
-        {isAdmin && (
+        {isAdmin && !isPublic && (
           <li>
             <NavLink
               to="/admin"
@@ -59,7 +62,7 @@ export default function Navbar() {
         )}
       </ul>
 
-      {user && (
+      {user && !isPublic && (
         <div className={styles.userArea}>
           <button className={styles.helpBtn} onClick={() => setShowHelp(true)} title="Site guide">?</button>
           <ShareBtn />

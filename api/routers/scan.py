@@ -2,6 +2,8 @@
 
 import os
 import base64
+import json
+import re
 from typing import Optional
 
 from fastapi import APIRouter, UploadFile, File, HTTPException
@@ -12,11 +14,15 @@ ALLOWED_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 MAX_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB
 
 
-def _encode_image(data: bytes, content_type: str) -> tuple[str, str]:
-    """Return (base64_data, media_type) ready for the Anthropic API."""
-    # Normalize content type
-    media_type = content_type if content_type in ("image/jpeg", "image/png", "image/webp", "image/gif") else "image/jpeg"
-    return base64.standard_b64encode(data).decode("utf-8"), media_type
+def _detect_media_type(image_bytes: bytes) -> str:
+    """Detect image media type from magic bytes."""
+    if image_bytes[:8] == b'\x89PNG\r\n\x1a\n':
+        return "image/png"
+    if image_bytes[:2] == b'\xff\xd8':
+        return "image/jpeg"
+    if image_bytes[:4] == b'RIFF' and image_bytes[8:12] == b'WEBP':
+        return "image/webp"
+    return "image/jpeg"
 
 
 @router.post("/analyze")
@@ -28,7 +34,8 @@ async def analyze_card(
     Accept one or two card images and return extracted card details via Claude Vision.
 
     Returns:
-        player_name, card_number, card_set, year, subset, raw_text
+        player_name, card_number, brand, subset, parallel, serial_number, year, grade,
+        confidence, is_sports_card, validation_reason, raw_text, parse_error
     """
     try:
         import anthropic
@@ -45,7 +52,6 @@ async def analyze_card(
             detail="ANTHROPIC_API_KEY environment variable not set"
         )
 
-    # Validate and read files
     if front.content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {front.content_type}")
 
@@ -53,76 +59,97 @@ async def analyze_card(
     if len(front_data) > MAX_SIZE_BYTES:
         raise HTTPException(status_code=400, detail="Front image too large (max 20MB)")
 
-    front_b64, front_type = _encode_image(front_data, front.content_type)
+    front_b64  = base64.standard_b64encode(front_data).decode("utf-8")
+    front_type = _detect_media_type(front_data)
 
-    # Build message content
-    content = []
-
-    content.append({
-        "type": "image",
-        "source": {"type": "base64", "media_type": front_type, "data": front_b64},
-    })
+    # Build content — label front and back clearly so the model uses both
+    content = [
+        {"type": "text", "text": "FRONT OF CARD:"},
+        {"type": "image", "source": {"type": "base64", "media_type": front_type, "data": front_b64}},
+    ]
 
     if back:
         back_data = await back.read()
         if len(back_data) > MAX_SIZE_BYTES:
             raise HTTPException(status_code=400, detail="Back image too large (max 20MB)")
-        back_b64, back_type = _encode_image(back_data, back.content_type or "image/jpeg")
-        content.append({
-            "type": "image",
-            "source": {"type": "base64", "media_type": back_type, "data": back_b64},
-        })
+        back_b64  = base64.standard_b64encode(back_data).decode("utf-8")
+        back_type = _detect_media_type(back_data)
+        content.append({"type": "text", "text": "BACK OF CARD:"})
+        content.append({"type": "image", "source": {"type": "base64", "media_type": back_type, "data": back_b64}})
 
     content.append({
         "type": "text",
         "text": (
-            "This is a hockey trading card. Please extract the following details:\n"
-            "1. Player Name (full name)\n"
-            "2. Card Number (e.g. 201, RC-15, etc.)\n"
-            "3. Card Set / Series (e.g. 'Upper Deck Series 1 Young Guns', 'Upper Deck AHL', etc.)\n"
-            "4. Season / Year (e.g. '2024-25', '2023-24')\n"
-            "5. Subset / Variant (e.g. 'Young Guns', 'Canvas', 'French', 'SP', or blank if base)\n"
-            "6. Team\n\n"
-            "Respond ONLY in this exact JSON format (no markdown, no extra text):\n"
-            '{"player_name":"","card_number":"","card_set":"","year":"","subset":"","team":""}'
+            "Analyze this hockey/sports card and extract the following details.\n"
+            "Look at BOTH the front and back of the card carefully.\n\n"
+            "The back typically has: card number, set name, year, manufacturer, serial number.\n"
+            "The front typically has: player name, team, photo, parallel color/foil name.\n\n"
+            "Return ONLY valid JSON with these exact keys:\n"
+            "{\n"
+            '    "player_name": "Full player name as printed on the card",\n'
+            '    "card_number": "Card number only, no # symbol (e.g. 201, RC-15)",\n'
+            '    "brand": "Base set brand WITHOUT subset, use short common names '
+            '(e.g. \\"Upper Deck Series 1\\", \\"O-Pee-Chee Platinum\\", \\"Topps Chrome\\", '
+            '\\"SP Authentic\\", \\"Parkhurst\\")",\n'
+            '    "subset": "Named product line within the set if any '
+            '(e.g. \\"Young Guns\\", \\"Marquee Rookies\\", \\"Future Watch\\"). '
+            'Empty string for true base set cards.",\n'
+            '    "parallel": "Parallel or foil variant name if any '
+            '(e.g. \\"Red Prism\\", \\"Gold\\", \\"Rainbow Foil\\", \\"Arctic Freeze\\"). '
+            'Empty string if this is the base (non-parallel) version.",\n'
+            '    "year": "Card year or season (e.g. \\"2023-24\\" or \\"2015\\")",\n'
+            '    "serial_number": "Print run if the card is serial-numbered '
+            '(e.g. \\"70/99\\", \\"1/250\\", \\"5/10\\"). '
+            'Empty string if not numbered. Check back of card carefully.",\n'
+            '    "grade": "Grade if card is in a graded slab '
+            '(e.g. \\"PSA 10\\", \\"BGS 9.5\\", \\"SGC 9\\"). Empty string if raw/ungraded.",\n'
+            '    "confidence": "high, medium, or low",\n'
+            '    "is_sports_card": true,\n'
+            '    "validation_reason": "Explain why this is or isn\'t a valid sports card"\n'
+            "}\n\n"
+            "Be precise. If the image is not a sports card, set \"is_sports_card\" to false "
+            "and explain why in \"validation_reason\".\n"
+            "If you can't determine a field, use your best guess based on visible text, logos, and card design."
         ),
     })
 
-    client = anthropic.Anthropic(api_key=api_key)
+    client  = anthropic.Anthropic(api_key=api_key)
     message = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=256,
+        model="claude-sonnet-4-6",
+        max_tokens=768,
         messages=[{"role": "user", "content": content}],
     )
 
     raw_text = message.content[0].text.strip()
 
-    # Parse JSON response
-    import json, re
+    _EMPTY = {
+        "player_name": "", "card_number": "", "brand": "", "subset": "",
+        "parallel": "", "serial_number": "", "year": "", "grade": "",
+        "confidence": "low", "is_sports_card": True, "validation_reason": "",
+        "raw_text": raw_text, "parse_error": True,
+    }
+
+    json_match = re.search(r'\{[^{}]*\}', raw_text, re.DOTALL)
+    if not json_match:
+        return _EMPTY
+
     try:
-        # Strip markdown code fences if model added them
-        clean = re.sub(r"```(?:json)?\s*|\s*```", "", raw_text).strip()
-        result = json.loads(clean)
+        result = json.loads(json_match.group())
     except json.JSONDecodeError:
-        # Return raw text so the frontend can show it and let user fill manually
-        return {
-            "player_name": "",
-            "card_number": "",
-            "card_set":    "",
-            "year":        "",
-            "subset":      "",
-            "team":        "",
-            "raw_text":    raw_text,
-            "parse_error": True,
-        }
+        return _EMPTY
 
     return {
-        "player_name": result.get("player_name", ""),
-        "card_number": result.get("card_number", ""),
-        "card_set":    result.get("card_set", ""),
-        "year":        result.get("year", ""),
-        "subset":      result.get("subset", ""),
-        "team":        result.get("team", ""),
-        "raw_text":    raw_text,
-        "parse_error": False,
+        "player_name":       result.get("player_name", ""),
+        "card_number":       result.get("card_number", ""),
+        "brand":             result.get("brand", ""),
+        "subset":            result.get("subset", ""),
+        "parallel":          result.get("parallel", ""),
+        "serial_number":     result.get("serial_number", ""),
+        "year":              result.get("year", ""),
+        "grade":             result.get("grade", ""),
+        "confidence":        result.get("confidence", "low"),
+        "is_sports_card":    result.get("is_sports_card", True),
+        "validation_reason": result.get("validation_reason", ""),
+        "raw_text":          raw_text,
+        "parse_error":       False,
     }

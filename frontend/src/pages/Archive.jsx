@@ -11,6 +11,8 @@ export default function Archive() {
   const [search,  setSearch]  = useState('')
   const [restoreTarget, setRestoreTarget] = useState(null)
   const [toast,   setToast]   = useState(null)
+  const [selected, setSelected] = useState(new Set())
+  const [bulkRestoring, setBulkRestoring] = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -42,6 +44,52 @@ export default function Archive() {
     !search || c.card_name?.toLowerCase().includes(search.toLowerCase())
   )
 
+  const allSelected = filtered.length > 0 && filtered.every(c => selected.has(c.card_name))
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelected(prev => {
+        const next = new Set(prev)
+        filtered.forEach(c => next.delete(c.card_name))
+        return next
+      })
+    } else {
+      setSelected(prev => {
+        const next = new Set(prev)
+        filtered.forEach(c => next.add(c.card_name))
+        return next
+      })
+    }
+  }
+
+  const toggleRow = (name) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(name) ? next.delete(name) : next.add(name)
+      return next
+    })
+  }
+
+  const handleBulkRestore = async () => {
+    setBulkRestoring(true)
+    const names = [...selected].filter(n => cards.some(c => c.card_name === n))
+    let restored = 0
+    let failed = 0
+    for (const name of names) {
+      try {
+        await restoreCard(name)
+        restored++
+      } catch {
+        failed++
+      }
+    }
+    setCards(prev => prev.filter(c => !selected.has(c.card_name)))
+    setSelected(new Set())
+    setBulkRestoring(false)
+    if (failed === 0) showToast(`${restored} card${restored !== 1 ? 's' : ''} restored`)
+    else showToast(`${restored} restored, ${failed} failed`, 'error')
+  }
+
   return (
     <div className={pageStyles.page}>
 
@@ -63,6 +111,15 @@ export default function Archive() {
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
+        {selected.size > 0 && (
+          <button
+            className={styles.bulkRestoreBtn}
+            onClick={handleBulkRestore}
+            disabled={bulkRestoring}
+          >
+            {bulkRestoring ? 'Restoring…' : `↩ Restore Selected (${selected.size})`}
+          </button>
+        )}
       </div>
 
       {loading && <p className={pageStyles.status}>Loading…</p>}
@@ -79,6 +136,15 @@ export default function Archive() {
           <table className={styles.table}>
             <thead>
               <tr>
+                <th className={`${styles.th} ${styles.checkCol}`}>
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                    className={styles.checkbox}
+                    title="Select all"
+                  />
+                </th>
                 <th className={styles.th}>Card Name</th>
                 <th className={styles.th}>Archived Date</th>
                 <th className={styles.th}>Last Value</th>
@@ -87,7 +153,18 @@ export default function Archive() {
             </thead>
             <tbody>
               {filtered.map(card => (
-                <tr key={card.card_name} className={styles.tr}>
+                <tr
+                  key={card.card_name}
+                  className={`${styles.tr} ${selected.has(card.card_name) ? styles.trSelected : ''}`}
+                >
+                  <td className={`${styles.td} ${styles.checkCol}`}>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(card.card_name)}
+                      onChange={() => toggleRow(card.card_name)}
+                      className={styles.checkbox}
+                    />
+                  </td>
                   <td className={`${styles.td} ${styles.nameCell}`}>{card.card_name}</td>
                   <td className={styles.td}>{card.archived_date || '—'}</td>
                   <td className={styles.td}>

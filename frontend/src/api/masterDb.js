@@ -23,3 +23,15 @@ export const getSeasonalTrends = () => client.get('/master-db/seasonal-trends')
 
 /** Get PSA/BGS graded prices for a player (for ROI calculator). */
 export const getGradingLookup = (player) => client.get(`/master-db/grading-lookup/${encodeURIComponent(player)}`)
+
+/** Get YG price history for a specific card (query-param, safe for special chars). */
+export const getYGPriceHistoryByName = (name) =>
+  client.get('/master-db/yg-price-history', { params: { name } })
+
+/** Update owned / cost_basis / purchase_date for a YG card. */
+export const updateYGOwnership = (player, season, data) =>
+  client.patch('/master-db/ownership', data, { params: { player, season } })
+
+/** Trigger a background eBay re-scrape for a single YG card. */
+export const scrapeYGCard = (player, season) =>
+  client.post('/master-db/scrape', null, { params: { player, season } })

@@ -209,6 +209,9 @@ export default function Portfolio() {
           </div>
         )}
 
+        {/* ── Recently Scraped ── */}
+        <RecentlyScraped cards={cards} navigate={navigate} fmtPrice={fmtPrice} />
+
       </>)}
     </div>
   )
@@ -240,6 +243,44 @@ function GainLossTable({ title, rows, navigate, fmtPrice, positive }) {
               <td className={`${styles.topTd}`} style={{ color: positive ? 'var(--success)' : 'var(--danger)' }}>
                 {card.roi >= 0 ? '+' : ''}{card.roi.toFixed(1)}%
               </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function RecentlyScraped({ cards, navigate, fmtPrice }) {
+  const recent = [...cards]
+    .filter(c => c.last_scraped)
+    .sort((a, b) => b.last_scraped.localeCompare(a.last_scraped))
+    .slice(0, 5)
+  if (!recent.length) return null
+  return (
+    <div className={styles.card} style={{ marginTop: 16 }}>
+      <h2 className={styles.cardTitle}>Recently Scraped</h2>
+      <table className={styles.topTable}>
+        <thead>
+          <tr>
+            <th className={styles.topTh}>Card</th>
+            <th className={styles.topTh}>Scraped</th>
+            <th className={styles.topTh}>Value</th>
+            <th className={styles.topTh}>Trend</th>
+          </tr>
+        </thead>
+        <tbody>
+          {recent.map(card => (
+            <tr
+              key={card.card_name}
+              className={styles.topRow}
+              onClick={() => navigate(`/ledger/${encodeURIComponent(card.card_name)}`)}
+              title="Click to inspect"
+            >
+              <td className={`${styles.topTd} ${styles.nameCell}`}>{card.card_name}</td>
+              <td className={styles.topTd}>{card.last_scraped}</td>
+              <td className={`${styles.topTd} ${styles.valueCell}`}>{fmtPrice(card.fair_value)}</td>
+              <td className={styles.topTd}><TrendBadge trend={card.trend} /></td>
             </tr>
           ))}
         </tbody>

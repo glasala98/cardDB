@@ -9,7 +9,12 @@ const client = axios.create({
 client.interceptors.response.use(
   res => res.data,
   err => {
-    const msg = err.response?.data?.detail || err.message || 'Unknown error'
+    const detail = err.response?.data?.detail
+    const msg = typeof detail === 'string'
+      ? detail
+      : Array.isArray(detail)
+        ? detail.map(d => d.msg ?? JSON.stringify(d)).join(', ')
+        : err.message || 'Unknown error'
     return Promise.reject(new Error(msg))
   }
 )

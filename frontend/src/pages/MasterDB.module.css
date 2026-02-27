@@ -182,8 +182,8 @@
 .tr:last-child .td { border-bottom: none; }
 .tr:hover .td { background: var(--bg-secondary); }
 
-.ownedRow .td { background: rgba(79, 142, 247, 0.04); }
-.ownedRow:hover .td { background: rgba(79, 142, 247, 0.1); }
+.ownedRow .td { background: rgba(29, 191, 191, 0.04); }
+.ownedRow:hover .td { background: rgba(29, 191, 191, 0.1); }
 
 .playerCell {
   font-weight: 600;
@@ -250,7 +250,7 @@
   font-size: 12px;
   font-weight: 700;
   color: var(--accent);
-  background: rgba(79,142,247,0.1);
+  background: rgba(29,191,191,0.1);
   padding: 2px 10px;
   border-radius: 20px;
 }
@@ -467,6 +467,223 @@
   font-size: 13px;
   text-align: center;
 }
+
+/* ── Clickable rows + deep-dive ──────────────────────────────── */
+.trClickable { cursor: pointer; }
+.trSelected .td { background: rgba(29,191,191,0.08) !important; }
+.detailRow .td { padding: 0; border-bottom: 2px solid var(--accent); }
+.detailCell { padding: 0 !important; }
+
+.detailPanel {
+  background: var(--bg-card);
+  padding: 20px 24px;
+  border-top: 2px solid var(--accent);
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.detailBlock {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.detailTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.detailSub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.detailPrices { display: flex; gap: 10px; flex-wrap: wrap; }
+.detailPriceItem { display: flex; flex-direction: column; gap: 2px; min-width: 60px; }
+.detailPriceLabel { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; }
+.detailPriceVal { font-size: 14px; font-weight: 700; color: var(--success); }
+
+.statsGrid {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.statChip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  min-width: 40px;
+}
+
+.statChipVal { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.statChipLabel { font-size: 9px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; }
+
+.detailMeta { font-size: 11px; color: var(--text-secondary); margin: 0; }
+.detailChart { margin-top: 4px; }
+.detailNoHistory { font-size: 12px; color: var(--text-secondary); margin: 8px 0 0; }
+
+.deepDiveHint { font-style: italic; }
+
+/* ── Ownership tracker ───────────────────────────────────────── */
+.ownedToggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+.ownedToggle input { cursor: pointer; accent-color: var(--accent); }
+
+.ownershipFields { display: flex; flex-direction: column; gap: 8px; }
+
+.ownershipLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.ownershipInput {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  width: 100%;
+}
+.ownershipInput:focus { border-color: var(--accent); }
+
+.saveOwnershipBtn {
+  background: var(--accent);
+  border: none;
+  border-radius: 7px;
+  padding: 7px 18px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: background 0.15s;
+}
+.saveOwnershipBtn:hover:not(:disabled) { background: var(--accent-hover); }
+.saveOwnershipBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.saveMsg { font-size: 12px; color: var(--success); }
+.scrapeError { color: var(--danger) !important; }
+
+/* ── My Cards Portfolio Summary ──────────────────────────────── */
+.myCardsSummary {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: rgba(29, 191, 191, 0.06);
+  border: 1px solid rgba(29, 191, 191, 0.2);
+  border-radius: 10px;
+  padding: 14px 20px;
+  margin-bottom: 16px;
+}
+.myCardsStat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 110px;
+}
+.myCardsLabel {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+.myCardsValue {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.myCardsGain { color: var(--success); }
+.myCardsLoss { color: var(--danger);  }
+.myCardsPct  { font-size: 13px; font-weight: 600; }
+
+/* ── Deep-dive Scrape Button ─────────────────────────────────── */
+.detailScrapeRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.scrapeYGBtn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 16px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.scrapeYGBtn:hover:not(:disabled) { background: var(--bg-card); border-color: var(--accent); }
+.scrapeYGBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Trajectory Summary Row ──────────────────────────────────── */
+.trajectoryRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.trajectoryLabel  { color: var(--text-secondary); }
+.trajectoryChange { font-weight: 700; font-size: 14px; }
+
+/* ── Compare enhancements ────────────────────────────────────── */
+.compareStats { display: flex; flex-wrap: wrap; gap: 8px; }
+.compareNHLBlock { margin-top: 4px; }
+.compareNHLTitle { font-size: 11px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 6px; }
+.compareGrades { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.compareGradeRow { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); }
+.compareGradeVal { font-weight: 700; color: var(--text-primary); }
+
+/* ── Value Finder ────────────────────────────────────────────── */
+.premiumOver  { color: var(--danger);  font-weight: 700; }
+.premiumUnder { color: var(--success); font-weight: 700; }
+
+/* ── Rookie Impact Score ─────────────────────────────────────── */
+.impactScore { font-size: 16px; font-weight: 700; color: var(--accent); }
+.topThree .td { background: rgba(29,191,191,0.05); }
+.topThree .impactScore { color: #f0b429; }
 
 /* ── Correlation Analytics ───────────────────────────────────── */
 .corrWrap { }

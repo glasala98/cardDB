@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { CurrencyProvider } from './context/CurrencyContext'
+import { PublicModeProvider } from './context/PublicModeContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Navbar from './components/Navbar'
 import Login from './pages/Login'
@@ -40,10 +41,12 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <CurrencyProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/*"     element={<AppShell />} />
-          </Routes>
+          <PublicModeProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/*"     element={<AppShell />} />
+            </Routes>
+          </PublicModeProvider>
         </CurrencyProvider>
       </AuthProvider>
     </BrowserRouter>

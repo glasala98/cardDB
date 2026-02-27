@@ -123,6 +123,20 @@
   flex-wrap: wrap;
 }
 
+/* ── Price Tier Badge ────────────────────────────────────────── */
+.tierBadge {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+.tierGold   { background: rgba(255, 193, 7, 0.18); border: 1px solid rgba(255, 193, 7, 0.45); color: #e6b800; }
+.tierSilver { background: rgba(180, 190, 200, 0.18); border: 1px solid rgba(180, 190, 200, 0.4); color: #a8b2be; }
+.tierBronze { background: rgba(176, 117, 80, 0.18); border: 1px solid rgba(176, 117, 80, 0.4); color: #c4845a; }
+
 .scrapeBtn {
   background: rgba(154, 160, 180, 0.12);
   border: 1px solid var(--border);
@@ -148,7 +162,7 @@
   transition: background 0.15s;
   white-space: nowrap;
 }
-.ebayLink:hover { background: rgba(79,142,247,0.1); }
+.ebayLink:hover { background: rgba(29,191,191,0.1); }
 
 .lastScraped {
   font-size: 11px;
