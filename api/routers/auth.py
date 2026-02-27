@@ -78,10 +78,11 @@ def me(username: str = Depends(get_current_user)):
     """Return the currently authenticated user."""
     users = load_users()
     user_data = users.get(username, {}) if users else {}
+    default_role = "admin" if username == "admin" else "user"
     return {
         "username":    username,
         "display_name": user_data.get("display_name", username),
-        "role":        user_data.get("role", "user"),
+        "role":        user_data.get("role", default_role),
     }
 
 
