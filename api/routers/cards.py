@@ -314,7 +314,7 @@ def card_of_the_day(user: str = DEFAULT_USER):
     if with_price.empty:
         return {"card": None}
     today = datetime.date.today().isoformat()
-    records = with_price.to_dict(orient="records")
+    records = with_price.fillna("").to_dict(orient="records")
     idx = int(hashlib.md5(today.encode()).hexdigest(), 16) % len(records)
     return {"card": _normalise_row(records[idx]), "date": today}
 
