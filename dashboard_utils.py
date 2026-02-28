@@ -481,8 +481,9 @@ def scrape_single_card(card_name, results_json_path=None):
                             price_source = 'psa9_estimate'
 
         if sales:
-            from scrape_card_prices import extract_serial_run
+            from scrape_card_prices import extract_serial_run, _normalize_shipping
             target_serial = extract_serial_run(card_name)
+            sales = _normalize_shipping(sales)
             fair_price, stats = calculate_fair_price(sales, target_serial=target_serial)
             # Save raw sales to results JSON
             results = {}
