@@ -7,6 +7,7 @@ import re
 import datetime
 import hashlib
 import urllib.request
+import urllib.parse
 from typing import Optional
 
 import pandas as pd
@@ -572,6 +573,30 @@ def fetch_image(name: str, user: str = DEFAULT_USER):
             raw_img = results.get(raw_name, {}).get("image_url")
             if raw_img:
                 image_url = raw_img  # fallback — will be saved below
+
+    # ── Step 4: eBay active listings search — last resort image fallback ─────
+    # Searches current (non-sold) eBay listings and extracts the first image
+    # hash from the HTML. Active listing images stay live for months.
+    if not image_url:
+        try:
+            encoded = urllib.parse.quote(name[:120])
+            search_url = (
+                f"https://www.ebay.com/sch/i.html"
+                f"?_nkw={encoded}&_sacat=0&LH_BIN=1"
+            )
+            req = urllib.request.Request(
+                search_url,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+            )
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                html = resp.read().decode("utf-8", errors="replace")
+            hashes = list(dict.fromkeys(
+                re.findall(r'i\.ebayimg\.com/images/g/([A-Za-z0-9_-]+)/s-l', html)
+            ))
+            if hashes:
+                image_url = f"https://i.ebayimg.com/images/g/{hashes[0]}/s-l400.jpg"
+        except Exception:
+            pass  # best-effort
 
     # ── Persist results ──────────────────────────────────────────────────────
     changed = False
