@@ -131,22 +131,64 @@ def list_cards(user: str = DEFAULT_USER):
 
 @router.get("/portfolio-history")
 def portfolio_history(user: str = DEFAULT_USER):
-    """Return time-series portfolio value snapshots.
+    """Return time-series portfolio value recalculated from per-card price history.
 
-    Reads the portfolio_history.json file associated with the given user and
-    returns all recorded snapshots for charting total collection value over time.
+    Dynamically sums fair values from price_history.json for each date, using
+    only cards currently in the collection. Archived cards are excluded so a
+    card added then removed within a day won't cause a spike. Today's live
+    values from the CSV are always appended as the final data point.
 
     Args:
         user: Username whose portfolio history to load. Defaults to 'admin'.
 
     Returns:
-        Dict with key 'history' containing a list of snapshot dicts, each
-        with at minimum a 'date' and 'total_value' field.
+        Dict with key 'history' containing a list of snapshot dicts each with
+        'date', 'total_value', 'total_cards', and 'avg_value'.
     """
     paths = _get_paths(user)
-    hist_dir = os.path.dirname(paths["history"])
-    portfolio_path = os.path.join(hist_dir, "portfolio_history.json")
-    return {"history": load_portfolio_history(portfolio_path=portfolio_path)}
+    df = load_data(paths["csv"], paths["results"])
+    current_cards = set(df["Card Name"].tolist())
+
+    date_totals: dict = {}
+    if os.path.exists(paths["history"]):
+        try:
+            with open(paths["history"], "r", encoding="utf-8") as f:
+                price_hist = json.load(f)
+        except Exception:
+            price_hist = {}
+
+        for card_name, entries in price_hist.items():
+            if card_name not in current_cards:
+                continue  # skip archived / removed cards
+            for entry in entries:
+                d = entry.get("date")
+                v = float(entry.get("fair_value") or 0)
+                if d and v > 0:
+                    bucket = date_totals.setdefault(d, {"total": 0.0, "count": 0})
+                    bucket["total"] += v
+                    bucket["count"] += 1
+
+    # Always include today's live CSV values as the rightmost point
+    today = datetime.date.today().isoformat()
+    try:
+        today_vals = df["Fair Value"].fillna(0).astype(float)
+        today_total = round(float(today_vals.sum()), 2)
+        today_count = int((today_vals > 0).sum())
+        if today_total > 0:
+            date_totals[today] = {"total": today_total, "count": today_count}
+    except Exception:
+        pass
+
+    history = [
+        {
+            "date":        d,
+            "total_value": round(b["total"], 2),
+            "total_cards": b["count"],
+            "avg_value":   round(b["total"] / b["count"], 2) if b["count"] else 0,
+        }
+        for d, b in sorted(date_totals.items())
+    ]
+    return {"history": history}
 
 
 @router.get("/archive")
