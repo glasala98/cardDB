@@ -723,9 +723,6 @@ def search_ebay_sold(driver, card_name, max_results=240, search_query=None):
                 except Exception:
                     pass
 
-                # Cap shipping at $5 — padded shipping on cheap cards
-                # inflates comps; anything over $5 is treated as free ship
-                shipping_val = min(shipping_val, 5.0)
                 total_val = round(price_val + shipping_val, 2)
 
                 # Get sold date from caption
