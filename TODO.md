@@ -56,6 +56,51 @@ app scales to all sports, all card types, millions of rows.
 
 ---
 
+## 🔐 Security (Post-Supabase)
+After the Supabase migration, harden the auth and data layer:
+
+### Authentication
+- [ ] Replace `users.yaml` with Supabase Auth (built-in JWT, bcrypt, session management)
+- [ ] Add **user self-registration** — sign-up form with email + password, email verification
+- [ ] Add **password reset** flow (email link via Supabase Auth)
+- [ ] Add **OAuth login** option (Google, GitHub) via Supabase Auth providers
+- [ ] Session expiry — currently 24h JWT; consider refresh tokens for longer sessions
+
+### Authorization & Data Isolation
+- [ ] Enable **Supabase Row Level Security (RLS)** on all tables — users can only read/write their own rows
+- [ ] `cards`, `price_history`, `portfolio_history`, `card_archive` tables: RLS policy `auth.uid() = user_id`
+- [ ] `master_cards` table: read-only for all authenticated users, write only from service role (scrapers)
+- [ ] API service role key (server-side only) — never expose to frontend
+
+### API Security
+- [ ] Move JWT secret to environment variable (already done) — ensure it rotates on breach
+- [ ] Rate-limit login endpoint (prevent brute force) — FastAPI middleware or nginx `limit_req`
+- [ ] Validate all user inputs at API boundary (already partially done via Pydantic)
+- [ ] Sanitize card names before passing to shell/scraper (no command injection)
+- [ ] HTTPS only in production (already handled by nginx + Let's Encrypt)
+- [ ] Review CORS origins — lock down to production domain only in prod
+
+### GitHub Repo
+- [ ] Make repo **private** (Settings → General → Danger Zone → Change visibility)
+  - GitHub Actions still works on private repos ✅
+  - VPS `git pull` via SSH still works ✅
+  - No code exposed publicly ✅
+
+---
+
+## 📐 Data Architecture & Flow
+*See [docs/architecture.md](docs/architecture.md) for the full diagram*
+
+- [ ] Create `docs/architecture.md` — data flow diagram covering:
+  - Browser → React → FastAPI → dashboard_utils → data files (current)
+  - Future: Browser → React → FastAPI → Supabase (target)
+  - GitHub Actions scraper flow (current vs future)
+  - Multi-user data isolation (current: `data/{user}/`, future: RLS)
+  - Card scan flow (image → Claude Vision → parsed fields → add card → auto-scrape)
+  - Auth flow (login → JWT → axios interceptor → protected routes)
+
+---
+
 ## 🌟 Feature Ideas
 - [ ] Expand Master DB beyond Young Guns to all rookie cards (all sports)
 - [ ] Add card image storage in Supabase (replace eBay hash approach)
@@ -80,3 +125,4 @@ app scales to all sports, all card types, millions of rows.
 - [x] In-process data cache (mtime-based, load_data + load_master_db)
 - [x] 1GB swap file added to server
 - [x] Admin password changed to lasala8324
+- [x] Full documentation pass (README rewrite, api/README, frontend/README, docs/, docstrings on all Python functions)
