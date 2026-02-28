@@ -42,6 +42,17 @@ BACKUP_DIR = os.path.join(SCRIPT_DIR, "backups")
 ARCHIVE_PATH = os.path.join(SCRIPT_DIR, "card_archive.csv")
 MONEY_COLS = ['Fair Value', 'Median (All)', 'Min', 'Max', 'Cost Basis']
 
+# ── In-process data cache (keyed by file paths → mtime) ──────────────────────
+_DATA_CACHE = {}  # key: (csv_path, json_path) → {mtimes, df}
+_MASTER_DB_CACHE = {}  # key: path → {mtime, df}
+
+
+def _file_mtime(path):
+    try:
+        return os.path.getmtime(path)
+    except OSError:
+        return 0
+
 # Master DB paths (shared across all users)
 MASTER_DB_DIR = os.path.join(SCRIPT_DIR, "data", "master_db")
 MASTER_DB_PATH = os.path.join(MASTER_DB_DIR, "young_guns.csv")
@@ -454,6 +465,15 @@ def parse_card_name(card_name):
 def load_data(csv_path=CSV_PATH, results_json_path=None):
     if results_json_path is None:
         results_json_path = RESULTS_JSON_PATH
+
+    # Return cached DataFrame if files haven't changed
+    cache_key = (csv_path, results_json_path)
+    csv_mt  = _file_mtime(csv_path)
+    json_mt = _file_mtime(results_json_path)
+    cached  = _DATA_CACHE.get(cache_key)
+    if cached and cached['csv_mt'] == csv_mt and cached['json_mt'] == json_mt:
+        return cached['df'].copy()
+
     df = pd.read_csv(csv_path)
 
     # De-sanitize string columns
@@ -507,7 +527,8 @@ def load_data(csv_path=CSV_PATH, results_json_path=None):
         df['Tags'] = ''
     df['Tags'] = df['Tags'].fillna('')
 
-    return df
+    _DATA_CACHE[cache_key] = {'csv_mt': csv_mt, 'json_mt': json_mt, 'df': df}
+    return df.copy()
 
 PARSED_COLS = ['Player', 'Year', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Last Scraped', 'Confidence']
 
@@ -1327,6 +1348,10 @@ def load_master_db(path=MASTER_DB_PATH):
     """Load the master card database CSV."""
     if not os.path.exists(path):
         return pd.DataFrame()
+    mt = _file_mtime(path)
+    cached = _MASTER_DB_CACHE.get(path)
+    if cached and cached['mt'] == mt:
+        return cached['df'].copy()
     df = pd.read_csv(path)
     df['Team'] = df['Team'].fillna('').str.strip()
     df['Position'] = df['Position'].fillna('').str.strip()
@@ -1337,7 +1362,8 @@ def load_master_db(path=MASTER_DB_PATH):
     df['Owned'] = pd.to_numeric(df['Owned'], errors='coerce').fillna(0).astype(int)
     df['CostBasis'] = pd.to_numeric(df['CostBasis'], errors='coerce').fillna(0)
     df['PurchaseDate'] = df['PurchaseDate'].fillna('').astype(str)
-    return df
+    _MASTER_DB_CACHE[path] = {'mt': mt, 'df': df}
+    return df.copy()
 
 
 def save_master_db(df, path=MASTER_DB_PATH):
