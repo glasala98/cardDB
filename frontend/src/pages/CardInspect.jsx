@@ -20,10 +20,9 @@ export default function CardInspect() {
   const [scraping, setScraping] = useState(false)
   const [toast,    setToast]    = useState(null)
 
-  // Grading ROI
+  // Grading ROI — costs hardcoded to current standard-tier pricing (2025)
+  const GRADING_COSTS = { psa: 25, bgs: 150, tag: 20 }
   const [gradingData,   setGradingData]   = useState(null)
-  const [gradingCost,   setGradingCost]   = useState(30)
-  const [shippingCost,  setShippingCost]  = useState(10)
   const [gradingResult, setGradingResult] = useState(null)
 
   // Price override (for "not found" cards)
@@ -54,11 +53,31 @@ export default function CardInspect() {
             .catch(() => {})
             .finally(() => setFetchingImg(false))
         }
-        // Auto-fetch grading data based on player name
+        // Auto-fetch grading data and compute ROI with hardcoded costs
         const player = d?.card?.player
         if (player) {
           getGradingLookup(player)
-            .then(r => setGradingData(r.cards || []))
+            .then(r => {
+              const cards = r.cards || []
+              setGradingData(cards)
+              const raw = d?.card?.fair_value ?? 0
+              const m = cards?.[0]
+              const { psa, bgs, tag } = { psa: 25, bgs: 150, tag: 20 }
+              setGradingResult({
+                raw,
+                psa: {
+                  fee:  psa,
+                  gr9:  { price: m?.psa9_price  ?? 0, roi: (m?.psa9_price  ?? 0) - raw - psa },
+                  gr10: { price: m?.psa10_price ?? 0, roi: (m?.psa10_price ?? 0) - raw - psa },
+                },
+                bgs: {
+                  fee:  bgs,
+                  gr95: { price: m?.bgs95_price ?? 0, roi: (m?.bgs95_price ?? 0) - raw - bgs },
+                  gr10: { price: m?.bgs10_price ?? 0, roi: (m?.bgs10_price ?? 0) - raw - bgs },
+                },
+                tag: { fee: tag },
+              })
+            })
             .catch(() => {})
         }
       })
@@ -72,18 +91,6 @@ export default function CardInspect() {
     setTimeout(() => setToast(null), 3500)
   }
 
-  const calcGradingROI = () => {
-    const raw = data?.card?.fair_value ?? 0
-    const total = Number(gradingCost) + Number(shippingCost)
-    const match = gradingData?.[0]
-    const p9  = match?.psa9_price  ?? 0
-    const p10 = match?.psa10_price ?? 0
-    setGradingResult({
-      raw, total,
-      psa9:  { price: p9,  roi: p9  - raw - total },
-      psa10: { price: p10, roi: p10 - raw - total },
-    })
-  }
 
   const handlePriceOverride = async () => {
     const val = parseFloat(overrideVal)
@@ -268,77 +275,98 @@ export default function CardInspect() {
       )}
 
       {/* ── Grading ROI Calculator ── */}
-      {(gradingData && gradingData.length > 0) || (data?.card?.fair_value > 0) ? (
+      {gradingResult && (
         <div className={styles.section}>
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>Grading ROI Calculator</h2>
           </div>
-          <div className={styles.roiInputs}>
-            <label className={styles.roiLabel}>
-              Grading Cost ($)
-              <input type="number" min="0" step="5" value={gradingCost}
-                onChange={e => setGradingCost(e.target.value)}
-                className={styles.roiInput} />
-            </label>
-            <label className={styles.roiLabel}>
-              Shipping ($)
-              <input type="number" min="0" step="1" value={shippingCost}
-                onChange={e => setShippingCost(e.target.value)}
-                className={styles.roiInput} />
-            </label>
-            <button className={styles.roiCalcBtn} onClick={calcGradingROI}>
-              Calculate
-            </button>
-          </div>
-
-          {gradingResult && (
-            <div className={styles.roiResults}>
-              <div className={styles.roiRow}>
-                <span className={styles.roiGrade}>Raw Value</span>
-                <span className={styles.roiPrice}>{fmt(gradingResult.raw)}</span>
-                <span className={styles.roiNote}>Grading + shipping: {fmt(gradingResult.total)}</span>
+          <div className={styles.roiResults}>
+            {/* Header */}
+            <div className={`${styles.roiRow} ${styles.roiHeader}`}>
+              <span className={styles.roiGrade}>Service</span>
+              <span className={styles.roiFee}>Fee</span>
+              <span className={styles.roiPrice}>Market Value</span>
+              <span className={styles.roiChange}>ROI</span>
+            </div>
+            {/* Raw baseline */}
+            <div className={styles.roiRow}>
+              <span className={styles.roiGrade}>Raw</span>
+              <span className={styles.roiFee}>—</span>
+              <span className={styles.roiPrice}>{fmt(gradingResult.raw)}</span>
+              <span className={styles.roiChange}>—</span>
+            </div>
+            {/* PSA rows */}
+            {gradingResult.psa.gr9.price > 0 && (
+              <div className={`${styles.roiRow} ${gradingResult.psa.gr9.roi > 0 ? styles.roiPositive : styles.roiNegative}`}>
+                <span className={styles.roiGrade}>PSA 9</span>
+                <span className={styles.roiFee}>{fmt(gradingResult.psa.fee)}</span>
+                <span className={styles.roiPrice}>{fmt(gradingResult.psa.gr9.price)}</span>
+                <span className={styles.roiChange}>{gradingResult.psa.gr9.roi >= 0 ? '+' : ''}{fmt(gradingResult.psa.gr9.roi)}</span>
               </div>
-              {gradingResult.psa9.price > 0 && (
-                <div className={`${styles.roiRow} ${gradingResult.psa9.roi > 0 ? styles.roiPositive : styles.roiNegative}`}>
-                  <span className={styles.roiGrade}>PSA 9</span>
-                  <span className={styles.roiPrice}>{fmt(gradingResult.psa9.price)}</span>
-                  <span className={styles.roiChange}>
-                    ROI: {gradingResult.psa9.roi >= 0 ? '+' : ''}{fmt(gradingResult.psa9.roi)}
-                  </span>
-                </div>
-              )}
-              {gradingResult.psa10.price > 0 && (
-                <div className={`${styles.roiRow} ${gradingResult.psa10.roi > 0 ? styles.roiPositive : styles.roiNegative}`}>
-                  <span className={styles.roiGrade}>PSA 10</span>
-                  <span className={styles.roiPrice}>{fmt(gradingResult.psa10.price)}</span>
-                  <span className={styles.roiChange}>
-                    ROI: {gradingResult.psa10.roi >= 0 ? '+' : ''}{fmt(gradingResult.psa10.roi)}
-                  </span>
-                </div>
-              )}
-              {gradingResult.psa9.price === 0 && gradingResult.psa10.price === 0 && (
-                <p className={styles.roiEmpty}>No graded price data available for this card in the Young Guns DB.</p>
-              )}
-              {(gradingResult.psa10.roi > 20 || gradingResult.psa9.roi > 20) && (
-                <p className={styles.roiVerdict + ' ' + styles.roiWorthIt}>
-                  Worth grading! Best ROI is {fmt(Math.max(gradingResult.psa10.roi, gradingResult.psa9.roi))} after costs.
+            )}
+            {gradingResult.psa.gr10.price > 0 && (
+              <div className={`${styles.roiRow} ${gradingResult.psa.gr10.roi > 0 ? styles.roiPositive : styles.roiNegative}`}>
+                <span className={styles.roiGrade}>PSA 10</span>
+                <span className={styles.roiFee}>{fmt(gradingResult.psa.fee)}</span>
+                <span className={styles.roiPrice}>{fmt(gradingResult.psa.gr10.price)}</span>
+                <span className={styles.roiChange}>{gradingResult.psa.gr10.roi >= 0 ? '+' : ''}{fmt(gradingResult.psa.gr10.roi)}</span>
+              </div>
+            )}
+            {/* BGS rows */}
+            {gradingResult.bgs.gr95.price > 0 && (
+              <div className={`${styles.roiRow} ${gradingResult.bgs.gr95.roi > 0 ? styles.roiPositive : styles.roiNegative}`}>
+                <span className={styles.roiGrade}>BGS 9.5</span>
+                <span className={styles.roiFee}>{fmt(gradingResult.bgs.fee)}</span>
+                <span className={styles.roiPrice}>{fmt(gradingResult.bgs.gr95.price)}</span>
+                <span className={styles.roiChange}>{gradingResult.bgs.gr95.roi >= 0 ? '+' : ''}{fmt(gradingResult.bgs.gr95.roi)}</span>
+              </div>
+            )}
+            {gradingResult.bgs.gr10.price > 0 && (
+              <div className={`${styles.roiRow} ${gradingResult.bgs.gr10.roi > 0 ? styles.roiPositive : styles.roiNegative}`}>
+                <span className={styles.roiGrade}>BGS 10</span>
+                <span className={styles.roiFee}>{fmt(gradingResult.bgs.fee)}</span>
+                <span className={styles.roiPrice}>{fmt(gradingResult.bgs.gr10.price)}</span>
+                <span className={styles.roiChange}>{gradingResult.bgs.gr10.roi >= 0 ? '+' : ''}{fmt(gradingResult.bgs.gr10.roi)}</span>
+              </div>
+            )}
+            {/* TAG row — no market data available */}
+            <div className={styles.roiRow}>
+              <span className={styles.roiGrade}>TAG</span>
+              <span className={styles.roiFee}>{fmt(gradingResult.tag.fee)}</span>
+              <span className={styles.roiPrice} style={{ color: 'var(--text-secondary)' }}>No data</span>
+              <span className={styles.roiChange}>—</span>
+            </div>
+            {/* No graded data message */}
+            {gradingResult.psa.gr9.price === 0 && gradingResult.psa.gr10.price === 0 &&
+             gradingResult.bgs.gr95.price === 0 && gradingResult.bgs.gr10.price === 0 && (
+              <p className={styles.roiEmpty}>No PSA/BGS market data for this card in the Young Guns DB.</p>
+            )}
+            {/* Verdict */}
+            {(() => {
+              const best = Math.max(
+                gradingResult.psa.gr10.roi, gradingResult.psa.gr9.roi,
+                gradingResult.bgs.gr10.roi, gradingResult.bgs.gr95.roi
+              )
+              if (best > 20) return (
+                <p className={`${styles.roiVerdict} ${styles.roiWorthIt}`}>
+                  Worth grading — best ROI is {fmt(best)} after fees.
                 </p>
-              )}
-              {(gradingResult.psa10.roi > 0 || gradingResult.psa9.roi > 0) &&
-               Math.max(gradingResult.psa10.roi, gradingResult.psa9.roi) <= 20 && (
-                <p className={styles.roiVerdict + ' ' + styles.roiMarginal}>
+              )
+              if (best > 0) return (
+                <p className={`${styles.roiVerdict} ${styles.roiMarginal}`}>
                   Marginal gain — may be worth it for gem-mint candidates.
                 </p>
-              )}
-              {gradingResult.psa10.price > 0 && gradingResult.psa10.roi <= 0 && gradingResult.psa9.roi <= 0 && (
-                <p className={styles.roiVerdict + ' ' + styles.roiNotWorth}>
-                  Not profitable after {fmt(gradingResult.total)} in grading costs.
+              )
+              if (gradingResult.psa.gr10.price > 0 || gradingResult.bgs.gr10.price > 0) return (
+                <p className={`${styles.roiVerdict} ${styles.roiNotWorth}`}>
+                  Not profitable after grading fees.
                 </p>
-              )}
-            </div>
-          )}
+              )
+              return null
+            })()}
+          </div>
         </div>
-      ) : null}
+      )}
 
       {/* ── Price History Chart ── */}
       <div className={styles.section}>
