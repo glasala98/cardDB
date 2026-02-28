@@ -427,7 +427,7 @@ def _do_scrape(card_name: str, paths: dict):
         result = scrape_single_card(card_name, results_json_path=paths["results"])
         if not result:
             return
-        stats = result.get("stats", {})
+        stats = result  # scrape_single_card returns the stats dict directly
         df = load_data(paths["csv"], paths["results"])
         idx = df[df["Card Name"] == card_name].index
         if len(idx) == 0:
