@@ -433,11 +433,11 @@ export default function CardLedger() {
                   <tr>
                     <SortTh col="player"       label="Card" />
                     <SortTh col="fair_value"   label="Fair Value" />
-                    <SortTh col="cost_basis"   label="Cost Basis" />
                     <SortTh col="trend"        label="Trend" />
                     <th className={styles.th}>Confidence</th>
-                    <SortTh col="last_scraped" label="Last Scraped" />
                     <SortTh col="num_sales"    label="Sales" />
+                    <SortTh col="cost_basis"   label="Cost Basis" />
+                    <SortTh col="last_scraped" label="Last Scraped" />
                     <th className={styles.th}>Tags</th>
                     {!isPublic && <th className={styles.th}>Actions</th>}
                   </tr>
@@ -468,6 +468,9 @@ export default function CardLedger() {
                         </span>
                       </td>
                       <td className={styles.td}>{fmt(card.fair_value)}</td>
+                      <td className={`${styles.td} ${styles.compactCell}`}><TrendBadge trend={card.trend} /></td>
+                      <td className={`${styles.td} ${styles.compactCell}`}><ConfidenceBadge confidence={card.confidence} /></td>
+                      <td className={`${styles.td} ${styles.compactCell}`}>{card.num_sales || '—'}</td>
                       <td
                         className={`${styles.td} ${!isPublic ? styles.editableCell : ''}`}
                         onClick={() => !isPublic && costEdit !== card.card_name && setCostEdit(card.card_name)}
@@ -483,11 +486,8 @@ export default function CardLedger() {
                           <span className={styles.editableValue}>{fmt(card.cost_basis)}</span>
                         )}
                       </td>
-                      <td className={styles.td}><TrendBadge trend={card.trend} /></td>
-                      <td className={styles.td}><ConfidenceBadge confidence={card.confidence} /></td>
-                      <td className={styles.td}><ScrapedCell dateStr={card.last_scraped} /></td>
-                      <td className={styles.td}>{card.num_sales || '—'}</td>
-                      <td className={styles.td}><span className={styles.tags}>{card.tags || '—'}</span></td>
+                      <td className={`${styles.td} ${styles.compactCell}`}><ScrapedCell dateStr={card.last_scraped} /></td>
+                      <td className={`${styles.td} ${styles.compactCell}`}><span className={styles.tags}>{card.tags || '—'}</span></td>
                       {!isPublic && (
                         <td className={styles.td}>
                           <div className={styles.actions}>

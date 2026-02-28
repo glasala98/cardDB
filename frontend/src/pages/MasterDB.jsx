@@ -221,22 +221,15 @@ export default function MasterDB() {
                 <th className={styles.th}>Player</th>
                 <th className={styles.th}>Team</th>
                 <SortTh col={priceMode} label={`${PRICE_MODES.find(p => p.key === priceMode)?.label ?? 'Price'} ($)`} className={styles.activeCol} />
-                <SortTh col="num_sales"   label="Sales" />
+                <SortTh col="num_sales" label="Sales" />
                 <th className={styles.th}>Min ($)</th>
                 <th className={styles.th}>Max ($)</th>
-                <SortTh col="trend"       label="Trend" />
-                <th className={styles.th}>Last Scraped</th>
-                <SortTh col="psa10_price" label="PSA 10" />
-                <SortTh col="psa9_price"  label="PSA 9" />
-                <SortTh col="psa8_price"  label="PSA 8" />
-                <SortTh col="bgs10_price" label="BGS 10" />
-                <SortTh col="bgs95_price" label="BGS 9.5" />
-                <SortTh col="bgs9_price"  label="BGS 9" />
+                <SortTh col="trend"     label="Trend" />
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={16} className={styles.empty}>No cards match the current filters.</td></tr>
+                <tr><td colSpan={9} className={styles.empty}>No cards match the current filters.</td></tr>
               )}
               {filtered.map((card, i) => {
                 const isSelected = selectedCard?.player === card.player && selectedCard?.season === card.season
@@ -258,17 +251,10 @@ export default function MasterDB() {
                       <td className={styles.td}>{fmt(card.min)}</td>
                       <td className={styles.td}>{fmt(card.max)}</td>
                       <td className={styles.td}><TrendBadge trend={card.trend} /></td>
-                      <td className={`${styles.td} ${styles.dateCell}`}>{card.last_scraped || '—'}</td>
-                      <td className={`${styles.td} ${styles.gradeCell}`}>{fmt(card.psa10_price)}</td>
-                      <td className={`${styles.td} ${styles.gradeCell}`}>{fmt(card.psa9_price)}</td>
-                      <td className={`${styles.td} ${styles.gradeCell}`}>{fmt(card.psa8_price)}</td>
-                      <td className={`${styles.td} ${styles.gradeCell}`}>{fmt(card.bgs10_price)}</td>
-                      <td className={`${styles.td} ${styles.gradeCell}`}>{fmt(card.bgs95_price)}</td>
-                      <td className={`${styles.td} ${styles.gradeCell}`}>{fmt(card.bgs9_price)}</td>
                     </tr>
                     {isSelected && (
                       <tr key={`${card.season}-${card.card_number}-detail`} className={styles.detailRow}>
-                        <td colSpan={16} className={styles.detailCell}>
+                        <td colSpan={9} className={styles.detailCell}>
                           <YGCardDetail
                             card={card}
                             nhlStats={nhlStats}
