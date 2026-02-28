@@ -1,13 +1,19 @@
-streamlit
+# Scraper
 pandas
-plotly
-anthropic
 selenium
-bcrypt
-PyYAML
+requests
+
+# API
 fastapi
 uvicorn
 python-multipart
 python-jose[cryptography]
 passlib[bcrypt]
-requests
+PyYAML
+python-dotenv
+
+# AI scanning
+anthropic
+
+# Misc
+bcrypt
