@@ -574,27 +574,60 @@ def fetch_image(name: str, user: str = DEFAULT_USER):
             if raw_img:
                 image_url = raw_img  # fallback — will be saved below
 
-    # ── Step 4: eBay active listings search — last resort image fallback ─────
-    # Searches current (non-sold) eBay listings and extracts the first image
-    # hash from the HTML. Active listing images stay live for months.
-    if not image_url:
+    # ── Step 4: eBay active listings — search + navigate listing page ────────
+    # Search current eBay listings, find the first item URL, then navigate to
+    # that listing page and extract both front and back image hashes.
+    # Active listing images stay live for months. Runs whenever front or back
+    # is missing so cards always get both images when available.
+    if not image_url or not image_url_back:
         try:
-            encoded = urllib.parse.quote(name[:120])
-            search_url = (
-                f"https://www.ebay.com/sch/i.html"
-                f"?_nkw={encoded}&_sacat=0&LH_BIN=1"
+            _hdrs = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            _LOT = re.compile(
+                r'\blot\b|bundle|buy\s*\d|\d\s*pack|set of|\bcollection\b',
+                re.IGNORECASE,
             )
-            req = urllib.request.Request(
-                search_url,
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
-            )
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                html = resp.read().decode("utf-8", errors="replace")
-            hashes = list(dict.fromkeys(
-                re.findall(r'i\.ebayimg\.com/images/g/([A-Za-z0-9_-]+)/s-l', html)
-            ))
-            if hashes:
-                image_url = f"https://i.ebayimg.com/images/g/{hashes[0]}/s-l400.jpg"
+            # Exclude lot/bundle listings at the eBay search level
+            search_q = urllib.parse.quote(f"{name[:100]} -lot -bundle")
+            search_url = f"https://www.ebay.com/sch/i.html?_nkw={search_q}&_sacat=0&LH_BIN=1"
+            with urllib.request.urlopen(
+                urllib.request.Request(search_url, headers=_hdrs), timeout=12
+            ) as resp:
+                search_html = resp.read().decode("utf-8", errors="replace")
+
+            # Grab first listing URL that doesn't look like a lot/bundle
+            # eBay embeds titles in the search HTML alongside item hrefs
+            item_m = None
+            for m in re.finditer(
+                r'href="(https://www\.ebay\.com/itm/(\d+))[^"]*"[^>]*>([^<]*)',
+                search_html,
+            ):
+                title_fragment = m.group(3).strip()
+                if not _LOT.search(title_fragment):
+                    item_m = m
+                    break
+            # Fallback: accept first match if every result looked like a lot
+            if not item_m:
+                item_m = re.search(r'href="(https://www\.ebay\.com/itm/\d+)[^"]*"', search_html)
+            if item_m:
+                listing_url = item_m.group(1)
+                with urllib.request.urlopen(
+                    urllib.request.Request(listing_url, headers=_hdrs), timeout=12
+                ) as resp2:
+                    listing_html = resp2.read().decode("utf-8", errors="replace")
+                page_hashes = list(dict.fromkeys(
+                    re.findall(r'i\.ebayimg\.com/images/g/([A-Za-z0-9_-]+)/s-l', listing_html)
+                ))
+                if not image_url and page_hashes:
+                    image_url = f"https://i.ebayimg.com/images/g/{page_hashes[0]}/s-l400.jpg"
+                if not image_url_back and len(page_hashes) >= 2:
+                    image_url_back = f"https://i.ebayimg.com/images/g/{page_hashes[1]}/s-l400.jpg"
+            elif not image_url:
+                # Fallback: at least grab front from search thumbnails
+                th = list(dict.fromkeys(
+                    re.findall(r'i\.ebayimg\.com/images/g/([A-Za-z0-9_-]+)/s-l', search_html)
+                ))
+                if th:
+                    image_url = f"https://i.ebayimg.com/images/g/{th[0]}/s-l400.jpg"
         except Exception:
             pass  # best-effort
 
