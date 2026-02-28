@@ -106,6 +106,11 @@ export default function CardLedger() {
     return [...t].sort()
   }, [cards])
 
+  // Hide optional columns when no card has that data populated
+  const hasCostBasis = useMemo(() => cards.some(c => c.cost_basis != null && c.cost_basis !== '' && Number(c.cost_basis) > 0), [cards])
+  const hasTags      = useMemo(() => cards.some(c => c.tags && c.tags.trim() !== ''), [cards])
+  const colCount     = 6 + (hasCostBasis ? 1 : 0) + (hasTags ? 1 : 0) + (!isPublic ? 1 : 0)
+
   const filtered = useMemo(() => {
     const s = search.toLowerCase()
     return cards
@@ -436,15 +441,15 @@ export default function CardLedger() {
                     <SortTh col="trend"        label="Trend" />
                     <th className={`${styles.th} ${styles.hideTablet}`}>Confidence</th>
                     <SortTh col="num_sales"    label="Sales"       className={styles.hideTablet} />
-                    <SortTh col="cost_basis"   label="Cost Basis"  className={styles.hideMobile} />
+                    {hasCostBasis && <SortTh col="cost_basis" label="Cost Basis" className={styles.hideMobile} />}
                     <SortTh col="last_scraped" label="Last Scraped" className={styles.hideTablet} />
-                    <th className={`${styles.th} ${styles.hideTablet}`}>Tags</th>
+                    {hasTags && <th className={`${styles.th} ${styles.hideTablet}`}>Tags</th>}
                     {!isPublic && <th className={styles.th}>Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 && (
-                    <tr><td colSpan={isPublic ? 8 : 9} className={styles.empty}>No cards match the current filters.</td></tr>
+                    <tr><td colSpan={colCount} className={styles.empty}>No cards match the current filters.</td></tr>
                   )}
                   {filtered.map(card => (
                     <tr key={card.card_name} className={styles.tr}>
@@ -471,23 +476,25 @@ export default function CardLedger() {
                       <td className={`${styles.td} ${styles.compactCell}`}><TrendBadge trend={card.trend} /></td>
                       <td className={`${styles.td} ${styles.compactCell} ${styles.hideTablet}`}><ConfidenceBadge confidence={card.confidence} /></td>
                       <td className={`${styles.td} ${styles.compactCell} ${styles.hideTablet}`}>{card.num_sales || '—'}</td>
-                      <td
-                        className={`${styles.td} ${styles.hideMobile} ${!isPublic ? styles.editableCell : ''}`}
-                        onClick={() => !isPublic && costEdit !== card.card_name && setCostEdit(card.card_name)}
-                        title={isPublic ? undefined : 'Click to edit cost basis'}
-                      >
-                        {!isPublic && costEdit === card.card_name ? (
-                          <InlineCostInput
-                            initial={card.cost_basis}
-                            onSave={val => handleCostSave(card.card_name, val)}
-                            onCancel={() => setCostEdit(null)}
-                          />
-                        ) : (
-                          <span className={styles.editableValue}>{fmt(card.cost_basis)}</span>
-                        )}
-                      </td>
+                      {hasCostBasis && (
+                        <td
+                          className={`${styles.td} ${styles.hideMobile} ${!isPublic ? styles.editableCell : ''}`}
+                          onClick={() => !isPublic && costEdit !== card.card_name && setCostEdit(card.card_name)}
+                          title={isPublic ? undefined : 'Click to edit cost basis'}
+                        >
+                          {!isPublic && costEdit === card.card_name ? (
+                            <InlineCostInput
+                              initial={card.cost_basis}
+                              onSave={val => handleCostSave(card.card_name, val)}
+                              onCancel={() => setCostEdit(null)}
+                            />
+                          ) : (
+                            <span className={styles.editableValue}>{fmt(card.cost_basis)}</span>
+                          )}
+                        </td>
+                      )}
                       <td className={`${styles.td} ${styles.compactCell} ${styles.hideTablet}`}><ScrapedCell dateStr={card.last_scraped} /></td>
-                      <td className={`${styles.td} ${styles.compactCell} ${styles.hideTablet}`}><span className={styles.tags}>{card.tags || '—'}</span></td>
+                      {hasTags && <td className={`${styles.td} ${styles.compactCell} ${styles.hideTablet}`}><span className={styles.tags}>{card.tags || '—'}</span></td>}
                       {!isPublic && (
                         <td className={styles.td}>
                           <div className={styles.actions}>
