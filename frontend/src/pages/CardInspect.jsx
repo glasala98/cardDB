@@ -274,8 +274,8 @@ export default function CardInspect() {
         </div>
       )}
 
-      {/* ── Grading ROI Calculator ── */}
-      {gradingResult && (
+      {/* ── Grading ROI Calculator — hidden for already-graded cards ── */}
+      {gradingResult && !data?.card?.grade && (
         <div className={styles.section}>
           <div className={styles.sectionHeader}>
             <h2 className={styles.sectionTitle}>Grading ROI Calculator</h2>
