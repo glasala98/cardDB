@@ -26,6 +26,18 @@ DEFAULT_USER = "admin"
 
 
 def _get_paths(user: str = DEFAULT_USER):
+    """Resolve file paths for a given user's data directory.
+
+    Falls back to the global admin paths if user-specific paths cannot be
+    determined (e.g. single-user deployments without users.yaml).
+
+    Args:
+        user: Username whose paths should be resolved. Defaults to 'admin'.
+
+    Returns:
+        Dict with keys 'csv', 'results', 'history', 'portfolio', 'archive',
+        and 'backup_dir', each mapped to an absolute file path string.
+    """
     try:
         return get_user_paths(user)
     except Exception:
@@ -41,7 +53,20 @@ def _get_paths(user: str = DEFAULT_USER):
 
 
 def _normalise_row(r: dict) -> dict:
-    """Convert a DataFrame row dict to the API card shape."""
+    """Convert a DataFrame row dict to the canonical API card shape.
+
+    Maps raw CSV column names (e.g. 'Card Name', 'Fair Value') to the
+    snake_case keys expected by the frontend (e.g. 'card_name', 'fair_value').
+    Missing or falsy values are normalised to None or empty string as
+    appropriate.
+
+    Args:
+        r: Dict representing one row from the cards DataFrame, with original
+           column names as keys.
+
+    Returns:
+        Dict with standardised API field names suitable for JSON serialisation.
+    """
     return {
         "card_name":    r.get("Card Name", ""),
         "fair_value":   r.get("Fair Value")   or None,
@@ -87,7 +112,17 @@ class CardCreate(BaseModel):
 
 @router.get("")
 def list_cards(user: str = DEFAULT_USER):
-    """Return all cards for the ledger table."""
+    """Return all cards in the collection for the ledger table.
+
+    Loads the cards CSV and results JSON, merges them, and returns every row
+    in the normalised API shape.
+
+    Args:
+        user: Username whose collection to load. Defaults to 'admin'.
+
+    Returns:
+        Dict with key 'cards' containing a list of normalised card dicts.
+    """
     paths = _get_paths(user)
     df = load_data(paths["csv"], paths["results"])
     return {"cards": [_normalise_row(r) for r in df.fillna("").to_dict(orient="records")]}
@@ -95,7 +130,18 @@ def list_cards(user: str = DEFAULT_USER):
 
 @router.get("/portfolio-history")
 def portfolio_history(user: str = DEFAULT_USER):
-    """Return portfolio value snapshots."""
+    """Return time-series portfolio value snapshots.
+
+    Reads the portfolio_history.json file associated with the given user and
+    returns all recorded snapshots for charting total collection value over time.
+
+    Args:
+        user: Username whose portfolio history to load. Defaults to 'admin'.
+
+    Returns:
+        Dict with key 'history' containing a list of snapshot dicts, each
+        with at minimum a 'date' and 'total_value' field.
+    """
     paths = _get_paths(user)
     hist_dir = os.path.dirname(paths["history"])
     portfolio_path = os.path.join(hist_dir, "portfolio_history.json")
@@ -104,7 +150,18 @@ def portfolio_history(user: str = DEFAULT_USER):
 
 @router.get("/archive")
 def list_archive(user: str = DEFAULT_USER):
-    """Return all archived cards."""
+    """Return all soft-deleted (archived) cards.
+
+    Reads the card_archive.csv for the given user. Returns an empty list if
+    no archive file exists rather than raising an error.
+
+    Args:
+        user: Username whose archive to load. Defaults to 'admin'.
+
+    Returns:
+        Dict with key 'cards' containing a list of dicts, each with
+        'card_name', 'archived_date', and 'fair_value'.
+    """
     paths = _get_paths(user)
     try:
         archive_df = load_archive(archive_path=paths["archive"])
@@ -123,7 +180,25 @@ def list_archive(user: str = DEFAULT_USER):
 
 @router.get("/detail")
 def card_detail(name: str, user: str = DEFAULT_USER):
-    """Return full detail for a single card (price history, sales, confidence)."""
+    """Return full detail for a single card including price history and raw sales.
+
+    Loads both the cards CSV and the results JSON to build a combined response.
+    Price history entries are deduplicated by date (latest value wins).
+    Raw sale titles have eBay's appended accessibility text stripped.
+
+    Args:
+        name: Exact card name to look up (passed as query param to avoid
+              path-encoding issues with brackets and slashes).
+        user: Username whose data to query. Defaults to 'admin'.
+
+    Returns:
+        Dict with keys: 'card' (normalised card dict), 'price_history' (list of
+        {'date', 'price'} dicts), 'raw_sales' (list of sale dicts), 'confidence',
+        'search_url', 'image_url', 'image_url_back', 'is_estimated', 'price_source'.
+
+    Raises:
+        HTTPException: 404 if no card with that name exists in the collection.
+    """
     card_name = name
     paths = _get_paths(user)
     df = load_data(paths["csv"], paths["results"])
@@ -187,7 +262,22 @@ def card_detail(name: str, user: str = DEFAULT_USER):
 
 @router.post("")
 def add_card(body: CardCreate, user: str = DEFAULT_USER):
-    """Add a new card to the collection."""
+    """Add a new card to the collection.
+
+    Appends a row to the user's cards CSV with default pricing values of zero.
+    The card can then be scraped separately to populate market data.
+
+    Args:
+        body: CardCreate payload with card_name (required), cost_basis,
+              purchase_date, and tags.
+        user: Username whose collection to update. Defaults to 'admin'.
+
+    Returns:
+        Dict with keys 'status' ('ok') and 'card_name'.
+
+    Raises:
+        HTTPException: 409 if a card with the same name already exists.
+    """
     paths = _get_paths(user)
     df = load_data(paths["csv"], paths["results"])
 
@@ -214,8 +304,24 @@ def add_card(body: CardCreate, user: str = DEFAULT_USER):
 
 @router.patch("/update")
 def update_card(name: str, body: CardUpdate, user: str = DEFAULT_USER):
+    """Update editable fields on a card.
+
+    Only fields explicitly provided in the request body are written; omitted
+    fields are left unchanged. Supports updating fair_value, cost_basis,
+    purchase_date, and tags.
+
+    Args:
+        name: Exact card name to update (query param).
+        body: CardUpdate payload with optional fields to overwrite.
+        user: Username whose collection to update. Defaults to 'admin'.
+
+    Returns:
+        Dict with key 'status' set to 'ok'.
+
+    Raises:
+        HTTPException: 404 if no card with that name exists.
+    """
     card_name = name
-    """Update editable fields on a card."""
     paths = _get_paths(user)
     df = load_data(paths["csv"], paths["results"])
 
@@ -235,8 +341,22 @@ def update_card(name: str, body: CardUpdate, user: str = DEFAULT_USER):
 
 @router.delete("/archive")
 def archive_card_endpoint(name: str, user: str = DEFAULT_USER):
+    """Archive (soft-delete) a card, moving it out of the active collection.
+
+    The card row is removed from the live CSV and appended to card_archive.csv
+    with an 'Archived Date' timestamp. It can be restored via POST /restore.
+
+    Args:
+        name: Exact card name to archive (query param).
+        user: Username whose collection to update. Defaults to 'admin'.
+
+    Returns:
+        Dict with key 'status' set to 'archived'.
+
+    Raises:
+        HTTPException: 404 if no card with that name exists in the active collection.
+    """
     card_name = name
-    """Archive (soft-delete) a card."""
     paths = _get_paths(user)
     df = load_data(paths["csv"], paths["results"])
 
@@ -250,8 +370,23 @@ def archive_card_endpoint(name: str, user: str = DEFAULT_USER):
 
 @router.post("/restore")
 def restore_card_endpoint(name: str, user: str = DEFAULT_USER):
+    """Restore a previously archived card back into the active collection.
+
+    Reads the card row from card_archive.csv, converts any money strings
+    (e.g. '$12.50') back to floats, strips the 'Archived Date' field, and
+    appends the row to the live cards CSV.
+
+    Args:
+        name: Exact card name to restore (query param).
+        user: Username whose archive and collection to update. Defaults to 'admin'.
+
+    Returns:
+        Dict with keys 'status' ('restored') and 'card_name'.
+
+    Raises:
+        HTTPException: 404 if the card is not found in the archive.
+    """
     card_name = name
-    """Restore a card from the archive."""
     paths = _get_paths(user)
     card_data = restore_card(card_name, archive_path=paths["archive"])
     if not card_data:
@@ -276,7 +411,18 @@ def restore_card_endpoint(name: str, user: str = DEFAULT_USER):
 # ── Scrape endpoint ───────────────────────────────────────────────────────────
 
 def _do_scrape(card_name: str, paths: dict):
-    """Background task: scrape one card and save results."""
+    """Background task: scrape eBay sales for one card and persist updated stats.
+
+    Calls scrape_single_card, then writes the resulting fair price, trend,
+    min/max, num_sales, and top-3 prices back to the cards CSV. Also appends
+    a new entry to the price history JSON. Silently no-ops if scraping returns
+    no sales data or encounters an error.
+
+    Args:
+        card_name: Exact card name string to scrape.
+        paths: Dict of file paths as returned by _get_paths(), used to locate
+               the CSV, results JSON, and price history JSON.
+    """
     try:
         result = scrape_single_card(card_name, results_json_path=paths["results"])
         if not result:
@@ -307,7 +453,19 @@ def _do_scrape(card_name: str, paths: dict):
 
 @router.get("/card-of-the-day")
 def card_of_the_day(user: str = DEFAULT_USER):
-    """Return a highlighted card for today (consistent within the day)."""
+    """Return a deterministically selected highlighted card for the current day.
+
+    Uses an MD5 hash of today's date to pick a stable index into the list of
+    cards that have a non-zero fair value, so the same card is returned for
+    all requests within a calendar day.
+
+    Args:
+        user: Username whose collection to select from. Defaults to 'admin'.
+
+    Returns:
+        Dict with keys 'card' (normalised card dict or None if no priced cards
+        exist) and 'date' (ISO-format date string for today).
+    """
     paths = _get_paths(user)
     df = load_data(paths["csv"], paths["results"])
     with_price = df[df["Fair Value"].notna() & (df["Fair Value"].astype(float) > 0)]
@@ -321,11 +479,28 @@ def card_of_the_day(user: str = DEFAULT_USER):
 
 @router.post("/fetch-image")
 def fetch_image(name: str, user: str = DEFAULT_USER):
-    """Fetch front and back card images from an eBay listing.
+    """Fetch and cache front and back card images from eBay listing URLs.
 
-    Step 1 (fast): Extract the front image hash directly from the listing URL.
-    Step 2 (fetch): Fetch the listing page HTML to find all image hashes;
-                    the second unique hash is the back of the card.
+    Uses a two-step strategy:
+      Step 1 (URL extraction): Parses the eBay CDN image hash directly from
+        stored listing URLs — no HTTP request needed.
+      Step 2 (page fetch): GETs the first listing page and scans HTML for all
+        eBay CDN image hashes; the second unique hash is treated as the card back.
+    If the graded card has no image, falls back to the raw (ungraded) version's
+    image stored in the results JSON.
+    Discovered image URLs are persisted back to the results JSON for caching.
+
+    Args:
+        name: Exact card name to fetch images for (query param).
+        user: Username whose results JSON to read/write. Defaults to 'admin'.
+
+    Returns:
+        Dict with keys 'image_url' (front, may be None) and 'image_url_back'
+        (back, may be None).
+
+    Raises:
+        HTTPException: 404 if no results data file exists or the card has no
+                       results entry.
     """
     paths = _get_paths(user)
 
@@ -415,7 +590,25 @@ def fetch_image(name: str, user: str = DEFAULT_USER):
 
 @router.post("/bulk-import")
 async def bulk_import(file: UploadFile = File(...), user: str = DEFAULT_USER):
-    """Import cards from a CSV file. Must have at least a 'Card Name' column."""
+    """Import multiple cards from an uploaded CSV file.
+
+    The CSV must contain at least a 'Card Name' column (also accepts
+    'card_name', 'cardname', or 'name' as variants). Optionally reads
+    'Fair Value', 'Cost Basis', 'Purchase Date', and 'Tags' columns.
+    Cards already present in the collection are skipped (not duplicated).
+
+    Args:
+        file: Uploaded CSV file (multipart/form-data).
+        user: Username whose collection to import into. Defaults to 'admin'.
+
+    Returns:
+        Dict with keys 'added' (int count), 'skipped' (int count), and
+        'cards' (list of added card name strings).
+
+    Raises:
+        HTTPException: 400 if the file cannot be parsed as CSV or lacks a
+                       recognisable card name column.
+    """
     paths = _get_paths(user)
     df = load_data(paths["csv"], paths["results"])
 
@@ -464,6 +657,14 @@ async def bulk_import(file: UploadFile = File(...), user: str = DEFAULT_USER):
 
 
 def _safe_float(val):
+    """Convert a value to float, stripping currency symbols and commas.
+
+    Args:
+        val: Value to convert — may be a number, string like '$12.50', or None.
+
+    Returns:
+        Float representation of val, or 0.0 if conversion fails.
+    """
     try:
         return float(str(val).replace("$", "").replace(",", "").strip())
     except (ValueError, TypeError):
@@ -472,8 +673,24 @@ def _safe_float(val):
 
 @router.post("/scrape")
 def scrape_card(name: str, background_tasks: BackgroundTasks, user: str = DEFAULT_USER):
+    """Trigger an asynchronous eBay re-scrape for a single card.
+
+    Validates the card exists in the collection, then schedules _do_scrape as a
+    FastAPI background task. The response returns immediately while scraping
+    continues in the background.
+
+    Args:
+        name: Exact card name to scrape (query param).
+        background_tasks: FastAPI BackgroundTasks instance for deferred execution.
+        user: Username whose collection to update. Defaults to 'admin'.
+
+    Returns:
+        Dict with keys 'status' ('queued') and 'card' (the card name).
+
+    Raises:
+        HTTPException: 404 if no card with that name exists in the collection.
+    """
     card_name = name
-    """Trigger a background re-scrape for a single card."""
     paths = _get_paths(user)
     df = load_data(paths["csv"], paths["results"])
     if df[df["Card Name"] == card_name].empty:

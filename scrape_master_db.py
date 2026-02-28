@@ -72,10 +72,17 @@ _progress = {"done": 0, "found": 0, "not_found": 0, "errors": 0}
 
 
 def build_card_name(row):
-    """Convert a master DB row into the standard card name format used by the scraper.
+    """Convert a master DB DataFrame row into the standard scraper card name format.
 
     Format: "SEASON Upper Deck - Young Guns #CARDNUM - PLAYER"
     Example: "2023-24 Upper Deck - Young Guns #201 - Connor Bedard"
+
+    Args:
+        row: A pandas Series (or dict-like) with at minimum the keys
+            'Season' (str), 'CardNumber' (int-castable), and 'PlayerName' (str).
+
+    Returns:
+        A card name string compatible with process_card() and all query builders.
     """
     season = row['Season']
     card_num = int(row['CardNumber'])
@@ -84,7 +91,17 @@ def build_card_name(row):
 
 
 def _create_fast_driver():
-    """Create a lean Chrome driver optimized for bulk scraping."""
+    """Create a lean Chrome WebDriver optimised for high-volume bulk scraping.
+
+    Compared to the default create_driver(), this version disables image
+    loading, uses 'eager' page-load strategy (returns as soon as the DOM is
+    ready rather than waiting for all resources), and sets shorter timeouts
+    (15 s page load, 10 s script). Uses webdriver-manager when available and
+    falls back to the system ChromeDriver.
+
+    Returns:
+        A configured selenium.webdriver.Chrome instance.
+    """
     from selenium.webdriver.chrome.options import Options as ChromeOptions
     opts = ChromeOptions()
     opts.add_argument('--headless')
@@ -114,8 +131,15 @@ def _create_fast_driver():
 
 
 def get_fast_driver():
-    """Get or create a Chrome driver for the current thread.
-    Automatically recreates if the previous one crashed."""
+    """Return the thread-local fast Chrome driver, recreating it if it has crashed.
+
+    Performs a lightweight health check (driver.title access) before returning
+    the cached driver. If the check raises an exception the dead driver is quit
+    and a fresh one is created via _create_fast_driver().
+
+    Returns:
+        A healthy selenium.webdriver.Chrome instance bound to the calling thread.
+    """
     if hasattr(_thread_local, 'driver'):
         try:
             _thread_local.driver.title  # quick health check
@@ -138,7 +162,14 @@ scrape_card_prices.get_driver = get_fast_driver
 # Reduce the delay inside process_card by patching time.sleep for the scraper module
 _original_sleep = time.sleep
 def _fast_sleep(seconds):
-    """Cap sleep to 0.3s max during bulk scraping."""
+    """Replacement for time.sleep that caps delay to 0.3 s during bulk scraping.
+
+    Monkey-patched onto the scrape_card_prices module so that the random
+    delays inside process_card() do not significantly slow down bulk runs.
+
+    Args:
+        seconds: Requested sleep duration in seconds. Clamped to 0.3 s max.
+    """
     _original_sleep(min(seconds, 0.3))
 scrape_card_prices.time = type(time)('time')
 scrape_card_prices.time.sleep = _fast_sleep
@@ -146,8 +177,20 @@ scrape_card_prices.time.time = time.time
 
 
 def scrape_one_card(card_name):
-    """Scrape a single card with retry on driver crash.
-    Returns (card_name, result_dict).
+    """Scrape a single raw (ungraded) card, retrying once on driver crash.
+
+    Calls process_card() and updates the shared _progress counters under
+    _lock. On the first failure the dead driver is removed from thread-local
+    storage so get_fast_driver() will recreate it; the second failure is
+    recorded as an error and returns a safe empty result.
+
+    Args:
+        card_name: Full card name string as produced by build_card_name().
+
+    Returns:
+        A tuple (card_name, result_dict) where result_dict has at minimum the
+        keys 'estimated_value', 'stats', 'raw_sales', and 'search_url'.
+        On a terminal error, estimated_value is None and stats/raw_sales are empty.
     """
     for attempt in range(2):
         try:
@@ -180,15 +223,29 @@ def scrape_one_card(card_name):
 
 
 def scrape_one_graded_card(card_name, grades_to_scrape):
-    """Scrape graded prices for a single card across multiple grades.
-    Uses smart probing: if PSA 10 has 0 sales, skip PSA 9 and 8.
+    """Scrape graded prices for a single card across multiple grade variants.
+
+    Appends the grade label to the card name (e.g. "... [PSA 10]") and calls
+    process_card() for each requested grade. Uses smart probing to skip lower
+    grades when the top grade in a grading-company group has zero sales:
+    if PSA 10 has 0 sales, PSA 9 and PSA 8 are skipped (recorded as 0 sales);
+    the same logic applies independently to the BGS group.
+
+    Driver crashes are handled identically to scrape_one_card(): one retry
+    with driver recreation; second failure is recorded as an error.
 
     Args:
-        card_name: Base card name (no grade suffix)
-        grades_to_scrape: List of grade keys like ['PSA 10', 'PSA 9', 'BGS 9.5']
+        card_name: Base card name string (no grade suffix), as produced by
+            build_card_name().
+        grades_to_scrape: List of grade key strings from GRADE_COLUMNS, e.g.
+            ['PSA 10', 'PSA 9', 'BGS 9.5'].
 
     Returns:
-        dict of {grade_key: {'fair_value': float, 'num_sales': int, 'raw_sales': list}} for grades with data
+        A dict keyed by grade_key (only for grades that were attempted) with
+        values of the form:
+            {'fair_value': float, 'num_sales': int, 'raw_sales': list}
+        Grades skipped by smart probing are included with fair_value=0 and
+        num_sales=0 and no raw_sales key.
     """
     results = {}
 
@@ -249,6 +306,22 @@ def scrape_one_graded_card(card_name, grades_to_scrape):
 
 
 def main():
+    """Parse CLI arguments and dispatch to the raw or graded scraping pass.
+
+    Loads young_guns.csv, ensures all required columns exist, builds the
+    CardName column for every row, then delegates to either _run_raw_scrape()
+    or _run_graded_scrape() depending on whether --graded is specified.
+
+    CLI args:
+        --workers: Number of parallel Chrome instances (default 15).
+        --season: Restrict scraping to a single season string (e.g. '2024-25').
+        --force: Re-scrape cards that already have a LastScraped value.
+        --limit: Maximum number of cards to scrape in this run (0 = all).
+        --graded: Enable graded-price scraping mode (PSA/BGS).
+        --grades: Comma-separated list of grade keys to scrape; defaults to all 6.
+        --min-raw-value: Minimum raw FairValue required to qualify for graded
+            scraping (default $5.00).
+    """
     parser = argparse.ArgumentParser(description="Bulk scrape Master DB cards on eBay")
     parser.add_argument('--workers', type=int, default=15, help="Number of parallel Chrome instances (default: 15)")
     parser.add_argument('--season', type=str, default=None, help="Scrape only this season (e.g. '2024-25')")
@@ -317,7 +390,21 @@ def main():
 
 
 def _run_raw_scrape(df, args):
-    """Original raw/ungraded scraping pass."""
+    """Execute the ungraded (raw) scraping pass over the master DB.
+
+    Selects cards that have not yet been scraped (or all cards if --force),
+    optionally filtered by season and capped by --limit. Scrapes in parallel
+    using scrape_one_card(). Writes CSV and JSON results to disk at every
+    50-card checkpoint to reduce data loss on crashes. Updates FairValue,
+    NumSales, Min, Max, Trend, Top3Prices, and LastScraped columns in the
+    DataFrame. Appends a YG portfolio snapshot on completion.
+
+    Args:
+        df: Master DB DataFrame with at minimum 'CardName', 'LastScraped',
+            'FairValue', 'NumSales', 'Min', 'Max', 'Trend', 'Top3Prices' columns.
+        args: Parsed argparse.Namespace with attributes 'workers', 'season',
+            'force', and 'limit'.
+    """
     # Determine which cards to scrape
     if args.force:
         to_scrape = df.copy()
@@ -442,7 +529,24 @@ def _run_raw_scrape(df, args):
 
 
 def _run_graded_scrape(df, args, grades_to_scrape):
-    """Graded scraping pass — scrapes PSA/BGS prices for cards above min raw value."""
+    """Execute the graded (PSA/BGS) scraping pass over the master DB.
+
+    Selects cards whose raw FairValue meets or exceeds args.min_raw_value,
+    optionally filtered by season and capped by --limit. Scrapes each card
+    across all requested grade variants in parallel using
+    scrape_one_graded_card(). Writes grade value/sales counts to the per-grade
+    CSV columns (e.g. PSA10_Value, PSA10_Sales) and updates GradedLastScraped.
+    Flushes accumulated price-history and raw-sales JSON to disk at every
+    50-card checkpoint.
+
+    Args:
+        df: Master DB DataFrame that must already contain all GRADED_CSV_COLUMNS
+            and the 'CardName', 'FairValue', 'NumSales' columns.
+        args: Parsed argparse.Namespace with attributes 'workers', 'season',
+            'limit', and 'min_raw_value'.
+        grades_to_scrape: List of grade key strings from GRADE_COLUMNS, e.g.
+            ['PSA 10', 'PSA 9', 'BGS 9.5'].
+    """
     min_val = args.min_raw_value
 
     # Filter to cards that have been raw-scraped and meet minimum value

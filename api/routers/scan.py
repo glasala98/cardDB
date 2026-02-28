@@ -15,7 +15,17 @@ MAX_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB
 
 
 def _detect_media_type(image_bytes: bytes) -> str:
-    """Detect image media type from magic bytes."""
+    """Detect image media type by inspecting the file's magic bytes.
+
+    Supports PNG (8-byte signature), JPEG (0xFF 0xD8 prefix), and WebP
+    (RIFF....WEBP). Falls back to 'image/jpeg' for any unrecognised format.
+
+    Args:
+        image_bytes: Raw binary content of the image file.
+
+    Returns:
+        MIME type string: 'image/png', 'image/jpeg', or 'image/webp'.
+    """
     if image_bytes[:8] == b'\x89PNG\r\n\x1a\n':
         return "image/png"
     if image_bytes[:2] == b'\xff\xd8':
@@ -30,12 +40,31 @@ async def analyze_card(
     front: UploadFile = File(...),
     back:  Optional[UploadFile] = File(default=None),
 ):
-    """
-    Accept one or two card images and return extracted card details via Claude Vision.
+    """Identify a sports card from uploaded images using Claude Vision.
+
+    Accepts a mandatory front image and an optional back image (multipart
+    form-data). Both images are base64-encoded and sent to the Claude
+    claude-sonnet-4-6 model with a structured prompt requesting JSON output.
+    The raw model response is parsed and validated; on parse failure the
+    raw text is returned with 'parse_error' set to True.
+
+    Each image must be JPEG, PNG, or WebP and no larger than 20 MB.
+
+    Args:
+        front: Mandatory front-face image of the card (JPEG/PNG/WebP, max 20 MB).
+        back: Optional back-face image of the card (JPEG/PNG/WebP, max 20 MB).
 
     Returns:
-        player_name, card_number, brand, subset, parallel, serial_number, year, grade,
-        confidence, is_sports_card, validation_reason, raw_text, parse_error
+        Dict with keys: 'player_name', 'card_number', 'brand', 'subset',
+        'parallel', 'serial_number', 'year', 'grade', 'confidence'
+        (high|medium|low), 'is_sports_card' (bool), 'validation_reason',
+        'raw_text' (raw model output), and 'parse_error' (bool).
+
+    Raises:
+        HTTPException: 400 if the front image type is not in ALLOWED_TYPES or
+                       either image exceeds MAX_SIZE_BYTES.
+        HTTPException: 503 if the anthropic package is not installed or
+                       ANTHROPIC_API_KEY is not set in the environment.
     """
     try:
         import anthropic

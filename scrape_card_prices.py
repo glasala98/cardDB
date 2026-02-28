@@ -35,13 +35,32 @@ except ImportError:
 
 
 def is_graded_card(card_name):
-    """Check if the card name indicates it's a graded card (PSA or BGS)."""
+    """Return True if the card name contains a PSA or BGS grade marker.
+
+    Args:
+        card_name: Full card name string, e.g. "2023-24 Upper Deck - Young Guns #201 - Bedard [PSA 10]".
+
+    Returns:
+        True if a PSA or BGS grade is found in card_name, False otherwise.
+    """
     return bool(re.search(r'\b(PSA|BGS)\s+\d+(\.\d+)?', card_name, re.IGNORECASE))
 
 
 def get_grade_info(card_name):
-    """Extract grading details from card name. Returns (grade_str, grade_num) or (None, None).
-    Supports PSA (integer grades) and BGS (decimal grades like 9.5)."""
+    """Extract the grade label and numeric value from a card name.
+
+    Checks for BGS first (to handle decimal grades like 9.5 before PSA integer
+    grades are matched), then falls back to PSA. Supports both bracketed
+    "[PSA 10]" and bare "PSA 10" forms.
+
+    Args:
+        card_name: Full card name string that may contain a grade marker.
+
+    Returns:
+        A tuple (grade_str, grade_num) where grade_str is a string like
+        "PSA 9" or "BGS 9.5" and grade_num is the corresponding float.
+        Returns (None, None) if no grade is found.
+    """
     # Check BGS first (more specific due to decimal grades)
     bgs_match = re.search(r'\[BGS\s+(\d+(?:\.\d+)?)\]', card_name, re.IGNORECASE)
     if bgs_match:
@@ -64,10 +83,22 @@ def get_grade_info(card_name):
 
 
 def clean_card_name_for_search(card_name):
-    """Build a focused eBay search query from card name components.
+    """Build a focused eBay sold-listing search query from a card name.
 
-    Priority order: player name, card number, set/year.
-    Keeps queries short so eBay finds more matches.
+    Parses the card name into player, card number, serial, variant, subset,
+    year, and brand components, then assembles them in priority order:
+    player > card number > serial > variant > subset > year > brand.
+
+    Strips over 250 known variant/parallel names that do not affect value,
+    and appends grade inclusion/exclusion terms for graded cards (e.g.
+    '"PSA 9" -BGS -SGC') or grade exclusions for raw cards ('-PSA -BGS').
+
+    Args:
+        card_name: Full card name string in the standard format, e.g.
+            "2023-24 Upper Deck - Young Guns #201 - Connor Bedard".
+
+    Returns:
+        A search query string ready for URL-encoding and submission to eBay.
     """
 
     grade_str, grade_num = get_grade_info(card_name)
@@ -335,7 +366,17 @@ def clean_card_name_for_search(card_name):
 
 
 def create_driver():
-    """Create a headless Chrome driver."""
+    """Create a headless Chrome WebDriver with memory-saving and anti-detection flags.
+
+    Launches Chrome in headless mode with flags that reduce RAM usage on
+    low-resource servers (--no-zygote, --disable-background-networking, etc.)
+    and spoof the user-agent to avoid bot-detection. Uses webdriver-manager
+    to auto-download ChromeDriver when available, otherwise falls back to the
+    system-installed driver.
+
+    Returns:
+        A configured selenium.webdriver.Chrome instance ready for use.
+    """
     options = Options()
     options.add_argument('--headless=new')
     options.add_argument('--disable-gpu')
@@ -364,7 +405,23 @@ def create_driver():
 
 
 def title_matches_grade(title, grade_str, grade_num):
-    """Check that a listing title matches the expected grade exactly (PSA or BGS)."""
+    """Verify that a listing title matches the expected grade exactly.
+
+    For graded cards, confirms the title contains the target grade and rejects
+    titles that contain any other grade from the same grading company (to filter
+    out mixed-grade lots). For raw cards, rejects titles that mention any
+    grading service (PSA, BGS, SGC, or "graded").
+
+    Args:
+        title: eBay listing title string.
+        grade_str: Grade label to match, e.g. "PSA 9" or "BGS 9.5". Pass None
+            for raw (ungraded) cards.
+        grade_num: Numeric grade as a float, e.g. 9.0 or 9.5. Ignored when
+            grade_str is None.
+
+    Returns:
+        True if the title is a valid comp for the target grade, False otherwise.
+    """
     title_upper = title.upper()
 
     if grade_str:
@@ -401,7 +458,18 @@ def title_matches_grade(title, grade_str, grade_num):
 
 
 def build_simplified_query(card_name):
-    """Build a simpler fallback query: just player + card number + year."""
+    """Build the stage-3 fallback eBay query: player + card number + serial + year only.
+
+    Drops all parallel, variant, subset, and brand information to cast the
+    widest net when stages 1 and 2 return no results. Serial number is kept
+    so numbered-card results are not polluted by base-card comps.
+
+    Args:
+        card_name: Full card name string in the standard format.
+
+    Returns:
+        A simplified search query string with grade exclusion/inclusion terms appended.
+    """
     grade_str, grade_num = get_grade_info(card_name)
 
     clean = re.sub(r'\[.*?\]', '', card_name)
@@ -453,7 +521,18 @@ def build_simplified_query(card_name):
 
 
 def build_set_query(card_name):
-    """Stage 2 fallback: player + card# + serial + set + year. Drops parallel/subset name."""
+    """Build the stage-2 fallback eBay query: player + card number + serial + set + year.
+
+    Drops the parallel/subset name (e.g. "Red Prism") while keeping the base
+    set name (e.g. "OPC Platinum") and serial number. Used when the stage-1
+    exact query returns no results.
+
+    Args:
+        card_name: Full card name string in the standard format.
+
+    Returns:
+        A set-level search query string with grade exclusion/inclusion terms appended.
+    """
     grade_str, grade_num = get_grade_info(card_name)
 
     clean = re.sub(r'\[.*?\]', '', card_name)
@@ -514,7 +593,35 @@ def build_set_query(card_name):
 
 
 def search_ebay_sold(driver, card_name, max_results=240, search_query=None):
-    """Search eBay sold listings for a card and return recent sale prices with dates."""
+    """Scrape eBay completed/sold listings for a card and return structured sale records.
+
+    Navigates to eBay's sold-listing search page sorted by most recent, waits
+    for the card-based result layout to load, then iterates over each listing
+    to extract title, item price, shipping cost (added to total), sold date,
+    listing URL, and thumbnail image URL. Applies title_matches_grade() to
+    filter out listings that do not match the target grade.
+
+    Args:
+        driver: A Selenium WebDriver instance (should already be created via
+            get_driver() or create_driver()).
+        card_name: Full card name string used to extract grade info for filtering.
+        max_results: Maximum number of sale records to return. Defaults to 240
+            (one full eBay results page).
+        search_query: Pre-built eBay query string. If None, one is generated via
+            clean_card_name_for_search(card_name).
+
+    Returns:
+        A list of dicts, each containing:
+            - title (str): listing title.
+            - item_price (str): formatted item price, e.g. "$12.99".
+            - shipping (str): "Free" or formatted shipping cost.
+            - price_val (float): total price (item + shipping).
+            - sold_date (str or None): ISO date string "YYYY-MM-DD" or None.
+            - days_ago (int or None): days since sold, or None if date unknown.
+            - listing_url (str): direct URL to the eBay listing.
+            - image_url (str): thumbnail image URL, or empty string.
+        Returns an empty list on error or if no results are found.
+    """
 
     if search_query is None:
         search_query = clean_card_name_for_search(card_name)
@@ -652,7 +759,17 @@ def search_ebay_sold(driver, card_name, max_results=240, search_query=None):
 
 
 def extract_serial_run(text):
-    """Extract the print run from a title, e.g. '/99' from '#70/99'. Returns int or None."""
+    """Extract the print-run number from a card name or listing title.
+
+    Looks for a '/NNN' pattern, as found in numbered card references like
+    "#70/99" or "Numbered /25".
+
+    Args:
+        text: Any string that may contain a print-run notation.
+
+    Returns:
+        The print-run limit as an int (e.g. 99), or None if not found.
+    """
     m = re.search(r'/(\d+)', text)
     return int(m.group(1)) if m else None
 
@@ -669,14 +786,37 @@ SERIAL_VALUE = {
 
 
 def get_nearby_serials(serial, n=4):
-    """Return the n closest serial print runs to use as comps when exact not found."""
+    """Return the n closest known print-run values to use as comp serials.
+
+    Used in stage-4 fallback when no direct sales exist for the target serial.
+    Excludes the target serial itself from results.
+
+    Args:
+        serial: The target print-run number (e.g. 99).
+        n: Number of nearby serials to return. Defaults to 4.
+
+    Returns:
+        A list of up to n ints from SERIAL_VALUE, sorted by proximity to serial.
+    """
     all_serials = sorted(SERIAL_VALUE.keys())
     distances = sorted((abs(s - serial), s) for s in all_serials if s != serial)
     return [s for _, s in distances[:n]]
 
 
 def build_serial_comp_query(card_name, comp_serial):
-    """Build a search query for a nearby serial comp (e.g. /75 instead of /99)."""
+    """Build an eBay search query targeting a nearby serial print run as a price comp.
+
+    Used in stage-4 fallback to find sales of a different print-run variant of
+    the same card (e.g. search for /75 when the target is /99 but has no sales).
+    Substitutes comp_serial for the card's own serial in the query.
+
+    Args:
+        card_name: Full card name string in the standard format.
+        comp_serial: The substitute print-run number to query (e.g. 75).
+
+    Returns:
+        A search query string with the comp serial embedded and grade terms appended.
+    """
     grade_str, grade_num = get_grade_info(card_name)
 
     clean = re.sub(r'\[.*?\]', '', card_name)
@@ -732,12 +872,29 @@ def build_serial_comp_query(card_name, comp_serial):
 
 
 def serial_multiplier(from_serial, to_serial):
-    """Get price multiplier to convert a from_serial price to a to_serial estimate.
-    E.g. serial_multiplier(10, 99) returns ~0.17 (a /10 is worth ~6x a /99, so divide)."""
+    """Compute the price multiplier to scale a comp serial's price to the target serial.
+
+    Uses the SERIAL_VALUE table of relative market multipliers. Values between
+    known entries are linearly interpolated; values outside the table range are
+    clamped or extrapolated proportionally.
+
+    Example:
+        serial_multiplier(10, 99) returns ~0.167, because a /10 card sells for
+        roughly 6x a /99, so dividing by 6 converts a /10 price to a /99 estimate.
+
+    Args:
+        from_serial: The print-run of the comp sale (e.g. 10).
+        to_serial: The print-run of the target card (e.g. 99).
+
+    Returns:
+        A float multiplier. Multiply the comp price by this value to estimate
+        the target serial's price.
+    """
     if from_serial == to_serial:
         return 1.0
 
     def get_value(s):
+        """Return the relative market value for serial s, interpolating if needed."""
         if s in SERIAL_VALUE:
             return SERIAL_VALUE[s]
         # Interpolate from nearest known values
@@ -757,8 +914,26 @@ def serial_multiplier(from_serial, to_serial):
 
 
 def adjust_sales_for_serial(sales, target_serial):
-    """Filter or adjust sales to match target serial number.
-    If exact matches exist, use only those. Otherwise adjust nearby serials."""
+    """Filter or price-adjust a sale list to reflect the target serial number.
+
+    Prefers exact-serial matches; if none exist, scales other numbered-card
+    prices using serial_multiplier(). Unnumbered (base-card) sales in the list
+    are discarded entirely since they represent a different product.
+
+    Adjusted sale dicts receive two extra keys:
+        _serial_adjusted (bool): True to flag the record as estimated.
+        _original_serial (int): The actual serial from the listing title.
+
+    Args:
+        sales: List of sale dicts as returned by search_ebay_sold().
+        target_serial: The card's own print-run number as an int, or None to
+            skip adjustment and return sales unchanged.
+
+    Returns:
+        A list of sale dicts. Returns exact matches only when they exist,
+        otherwise returns price-adjusted dicts for all numbered comps found.
+        Returns the original sales list unchanged when target_serial is None.
+    """
     if not target_serial:
         return sales
 
@@ -791,7 +966,33 @@ def adjust_sales_for_serial(sales, target_serial):
 
 
 def calculate_fair_price(sales, target_serial=None):
-    """Pick the most representative price from the 3 most recent sales, considering trend."""
+    """Calculate a fair market price from a list of recent eBay sales.
+
+    Steps:
+      1. Optionally filters/adjusts sales for a numbered card's serial via
+         adjust_sales_for_serial().
+      2. Removes outliers more than 3x or less than 1/3 of the median price
+         (catches lot sales and $0.99 auctions).
+      3. Determines trend by comparing average price of the older half of sales
+         to the newer half (up/down/stable at ±10% threshold).
+      4. Selects the representative price from the 3 most recent sales:
+         highest for uptrend, lowest for downtrend, median for stable.
+
+    Args:
+        sales: List of sale dicts as returned by search_ebay_sold() or
+            adjust_sales_for_serial(). Each dict must have 'price_val' and
+            optionally 'days_ago'.
+        target_serial: Print-run number of the card, or None for unnumbered cards.
+            When provided, sales are first passed through adjust_sales_for_serial().
+
+    Returns:
+        A tuple (fair_price, stats) where:
+            - fair_price (float): the chosen representative price.
+            - stats (dict): summary with keys 'fair_price', 'chosen_sale',
+              'chosen_date', 'trend', 'top_3_prices', 'median_all',
+              'num_sales', 'outliers_removed', 'min', 'max'.
+        Returns (None, {}) if sales is empty or all sales are filtered out.
+    """
 
     if not sales:
         return None, {}
@@ -899,7 +1100,15 @@ _thread_local = threading.local()
 
 
 def get_driver():
-    """Get or create a Chrome driver for the current thread."""
+    """Return the thread-local Chrome WebDriver, creating it on first use.
+
+    Each worker thread maintains its own driver instance stored in
+    _thread_local.driver. scrape_master_db monkey-patches this function
+    to substitute its own faster driver configuration.
+
+    Returns:
+        A selenium.webdriver.Chrome instance bound to the calling thread.
+    """
     if not hasattr(_thread_local, 'driver'):
         _thread_local.driver = create_driver()
     return _thread_local.driver
@@ -909,14 +1118,39 @@ DEFAULT_PRICE = 5.00
 
 
 def process_card(card):
-    """Search and price a single card.
+    """Search eBay and compute a fair market price for a single card.
 
-    4-stage search with decreasing confidence:
-      1. Exact: variant + subset + serial + set         → confidence: high
-      2. Set:   serial + set (no parallel name)         → confidence: medium
-      3. Broad: player + card# + serial + year          → confidence: low
-      4. Comps: nearby serial print runs (adjusted)     → confidence: estimated
-         (stage 4 results are NOT stored as historical sales)
+    Executes a 4-stage search with decreasing specificity, stopping as soon
+    as any stage returns results:
+
+      Stage 1 — Exact (confidence: high):
+          Full query: variant + subset + serial + set + year.
+      Stage 2 — Set (confidence: medium):
+          Drops parallel/subset name; keeps serial + set + year.
+      Stage 3 — Broad (confidence: low):
+          Player + card number + serial + year only.
+      Stage 4 — Serial comps (confidence: estimated):
+          Searches nearby print-run variants (e.g. /75 for a /99 card) and
+          adjusts prices via serial_multiplier(). Stage-4 sales are NOT
+          written to historical raw_sales.
+
+    A random sleep of 0.5–1.5 s is added before each search to avoid
+    rate-limiting.
+
+    Args:
+        card: Full card name string, e.g.
+            "2023-24 Upper Deck - Young Guns #201 - Connor Bedard".
+
+    Returns:
+        A tuple (card_name, result_dict) where result_dict contains:
+            - estimated_value (str): formatted price string, e.g. "$12.50".
+            - confidence (str): one of 'high', 'medium', 'low', 'estimated', 'none'.
+            - stats (dict): output of calculate_fair_price() plus 'confidence' key.
+            - raw_sales (list): direct comp sales (stages 1-3 only).
+            - search_url (str or None): URL of the successful eBay search.
+            - image_url (str or None): thumbnail URL from the first direct sale.
+        When no sales are found at any stage, estimated_value defaults to
+        $5.00 and confidence is 'none'.
     """
     driver = get_driver()
     time.sleep(random.uniform(0.5, 1.5))
@@ -1000,6 +1234,18 @@ def process_card(card):
 
 
 def main():
+    """Run a full one-shot scrape of all cards in hockey_cards.csv.
+
+    Backs up existing data, reads unique card names from hockey_cards.csv,
+    scrapes all cards in parallel using NUM_WORKERS Chrome instances, then
+    writes two output files:
+        - card_prices_results.json: full result dicts keyed by card name.
+        - card_prices_summary.csv: one-row-per-card summary with fair value,
+          trend, price range, and number of sales.
+
+    Returns:
+        Dict mapping card_name to result_dict (same as written to JSON).
+    """
     # Backup existing data before full scrape
     try:
         from dashboard_utils import backup_data

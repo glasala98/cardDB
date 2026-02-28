@@ -21,6 +21,14 @@ JWT_EXPIRY_H  = 24  # hours
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _make_token(username: str) -> str:
+    """Create a signed JWT for the given username, valid for JWT_EXPIRY_H hours.
+
+    Args:
+        username: The authenticated user's username to embed in the token subject.
+
+    Returns:
+        Encoded JWT string.
+    """
     payload = {
         "sub": username,
         "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=JWT_EXPIRY_H),
@@ -29,7 +37,15 @@ def _make_token(username: str) -> str:
 
 
 def _decode_token(token: str) -> str | None:
-    """Decode and verify token. Returns username or None."""
+    """Decode and verify a JWT, returning the embedded username.
+
+    Args:
+        token: Encoded JWT string to decode.
+
+    Returns:
+        Username string extracted from the token subject claim, or None if the
+        token is invalid, expired, or cannot be decoded.
+    """
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         return payload.get("sub")
@@ -38,7 +54,17 @@ def _decode_token(token: str) -> str | None:
 
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer)) -> str:
-    """FastAPI dependency — extracts and validates the Bearer token."""
+    """FastAPI dependency — extract and validate the Bearer token from the request.
+
+    Args:
+        credentials: HTTP Authorization header credentials injected by FastAPI.
+
+    Returns:
+        The authenticated username embedded in the token.
+
+    Raises:
+        HTTPException: 401 if no credentials are provided or the token is invalid/expired.
+    """
     if not credentials:
         raise HTTPException(status_code=401, detail="Not authenticated")
     username = _decode_token(credentials.credentials)
@@ -58,7 +84,20 @@ class LoginRequest(BaseModel):
 
 @router.post("/login")
 def login(body: LoginRequest):
-    """Verify credentials and return a JWT token."""
+    """Verify credentials and return a signed JWT.
+
+    In development (no users.yaml), accepts the hardcoded admin/admin fallback.
+    In production, delegates to verify_password against the users.yaml store.
+
+    Args:
+        body: LoginRequest containing username and password.
+
+    Returns:
+        Dict with keys 'token' (JWT string) and 'username'.
+
+    Raises:
+        HTTPException: 401 if credentials are invalid.
+    """
     users = load_users()
 
     # Dev fallback: if no users.yaml exists, accept admin / admin
@@ -75,7 +114,20 @@ def login(body: LoginRequest):
 
 @router.get("/me")
 def me(username: str = Depends(get_current_user)):
-    """Return the currently authenticated user."""
+    """Return profile data for the currently authenticated user.
+
+    Requires a valid Bearer token. Role defaults to 'admin' for the built-in
+    admin account and 'user' for all others when no users.yaml entry is found.
+
+    Args:
+        username: Injected by the get_current_user dependency.
+
+    Returns:
+        Dict with keys 'username', 'display_name', and 'role'.
+
+    Raises:
+        HTTPException: 401 if the token is missing or invalid.
+    """
     users = load_users()
     user_data = users.get(username, {}) if users else {}
     default_role = "admin" if username == "admin" else "user"
@@ -88,5 +140,12 @@ def me(username: str = Depends(get_current_user)):
 
 @router.post("/logout")
 def logout():
-    """Logout — client should discard the token."""
+    """Invalidate the current session (client-side token discard).
+
+    JWT tokens are stateless; this endpoint signals the client to drop its
+    stored token. No server-side token revocation is performed.
+
+    Returns:
+        Dict with key 'status' set to 'logged out'.
+    """
     return {"status": "logged out"}

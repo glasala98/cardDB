@@ -19,7 +19,15 @@ WORKERS         = 3   # must match --workers in the workflow
 
 @router.get("/alerts")
 def market_alerts():
-    """Return market alerts for tracked cards."""
+    """Return market movement alerts for tracked cards.
+
+    Delegates to get_market_alerts() from dashboard_utils. Returns an empty
+    list rather than raising if the underlying call fails.
+
+    Returns:
+        Dict with key 'alerts' containing a list of alert dicts, each with
+        at minimum 'card_name', 'direction', and 'pct_change'.
+    """
     try:
         alerts = get_market_alerts()
     except Exception:
@@ -29,10 +37,22 @@ def market_alerts():
 
 @router.post("/trigger-scrape")
 def trigger_scrape():
-    """Dispatch the daily_scrape GitHub Actions workflow manually.
+    """Dispatch the daily_scrape GitHub Actions workflow via the GitHub API.
 
-    Requires a GITHUB_TOKEN env var — a Personal Access Token with
-    the 'workflow' scope.
+    Sends a workflow_dispatch event to the configured repository so that
+    the daily scrape runs on demand. Also estimates total runtime based on
+    the current number of cards and the configured worker count.
+
+    Requires a GITHUB_TOKEN environment variable — a classic Personal Access
+    Token with 'repo' and 'workflow' scopes.
+
+    Returns:
+        Dict with keys 'status' ('dispatched'), 'card_count' (int), and
+        'estimated_minutes' (int estimate of workflow duration).
+
+    Raises:
+        HTTPException: 503 if GITHUB_TOKEN is not set.
+        HTTPException: 502 if the GitHub API returns an error or is unreachable.
     """
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
@@ -89,7 +109,25 @@ def trigger_scrape():
 
 @router.get("/scrape-status")
 def scrape_status():
-    """Poll the latest GitHub Actions workflow run for the daily scrape."""
+    """Poll the latest GitHub Actions run status for the daily scrape workflow.
+
+    Fetches the most recent workflow run and its job steps from the GitHub
+    API, returning enough information for the frontend progress modal.
+    Step data is best-effort and omitted if the jobs endpoint fails.
+
+    Requires a GITHUB_TOKEN environment variable.
+
+    Returns:
+        Dict with keys 'status' (queued|in_progress|completed), 'conclusion'
+        (success|failure|cancelled|None), 'started_at', 'updated_at',
+        'html_url', 'run_number', and 'steps' (list of step dicts with
+        'name', 'status', 'conclusion', 'started_at').
+        Returns {'status': 'no_runs'} if no runs exist yet.
+
+    Raises:
+        HTTPException: 503 if GITHUB_TOKEN is not set.
+        HTTPException: 502 if the GitHub API cannot be reached.
+    """
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
         raise HTTPException(status_code=503, detail="GITHUB_TOKEN not configured")

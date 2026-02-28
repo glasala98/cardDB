@@ -5,3 +5,9 @@ anthropic
 selenium
 bcrypt
 PyYAML
+fastapi
+uvicorn
+python-multipart
+python-jose[cryptography]
+passlib[bcrypt]
+requests

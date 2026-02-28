@@ -30,7 +30,30 @@ from dashboard_utils import (
 
 
 def daily_scrape_user(csv_path, results_path, history_path, backup_dir, max_workers=3):
-    """Scrape all cards for a single user's data paths."""
+    """Scrape and update prices for all cards belonging to one user.
+
+    Workflow:
+      1. Creates a timestamped backup of the user's CSV and results JSON.
+      2. Loads all card names from the CSV via load_data().
+      3. Scrapes each card in parallel using process_card() across up to
+         max_workers Chrome instances.
+      4. Merges new eBay sales with the existing raw_sales list in the results
+         JSON (deduplicates by sold_date + title, sorts most-recent-first).
+      5. Updates Fair Value, Trend, Median, Min, Max, Num Sales, and Top 3
+         Prices columns in the DataFrame for any card with sales found.
+      6. Appends a per-card price-history entry to price_history.json.
+      7. Saves the updated CSV and results JSON.
+      8. Appends a portfolio snapshot (total value, card count, average value)
+         to portfolio_history.json.
+
+    Args:
+        csv_path: Absolute path to the user's cards CSV file.
+        results_path: Absolute path to the user's results JSON file.
+        history_path: Absolute path to the user's price_history.json file.
+        backup_dir: Directory where timestamped backups are written.
+        max_workers: Number of parallel Chrome browser instances to use.
+            Defaults to 3.
+    """
     start = datetime.now()
     print(f"[{start.strftime('%Y-%m-%d %H:%M:%S')}] Scrape starting")
 
@@ -139,7 +162,19 @@ def daily_scrape_user(csv_path, results_path, history_path, backup_dir, max_work
 
 
 def daily_scrape(max_workers=3, user=None):
-    """Main entry point. Scrapes one user or all users."""
+    """Scrape price data for one user or all users defined in users.yaml.
+
+    Loads users.yaml to discover per-user data paths. If users.yaml is absent
+    (legacy single-user mode), falls back to the global CSV_PATH and
+    RESULTS_JSON_PATH constants. When a specific user is requested but not
+    found in users.yaml, the process exits with a non-zero status.
+
+    Args:
+        max_workers: Number of parallel Chrome browser instances per user.
+            Defaults to 3.
+        user: Username to scrape exclusively, or None to scrape all users.
+            Defaults to None.
+    """
     users = load_users()
 
     if not users:
