@@ -434,11 +434,11 @@ export default function CardLedger() {
                     <SortTh col="player"       label="Card" />
                     <SortTh col="fair_value"   label="Fair Value" />
                     <SortTh col="trend"        label="Trend" />
-                    <th className={styles.th}>Confidence</th>
-                    <SortTh col="num_sales"    label="Sales" />
-                    <SortTh col="cost_basis"   label="Cost Basis" />
-                    <SortTh col="last_scraped" label="Last Scraped" />
-                    <th className={styles.th}>Tags</th>
+                    <th className={`${styles.th} ${styles.hideTablet}`}>Confidence</th>
+                    <SortTh col="num_sales"    label="Sales"       className={styles.hideTablet} />
+                    <SortTh col="cost_basis"   label="Cost Basis"  className={styles.hideMobile} />
+                    <SortTh col="last_scraped" label="Last Scraped" className={styles.hideTablet} />
+                    <th className={`${styles.th} ${styles.hideTablet}`}>Tags</th>
                     {!isPublic && <th className={styles.th}>Actions</th>}
                   </tr>
                 </thead>
@@ -469,10 +469,10 @@ export default function CardLedger() {
                       </td>
                       <td className={styles.td}>{fmt(card.fair_value)}</td>
                       <td className={`${styles.td} ${styles.compactCell}`}><TrendBadge trend={card.trend} /></td>
-                      <td className={`${styles.td} ${styles.compactCell}`}><ConfidenceBadge confidence={card.confidence} /></td>
-                      <td className={`${styles.td} ${styles.compactCell}`}>{card.num_sales || '—'}</td>
+                      <td className={`${styles.td} ${styles.compactCell} ${styles.hideTablet}`}><ConfidenceBadge confidence={card.confidence} /></td>
+                      <td className={`${styles.td} ${styles.compactCell} ${styles.hideTablet}`}>{card.num_sales || '—'}</td>
                       <td
-                        className={`${styles.td} ${!isPublic ? styles.editableCell : ''}`}
+                        className={`${styles.td} ${styles.hideMobile} ${!isPublic ? styles.editableCell : ''}`}
                         onClick={() => !isPublic && costEdit !== card.card_name && setCostEdit(card.card_name)}
                         title={isPublic ? undefined : 'Click to edit cost basis'}
                       >
@@ -486,8 +486,8 @@ export default function CardLedger() {
                           <span className={styles.editableValue}>{fmt(card.cost_basis)}</span>
                         )}
                       </td>
-                      <td className={`${styles.td} ${styles.compactCell}`}><ScrapedCell dateStr={card.last_scraped} /></td>
-                      <td className={`${styles.td} ${styles.compactCell}`}><span className={styles.tags}>{card.tags || '—'}</span></td>
+                      <td className={`${styles.td} ${styles.compactCell} ${styles.hideTablet}`}><ScrapedCell dateStr={card.last_scraped} /></td>
+                      <td className={`${styles.td} ${styles.compactCell} ${styles.hideTablet}`}><span className={styles.tags}>{card.tags || '—'}</span></td>
                       {!isPublic && (
                         <td className={styles.td}>
                           <div className={styles.actions}>

@@ -187,7 +187,18 @@
 
 .playerCell {
   font-weight: 600;
-  min-width: 130px;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teamCell {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
 }
 
 .priceCell {
@@ -205,6 +216,17 @@
 .dateCell {
   font-size: 11px;
   color: var(--text-secondary);
+}
+
+/* ── Responsive column hiding ─────────────────────────────────── */
+@media (max-width: 900px) {
+  .hideTablet { display: none !important; }
+}
+
+@media (max-width: 600px) {
+  .hideMobile { display: none !important; }
+  .playerCell { max-width: 120px; }
+  .td, .th { padding: 6px 7px; font-size: 11px; }
 }
 
 .empty {

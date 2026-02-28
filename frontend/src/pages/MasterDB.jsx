@@ -216,14 +216,14 @@ export default function MasterDB() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th className={styles.th}>Season</th>
-                <th className={styles.th}>#</th>
+                <th className={`${styles.th} ${styles.hideMobile}`}>Season</th>
+                <th className={`${styles.th} ${styles.hideMobile}`}>#</th>
                 <th className={styles.th}>Player</th>
-                <th className={styles.th}>Team</th>
+                <th className={`${styles.th} ${styles.hideTablet}`}>Team</th>
                 <SortTh col={priceMode} label={`${PRICE_MODES.find(p => p.key === priceMode)?.label ?? 'Price'} ($)`} className={styles.activeCol} />
-                <SortTh col="num_sales" label="Sales" />
-                <th className={styles.th}>Min ($)</th>
-                <th className={styles.th}>Max ($)</th>
+                <SortTh col="num_sales" label="Sales" className={styles.hideTablet} />
+                <th className={`${styles.th} ${styles.hideTablet}`}>Min ($)</th>
+                <th className={`${styles.th} ${styles.hideTablet}`}>Max ($)</th>
                 <SortTh col="trend"     label="Trend" />
               </tr>
             </thead>
@@ -240,16 +240,16 @@ export default function MasterDB() {
                       className={`${styles.tr} ${styles.trClickable} ${card.owned ? styles.ownedRow : ''} ${isSelected ? styles.trSelected : ''}`}
                       onClick={() => handleRowClick(card)}
                     >
-                      <td className={styles.td}>{card.season}</td>
-                      <td className={styles.td}>{card.card_number}</td>
+                      <td className={`${styles.td} ${styles.hideMobile}`}>{card.season}</td>
+                      <td className={`${styles.td} ${styles.hideMobile}`}>{card.card_number}</td>
                       <td className={`${styles.td} ${styles.playerCell}`}>{card.player}</td>
-                      <td className={styles.td}>{card.team}</td>
+                      <td className={`${styles.td} ${styles.teamCell} ${styles.hideTablet}`}>{card.team}</td>
                       <td className={`${styles.td} ${styles.priceCell} ${styles.activePriceCol}`}>
                         {fmt(card[priceMode])}
                       </td>
-                      <td className={styles.td}>{card.num_sales || '—'}</td>
-                      <td className={styles.td}>{fmt(card.min)}</td>
-                      <td className={styles.td}>{fmt(card.max)}</td>
+                      <td className={`${styles.td} ${styles.hideTablet}`}>{card.num_sales || '—'}</td>
+                      <td className={`${styles.td} ${styles.hideTablet}`}>{fmt(card.min)}</td>
+                      <td className={`${styles.td} ${styles.hideTablet}`}>{fmt(card.max)}</td>
                       <td className={styles.td}><TrendBadge trend={card.trend} /></td>
                     </tr>
                     {isSelected && (
