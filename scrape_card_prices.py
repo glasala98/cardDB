@@ -666,6 +666,18 @@ def search_ebay_sold(driver, card_name, max_results=240, search_query=None):
                 if not title_matches_grade(title, grade_str, grade_num):
                     continue
 
+                # Filter: skip lot/bundle listings — they distort single-card prices
+                _LOT_RE = re.compile(
+                    r'\byou\s*pick\b|\byour\s*pick\b|\bu\s*pick\b'
+                    r'|buy\s*\d+\s*get|\blot\s*of\b|\blot\b(?!\s*\d)'
+                    r'|\bbundle\b|\bwith\s+young\s+guns\b|\binserts?\s+&'
+                    r'|\bcanvas.*outburst|\boutburst.*canvas'
+                    r'|\b\d{3}-\d{3}\b',   # card number ranges like 251-500
+                    re.IGNORECASE,
+                )
+                if _LOT_RE.search(title):
+                    continue
+
                 # Get listing URL — use the title's parent anchor (s-card__link)
                 listing_url = ''
                 try:
@@ -711,6 +723,9 @@ def search_ebay_sold(driver, card_name, max_results=240, search_query=None):
                 except Exception:
                     pass
 
+                # Cap shipping at $5 — padded shipping on cheap cards
+                # inflates comps; anything over $5 is treated as free ship
+                shipping_val = min(shipping_val, 5.0)
                 total_val = round(price_val + shipping_val, 2)
 
                 # Get sold date from caption
