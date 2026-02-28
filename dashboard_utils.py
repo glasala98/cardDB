@@ -42,6 +42,25 @@ BACKUP_DIR = os.path.join(SCRIPT_DIR, "backups")
 ARCHIVE_PATH = os.path.join(SCRIPT_DIR, "card_archive.csv")
 MONEY_COLS = ['Fair Value', 'Median (All)', 'Min', 'Max', 'Cost Basis']
 
+# ── In-process data cache (keyed by file paths → mtime) ──────────────────────
+_DATA_CACHE = {}  # key: (csv_path, json_path) → {mtimes, df}
+_MASTER_DB_CACHE = {}  # key: path → {mtime, df}
+
+
+def _file_mtime(path):
+    """Return the modification time of a file, or 0 if the file does not exist.
+
+    Args:
+        path: Filesystem path to check.
+
+    Returns:
+        Float modification timestamp from os.path.getmtime, or 0.0 on OSError.
+    """
+    try:
+        return os.path.getmtime(path)
+    except OSError:
+        return 0
+
 # Master DB paths (shared across all users)
 MASTER_DB_DIR = os.path.join(SCRIPT_DIR, "data", "master_db")
 MASTER_DB_PATH = os.path.join(MASTER_DB_DIR, "young_guns.csv")
@@ -53,7 +72,19 @@ EMPTY_CSV_COLS = ['Card Name', 'Fair Value', 'Trend', 'Top 3 Prices', 'Median (A
 # ── User management ──────────────────────────────────────────────
 
 def get_user_paths(username):
-    """Return file paths for a specific user's data directory."""
+    """Return file paths for a specific user's data directory.
+
+    Creates the user directory and backups sub-directory if they do not
+    already exist.
+
+    Args:
+        username: The username whose paths should be resolved.
+
+    Returns:
+        Dict with keys ``csv``, ``results``, ``history``, ``portfolio``,
+        ``archive``, and ``backup_dir``, each mapping to an absolute path
+        inside ``data/<username>/``.
+    """
     user_dir = os.path.join(DATA_ROOT, username)
     os.makedirs(user_dir, exist_ok=True)
     os.makedirs(os.path.join(user_dir, "backups"), exist_ok=True)
@@ -68,7 +99,13 @@ def get_user_paths(username):
 
 
 def load_users():
-    """Load user config from users.yaml."""
+    """Load the user configuration from users.yaml.
+
+    Returns:
+        Dict mapping username strings to their configuration dicts (which
+        include at least ``password_hash``).  Returns an empty dict when
+        users.yaml does not exist or contains no ``users`` key.
+    """
     if not os.path.exists(USERS_YAML):
         return {}
     with open(USERS_YAML, 'r', encoding='utf-8') as f:
@@ -77,7 +114,16 @@ def load_users():
 
 
 def verify_password(username, password):
-    """Verify a username/password against users.yaml. Returns True if valid."""
+    """Verify a plaintext password against the bcrypt hash stored in users.yaml.
+
+    Args:
+        username: The username to look up.
+        password: The plaintext password to check.
+
+    Returns:
+        True if the username exists and the password matches its stored hash,
+        False otherwise (including when bcrypt is unavailable).
+    """
     users = load_users()
     if username not in users:
         return False
@@ -89,12 +135,39 @@ def verify_password(username, password):
 
 
 def init_user_data(csv_path):
-    """Create an empty CSV for a new user if it doesn't exist."""
+    """Create an empty card-collection CSV for a new user if it does not exist.
+
+    Writes a CSV containing only the header row defined by ``EMPTY_CSV_COLS``.
+    Has no effect when the file already exists.
+
+    Args:
+        csv_path: Absolute path at which the CSV should be created.
+    """
     if not os.path.exists(csv_path):
         pd.DataFrame(columns=EMPTY_CSV_COLS).to_csv(csv_path, index=False)
 
 def analyze_card_images(front_image_bytes, back_image_bytes=None):
-    """Use Claude vision to extract card details from front/back photos."""
+    """Use Claude Vision to extract structured card details from photo bytes.
+
+    Sends the front (and optionally back) image to the Anthropic API and
+    returns a parsed dict of card attributes.  Both JPEG, PNG, and WebP
+    inputs are supported; the correct media type is detected automatically.
+
+    Args:
+        front_image_bytes: Raw bytes of the card front image.
+        back_image_bytes: Raw bytes of the card back image.  Optional — pass
+            ``None`` to analyse the front only.
+
+    Returns:
+        Tuple ``(card_info, error)``.
+
+        * On success: ``card_info`` is a dict with keys ``player_name``,
+          ``card_number``, ``card_set``, ``year``, ``variant``, ``grade``,
+          ``confidence``, ``is_sports_card``, ``validation_reason``; and
+          ``error`` is ``None``.
+        * On failure: ``card_info`` is ``None`` and ``error`` is a
+          human-readable string describing the problem.
+    """
     if not HAS_ANTHROPIC:
         return None, "anthropic package not installed. Run: pip install anthropic"
 
@@ -105,6 +178,16 @@ def analyze_card_images(front_image_bytes, back_image_bytes=None):
     client = anthropic.Anthropic(api_key=api_key)
 
     def _detect_media_type(image_bytes):
+        """Detect the MIME type of an image from its magic bytes.
+
+        Args:
+            image_bytes: Raw image bytes to inspect.
+
+        Returns:
+            MIME type string — one of ``"image/png"``, ``"image/jpeg"``, or
+            ``"image/webp"``.  Defaults to ``"image/jpeg"`` when the header
+            is not recognised.
+        """
         if image_bytes[:8] == b'\x89PNG\r\n\x1a\n':
             return "image/png"
         if image_bytes[:2] == b'\xff\xd8':
@@ -179,7 +262,20 @@ If you can't determine a field, use your best guess based on card design, logos,
 
 
 def _merge_sales(new_sales, existing_sales):
-    """Merge new sales with existing, deduplicating by (sold_date, title)."""
+    """Merge two lists of eBay sale dicts, deduplicating by (sold_date, title).
+
+    New sales are preferred when there is a duplicate key — the new entry
+    appears first in the combined list before deduplication runs.  The
+    returned list is sorted with the most recent ``sold_date`` first;
+    entries without a date sort last.
+
+    Args:
+        new_sales: List of freshly scraped sale dicts.
+        existing_sales: List of previously stored sale dicts.
+
+    Returns:
+        Merged, deduplicated, and date-sorted list of sale dicts.
+    """
     seen = set()
     merged = []
     for sale in new_sales + existing_sales:
@@ -192,13 +288,90 @@ def _merge_sales(new_sales, existing_sales):
     return merged
 
 
+def _filter_sales_by_variant(card_name, sales):
+    """Filter eBay comp sales to those matching the card's variant/parallel keywords.
+
+    Parses the subset/parallel name out of ``card_name`` and keeps only sales
+    whose listing title contains at least one of its distinctive keywords.
+    Common generic words (e.g. ``rookie``, ``young``, ``guns``) are excluded
+    from the keyword list to avoid over-filtering.
+
+    Falls back to the full unfiltered list when no keywords can be extracted
+    or when filtering would remove every sale.
+
+    Args:
+        card_name: Full card name string (e.g. ``"2023-24 UD - Young Guns Red
+            Prism #201 - Connor Bedard"``).
+        sales: List of eBay sale dicts, each with at least a ``"title"`` key.
+
+    Returns:
+        Filtered list of sale dicts, or the original ``sales`` list unchanged
+        when filtering is not applicable.
+    """
+    if not sales:
+        return sales
+    parsed = parse_card_name(card_name)
+    subset = (parsed.get('Subset') or '').strip()
+    if not subset:
+        return sales
+    # Words too generic to distinguish one parallel from another
+    _SKIP = {
+        'marquee', 'rookie', 'rookies', 'young', 'guns', 'rc', 'base',
+        'sp', 'ssp', 'variation', 'short', 'print', 'the', 'and',
+    }
+    kws = [w for w in re.findall(r'\b[A-Za-z]{3,}\b', subset) if w.lower() not in _SKIP]
+    if not kws:
+        return sales
+    filtered = [s for s in sales if any(kw.lower() in s.get('title', '').lower() for kw in kws)]
+    return filtered if filtered else sales  # fall back to all if nothing matches
+
+
+def _strip_grade_from_name(card_name):
+    """Remove a grading-company label from a card name to obtain its raw equivalent.
+
+    Handles both bracketed forms (``[PSA 9]``) and trailing inline forms
+    (``PSA 9`` at end of string).  Supports PSA, BGS, CGC, SGC, and CSG.
+
+    Args:
+        card_name: Full card name string that may contain a grade marker.
+
+    Returns:
+        Card name string with the grade marker stripped and surrounding
+        whitespace cleaned up.
+    """
+    name = re.sub(r'\s*\[(?:PSA|BGS|CGC|SGC|CSG)\s+[\d.]+[^\]]*\]', '', card_name)
+    name = re.sub(r'\s+(?:PSA|BGS|CGC|SGC|CSG)\s+\d+(?:\.\d+)?\s*$', '', name, flags=re.IGNORECASE)
+    return name.strip()
+
+
 def scrape_single_card(card_name, results_json_path=None):
-    """Scrape eBay for a single card and return result dict."""
+    """Scrape eBay sold listings for one card and persist the results to JSON.
+
+    Launches a headless Chrome driver, searches eBay for the card, applies
+    variant/parallel filtering, and falls back to simplified queries or grade
+    estimation (raw → PSA 9, raw/PSA 9 → PSA 10) when no direct comps are
+    found.  Merges new sales with any previously stored sales in the results
+    JSON, preserves existing ``image_url`` data, and writes the updated dict
+    back to disk.
+
+    Args:
+        card_name: Full card name string used as the eBay search query and
+            the key inside the results JSON.
+        results_json_path: Path to the ``card_prices_results.json`` file.
+            Defaults to the module-level ``RESULTS_JSON_PATH`` constant.
+
+    Returns:
+        Stats dict from ``calculate_fair_price`` (keys include ``fair_price``,
+        ``num_sales``, ``min``, ``max``, ``median``) when sales are found, or
+        ``None`` when no comparable sales could be located.
+    """
     if results_json_path is None:
         results_json_path = RESULTS_JSON_PATH
     driver = create_driver()
     try:
         sales = search_ebay_sold(driver, card_name, max_results=50)
+        # Filter to comps that match the card's specific variant/parallel
+        sales = _filter_sales_by_variant(card_name, sales)
 
         # Retry with simplified query if no results
         if not sales:
@@ -267,6 +440,43 @@ def scrape_single_card(card_name, results_json_path=None):
                         continue
             except Exception:
                 pass
+            # Apply variant filter to simplified results too
+            sales = _filter_sales_by_variant(card_name, sales)
+
+        # ── Graded card estimation fallback ──────────────────────────────────
+        # When no direct comps exist, estimate from raw or PSA-9 comps.
+        # PSA 9  ≈ raw price   (1×)
+        # PSA 10 ≈ 2.5× raw or 2.5× PSA 9
+        is_estimated = False
+        price_source = 'direct'
+        if not sales:
+            grade_str, grade_num = get_grade_info(card_name)
+            if grade_str and grade_num:
+                raw_name = _strip_grade_from_name(card_name)
+                if raw_name and raw_name != card_name:
+                    raw_sales = search_ebay_sold(driver, raw_name, max_results=30)
+                    raw_sales = _filter_sales_by_variant(raw_name, raw_sales)
+                    if raw_sales:
+                        if grade_num == 9:
+                            sales = raw_sales
+                            is_estimated = True
+                            price_source = 'raw_estimate'
+                        elif grade_num == 10:
+                            sales = [{**s, 'price_val': round(s.get('price_val', 0) * 2.5, 2)}
+                                     for s in raw_sales]
+                            is_estimated = True
+                            price_source = 'raw_estimate_psa10'
+                # PSA 10 secondary fallback: PSA 9 comps × 2.5
+                if not sales and grade_num == 10:
+                    psa9_name = re.sub(r'\bPSA\s*10\b', 'PSA 9', card_name, flags=re.IGNORECASE)
+                    if psa9_name != card_name:
+                        psa9_sales = search_ebay_sold(driver, psa9_name, max_results=30)
+                        psa9_sales = _filter_sales_by_variant(psa9_name, psa9_sales)
+                        if psa9_sales:
+                            sales = [{**s, 'price_val': round(s.get('price_val', 0) * 2.5, 2)}
+                                     for s in psa9_sales]
+                            is_estimated = True
+                            price_source = 'psa9_estimate'
 
         if sales:
             from scrape_card_prices import extract_serial_run
@@ -283,11 +493,21 @@ def scrape_single_card(card_name, results_json_path=None):
             # Merge new sales with existing ones (accumulate history)
             existing_sales = results.get(card_name, {}).get('raw_sales', [])
             merged = _merge_sales(sales, existing_sales)
+            # Preserve existing image URLs; pick up new ones if available
+            existing = results.get(card_name, {})
+            image_url = existing.get('image_url') or next(
+                (s.get('image_url') for s in sales if s.get('image_url')), None
+            )
+            image_url_back = existing.get('image_url_back')
             results[card_name] = {
                 'raw_sales': merged,
                 'fair_price': stats.get('fair_price'),
                 'num_sales': stats.get('num_sales'),
-                'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'image_url': image_url,
+                'image_url_back': image_url_back,
+                'is_estimated': is_estimated,
+                'price_source': price_source,
             }
             with open(results_json_path, 'w', encoding='utf-8') as f:
                 json.dump(results, f, indent=2, ensure_ascii=False)
@@ -297,7 +517,28 @@ def scrape_single_card(card_name, results_json_path=None):
         driver.quit()
 
 def parse_card_name(card_name):
-    """Parse a card name string into Player, Year, Set, Card #, Grade components."""
+    """Parse a structured card name string into its constituent fields.
+
+    Supports the canonical ``"YEAR SET - SUBSET - PLAYER"`` dash-delimited
+    format as well as freeform names.  Extracts serial numbers (``#70/99``),
+    grading labels (``[PSA 9]``), card numbers (``#201``), subset names, and
+    player names via regex heuristics.
+
+    Examples::
+
+        parse_card_name("2023-24 Upper Deck - Young Guns #201 - Connor Bedard [PSA 9] /99")
+        # → {'Player': 'Connor Bedard', 'Year': '2023-24',
+        #    'Set': '2023-24 Upper Deck', 'Subset': 'Young Guns',
+        #    'Card #': '201', 'Serial': '1/99', 'Grade': 'PSA 9'}
+
+    Args:
+        card_name: Raw card name string to parse.
+
+    Returns:
+        Dict with string values for keys ``Player``, ``Year``, ``Set``,
+        ``Subset``, ``Card #``, ``Serial``, and ``Grade``.  Any field that
+        cannot be determined is set to an empty string.
+    """
     result = {'Player': '', 'Year': '', 'Set': '', 'Subset': '', 'Card #': '', 'Serial': '', 'Grade': ''}
 
     if not card_name or not isinstance(card_name, str):
@@ -372,8 +613,39 @@ def parse_card_name(card_name):
 
 
 def load_data(csv_path=CSV_PATH, results_json_path=None):
+    """Load the card collection CSV and enrich it with data from the results JSON.
+
+    Parsed fields (Player, Year, Set, Subset, Card #, Serial, Grade) are
+    derived by calling ``parse_card_name`` on each row.  ``Last Scraped`` and
+    ``Confidence`` are read from the results JSON.  Monetary columns are
+    normalised to numeric floats and the ``Trend`` column is standardised.
+
+    Results are cached in ``_DATA_CACHE`` keyed by ``(csv_path,
+    results_json_path)``; the cache is bypassed automatically whenever either
+    file's mtime changes.
+
+    Args:
+        csv_path: Path to the card collection CSV.  Defaults to the
+            module-level ``CSV_PATH`` constant.
+        results_json_path: Path to the scrape results JSON.  Defaults to
+            ``RESULTS_JSON_PATH``.
+
+    Returns:
+        Pandas DataFrame with all original CSV columns plus ``Player``,
+        ``Year``, ``Set``, ``Subset``, ``Card #``, ``Serial``, ``Grade``,
+        ``Last Scraped``, and ``Confidence``.
+    """
     if results_json_path is None:
         results_json_path = RESULTS_JSON_PATH
+
+    # Return cached DataFrame if files haven't changed
+    cache_key = (csv_path, results_json_path)
+    csv_mt  = _file_mtime(csv_path)
+    json_mt = _file_mtime(results_json_path)
+    cached  = _DATA_CACHE.get(cache_key)
+    if cached and cached['csv_mt'] == csv_mt and cached['json_mt'] == json_mt:
+        return cached['df'].copy()
+
     df = pd.read_csv(csv_path)
 
     # De-sanitize string columns
@@ -401,7 +673,7 @@ def load_data(csv_path=CSV_PATH, results_json_path=None):
         for col in parse_cols:
             df[col] = pd.Series(dtype='object')
 
-    # Add Last Scraped from results JSON
+    # Add Last Scraped and Confidence from results JSON
     if os.path.exists(results_json_path):
         try:
             with open(results_json_path, 'r', encoding='utf-8') as f:
@@ -412,21 +684,39 @@ def load_data(csv_path=CSV_PATH, results_json_path=None):
             df['Last Scraped'] = df['Last Scraped'].apply(
                 lambda x: x.split(' ')[0] if isinstance(x, str) and x else ''
             )
+            df['Confidence'] = df['Card Name'].apply(
+                lambda name: results.get(name, {}).get('confidence', '') or ''
+            )
         except Exception:
             df['Last Scraped'] = ''
+            df['Confidence'] = ''
     else:
         df['Last Scraped'] = ''
+        df['Confidence'] = ''
 
     # Ensure Tags column exists (backward compat for existing CSVs)
     if 'Tags' not in df.columns:
         df['Tags'] = ''
     df['Tags'] = df['Tags'].fillna('')
 
-    return df
+    _DATA_CACHE[cache_key] = {'csv_mt': csv_mt, 'json_mt': json_mt, 'df': df}
+    return df.copy()
 
-PARSED_COLS = ['Player', 'Year', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Last Scraped']
+PARSED_COLS = ['Player', 'Year', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Last Scraped', 'Confidence']
 
 def save_data(df, csv_path=CSV_PATH):
+    """Write the card collection DataFrame to CSV.
+
+    Drops display-only parsed columns (Player, Year, Set, etc.) before
+    saving so they are not persisted in the file.  Monetary columns are
+    formatted as ``"$X.XX"`` strings.  String columns are sanitised to
+    prevent CSV injection by prepending a single quote to values starting
+    with ``=``, ``+``, ``-``, or ``@``.
+
+    Args:
+        df: Card collection DataFrame as returned by ``load_data``.
+        csv_path: Destination CSV path.  Defaults to ``CSV_PATH``.
+    """
     save_df = df.copy()
     # Drop display-only parsed columns before saving
     save_df = save_df.drop(columns=[c for c in PARSED_COLS if c in save_df.columns], errors='ignore')
@@ -445,7 +735,24 @@ def save_data(df, csv_path=CSV_PATH):
 
 
 def backup_data(label="scrape", csv_path=None, results_path=None, backup_dir=None):
-    """Save a timestamped backup of the CSV and results JSON to backups/."""
+    """Create timestamped copies of the card CSV and results JSON in a backup directory.
+
+    Both files are copied with names of the form
+    ``card_prices_summary_YYYY-MM-DD_HHMMSS_<label>.csv`` (and the equivalent
+    ``_results_*.json``).  Files that do not yet exist are silently skipped.
+
+    Args:
+        label: Short string appended to the backup filename for identification
+            (e.g. ``"scrape"`` or ``"manual"``).  Defaults to ``"scrape"``.
+        csv_path: Source CSV path.  Defaults to ``CSV_PATH``.
+        results_path: Source results JSON path.  Defaults to
+            ``RESULTS_JSON_PATH``.
+        backup_dir: Directory in which backups are written.  Created if it
+            does not exist.  Defaults to ``BACKUP_DIR``.
+
+    Returns:
+        Timestamp string ``"YYYY-MM-DD_HHMMSS"`` used in the backup filenames.
+    """
     csv_path = csv_path or CSV_PATH
     results_path = results_path or RESULTS_JSON_PATH
     backup_dir = backup_dir or BACKUP_DIR
@@ -464,7 +771,18 @@ def backup_data(label="scrape", csv_path=None, results_path=None, backup_dir=Non
 
 
 def load_sales_history(card_name, results_json_path=None):
-    """Load raw eBay sales for a card from card_prices_results.json."""
+    """Load the raw eBay sold-listing history for a single card.
+
+    Args:
+        card_name: The card name key as stored in the results JSON.
+        results_json_path: Path to ``card_prices_results.json``.  Defaults to
+            ``RESULTS_JSON_PATH``.
+
+    Returns:
+        List of sale dicts (each with keys such as ``sold_date``, ``title``,
+        ``price_val``).  Returns an empty list when the file does not exist,
+        the card has no entry, or the file cannot be parsed.
+    """
     results_json_path = results_json_path or RESULTS_JSON_PATH
     if not os.path.exists(results_json_path):
         return []
@@ -478,7 +796,19 @@ def load_sales_history(card_name, results_json_path=None):
 
 
 def append_price_history(card_name, fair_value, num_sales, history_path=None):
-    """Append a price snapshot to the history log."""
+    """Append a dated price snapshot for a card to the price history JSON.
+
+    Each snapshot stored is ``{"date": "YYYY-MM-DD", "fair_value": float,
+    "num_sales": int}``.  Multiple entries per day are allowed (no
+    deduplication).
+
+    Args:
+        card_name: Card identifier used as the key in ``price_history.json``.
+        fair_value: Calculated fair market value to record.
+        num_sales: Number of eBay sales used to compute the value.
+        history_path: Path to ``price_history.json``.  Defaults to
+            ``HISTORY_PATH``.
+    """
     history_path = history_path or HISTORY_PATH
     history = {}
     if os.path.exists(history_path):
@@ -502,7 +832,18 @@ def append_price_history(card_name, fair_value, num_sales, history_path=None):
 
 
 def load_price_history(card_name, history_path=None):
-    """Load fair value history for a card from price_history.json."""
+    """Load the fair-value price history for a single card.
+
+    Args:
+        card_name: The card name key to look up in ``price_history.json``.
+        history_path: Path to ``price_history.json``.  Defaults to
+            ``HISTORY_PATH``.
+
+    Returns:
+        List of snapshot dicts ``{"date", "fair_value", "num_sales"}``, oldest
+        first.  Returns an empty list when the file is missing or the card has
+        no recorded history.
+    """
     history_path = history_path or HISTORY_PATH
     if not os.path.exists(history_path):
         return []
@@ -515,7 +856,18 @@ def load_price_history(card_name, history_path=None):
 
 
 def append_portfolio_snapshot(total_value, total_cards, avg_value, portfolio_path=None):
-    """Append a daily portfolio value snapshot. Deduplicates by date."""
+    """Append a daily portfolio value snapshot, replacing any existing entry for today.
+
+    The snapshot written is ``{"date", "total_value", "total_cards",
+    "avg_value"}``.  At most one snapshot per calendar date is retained.
+
+    Args:
+        total_value: Sum of fair values across the whole collection (CAD).
+        total_cards: Number of cards in the collection.
+        avg_value: Average fair value per card.
+        portfolio_path: Path to ``portfolio_history.json``.  Defaults to
+            ``<SCRIPT_DIR>/portfolio_history.json``.
+    """
     portfolio_path = portfolio_path or os.path.join(SCRIPT_DIR, "portfolio_history.json")
     snapshots = []
     if os.path.exists(portfolio_path):
@@ -539,7 +891,17 @@ def append_portfolio_snapshot(total_value, total_cards, avg_value, portfolio_pat
 
 
 def load_portfolio_history(portfolio_path=None):
-    """Load portfolio snapshots list."""
+    """Load the full list of daily portfolio value snapshots.
+
+    Args:
+        portfolio_path: Path to ``portfolio_history.json``.  Defaults to
+            ``<SCRIPT_DIR>/portfolio_history.json``.
+
+    Returns:
+        List of snapshot dicts ``{"date", "total_value", "total_cards",
+        "avg_value"}``, in the order they were appended.  Returns an empty
+        list when the file does not exist or cannot be parsed.
+    """
     portfolio_path = portfolio_path or os.path.join(SCRIPT_DIR, "portfolio_history.json")
     if not os.path.exists(portfolio_path):
         return []
@@ -551,7 +913,22 @@ def load_portfolio_history(portfolio_path=None):
 
 
 def scrape_graded_comparison(card_name):
-    """Scrape raw and graded (PSA 9, PSA 10) prices for ROI comparison."""
+    """Scrape eBay sold prices for a card at raw, PSA 9, and PSA 10 grades.
+
+    Strips any existing grade marker from ``card_name`` and then runs three
+    separate eBay searches (raw / PSA 9 / PSA 10) in the same browser
+    session.  A short random sleep is inserted between searches to reduce
+    the risk of rate-limiting.
+
+    Args:
+        card_name: Full card name string.  Any existing grading label is
+            removed before constructing the per-grade search queries.
+
+    Returns:
+        Dict with keys ``"raw"``, ``"psa_9"``, ``"psa_10"``.  Each value is
+        either a stats dict ``{"fair_price", "num_sales", "min", "max"}`` or
+        ``None`` when no comparable sales were found for that grade.
+    """
     import time as _time
     import random as _random
 
@@ -586,7 +963,23 @@ def scrape_graded_comparison(card_name):
 
 
 def archive_card(df, card_name, archive_path=None):
-    """Move a card from the main CSV to the archive CSV. Returns updated df."""
+    """Remove a card from the active collection and append it to the archive CSV.
+
+    Display-only parsed columns are stripped before writing to the archive.
+    Monetary columns are formatted as ``"$X.XX"`` strings, and string values
+    are sanitised against CSV injection.  An ``"Archived Date"`` column
+    (``"YYYY-MM-DD HH:MM:SS"``) is added to the archived row.
+
+    If the card is not found in ``df``, the DataFrame is returned unchanged.
+
+    Args:
+        df: Active card collection DataFrame (as returned by ``load_data``).
+        card_name: Exact ``Card Name`` value of the card to archive.
+        archive_path: Path to the archive CSV.  Defaults to ``ARCHIVE_PATH``.
+
+    Returns:
+        Updated DataFrame with the specified card removed.
+    """
     archive_path = archive_path or ARCHIVE_PATH
     card_rows = df[df['Card Name'] == card_name]
     if len(card_rows) == 0:
@@ -596,6 +989,8 @@ def archive_card(df, card_name, archive_path=None):
     archive_row = archive_row.drop(columns=[c for c in PARSED_COLS if c in archive_row.columns], errors='ignore')
     archive_row['Archived Date'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     for col in MONEY_COLS:
+        if col not in archive_row.columns:
+            continue
         archive_row[col] = archive_row[col].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "$0.00")
 
     # Sanitize string columns
@@ -615,7 +1010,18 @@ def archive_card(df, card_name, archive_path=None):
 
 
 def load_archive(archive_path=None):
-    """Load archived cards."""
+    """Load the archive CSV as a DataFrame.
+
+    De-sanitises any CSV-injection-protected string values and converts
+    monetary columns back to numeric floats.
+
+    Args:
+        archive_path: Path to the archive CSV.  Defaults to ``ARCHIVE_PATH``.
+
+    Returns:
+        DataFrame of archived cards, or an empty DataFrame when the file does
+        not exist or cannot be parsed.
+    """
     archive_path = archive_path or ARCHIVE_PATH
     if not os.path.exists(archive_path):
         return pd.DataFrame()
@@ -639,7 +1045,20 @@ def load_archive(archive_path=None):
 
 
 def restore_card(card_name, archive_path=None):
-    """Remove a card from the archive and return its row data for re-adding."""
+    """Remove a card from the archive CSV and return its data for re-adding.
+
+    Rewrites the archive file without the restored card.  When the archive
+    becomes empty after removal, the file is deleted entirely.
+
+    Args:
+        card_name: Exact ``Card Name`` value to restore.
+        archive_path: Path to the archive CSV.  Defaults to ``ARCHIVE_PATH``.
+
+    Returns:
+        Dict of the first matching archived row (as returned by
+        ``DataFrame.iloc[0].to_dict()``), or ``None`` when the file does not
+        exist, the card is not found, or an error occurs.
+    """
     archive_path = archive_path or ARCHIVE_PATH
     if not os.path.exists(archive_path):
         return None
@@ -684,7 +1103,21 @@ TEAM_ABBREV_TO_NAME = {v: k for k, v in TEAM_NAME_TO_ABBREV.items()}
 
 
 def load_nhl_player_stats(player_name=None, path=None):
-    """Load NHL stats. If player_name given, return that player's dict."""
+    """Load NHL player statistics from the stats JSON file.
+
+    Args:
+        player_name: If provided, return only the stats dict for this player
+            (looked up under the ``players`` key of the JSON).  Pass ``None``
+            to return the full JSON object.
+        path: Path to ``nhl_player_stats.json``.  Defaults to
+            ``NHL_STATS_PATH``.
+
+    Returns:
+        When ``player_name`` is given: the player's stats dict, or ``None``
+        if the player is not found.
+        When ``player_name`` is ``None``: the full data dict (containing
+        ``players`` and ``standings``), or ``{}`` on error.
+    """
     path = path or NHL_STATS_PATH
     if not os.path.exists(path):
         return {} if player_name is None else None
@@ -699,7 +1132,15 @@ def load_nhl_player_stats(player_name=None, path=None):
 
 
 def save_nhl_player_stats(data, path=None):
-    """Write the full NHL stats JSON."""
+    """Write the full NHL player stats dict to the stats JSON file.
+
+    Creates parent directories as needed.
+
+    Args:
+        data: Complete stats dict (with ``players`` and ``standings`` keys)
+            to serialise.
+        path: Destination path.  Defaults to ``NHL_STATS_PATH``.
+    """
     path = path or NHL_STATS_PATH
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, 'w', encoding='utf-8') as f:
@@ -707,13 +1148,39 @@ def save_nhl_player_stats(data, path=None):
 
 
 def load_nhl_standings(path=None):
-    """Load team standings from the stats JSON."""
+    """Load the NHL team standings dict from the stats JSON file.
+
+    Args:
+        path: Path to ``nhl_player_stats.json``.  Defaults to
+            ``NHL_STATS_PATH``.
+
+    Returns:
+        Dict mapping team abbreviation strings to standings data dicts.
+        Returns an empty dict when the file is missing or has no
+        ``standings`` key.
+    """
     data = load_nhl_player_stats(path=path)
     return data.get('standings', {})
 
 
 def get_player_stats_for_card(player_name, path=None):
-    """Get formatted stats summary for a card's player."""
+    """Return a formatted current-season stats dict for a card's player.
+
+    Reads from the NHL stats JSON and reshapes the ``current_season`` block
+    into a flat dict that includes a pre-built human-readable ``summary``
+    string.  Skater and goalie stats are handled separately.
+
+    Args:
+        player_name: Full player name as stored in ``nhl_player_stats.json``.
+        path: Path to the stats JSON.  Defaults to ``NHL_STATS_PATH``.
+
+    Returns:
+        Dict with keys ``type``, ``position``, ``current_team``, ``nhl_id``,
+        ``history``, ``summary``, and all current-season stat fields (e.g.
+        ``goals``, ``assists``, ``points`` for skaters; ``wins``, ``gaa``,
+        ``save_pct`` for goalies).  Returns ``None`` when the player is not
+        found or has no current-season data.
+    """
     stats = load_nhl_player_stats(player_name, path=path)
     if not stats:
         return None
@@ -752,7 +1219,17 @@ def get_player_stats_for_card(player_name, path=None):
 
 
 def get_player_bio_for_card(player_name, path=None):
-    """Get bio data (nationality, draft) for a card's player."""
+    """Return the biographical data dict for a card's player.
+
+    Args:
+        player_name: Full player name as stored in ``nhl_player_stats.json``.
+        path: Path to the stats JSON.  Defaults to ``NHL_STATS_PATH``.
+
+    Returns:
+        Bio dict with fields such as ``nationality``, ``draft_round``, and
+        ``draft_overall``, or ``None`` when the player is not found or has
+        no bio data.
+    """
     stats = load_nhl_player_stats(player_name, path=path)
     if not stats or not stats.get('bio'):
         return None
@@ -760,7 +1237,17 @@ def get_player_bio_for_card(player_name, path=None):
 
 
 def get_all_player_bios(path=None):
-    """Get all player bios as a dict keyed by player name."""
+    """Return biographical data for every player that has bio information.
+
+    Args:
+        path: Path to ``nhl_player_stats.json``.  Defaults to
+            ``NHL_STATS_PATH``.
+
+    Returns:
+        Dict mapping player name strings to their bio dicts.  Players with no
+        ``bio`` entry are excluded.  Returns an empty dict when the stats file
+        is missing or empty.
+    """
     data = load_nhl_player_stats(path=path)
     if not data:
         return {}
@@ -824,6 +1311,18 @@ def compute_correlation_snapshot(cards_df, nhl_players, nhl_standings):
             })
 
     def safe_linregress(x_vals, y_vals):
+        """Run a linear regression, returning None when there are too few points.
+
+        Args:
+            x_vals: Sequence of independent-variable values.
+            y_vals: Sequence of dependent-variable values (same length as
+                ``x_vals``).
+
+        Returns:
+            Dict with keys ``r``, ``r_squared``, ``slope``, ``intercept``,
+            ``p_value``, and ``n``, or ``None`` when fewer than three data
+            points are provided.
+        """
         if len(x_vals) < 3:
             return None
         result = linregress(x_vals, y_vals)
@@ -948,7 +1447,19 @@ def compute_correlation_snapshot(cards_df, nhl_players, nhl_standings):
 
 
 def load_correlation_history(path=None):
-    """Load the full correlation history dict."""
+    """Load the full correlation history from JSON.
+
+    The history is a dict keyed by ``"YYYY-MM-DD"`` date strings, each
+    mapping to the snapshot produced by ``compute_correlation_snapshot``.
+
+    Args:
+        path: Path to ``yg_correlation_history.json``.  Defaults to
+            ``YG_CORRELATION_HISTORY_PATH``.
+
+    Returns:
+        Dict of dated snapshots, or an empty dict when the file does not
+        exist or cannot be parsed.
+    """
     path = path or YG_CORRELATION_HISTORY_PATH
     if not os.path.exists(path):
         return {}
@@ -960,7 +1471,16 @@ def load_correlation_history(path=None):
 
 
 def save_correlation_snapshot(snapshot, path=None):
-    """Append/overwrite today's correlation snapshot."""
+    """Append or overwrite today's correlation snapshot in the history file.
+
+    Reads the existing history, sets today's date key to ``snapshot``, and
+    writes the updated dict back.  Creates parent directories if needed.
+
+    Args:
+        snapshot: Snapshot dict as returned by ``compute_correlation_snapshot``.
+        path: Path to ``yg_correlation_history.json``.  Defaults to
+            ``YG_CORRELATION_HISTORY_PATH``.
+    """
     path = path or YG_CORRELATION_HISTORY_PATH
     os.makedirs(os.path.dirname(path), exist_ok=True)
     history = load_correlation_history(path)
@@ -1022,8 +1542,20 @@ def append_yg_price_history(card_name, fair_value, num_sales, history_path=None,
 
 
 def load_yg_price_history(card_name=None, history_path=None):
-    """Load YG price history. If card_name given, return that card's list.
-    If None, return entire dict."""
+    """Load Young Guns price history from the YG history JSON.
+
+    Args:
+        card_name: If provided, return only the price snapshot list for this
+            card.  Pass ``None`` to return the full history dict for all cards.
+        history_path: Path to ``yg_price_history.json``.  Defaults to
+            ``YG_PRICE_HISTORY_PATH``.
+
+    Returns:
+        When ``card_name`` is given: list of snapshot dicts (``{"date",
+        "fair_value", "num_sales"[, "graded"]}``), or ``[]`` if not found.
+        When ``card_name`` is ``None``: full history dict keyed by card name,
+        or ``{}`` on error.
+    """
     history_path = history_path or YG_PRICE_HISTORY_PATH
     if not os.path.exists(history_path):
         return [] if card_name else {}
@@ -1039,7 +1571,19 @@ def load_yg_price_history(card_name=None, history_path=None):
 
 def append_yg_portfolio_snapshot(total_value, total_cards, avg_value, cards_scraped,
                                  portfolio_path=None):
-    """Append a daily YG market snapshot. Deduplicates by date."""
+    """Append a daily Young Guns market snapshot, replacing any entry for today.
+
+    The snapshot written is ``{"date", "total_value", "total_cards",
+    "avg_value", "cards_scraped"}``.  Creates parent directories if needed.
+
+    Args:
+        total_value: Aggregate fair value of all YG cards in the master DB.
+        total_cards: Total number of YG cards tracked.
+        avg_value: Average fair value per YG card.
+        cards_scraped: Number of cards with fresh price data in this run.
+        portfolio_path: Path to ``yg_portfolio_history.json``.  Defaults to
+            ``YG_PORTFOLIO_HISTORY_PATH``.
+    """
     portfolio_path = portfolio_path or YG_PORTFOLIO_HISTORY_PATH
     os.makedirs(os.path.dirname(portfolio_path), exist_ok=True)
     snapshots = []
@@ -1065,7 +1609,17 @@ def append_yg_portfolio_snapshot(total_value, total_cards, avg_value, cards_scra
 
 
 def load_yg_portfolio_history(portfolio_path=None):
-    """Load YG market snapshots list."""
+    """Load the full list of daily Young Guns market snapshots.
+
+    Args:
+        portfolio_path: Path to ``yg_portfolio_history.json``.  Defaults to
+            ``YG_PORTFOLIO_HISTORY_PATH``.
+
+    Returns:
+        List of snapshot dicts ``{"date", "total_value", "total_cards",
+        "avg_value", "cards_scraped"}``, in appended order.  Returns an empty
+        list when the file does not exist or cannot be parsed.
+    """
     portfolio_path = portfolio_path or YG_PORTFOLIO_HISTORY_PATH
     if not os.path.exists(portfolio_path):
         return []
@@ -1077,8 +1631,20 @@ def load_yg_portfolio_history(portfolio_path=None):
 
 
 def save_yg_raw_sales(card_name, sales, path=None):
-    """Save raw eBay sales for a card, merging with existing data.
-    Deduplicates by (sold_date, title). Caps at 50 sales per card."""
+    """Save raw eBay sales for a Young Guns card, merging with existing data.
+
+    Only sales that have both a ``sold_date`` and a ``price_val`` are kept.
+    New sales are merged with any existing sales using ``(sold_date, title)``
+    as the deduplication key.  The merged list is sorted by ``sold_date``
+    descending and written back to the JSON file.
+
+    Args:
+        card_name: Card identifier used as the key in the sales JSON.
+        sales: List of sale dicts (each with at least ``sold_date``,
+            ``price_val``, and optionally ``title``).
+        path: Path to ``yg_raw_sales.json``.  Defaults to
+            ``YG_RAW_SALES_PATH``.
+    """
     path = path or YG_RAW_SALES_PATH
     os.makedirs(os.path.dirname(path), exist_ok=True)
     data = {}
@@ -1113,7 +1679,20 @@ def save_yg_raw_sales(card_name, sales, path=None):
 
 
 def load_yg_raw_sales(card_name=None, path=None):
-    """Load raw sales. If card_name given, return that card's list. Otherwise return all."""
+    """Load raw eBay sales for one or all Young Guns cards.
+
+    Args:
+        card_name: If provided, return only the sales list for this card.
+            Pass ``None`` to return the full dict for all cards.
+        path: Path to ``yg_raw_sales.json``.  Defaults to
+            ``YG_RAW_SALES_PATH``.
+
+    Returns:
+        When ``card_name`` is given: list of sale dicts (``{"sold_date",
+        "price_val", "title"}``), or ``[]`` if the card is not present.
+        When ``card_name`` is ``None``: full dict keyed by card name, or
+        ``{}`` on error.
+    """
     path = path or YG_RAW_SALES_PATH
     if not os.path.exists(path):
         return [] if card_name else {}
@@ -1128,9 +1707,17 @@ def load_yg_raw_sales(card_name=None, path=None):
 
 
 def batch_save_yg_raw_sales(all_sales_dict, path=None):
-    """Batch-save raw sales for multiple cards in a single file write.
+    """Batch-save raw eBay sales for multiple Young Guns cards in one file write.
+
+    Merges each card's new sales with its existing stored sales using the
+    same ``(sold_date, title)`` deduplication logic as ``save_yg_raw_sales``.
+    More efficient than calling ``save_yg_raw_sales`` in a loop because the
+    JSON file is read and written only once.
+
     Args:
-        all_sales_dict: {card_name: [sales_list]} to merge
+        all_sales_dict: Dict mapping card name strings to lists of sale dicts.
+        path: Path to ``yg_raw_sales.json``.  Defaults to
+            ``YG_RAW_SALES_PATH``.
     """
     path = path or YG_RAW_SALES_PATH
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -1163,9 +1750,22 @@ def batch_save_yg_raw_sales(all_sales_dict, path=None):
 
 
 def batch_append_yg_price_history(updates, path=None):
-    """Batch-append price history for multiple cards in a single file write.
+    """Batch-append price history for multiple Young Guns cards in one file write.
+
+    Applies the same today-deduplication and graded-price merging logic as
+    ``append_yg_price_history`` for every card in ``updates``, then writes
+    the result in a single JSON dump.
+
     Args:
-        updates: {card_name: {'fair_value': float, 'num_sales': int, 'graded_prices': dict|None}}
+        updates: Dict mapping card name strings to update dicts with keys:
+
+            * ``fair_value`` (float): New ungraded fair value.
+            * ``num_sales`` (int): Number of raw sales found.
+            * ``graded_prices`` (dict | None): Optional graded price data,
+              e.g. ``{"PSA 10": {"fair_value": 150.0, "num_sales": 5}}``.
+
+        path: Path to ``yg_price_history.json``.  Defaults to
+            ``YG_PRICE_HISTORY_PATH``.
     """
     path = path or YG_PRICE_HISTORY_PATH
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -1207,9 +1807,21 @@ def batch_append_yg_price_history(updates, path=None):
 
 
 def load_yg_market_timeline(path=None):
-    """Aggregate all raw sales across cards into a daily market timeline.
-    Returns a list of dicts: [{date, avg_price, total_volume, min_price, max_price}, ...]
-    sorted by date ascending."""
+    """Aggregate all YG raw sales into a daily market price timeline.
+
+    Reads ``yg_raw_sales.json`` and groups every individual sale by its
+    ``sold_date``.  Computes summary statistics per day across all cards.
+
+    Args:
+        path: Path to ``yg_raw_sales.json``.  Defaults to
+            ``YG_RAW_SALES_PATH``.
+
+    Returns:
+        List of dicts sorted by ``date`` ascending, each containing:
+        ``date`` (str), ``avg_price`` (float), ``total_volume`` (int),
+        ``min_price`` (float), ``max_price`` (float).
+        Returns an empty list when there are no sales.
+    """
     all_sales = load_yg_raw_sales(path=path)
     if not all_sales:
         return []
@@ -1237,9 +1849,26 @@ def load_yg_market_timeline(path=None):
 
 
 def load_master_db(path=MASTER_DB_PATH):
-    """Load the master card database CSV."""
+    """Load the Young Guns master database CSV with mtime-based caching.
+
+    Normalises the ``Team``, ``Position``, ``Owned``, ``CostBasis``, and
+    ``PurchaseDate`` columns, adding them with sensible defaults when absent.
+    Results are cached in ``_MASTER_DB_CACHE``; the cache is bypassed when
+    the file's mtime has changed.
+
+    Args:
+        path: Path to ``young_guns.csv``.  Defaults to ``MASTER_DB_PATH``.
+
+    Returns:
+        DataFrame of Young Guns cards, or an empty DataFrame when the file
+        does not exist.
+    """
     if not os.path.exists(path):
         return pd.DataFrame()
+    mt = _file_mtime(path)
+    cached = _MASTER_DB_CACHE.get(path)
+    if cached and cached['mt'] == mt:
+        return cached['df'].copy()
     df = pd.read_csv(path)
     df['Team'] = df['Team'].fillna('').str.strip()
     df['Position'] = df['Position'].fillna('').str.strip()
@@ -1250,11 +1879,19 @@ def load_master_db(path=MASTER_DB_PATH):
     df['Owned'] = pd.to_numeric(df['Owned'], errors='coerce').fillna(0).astype(int)
     df['CostBasis'] = pd.to_numeric(df['CostBasis'], errors='coerce').fillna(0)
     df['PurchaseDate'] = df['PurchaseDate'].fillna('').astype(str)
-    return df
+    _MASTER_DB_CACHE[path] = {'mt': mt, 'df': df}
+    return df.copy()
 
 
 def save_master_db(df, path=MASTER_DB_PATH):
-    """Save the master card database CSV."""
+    """Write the Young Guns master database DataFrame to CSV.
+
+    Creates parent directories if they do not already exist.
+
+    Args:
+        df: Young Guns DataFrame (as returned by ``load_master_db``).
+        path: Destination path.  Defaults to ``MASTER_DB_PATH``.
+    """
     os.makedirs(os.path.dirname(path), exist_ok=True)
     df.to_csv(path, index=False)
 
@@ -1263,10 +1900,26 @@ def save_master_db(df, path=MASTER_DB_PATH):
 # MARKET ALERTS
 # ============================================================
 def get_market_alerts(price_history, top_n=5, min_pct=5):
-    """Detect cards with significant price swings between last 2 scrapes.
+    """Detect cards with significant price swings between the two most recent scrapes.
 
-    Returns list of dicts sorted by abs(pct_change) descending:
-        {card_name, old_price, new_price, pct_change, direction}
+    Compares the last two price snapshots for each card and flags those whose
+    percentage change meets the minimum threshold.  The result is sorted by
+    absolute percentage change descending so the largest movers appear first.
+
+    Args:
+        price_history: Dict mapping card name strings to lists of snapshot
+            dicts (each with a ``fair_value`` key), as returned by
+            ``load_yg_price_history()``.
+        top_n: Maximum number of gainers and losers to return combined;
+            the function returns up to ``top_n * 2`` entries. Defaults to 5.
+        min_pct: Minimum absolute percentage change required to include a
+            card in the results. Defaults to 5.
+
+    Returns:
+        List of dicts, each with keys ``card_name``, ``old_price``,
+        ``new_price``, ``pct_change`` (signed float), and ``direction``
+        (``"up"`` or ``"down"``).  At most ``top_n * 2`` entries are
+        returned.
     """
     alerts = []
     for card_name, entries in price_history.items():
@@ -1296,9 +1949,32 @@ def get_market_alerts(price_history, top_n=5, min_pct=5):
 # CARD OF THE DAY
 # ============================================================
 def get_card_of_the_day(master_df, nhl_players, price_history, correlation_snapshot=None):
-    """Pick the card of the day: biggest gainer, or most undervalued if no movers.
+    """Select a featured card of the day from the Young Guns master database.
 
-    Returns dict: {card_name, player, team, price, reason, stats, pct_change}
+    Selection priority:
+
+    1. Biggest gainer — card with the largest positive percentage price change
+       between its last two scrapes (must be > 5 %).
+    2. Most undervalued — card whose actual price is furthest below the
+       regression-expected price derived from ``correlation_snapshot``.
+    3. Deterministic date hash — a stable pseudo-random pick based on today's
+       date, ensuring a consistent result within a calendar day.
+
+    Args:
+        master_df: Young Guns master DataFrame (from ``load_master_db``).
+            Must contain ``CardName``, ``PlayerName``, ``Team``, and
+            ``FairValue`` columns.
+        nhl_players: Dict from ``nhl_player_stats.json`` ``players`` key.
+        price_history: Full YG price history dict (from
+            ``load_yg_price_history()``).
+        correlation_snapshot: Optional snapshot dict from
+            ``compute_correlation_snapshot``; used for the undervalued
+            fallback.  Pass ``None`` to skip that fallback.
+
+    Returns:
+        Dict with keys ``card_name``, ``player``, ``team``, ``price``,
+        ``pct_change``, ``reason``, and ``stats`` (current-season NHL stats
+        dict).  Returns ``None`` when ``master_df`` is empty.
     """
     import hashlib
     today = datetime.now().strftime('%Y-%m-%d')
@@ -1385,9 +2061,24 @@ def get_card_of_the_day(master_df, nhl_players, price_history, correlation_snaps
 # TEAM MARKET MULTIPLIER
 # ============================================================
 def compute_team_multipliers(correlation_snapshot):
-    """Compute team market multipliers: actual avg price vs regression-expected price.
+    """Compute per-team price premium multipliers relative to regression-expected prices.
 
-    Returns dict: {team_abbrev: {actual, expected, multiplier, premium_pct, count, country}}
+    For each team, divides the observed average card price by the price
+    predicted by the points-vs-price linear regression stored in
+    ``correlation_snapshot``.  A multiplier > 1 indicates a market premium
+    for that team; < 1 indicates a discount.
+
+    Args:
+        correlation_snapshot: Snapshot dict as produced by
+            ``compute_correlation_snapshot``, containing at least
+            ``correlations.points_vs_price`` and ``team_premiums``.
+
+    Returns:
+        Dict mapping team abbreviation strings to dicts with keys:
+        ``actual`` (float), ``expected`` (float), ``multiplier`` (float),
+        ``premium_pct`` (float), ``count`` (int), ``country`` (``"CA"`` or
+        ``"US"``).  Returns an empty dict when the regression slope is
+        non-positive or ``team_premiums`` is absent.
     """
     pts_corr = correlation_snapshot.get('correlations', {}).get('points_vs_price', {})
     slope = pts_corr.get('slope', 0)
@@ -1422,16 +2113,35 @@ def compute_team_multipliers(correlation_snapshot):
 # ROOKIE SEASON IMPACT SCORE
 # ============================================================
 def compute_impact_scores(master_df, nhl_players, team_multipliers=None):
-    """Compute a 0-100 Impact Score for each player.
+    """Compute a 0–100 composite Rookie Impact Score for each Young Guns player.
 
-    Weights:
-        Points pace (pts/GP):  40%
-        Team market:           20%
-        Draft position:        15%
-        Shooting %:            10%
-        Plus/minus rate:       15%
+    Only skaters with at least 5 games played are scored.  Each factor is
+    normalised across all qualifying players before weighting.
 
-    Returns dict: {player_name: {score, breakdown: {pace, team, draft, shooting, plusminus}}}
+    Score weights:
+
+    * Points pace (pts/GP): 40 %
+    * Team market multiplier: 20 %
+    * Draft position (lower pick = higher score): 15 %
+    * Shooting percentage: 10 %
+    * Plus/minus rate (per GP): 15 %
+
+    Undrafted players are assigned a ``draft_overall`` of 300 (worst rank).
+
+    Args:
+        master_df: Young Guns master DataFrame (from ``load_master_db``).
+            Must contain ``PlayerName`` column.
+        nhl_players: Dict from ``nhl_player_stats.json`` ``players`` key.
+        team_multipliers: Optional dict from ``compute_team_multipliers``.
+            When provided, the team market score uses the player's team
+            multiplier; otherwise all team scores default to 1.0.
+
+    Returns:
+        Dict mapping player name strings to dicts with keys ``score``
+        (float, 0–100), ``breakdown`` (dict with ``pace``, ``team``,
+        ``draft``, ``shooting``, ``plusminus``), ``team``, ``points``,
+        ``goals``, ``gp``, and ``position``.  Players with insufficient
+        data are excluded.
     """
     raw = {}
     for _, row in master_df.iterrows():
@@ -1483,6 +2193,19 @@ def compute_impact_scores(master_df, nhl_players, team_multipliers=None):
     all_tm = [v['tm_score'] for v in raw.values()]
 
     def normalize(val, vals, invert=False):
+        """Min-max normalise a value to the 0–100 range across a population.
+
+        Args:
+            val: The value to normalise.
+            vals: Full population of values used to determine the range.
+            invert: When ``True``, lower raw values score higher (e.g. draft
+                pick number, where 1st overall is best).  Defaults to
+                ``False``.
+
+        Returns:
+            Float in [0, 100].  Returns 50 when all population values are
+            identical (zero range).
+        """
         mn, mx = min(vals), max(vals)
         if mx == mn:
             return 50

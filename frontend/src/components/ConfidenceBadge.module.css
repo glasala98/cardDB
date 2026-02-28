@@ -1,0 +1,15 @@
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: help;
+}
+
+.high      { background: rgba(76, 175, 130, 0.15); color: #4caf82; }
+.medium    { background: rgba(244, 165, 34, 0.15);  color: #f4a522; }
+.low       { background: rgba(255, 152, 0, 0.15);   color: #ff9800; }
+.estimated { background: rgba(224, 92, 92, 0.15);   color: #e05c5c; }
+.none      { background: rgba(154, 160, 180, 0.1);  color: #9aa0b4; }
+.notfound  { background: rgba(80, 80, 100, 0.15);  color: #6b6d80; }

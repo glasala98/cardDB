@@ -36,7 +36,20 @@ MIN_SEASON = "2020-21"
 
 
 def fetch_json(url, retries=2):
-    """Fetch JSON from NHL API with retry."""
+    """Perform an HTTP GET request and return the parsed JSON response.
+
+    Retries up to retries times on URLError or HTTPError, sleeping 1 s
+    between attempts. Sets a browser-like User-Agent header to avoid
+    rejection by the NHL API.
+
+    Args:
+        url: Fully-qualified URL string to fetch.
+        retries: Number of additional attempts after the first failure.
+            Defaults to 2 (3 total attempts).
+
+    Returns:
+        Parsed JSON as a dict or list, or None if all attempts fail.
+    """
     for attempt in range(retries + 1):
         try:
             req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -52,7 +65,19 @@ def fetch_json(url, retries=2):
 
 
 def fetch_standings():
-    """Fetch current NHL standings. Returns dict keyed by team abbreviation."""
+    """Fetch the current NHL standings from the NHL API.
+
+    Calls the /standings/now endpoint, sorts teams by points descending to
+    determine league rank, and tracks per-division rank order as teams are
+    iterated. Teams with a missing abbreviation are skipped.
+
+    Returns:
+        A dict keyed by team abbreviation (str), where each value is a dict
+        with keys: 'team_name', 'wins', 'losses', 'otl', 'points',
+        'games_played', 'goal_diff', 'league_rank', 'division_rank',
+        'division', 'conference', 'streak'. Returns an empty dict if the API
+        call fails or returns no standings data.
+    """
     data = fetch_json(f"{NHL_API_BASE}/standings/now")
     if not data or 'standings' not in data:
         return {}
@@ -91,7 +116,18 @@ def fetch_standings():
 
 
 def fetch_team_stats(team_abbrev):
-    """Fetch roster stats for a single team. Returns (skaters, goalies) lists."""
+    """Fetch the current-season roster stats for one NHL team.
+
+    Calls the /club-stats/{team_abbrev}/now endpoint. The returned skaters
+    and goalies lists contain the raw API dicts for each player.
+
+    Args:
+        team_abbrev: Three-letter NHL team abbreviation, e.g. "TOR".
+
+    Returns:
+        A tuple (skaters, goalies) where each element is a list of player
+        stat dicts from the NHL API. Returns ([], []) on failure.
+    """
     data = fetch_json(f"{NHL_API_BASE}/club-stats/{team_abbrev}/now")
     if not data:
         return [], []
@@ -99,13 +135,39 @@ def fetch_team_stats(team_abbrev):
 
 
 def normalize_name(name):
-    """Strip diacritics and normalize for matching."""
+    """Strip diacritics and lowercase a player name for fuzzy comparison.
+
+    Applies NFKD Unicode normalization and removes all combining characters,
+    so accented letters like 'é' become 'e'. Used as a pre-processing step in
+    match_player() to handle names like "Martin St-Louis".
+
+    Args:
+        name: Player name string, possibly containing accented characters.
+
+    Returns:
+        A lowercased ASCII-safe version of name with leading/trailing whitespace
+        removed.
+    """
     nfkd = unicodedata.normalize('NFKD', name)
     return ''.join(c for c in nfkd if not unicodedata.combining(c)).strip().lower()
 
 
 def fetch_player_bio(nhl_id):
-    """Fetch player bio from NHL API. Returns dict with birth/draft info."""
+    """Fetch biographical and draft information for a player from the NHL API.
+
+    Calls the /player/{nhl_id}/landing endpoint. Handles both dict-style and
+    plain-string fields for birth location data, as the NHL API returns
+    inconsistent shapes for some players.
+
+    Args:
+        nhl_id: Numeric NHL player ID as returned in roster stats.
+
+    Returns:
+        A dict with keys: 'birth_country', 'birth_city', 'birth_state_province',
+        'birth_date', 'draft_year', 'draft_round', 'draft_overall', 'draft_team',
+        'height_inches', 'weight_pounds', 'shoots_catches'. Returns None if the
+        API call fails.
+    """
     data = fetch_json(f"{NHL_API_BASE}/player/{nhl_id}/landing")
     if not data:
         return None
@@ -126,8 +188,24 @@ def fetch_player_bio(nhl_id):
 
 
 def build_player_index(all_teams_data):
-    """Build player index from all team roster data.
-    Returns (skaters_by_name, goalies_by_name) dicts keyed by 'First Last'."""
+    """Build a name-keyed lookup of all NHL players from all 32 teams' roster data.
+
+    Iterates the raw API dicts from fetch_team_stats() for all teams, extracts
+    skater and goalie stats, and indexes them by "First Last" full name.
+    Players with an empty name are skipped.
+
+    Args:
+        all_teams_data: Dict mapping team abbreviation (str) to a (skaters, goalies)
+            tuple as returned by fetch_team_stats().
+
+    Returns:
+        A tuple (skaters_by_name, goalies_by_name) where each element is a dict
+        keyed by player full name (str). Skater dicts contain: 'nhl_id', 'team',
+        'position', 'games_played', 'goals', 'assists', 'points', 'plus_minus',
+        'shots', 'shooting_pct', 'powerplay_goals', 'game_winning_goals'.
+        Goalie dicts contain: 'nhl_id', 'team', 'position', 'games_played',
+        'games_started', 'wins', 'losses', 'otl', 'save_pct', 'gaa', 'shutouts'.
+    """
     skaters = {}
     goalies = {}
 
@@ -177,8 +255,26 @@ def build_player_index(all_teams_data):
 
 
 def match_player(player_name, skaters, goalies):
-    """Try to match a card player name to an NHL API player.
-    Returns (api_data, player_type) or (None, None)."""
+    """Match a card's player name to an entry in the NHL API player index.
+
+    Tries three matching strategies in order, stopping at the first success:
+      1. Exact string match against skaters, then goalies.
+      2. Normalized match (diacritics stripped, lowercased) via normalize_name().
+      3. Fuzzy match using difflib.get_close_matches() with an 85% similarity
+         cutoff across the combined skater + goalie name pool.
+
+    Skaters are checked before goalies at each stage since they are more common.
+
+    Args:
+        player_name: Player name string as it appears in the card database.
+        skaters: Dict of skater data keyed by full name, from build_player_index().
+        goalies: Dict of goalie data keyed by full name, from build_player_index().
+
+    Returns:
+        A tuple (api_data, player_type) where api_data is the matching player's
+        stat dict and player_type is 'skater' or 'goalie'. Returns (None, None)
+        if no match is found at any stage.
+    """
     # Exact match — skaters first (more common)
     if player_name in skaters:
         return skaters[player_name], 'skater'
@@ -208,7 +304,31 @@ def match_player(player_name, skaters, goalies):
 
 
 def build_player_entry(player_name, api_data, player_type, card_team, standings, existing_entry=None):
-    """Build a player stats entry, merging with existing history."""
+    """Build or update a player stats entry for the nhl_player_stats.json output.
+
+    Constructs an entry with the player's current-season statistics. For
+    goalies, also attaches their team's current standings. Appends today's
+    snapshot to an append-only history list; if a snapshot for today already
+    exists in the previous entry it is replaced (idempotent on same-day runs).
+    History is kept sorted by date ascending.
+
+    Args:
+        player_name: Player full name string (used only for context; not stored
+            in the returned dict).
+        api_data: Stat dict for the player from build_player_index().
+        player_type: Either 'skater' or 'goalie'.
+        card_team: Team abbreviation string from the card database (may differ
+            from api_data['team'] for traded players).
+        standings: Dict of team standings keyed by abbreviation, as returned by
+            fetch_standings().
+        existing_entry: Previously stored player entry dict (used to preserve
+            the history list), or None for a new player.
+
+    Returns:
+        A dict suitable for storage under players[player_name] in the output
+        JSON. Contains keys: 'nhl_id', 'current_team', 'position', 'card_team',
+        'type', 'current_season', 'history', and for goalies 'team_standings'.
+    """
     today = datetime.now().strftime('%Y-%m-%d')
     team = api_data['team']
 
@@ -278,6 +398,29 @@ def build_player_entry(player_name, api_data, player_type, card_team, standings,
 
 
 def main():
+    """Fetch NHL stats, match players to the Young Guns DB, and save results.
+
+    Full pipeline:
+      1. Fetch current standings for all 32 NHL teams.
+      2. Fetch per-team roster stats and build a unified player name index.
+      3. Load young_guns.csv and filter to seasons >= MIN_SEASON (2020-21)
+         or the --season argument.
+      4. Match each YG card player to the API index using match_player().
+      5. Build player stat entries via build_player_entry(), merging with any
+         previously stored history.
+      6. Back-fill empty Position values in young_guns.csv from API data.
+      7. Save combined output to nhl_player_stats.json (players + standings +
+         unmatched list + metadata).
+      8. Optionally fetch full player bios (--fetch-bios flag) and re-save.
+      9. Compute and save a price-vs-performance correlation snapshot.
+
+    CLI args:
+        --season: Restrict card matching to one season string (e.g. "2025-26").
+        --dry-run: Print match results without writing any files.
+        --fetch-bios: Fetch birth country, draft details, and physical info for
+            each matched player via fetch_player_bio().
+        --verbose: Print per-player match/miss details.
+    """
     parser = argparse.ArgumentParser(description="Scrape NHL player stats and match to Young Guns DB")
     parser.add_argument('--season', type=str, help="Only match cards from this season (e.g. 2025-26)")
     parser.add_argument('--dry-run', action='store_true', help="Show matches without saving")

@@ -1,0 +1,192 @@
+/* ── Stats bar ────────────────────────────────────────────────── */
+.stats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.stat {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 120px;
+  flex: 1;
+}
+
+.statLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.statValue {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.statValue.large { font-size: 24px; }
+.success { color: var(--success); }
+.danger  { color: var(--danger);  }
+
+/* ── Section spacing ─────────────────────────────────────────── */
+.section { margin-bottom: 24px; }
+
+/* ── Chart placeholder ───────────────────────────────────────── */
+.chartPlaceholder {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 32px;
+  text-align: center;
+}
+
+.placeholderMsg {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.placeholderMsg strong {
+  color: var(--text-primary);
+}
+
+/* ── Lower two-column layout ─────────────────────────────────── */
+.lower {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .lower { grid-template-columns: 1fr; }
+}
+
+/* ── Generic card ────────────────────────────────────────────── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+}
+
+.cardTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 16px;
+}
+
+/* ── Trend breakdown ─────────────────────────────────────────── */
+.trendSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.trendRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.trendBar {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-secondary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.trendFill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.trendCount {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 24px;
+  text-align: right;
+}
+
+/* ── Top 10 table ────────────────────────────────────────────── */
+.topTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.topTh {
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-align: left;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.topTd {
+  padding: 8px 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+
+.topRow {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.topRow:last-child .topTd { border-bottom: none; }
+.topRow:hover .topTd { background: var(--bg-secondary); }
+
+.rankCell {
+  color: var(--text-secondary);
+  width: 24px;
+  font-weight: 600;
+}
+
+.nameCell {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--accent);
+}
+
+.valueCell {
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--success);
+}
+
+/* ── Card of the Day ───────────────────────────────────────────── */
+.cotd {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(29,191,191,0.08), rgba(29,191,191,0.04));
+  border: 1px solid rgba(29,191,191,0.3);
+  border-radius: 12px;
+  padding: 14px 20px;
+  margin-bottom: 20px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.cotd:hover { border-color: var(--accent); background: rgba(29,191,191,0.12); }
+.cotdIcon   { font-size: 28px; flex-shrink: 0; }
+.cotdBody   { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.cotdLabel  { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-secondary); font-weight: 600; }
+.cotdName   { font-size: 14px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cotdValue  { font-size: 16px; font-weight: 800; color: var(--accent); }

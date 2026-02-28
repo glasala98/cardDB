@@ -1,0 +1,379 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 16px;
+}
+
+.modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.closeBtn:hover { background: var(--bg-card); color: var(--text-primary); }
+
+.body {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Drop zones ──────────────────────────────────────────────── */
+.uploadSection { display: flex; flex-direction: column; gap: 6px; }
+
+.uploadLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.optional { font-weight: 400; text-transform: none; }
+
+.dropZone {
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: center;
+  min-height: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.dropZone:hover { border-color: var(--accent); background: rgba(29,191,191,0.04); }
+.hasFile { border-color: var(--accent); border-style: solid; padding: 8px; }
+
+.dropPrompt { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.dropIcon { font-size: 24px; margin-bottom: 4px; }
+.dropTitle { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+.dropSub { font-size: 11px; color: var(--text-secondary); }
+
+.browseBtn {
+  margin-top: 6px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 16px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.browseBtn:hover { background: var(--bg-card); }
+
+.preview {
+  max-width: 100%;
+  max-height: 160px;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+/* ── Analyze button ──────────────────────────────────────────── */
+.analyzeBtn {
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.analyzeBtn:hover:not(:disabled) { background: var(--accent-hover); }
+.analyzeBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0;
+}
+
+/* ── Not a card error ────────────────────────────────────────── */
+.notCardError {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(224, 92, 92, 0.1);
+  border: 1px solid rgba(224, 92, 92, 0.3);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--danger);
+}
+.notCardIcon { font-size: 16px; flex-shrink: 0; }
+.notCardReason { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
+
+/* ── AI Result ───────────────────────────────────────────────── */
+.aiResult, .aiRaw {
+  background: rgba(29, 191, 191, 0.08);
+  border: 1px solid rgba(29, 191, 191, 0.25);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.aiResultHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.aiTag {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* Confidence badge */
+.confBadge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+}
+.conf_high   { background: rgba(63, 182, 138, 0.15); border: 1px solid rgba(63, 182, 138, 0.35); color: var(--success); }
+.conf_medium { background: rgba(240, 160, 32, 0.15); border: 1px solid rgba(240, 160, 32, 0.35); color: var(--warning); }
+.conf_low    { background: rgba(224, 92, 92, 0.15);  border: 1px solid rgba(224, 92, 92, 0.35);  color: var(--danger);  }
+
+.confWarning { font-size: 11px; color: var(--danger);  margin: 0; }
+.confHint    { font-size: 11px; color: var(--warning); margin: 0; }
+
+.aiFields { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.aiField { font-size: 12px; color: var(--text-primary); }
+
+.rawText {
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+
+.error {
+  font-size: 12px;
+  color: var(--danger);
+  background: rgba(224, 92, 92, 0.1);
+  border: 1px solid rgba(224, 92, 92, 0.3);
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+/* ── Add New Card form ───────────────────────────────────────── */
+.addSection { display: flex; flex-direction: column; gap: 10px; }
+
+.addTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.fieldLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.input {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+.input:focus { border-color: var(--accent); }
+.input::placeholder { color: var(--text-secondary); }
+
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.col { display: flex; flex-direction: column; gap: 4px; }
+
+.addBtn {
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-top: 4px;
+}
+.addBtn:hover:not(:disabled) { background: var(--accent-hover); }
+.addBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.savedMsg {
+  font-size: 13px;
+  color: var(--success);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.addAnotherBtn {
+  background: none;
+  border: 1px solid var(--success);
+  border-radius: 6px;
+  padding: 4px 12px;
+  color: var(--success);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* ── Compact analyzed thumbnails ─────────────────────────────── */
+.analyzedRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.analyzedThumb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.thumbImg {
+  width: 64px;
+  height: 86px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.thumbLabel {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.reanalyzeBtn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 5px 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.reanalyzeBtn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+
+/* ── Missing field overrides ─────────────────────────────────── */
+.missingFields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: rgba(240, 160, 32, 0.07);
+  border: 1px solid rgba(240, 160, 32, 0.25);
+  border-radius: 6px;
+}
+
+.missingLabel { font-size: 11px; color: var(--warning); }
+
+.missingRow { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.missingInput {
+  flex: 1;
+  min-width: 120px;
+  background: var(--bg-card);
+  border: 1px solid rgba(240, 160, 32, 0.4);
+  border-radius: 6px;
+  padding: 5px 10px;
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+}
+.missingInput:focus { border-color: var(--warning); }
+.missingInput::placeholder { color: var(--text-secondary); }
+
+/* ── Card name preview ───────────────────────────────────────── */
+.cardNamePreview {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: rgba(29, 191, 191, 0.06);
+  border-radius: 6px;
+  border-left: 2px solid var(--accent);
+}
+
+.cardNamePreviewLabel {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.cardNamePreviewValue {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  word-break: break-word;
+}
