@@ -82,6 +82,31 @@ def get_grade_info(card_name):
     return None, None
 
 
+def _extract_player_name(last_segment):
+    """Extract a clean player name from the final dash-separated segment of a card name.
+
+    Strips card numbers, parenthetical text, and limits to the first 2–3
+    capitalized words so descriptive card names like 'Celebrini Scores First
+    Goal of... #66' yield 'Macklin Celebrini' instead of the full sentence.
+
+    Args:
+        last_segment: The last ' - ' segment from a parsed card name string.
+
+    Returns:
+        A clean player name string (e.g. 'Connor Bedard'), or the stripped
+        segment if no capitalized-word pattern is matched.
+    """
+    last = re.sub(r'#\d+(?:/\d+)?', '', last_segment).strip()  # strip #66 and #66/99
+    last = re.sub(r'\(.*?\)', '', last).strip()                 # strip (parenthetical text)
+    last = last.strip('.')
+    # Limit to the first 2 Title-Case words (First Last) — prevents descriptive
+    # card names like 'Celebrini Scores First Goal' from polluting the player name.
+    name_match = re.match(r'^([A-Z][a-zA-Z\'\-]+\s+[A-Z][a-zA-Z\'\-]+)\b', last)
+    if name_match:
+        return name_match.group(1)
+    return last.strip()
+
+
 def clean_card_name_for_search(card_name):
     """Build a focused eBay sold-listing search query from a card name.
 
@@ -119,10 +144,8 @@ def clean_card_name_for_search(card_name):
     player = ""
     if parts:
         last = parts[-1]
-        last = re.sub(r'#\d+/\d+', '', last).strip()
-        last = re.sub(r'\(.*?\)', '', last).strip()
-        if last and not last.startswith('['):
-            player = last
+        if not last.startswith('['):
+            player = _extract_player_name(last)
 
     # --- Extract card number - HIGH PRIORITY ---
     card_num = ""
@@ -496,13 +519,7 @@ def build_simplified_query(card_name):
     serial_str = f'/{serial}' if serial else ''
 
     # Player (last segment)
-    player = ""
-    if parts:
-        last = parts[-1]
-        last = re.sub(r'#\d+/\d+', '', last).strip()
-        last = re.sub(r'\(.*?\)', '', last).strip()
-        if last:
-            player = last
+    player = _extract_player_name(parts[-1]) if parts else ""
 
     # Player + card# + serial + year — drop parallel name but keep serial
     query_parts = [p for p in [player, card_num, serial_str, year] if p]
@@ -555,13 +572,7 @@ def build_set_query(card_name):
     serial = extract_serial_run(clean)
     serial_str = f'/{serial}' if serial else ''
 
-    player = ""
-    if parts:
-        last = parts[-1]
-        last = re.sub(r'#\d+/\d+', '', last).strip()
-        last = re.sub(r'\(.*?\)', '', last).strip()
-        if last:
-            player = last
+    player = _extract_player_name(parts[-1]) if parts else ""
 
     # Extract short brand/set (same mapping as clean_card_name_for_search)
     brand = parts[0] if parts else ""
@@ -1117,6 +1128,51 @@ def get_driver():
 DEFAULT_PRICE = 5.00
 
 
+def build_player_card_query(card_name):
+    """Build the stage-5 last-resort eBay query: player name + card number only.
+
+    Strips everything except the player name and card number. Used when all
+    broader queries (stages 1–4) return zero results. No year, serial, brand,
+    or grade exclusions beyond the target grade itself, so it casts the widest
+    possible net while still being card-specific.
+
+    Args:
+        card_name: Full card name string in the standard format.
+
+    Returns:
+        A minimal search query string, e.g. 'Connor Bedard #201 "PSA 9" -BGS -SGC'.
+    """
+    grade_str, grade_num = get_grade_info(card_name)
+
+    clean = re.sub(r'\[.*?\]', '', card_name)
+    clean = re.sub(r'\bPSA\s+\d+\b', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\bBGS\s+\d+(?:\.\d+)?\b', '', clean, flags=re.IGNORECASE)
+    parts = [p.strip() for p in clean.split(' - ')]
+
+    player = _extract_player_name(parts[-1]) if parts else ""
+
+    card_num = ""
+    num_match = re.search(r'#(\S+)', clean)
+    if num_match:
+        raw = num_match.group(1)
+        if '/' not in raw:
+            card_num = '#' + raw
+
+    query_parts = [p for p in [player, card_num] if p]
+    search_term = ' '.join(query_parts)
+
+    if grade_str:
+        search_term = f"{search_term} \"{grade_str}\""
+        if grade_str.upper().startswith('BGS'):
+            search_term += ' -PSA -SGC'
+        else:
+            search_term += ' -BGS -SGC'
+    else:
+        search_term = f"{search_term} -PSA -BGS -SGC -graded"
+
+    return search_term.strip()
+
+
 def process_card(card):
     """Search eBay and compute a fair market price for a single card.
 
@@ -1133,6 +1189,10 @@ def process_card(card):
           Searches nearby print-run variants (e.g. /75 for a /99 card) and
           adjusts prices via serial_multiplier(). Stage-4 sales are NOT
           written to historical raw_sales.
+      Stage 5 — Player + card# only (confidence: low):
+          Absolute last resort. Drops serial, year, brand, and all variant
+          terms. Catches cards whose names are too descriptive or unusual for
+          earlier stages, and un-numbered cards with no comps.
 
     A random sleep of 0.5–1.5 s is added before each search to avoid
     rate-limiting.
@@ -1194,6 +1254,15 @@ def process_card(card):
                     pricing_sales.append(adj)
                 break  # Use first nearby serial that has results
         # direct_sales stays empty — stage 4 comps are NOT stored historically
+
+    if not pricing_sales:
+        # Stage 5: player + card# only — absolute last resort for any card type.
+        # Catches unusual/descriptive card names and un-numbered cards with no comps.
+        time.sleep(random.uniform(0.5, 1.0))
+        confidence = 'low'
+        pricing_sales = search_ebay_sold(driver, card, search_query=build_player_card_query(card))
+        if pricing_sales:
+            direct_sales = list(pricing_sales)
 
     if pricing_sales:
         fair_price, stats = calculate_fair_price(pricing_sales, target_serial=target_serial)
