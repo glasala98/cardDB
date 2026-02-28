@@ -323,7 +323,9 @@ def _filter_sales_by_variant(card_name, sales):
     if not kws:
         return sales
     filtered = [s for s in sales if any(kw.lower() in s.get('title', '').lower() for kw in kws)]
-    return filtered if filtered else sales  # fall back to all if nothing matches
+    # Return empty rather than falling back to all sales — a wrong-variant price
+    # is worse than "No Data". The scraper's stage fallbacks handle the empty case.
+    return filtered
 
 
 def _strip_grade_from_name(card_name):
