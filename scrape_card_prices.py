@@ -988,6 +988,57 @@ def adjust_sales_for_serial(sales, target_serial):
     return others
 
 
+def _normalize_shipping(sales):
+    """Clamp outlier shipping costs using the median of this comp set.
+
+    Learns what "typical" shipping looks like from the actual sales returned
+    for a card, then caps any individual sale's shipping at 2× that median.
+    Free-shipping entries are preserved but don't skew the median.
+
+    Example: if 12 comps show $3-5 shipping and 2 show $18, those 2 get
+    normalized to the median (~$4) so they don't inflate the fair price.
+
+    Args:
+        sales: List of sale dicts with ``price_val`` (item+shipping float)
+               and ``item_price`` (formatted string like ``"$12.99"``).
+
+    Returns:
+        List of sale dicts with ``price_val`` adjusted where shipping is
+        an outlier. Dicts are copied before mutation.
+    """
+    if not sales:
+        return sales
+
+    # Parse (item_price_float, shipping_float) for each sale
+    parsed = []
+    shipping_amounts = []
+    for s in sales:
+        item_str = re.sub(r'[^\d.]', '', s.get('item_price', '0'))
+        try:
+            item_f = float(item_str) if item_str else 0.0
+            ship_f = max(0.0, round(s.get('price_val', item_f) - item_f, 2))
+        except (ValueError, TypeError):
+            item_f, ship_f = 0.0, 0.0
+        parsed.append((s, item_f, ship_f))
+        if ship_f > 0:
+            shipping_amounts.append(ship_f)
+
+    if not shipping_amounts:
+        return sales  # all free shipping — nothing to normalize
+
+    shipping_amounts.sort()
+    median_ship = shipping_amounts[len(shipping_amounts) // 2]
+    cap = median_ship * 2.0
+
+    result = []
+    for s, item_f, ship_f in parsed:
+        if ship_f > cap and item_f > 0:
+            s = dict(s)
+            s['price_val'] = round(item_f + median_ship, 2)
+        result.append(s)
+    return result
+
+
 def calculate_fair_price(sales, target_serial=None):
     """Calculate a fair market price from a list of recent eBay sales.
 
@@ -1277,6 +1328,7 @@ def process_card(card):
             direct_sales = list(pricing_sales)
 
     if pricing_sales:
+        pricing_sales = _normalize_shipping(pricing_sales)
         fair_price, stats = calculate_fair_price(pricing_sales, target_serial=target_serial)
         stats['confidence'] = confidence
         # Pick the first real image URL from direct sales (best-confidence listings)
