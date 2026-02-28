@@ -1,15 +1,6 @@
 # CardDB — Things To Do
 
 ## 🔥 Immediate (Server / Deployment)
-- [ ] Upload frontend dist to server (table layout changes pending)
-  ```powershell
-  scp -r d:\sportscarddb\cardDB\frontend\dist\* root@southwestsportscards.ca:~/cardDB/frontend/dist/
-  ```
-- [ ] Upload users.yaml to server (new admin password)
-  ```powershell
-  scp d:\sportscarddb\cardDB\users.yaml root@southwestsportscards.ca:~/cardDB/users.yaml
-  ```
-  > ⚠️ `users.yaml` is gitignored — must be manually scp'd every time passwords/users change.
 - [ ] Consider resizing DO droplet to 2GB ($12/mo) — currently at 81% RAM usage
 
 ## 🔑 Dev Setup Notes
@@ -126,3 +117,4 @@ After the Supabase migration, harden the auth and data layer:
 - [x] 1GB swap file added to server
 - [x] Admin password changed to lasala8324
 - [x] Full documentation pass (README rewrite, api/README, frontend/README, docs/, docstrings on all Python functions)
+- [x] All dev changes deployed to production (frontend dist, users.yaml, git pull, API restart)
