@@ -279,10 +279,13 @@ def grading_lookup(player_name: str):
 
     cards = []
     for _, r in matches.fillna("").iterrows():
-        raw = _num(r, "FairValue")
-        p10 = _num(r, "PSA10_Value")
-        p9  = _num(r, "PSA9_Value")
-        p8  = _num(r, "PSA8_Value")
+        raw  = _num(r, "FairValue")
+        p10  = _num(r, "PSA10_Value")
+        p9   = _num(r, "PSA9_Value")
+        p8   = _num(r, "PSA8_Value")
+        b10  = _num(r, "BGS10_Value")
+        b95  = _num(r, "BGS9_5_Value")
+        b9   = _num(r, "BGS9_Value")
         cards.append({
             "card_name":   r.get("CardName", ""),
             "season":      r.get("Season", ""),
@@ -290,6 +293,9 @@ def grading_lookup(player_name: str):
             "psa10_price": p10,
             "psa9_price":  p9,
             "psa8_price":  p8,
+            "bgs10_price": b10,
+            "bgs95_price": b95,
+            "bgs9_price":  b9,
             "psa10_mult":  round(p10 / raw, 2) if raw and p10 else None,
             "psa9_mult":   round(p9  / raw, 2) if raw and p9  else None,
         })
