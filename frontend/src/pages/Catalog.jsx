@@ -120,7 +120,7 @@ export default function Catalog() {
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [search, sport, year, setName, isRookie, hasPrice, sortKey, sortDir])
+  }, [search, sport, year, setName, sortKey, sortDir])
 
   // Re-fetch on filter/sort change (debounce search)
   useEffect(() => {
