@@ -54,6 +54,14 @@ const Icons = {
       <line x1="7" y1="10" x2="11" y2="10"/>
     </svg>
   ),
+  Catalog: () => (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+      <rect x="2" y="2" width="6" height="6" rx="1"/>
+      <rect x="10" y="2" width="6" height="6" rx="1"/>
+      <rect x="2" y="10" width="6" height="6" rx="1"/>
+      <rect x="10" y="10" width="6" height="6" rx="1"/>
+    </svg>
+  ),
   Admin: () => (
     <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
       <circle cx="9" cy="9" r="2.5"/>
@@ -94,6 +102,7 @@ const NAV_ITEMS = [
   { to: '/ledger',    label: 'Card Ledger',  Icon: Icons.Ledger    },
   { to: '/portfolio', label: 'Portfolio',    Icon: Icons.Portfolio  },
   { to: '/master-db', label: 'Master DB',    Icon: Icons.Database   },
+  { to: '/catalog',   label: 'Card Catalog', Icon: Icons.Catalog    },
   { to: '/charts',    label: 'Charts',       Icon: Icons.Charts     },
   { to: '/nhl-stats', label: 'NHL Stats',    Icon: Icons.Stats      },
   { to: '/archive',   label: 'Archive',      Icon: Icons.Archive    },

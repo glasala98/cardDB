@@ -27,7 +27,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from api.routers import cards, master_db, stats, auth, scan, admin
+from api.routers import cards, master_db, stats, auth, scan, admin, catalog
 
 app = FastAPI(title="Card Dashboard API", version="0.1.0")
 
@@ -51,6 +51,7 @@ app.include_router(master_db.router, prefix="/api/master-db", tags=["master-db"]
 app.include_router(stats.router,     prefix="/api/stats",     tags=["stats"])
 app.include_router(scan.router,      prefix="/api/scan",      tags=["scan"])
 app.include_router(admin.router,     prefix="/api/admin",     tags=["admin"])
+app.include_router(catalog.router,   prefix="/api/catalog",   tags=["catalog"])
 
 
 @app.get("/api/health")

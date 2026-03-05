@@ -1,0 +1,125 @@
+.sportTabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.tab {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-family: var(--font);
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tab:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.tabActive {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+  font-weight: 600;
+}
+
+/* Badges */
+.rcBadge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 212, 170, 0.15);
+  color: var(--accent);
+  border: 1px solid rgba(0, 212, 170, 0.3);
+  letter-spacing: 0.5px;
+}
+
+.price {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.noPrice {
+  color: var(--text-muted);
+}
+
+/* Trend */
+.trendUp   { color: var(--success); font-size: 12px; }
+.trendDown { color: var(--danger);  font-size: 12px; }
+.trendFlat { color: var(--text-muted); font-size: 12px; }
+
+/* Confidence badges */
+.conf {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: capitalize;
+}
+.conf_high      { background: rgba(0, 201, 122, 0.15); color: #00c97a; }
+.conf_medium    { background: rgba(255, 179, 50, 0.15); color: #ffb332; }
+.conf_low       { background: rgba(240, 80, 80, 0.15);  color: #f05050; }
+.conf_estimated { background: rgba(120, 100, 200, 0.15); color: #9b80e0; }
+.conf_none      { background: var(--bg-card); color: var(--text-muted); }
+
+/* Pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.pgBtn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-family: var(--font);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  min-width: 32px;
+  text-align: center;
+}
+.pgBtn:hover:not(:disabled) { border-color: var(--accent); color: var(--text-primary); }
+.pgBtn:disabled { opacity: 0.35; cursor: default; }
+.pgActive {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+  font-weight: 700;
+}
+
+.pgEllipsis {
+  color: var(--text-muted);
+  padding: 0 4px;
+  font-size: 14px;
+}
+
+.pgInfo {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Loading bar (while paginating with existing data visible) */
+.loadingBar {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  background-size: 200% 100%;
+  animation: slide 1.2s linear infinite;
+  border-radius: 2px;
+  margin-top: 4px;
+}
+@keyframes slide {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
