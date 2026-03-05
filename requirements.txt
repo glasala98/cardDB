@@ -10,7 +10,7 @@ curl_cffi
 fastapi
 uvicorn
 python-multipart
-python-jose[cryptography]
+PyJWT
 passlib[bcrypt]
 PyYAML
 python-dotenv
