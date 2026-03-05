@@ -35,8 +35,16 @@ export default function Login() {
     <div className={styles.page}>
       <div className={styles.card}>
         <div className={styles.logo}>
-          <span className={styles.logoIcon}>🃏</span>
-          <h1 className={styles.title}>Card Dashboard</h1>
+          <div className={styles.logoMark}>
+            <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18">
+              <rect x="1" y="3" width="11" height="14" rx="2" fill="currentColor" opacity="0.9"/>
+              <rect x="6" y="1" width="11" height="14" rx="2" fill="currentColor" opacity="0.45"/>
+            </svg>
+          </div>
+          <div className={styles.logoText}>
+            <h1 className={styles.title}>CardDB</h1>
+            <span className={styles.subtitle}>Market Tracker</span>
+          </div>
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>
