@@ -24,38 +24,23 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
 
-      - name: Set up SSH
+      - name: Open SSH tunnel to home server DB
         run: |
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H southwestsportscards.ca >> ~/.ssh/known_hosts
-          echo "Host southwestsportscards.ca" >> ~/.ssh/config
-          echo "  IdentityFile ~/.ssh/id_ed25519" >> ~/.ssh/config
-          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
-          chmod 600 ~/.ssh/config
-
-      - name: Download current data from server
-        run: |
-          mkdir -p data/master_db
-          scp root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/young_guns.csv data/master_db/
-          scp root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/nhl_player_stats.json data/master_db/ || true
-          scp root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/yg_price_history.json data/master_db/ || true
-          scp root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/yg_portfolio_history.json data/master_db/ || true
-          scp root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/yg_raw_sales.json data/master_db/ || true
-          scp root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/yg_correlation_history.json data/master_db/ || true
+          ssh-keyscan -p ${{ secrets.SERVER_SSH_PORT }} ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+          ssh -fN -L 5432:localhost:5432 \
+            -p ${{ secrets.SERVER_SSH_PORT }} \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+            -i ~/.ssh/id_ed25519
 
       - name: Scrape raw card prices
         run: python -u scrape_master_db.py --workers 5
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Scrape NHL player stats
         run: python -u scrape_nhl_stats.py
-
-      - name: Upload results to server
-        run: |
-          scp data/master_db/young_guns.csv root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/young_guns.csv
-          scp data/master_db/nhl_player_stats.json root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/nhl_player_stats.json
-          scp data/master_db/yg_price_history.json root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/yg_price_history.json || true
-          scp data/master_db/yg_portfolio_history.json root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/yg_portfolio_history.json || true
-          scp data/master_db/yg_raw_sales.json root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/yg_raw_sales.json || true
-          scp data/master_db/yg_correlation_history.json root@southwestsportscards.ca:/opt/card-dashboard/data/master_db/yg_correlation_history.json || true
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

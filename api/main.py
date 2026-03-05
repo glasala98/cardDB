@@ -22,20 +22,23 @@ try:
 except ImportError:
     pass
 
+import pathlib
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from api.routers import cards, master_db, stats, auth, scan, admin
 
 app = FastAPI(title="Card Dashboard API", version="0.1.0")
 
-# CORS: allow Vite dev server in development; update for production domain
+# CORS: allow Vite dev server in development + production domains
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",      # Vite dev server
-        "http://localhost:4173",      # Vite preview
-        "https://southwestsportscards.ca",  # production
+        "http://localhost:5173",              # Vite dev server
+        "http://localhost:4173",              # Vite preview
+        "https://southwestsportscards.ca",    # custom domain
+        "https://*.up.railway.app",           # Railway deployment
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -53,3 +56,9 @@ app.include_router(admin.router,     prefix="/api/admin",     tags=["admin"])
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+# Serve React frontend for all non-API routes (SPA support)
+_dist = pathlib.Path(__file__).parent.parent / "frontend" / "dist"
+if _dist.exists():
+    app.mount("/", StaticFiles(directory=str(_dist), html=True), name="static")

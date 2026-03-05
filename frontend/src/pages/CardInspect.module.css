@@ -359,3 +359,54 @@
   from { transform: translateY(12px); opacity: 0; }
   to   { transform: translateY(0);    opacity: 1; }
 }
+
+/* ── Mobile ──────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  /* Smaller card image so it doesn't dominate the screen */
+  .cardImageWrap,
+  .cardImage,
+  .cardImagePlaceholder {
+    width: 120px;
+    height: 168px;
+  }
+
+  /* Shrink action buttons to fit alongside the badge */
+  .headerActions { gap: 6px; }
+  .scrapeBtn,
+  .ebayLink { padding: 5px 10px; font-size: 11px; }
+
+  /* Metrics: 2-column grid so each stat is large enough to read */
+  .metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .metric    { min-width: 0; padding: 10px 12px; }
+  .metricValue.large { font-size: 18px; }
+
+  /* ROI table: tighten spacing so 4 columns fit on ~375px */
+  .roiRow    { padding: 8px 10px; gap: 8px; }
+  .roiGrade  { min-width: 52px; font-size: 12px; }
+  .roiFee    { min-width: 40px; font-size: 11px; }
+  .roiPrice  { min-width: 80px; font-size: 13px; }
+  .roiChange { font-size: 12px; }
+
+  /* Sales table: truncate long titles instead of wrapping them */
+  .titleCell {
+    max-width: 150px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-break: normal;
+  }
+  .dateCell  { min-width: 80px; font-size: 12px; }
+  .priceCell { min-width: 70px; font-size: 12px; }
+
+  /* Toast: full-width at the bottom instead of right-anchored */
+  .toast {
+    bottom: 12px;
+    right: 12px;
+    left: 12px;
+    max-width: none;
+  }
+}

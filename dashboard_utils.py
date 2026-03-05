@@ -2,7 +2,6 @@ import os
 import base64
 import json
 import re
-import shutil
 from datetime import datetime
 import urllib.parse
 import pandas as pd
@@ -30,73 +29,15 @@ try:
 except ImportError:
     HAS_ANTHROPIC = False
 
+from db import get_db
+from psycopg2.extras import RealDictCursor, execute_values
+
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_ROOT = os.path.join(SCRIPT_DIR, "data")
 USERS_YAML = os.path.join(SCRIPT_DIR, "users.yaml")
 
-# Legacy global paths (used by daily_scrape.py as defaults)
-CSV_PATH = os.path.join(SCRIPT_DIR, "card_prices_summary.csv")
-RESULTS_JSON_PATH = os.path.join(SCRIPT_DIR, "card_prices_results.json")
-HISTORY_PATH = os.path.join(SCRIPT_DIR, "price_history.json")
-BACKUP_DIR = os.path.join(SCRIPT_DIR, "backups")
-ARCHIVE_PATH = os.path.join(SCRIPT_DIR, "card_archive.csv")
 MONEY_COLS = ['Fair Value', 'Median (All)', 'Min', 'Max', 'Cost Basis']
 
-# ── In-process data cache (keyed by file paths → mtime) ──────────────────────
-_DATA_CACHE = {}  # key: (csv_path, json_path) → {mtimes, df}
-_MASTER_DB_CACHE = {}  # key: path → {mtime, df}
-
-
-def _file_mtime(path):
-    """Return the modification time of a file, or 0 if the file does not exist.
-
-    Args:
-        path: Filesystem path to check.
-
-    Returns:
-        Float modification timestamp from os.path.getmtime, or 0.0 on OSError.
-    """
-    try:
-        return os.path.getmtime(path)
-    except OSError:
-        return 0
-
-# Master DB paths (shared across all users)
-MASTER_DB_DIR = os.path.join(SCRIPT_DIR, "data", "master_db")
-MASTER_DB_PATH = os.path.join(MASTER_DB_DIR, "young_guns.csv")
-
-# Empty CSV columns for new users
-EMPTY_CSV_COLS = ['Card Name', 'Fair Value', 'Trend', 'Top 3 Prices', 'Median (All)', 'Min', 'Max', 'Num Sales', 'Tags', 'Cost Basis', 'Purchase Date']
-
-
 # ── User management ──────────────────────────────────────────────
-
-def get_user_paths(username):
-    """Return file paths for a specific user's data directory.
-
-    Creates the user directory and backups sub-directory if they do not
-    already exist.
-
-    Args:
-        username: The username whose paths should be resolved.
-
-    Returns:
-        Dict with keys ``csv``, ``results``, ``history``, ``portfolio``,
-        ``archive``, and ``backup_dir``, each mapping to an absolute path
-        inside ``data/<username>/``.
-    """
-    user_dir = os.path.join(DATA_ROOT, username)
-    os.makedirs(user_dir, exist_ok=True)
-    os.makedirs(os.path.join(user_dir, "backups"), exist_ok=True)
-    return {
-        'csv': os.path.join(user_dir, "card_prices_summary.csv"),
-        'results': os.path.join(user_dir, "card_prices_results.json"),
-        'history': os.path.join(user_dir, "price_history.json"),
-        'portfolio': os.path.join(user_dir, "portfolio_history.json"),
-        'archive': os.path.join(user_dir, "card_archive.csv"),
-        'backup_dir': os.path.join(user_dir, "backups"),
-    }
-
 
 def load_users():
     """Load the user configuration from users.yaml.
@@ -133,18 +74,6 @@ def verify_password(username, password):
     except Exception:
         return False
 
-
-def init_user_data(csv_path):
-    """Create an empty card-collection CSV for a new user if it does not exist.
-
-    Writes a CSV containing only the header row defined by ``EMPTY_CSV_COLS``.
-    Has no effect when the file already exists.
-
-    Args:
-        csv_path: Absolute path at which the CSV should be created.
-    """
-    if not os.path.exists(csv_path):
-        pd.DataFrame(columns=EMPTY_CSV_COLS).to_csv(csv_path, index=False)
 
 def analyze_card_images(front_image_bytes, back_image_bytes=None):
     """Use Claude Vision to extract structured card details from photo bytes.
@@ -322,7 +251,9 @@ def _filter_sales_by_variant(card_name, sales):
     kws = [w for w in re.findall(r'\b[A-Za-z]{3,}\b', subset) if w.lower() not in _SKIP]
     if not kws:
         return sales
-    filtered = [s for s in sales if any(kw.lower() in s.get('title', '').lower() for kw in kws)]
+    # Require ALL keywords present (AND logic) — prevents e.g. "Red" alone
+    # matching an unrelated parallel that doesn't say "Red Prism" in the title.
+    filtered = [s for s in sales if all(kw.lower() in s.get('title', '').lower() for kw in kws)]
     # Return empty rather than falling back to all sales — a wrong-variant price
     # is worse than "No Data". The scraper's stage fallbacks handle the empty case.
     return filtered
@@ -346,29 +277,25 @@ def _strip_grade_from_name(card_name):
     return name.strip()
 
 
-def scrape_single_card(card_name, results_json_path=None):
-    """Scrape eBay sold listings for one card and persist the results to JSON.
+def scrape_single_card(card_name, username):
+    """Scrape eBay sold listings for one card and persist the results to Supabase.
 
     Launches a headless Chrome driver, searches eBay for the card, applies
     variant/parallel filtering, and falls back to simplified queries or grade
     estimation (raw → PSA 9, raw/PSA 9 → PSA 10) when no direct comps are
-    found.  Merges new sales with any previously stored sales in the results
-    JSON, preserves existing ``image_url`` data, and writes the updated dict
-    back to disk.
+    found.  Merges new sales with any previously stored sales in ``card_results``,
+    preserves existing ``image_url`` data, and upserts the updated row.
 
     Args:
         card_name: Full card name string used as the eBay search query and
-            the key inside the results JSON.
-        results_json_path: Path to the ``card_prices_results.json`` file.
-            Defaults to the module-level ``RESULTS_JSON_PATH`` constant.
+            the key in ``card_results``.
+        username: Username whose card_results row should be updated.
 
     Returns:
         Stats dict from ``calculate_fair_price`` (keys include ``fair_price``,
         ``num_sales``, ``min``, ``max``, ``median``) when sales are found, or
         ``None`` when no comparable sales could be located.
     """
-    if results_json_path is None:
-        results_json_path = RESULTS_JSON_PATH
     driver = create_driver()
     try:
         sales = search_ebay_sold(driver, card_name, max_results=50)
@@ -485,35 +412,21 @@ def scrape_single_card(card_name, results_json_path=None):
             target_serial = extract_serial_run(card_name)
             sales = _normalize_shipping(sales)
             fair_price, stats = calculate_fair_price(sales, target_serial=target_serial)
-            # Save raw sales to results JSON
-            results = {}
-            if os.path.exists(results_json_path):
-                try:
-                    with open(results_json_path, 'r', encoding='utf-8') as f:
-                        results = json.load(f)
-                except Exception:
-                    results = {}
-            # Merge new sales with existing ones (accumulate history)
-            existing_sales = results.get(card_name, {}).get('raw_sales', [])
+            # Load existing card_results to merge/preserve image_url
+            existing_data = load_card_results(username, card_name)
+            existing_sales = existing_data.get('raw_sales', [])
             merged = _merge_sales(sales, existing_sales)
-            # Preserve existing image URLs; pick up new ones if available
-            existing = results.get(card_name, {})
-            image_url = existing.get('image_url') or next(
+            image_url = existing_data.get('image_url') or next(
                 (s.get('image_url') for s in sales if s.get('image_url')), None
             )
-            image_url_back = existing.get('image_url_back')
-            results[card_name] = {
-                'raw_sales': merged,
-                'fair_price': stats.get('fair_price'),
-                'num_sales': stats.get('num_sales'),
-                'scraped_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'image_url': image_url,
-                'image_url_back': image_url_back,
-                'is_estimated': is_estimated,
-                'price_source': price_source,
-            }
-            with open(results_json_path, 'w', encoding='utf-8') as f:
-                json.dump(results, f, indent=2, ensure_ascii=False)
+            save_card_results(
+                username, card_name,
+                raw_sales=merged,
+                scraped_at=datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                confidence=stats.get('confidence', ''),
+                image_url=image_url,
+                image_hash=existing_data.get('image_hash', ''),
+            )
             return stats
         return None
     finally:
@@ -615,58 +528,70 @@ def parse_card_name(card_name):
     return result
 
 
-def load_data(csv_path=CSV_PATH, results_json_path=None):
-    """Load the card collection CSV and enrich it with data from the results JSON.
+_COL_FROM_DB = {
+    'card_name':    'Card Name',
+    'fair_value':   'Fair Value',
+    'trend':        'Trend',
+    'top_3_prices': 'Top 3 Prices',
+    'median_all':   'Median (All)',
+    'min_price':    'Min',
+    'max_price':    'Max',
+    'num_sales':    'Num Sales',
+    'tags':         'Tags',
+    'cost_basis':   'Cost Basis',
+    'purchase_date': 'Purchase Date',
+}
+_COL_TO_DB = {v: k for k, v in _COL_FROM_DB.items()}
 
-    Parsed fields (Player, Year, Set, Subset, Card #, Serial, Grade) are
-    derived by calling ``parse_card_name`` on each row.  ``Last Scraped`` and
-    ``Confidence`` are read from the results JSON.  Monetary columns are
-    normalised to numeric floats and the ``Trend`` column is standardised.
 
-    Results are cached in ``_DATA_CACHE`` keyed by ``(csv_path,
-    results_json_path)``; the cache is bypassed automatically whenever either
-    file's mtime changes.
+def load_data(username: str) -> pd.DataFrame:
+    """Load the active card collection for a user from PostgreSQL."""
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT * FROM cards WHERE user_id = %s AND archived = FALSE",
+                (username,)
+            )
+            rows = cur.fetchall()
 
-    Args:
-        csv_path: Path to the card collection CSV.  Defaults to the
-            module-level ``CSV_PATH`` constant.
-        results_json_path: Path to the scrape results JSON.  Defaults to
-            ``RESULTS_JSON_PATH``.
+    if not rows:
+        parse_cols = ['Player', 'Year', 'Set', 'Subset', 'Card #', 'Serial', 'Grade']
+        return pd.DataFrame(columns=list(_COL_FROM_DB.values()) + parse_cols + ['Last Scraped', 'Confidence'])
 
-    Returns:
-        Pandas DataFrame with all original CSV columns plus ``Player``,
-        ``Year``, ``Set``, ``Subset``, ``Card #``, ``Serial``, ``Grade``,
-        ``Last Scraped``, and ``Confidence``.
-    """
-    if results_json_path is None:
-        results_json_path = RESULTS_JSON_PATH
+    df = pd.DataFrame([dict(r) for r in rows]).rename(columns=_COL_FROM_DB)
 
-    # Return cached DataFrame if files haven't changed
-    cache_key = (csv_path, results_json_path)
-    csv_mt  = _file_mtime(csv_path)
-    json_mt = _file_mtime(results_json_path)
-    cached  = _DATA_CACHE.get(cache_key)
-    if cached and cached['csv_mt'] == csv_mt and cached['json_mt'] == json_mt:
-        return cached['df'].copy()
+    # Drop internal columns that callers don't expect
+    for drop_col in ('id', 'user_id', 'archived', 'archived_date', 'created_at', 'updated_at'):
+        if drop_col in df.columns:
+            df = df.drop(columns=[drop_col])
 
-    df = pd.read_csv(csv_path)
-
-    # De-sanitize string columns
-    object_cols = df.select_dtypes(include=['object']).columns
-    for col in object_cols:
-        df[col] = df[col].apply(
-            lambda x: str(x)[1:] if isinstance(x, str) and str(x).startswith("'") and len(str(x)) > 1 and str(x)[1] in ['=', '+', '-', '@'] else x
-        )
-
+    # Normalize money columns
     for col in MONEY_COLS:
-        if col not in df.columns:
-            continue
-        df[col] = df[col].astype(str).str.replace('$', '', regex=False).str.replace(',', '', regex=False)
-        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-    df['Num Sales'] = pd.to_numeric(df['Num Sales'], errors='coerce').fillna(0).astype(int)
-    df['Trend'] = df['Trend'].replace({'insufficient data': 'no data', 'unknown': 'no data'})
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+    df['Num Sales'] = pd.to_numeric(df.get('Num Sales', 0), errors='coerce').fillna(0).astype(int)
+    df['Trend'] = df['Trend'].replace({'insufficient data': 'no data', 'unknown': 'no data'}).fillna('no data')
+    df['Tags'] = df['Tags'].fillna('')
+    df['Top 3 Prices'] = df['Top 3 Prices'].fillna('')
+    df['Purchase Date'] = df['Purchase Date'].fillna('')
 
-    # Parse Card Name into display columns
+    # Fetch Last Scraped + Confidence from card_results
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT card_name, scraped_at, confidence FROM card_results WHERE user_id = %s",
+                (username,)
+            )
+            res_rows = cur.fetchall()
+    res_map = {r['card_name']: r for r in res_rows}
+    df['Last Scraped'] = df['Card Name'].map(
+        lambda n: (str(res_map.get(n, {}).get('scraped_at') or ''))[:10]
+    )
+    df['Confidence'] = df['Card Name'].map(
+        lambda n: res_map.get(n, {}).get('confidence') or ''
+    )
+
+    # Parse card names into display columns
     parse_cols = ['Player', 'Year', 'Set', 'Subset', 'Card #', 'Serial', 'Grade']
     if len(df) > 0:
         parsed = df['Card Name'].apply(parse_card_name).apply(pd.Series)
@@ -676,243 +601,297 @@ def load_data(csv_path=CSV_PATH, results_json_path=None):
         for col in parse_cols:
             df[col] = pd.Series(dtype='object')
 
-    # Add Last Scraped and Confidence from results JSON
-    if os.path.exists(results_json_path):
-        try:
-            with open(results_json_path, 'r', encoding='utf-8') as f:
-                results = json.load(f)
-            df['Last Scraped'] = df['Card Name'].apply(
-                lambda name: results.get(name, {}).get('scraped_at', '')
-            )
-            df['Last Scraped'] = df['Last Scraped'].apply(
-                lambda x: x.split(' ')[0] if isinstance(x, str) and x else ''
-            )
-            df['Confidence'] = df['Card Name'].apply(
-                lambda name: results.get(name, {}).get('confidence', '') or ''
-            )
-        except Exception:
-            df['Last Scraped'] = ''
-            df['Confidence'] = ''
-    else:
-        df['Last Scraped'] = ''
-        df['Confidence'] = ''
-
-    # Ensure Tags column exists (backward compat for existing CSVs)
-    if 'Tags' not in df.columns:
-        df['Tags'] = ''
-    df['Tags'] = df['Tags'].fillna('')
-
-    _DATA_CACHE[cache_key] = {'csv_mt': csv_mt, 'json_mt': json_mt, 'df': df}
-    return df.copy()
+    return df
 
 PARSED_COLS = ['Player', 'Year', 'Set', 'Subset', 'Card #', 'Serial', 'Grade', 'Last Scraped', 'Confidence']
 
-def save_data(df, csv_path=CSV_PATH):
-    """Write the card collection DataFrame to CSV.
 
-    Drops display-only parsed columns (Player, Year, Set, etc.) before
-    saving so they are not persisted in the file.  Monetary columns are
-    formatted as ``"$X.XX"`` strings.  String columns are sanitised to
-    prevent CSV injection by prepending a single quote to values starting
-    with ``=``, ``+``, ``-``, or ``@``.
+def save_data(df: pd.DataFrame, username: str) -> None:
+    """Upsert the card collection DataFrame to Supabase.
+
+    Drops display-only parsed columns before saving and converts
+    DataFrame column names back to snake_case for the ``cards`` table.
 
     Args:
         df: Card collection DataFrame as returned by ``load_data``.
-        csv_path: Destination CSV path.  Defaults to ``CSV_PATH``.
+        username: Username whose ``cards`` rows to upsert.
     """
-    save_df = df.copy()
-    # Drop display-only parsed columns before saving
-    save_df = save_df.drop(columns=[c for c in PARSED_COLS if c in save_df.columns], errors='ignore')
-    for col in MONEY_COLS:
-        if col in save_df.columns:
-            save_df[col] = save_df[col].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "$0.00")
+    save_df = df.drop(columns=[c for c in PARSED_COLS if c in df.columns], errors='ignore').copy()
+    save_df = save_df.rename(columns=_COL_TO_DB)
 
-    # Sanitize string columns to prevent CSV injection
-    object_cols = save_df.select_dtypes(include=['object']).columns
-    for col in object_cols:
-        save_df[col] = save_df[col].apply(
-            lambda x: "'" + str(x) if isinstance(x, str) and str(x).startswith(('=', '+', '-', '@')) else x
-        )
+    rows = []
+    for rec in save_df.to_dict('records'):
+        rec['user_id'] = username
+        rec['archived'] = False
+        for k, v in rec.items():
+            if isinstance(v, float) and pd.isna(v):
+                rec[k] = None
+        rows.append(rec)
 
-    save_df.to_csv(csv_path, index=False)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            for i in range(0, len(rows), 500):
+                execute_values(cur, """
+                    INSERT INTO cards
+                        (user_id, card_name, fair_value, trend, top_3_prices,
+                         median_all, min_price, max_price, num_sales, tags,
+                         cost_basis, purchase_date, archived)
+                    VALUES %s
+                    ON CONFLICT (user_id, card_name) DO UPDATE SET
+                        fair_value    = EXCLUDED.fair_value,
+                        trend         = EXCLUDED.trend,
+                        top_3_prices  = EXCLUDED.top_3_prices,
+                        median_all    = EXCLUDED.median_all,
+                        min_price     = EXCLUDED.min_price,
+                        max_price     = EXCLUDED.max_price,
+                        num_sales     = EXCLUDED.num_sales,
+                        tags          = EXCLUDED.tags,
+                        cost_basis    = EXCLUDED.cost_basis,
+                        purchase_date = EXCLUDED.purchase_date,
+                        updated_at    = NOW()
+                """, [
+                    (r.get('user_id'), r.get('card_name'), r.get('fair_value'),
+                     r.get('trend'), r.get('top_3_prices'), r.get('median_all'),
+                     r.get('min_price'), r.get('max_price'), r.get('num_sales'),
+                     r.get('tags'), r.get('cost_basis'), r.get('purchase_date'),
+                     r.get('archived', False))
+                    for r in rows[i:i + 500]
+                ])
 
 
-def backup_data(label="scrape", csv_path=None, results_path=None, backup_dir=None):
-    """Create timestamped copies of the card CSV and results JSON in a backup directory.
-
-    Both files are copied with names of the form
-    ``card_prices_summary_YYYY-MM-DD_HHMMSS_<label>.csv`` (and the equivalent
-    ``_results_*.json``).  Files that do not yet exist are silently skipped.
+def load_card_results(username: str, card_name: str) -> dict:
+    """Load the scrape metadata + raw_sales for one card from Supabase.
 
     Args:
-        label: Short string appended to the backup filename for identification
-            (e.g. ``"scrape"`` or ``"manual"``).  Defaults to ``"scrape"``.
-        csv_path: Source CSV path.  Defaults to ``CSV_PATH``.
-        results_path: Source results JSON path.  Defaults to
-            ``RESULTS_JSON_PATH``.
-        backup_dir: Directory in which backups are written.  Created if it
-            does not exist.  Defaults to ``BACKUP_DIR``.
+        username: Username whose card_results to query.
+        card_name: Exact card name key.
 
     Returns:
-        Timestamp string ``"YYYY-MM-DD_HHMMSS"`` used in the backup filenames.
+        Dict with keys ``raw_sales``, ``scraped_at``, ``confidence``,
+        ``image_url``, ``image_hash``, ``image_url_back``, ``search_url``,
+        ``is_estimated``, ``price_source``.  Returns an empty dict when not found.
     """
-    csv_path = csv_path or CSV_PATH
-    results_path = results_path or RESULTS_JSON_PATH
-    backup_dir = backup_dir or BACKUP_DIR
-    os.makedirs(backup_dir, exist_ok=True)
-    timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
-
-    if os.path.exists(csv_path):
-        backup_csv = os.path.join(backup_dir, f"card_prices_summary_{timestamp}_{label}.csv")
-        shutil.copy2(csv_path, backup_csv)
-
-    if os.path.exists(results_path):
-        backup_json = os.path.join(backup_dir, f"card_prices_results_{timestamp}_{label}.json")
-        shutil.copy2(results_path, backup_json)
-
-    return timestamp
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT raw_sales, scraped_at, confidence, image_url, image_hash,
+                       image_url_back, search_url, is_estimated, price_source
+                FROM card_results WHERE user_id = %s AND card_name = %s
+            """, (username, card_name))
+            row = cur.fetchone()
+    return dict(row) if row else {}
 
 
-def load_sales_history(card_name, results_json_path=None):
+def load_all_card_results(username: str) -> dict:
+    """Load scrape metadata + raw_sales for ALL cards belonging to a user.
+
+    Returns a dict keyed by card_name for efficient batch lookups (e.g.
+    during the daily scrape where N per-card queries would be slow).
+
+    Args:
+        username: Username whose card_results to query.
+
+    Returns:
+        Dict mapping card_name strings to result dicts (same shape as
+        ``load_card_results``).
+    """
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT card_name, raw_sales, scraped_at, confidence, image_url,
+                       image_hash, image_url_back, search_url, is_estimated, price_source
+                FROM card_results WHERE user_id = %s
+            """, (username,))
+            rows = cur.fetchall()
+    return {r['card_name']: dict(r) for r in rows}
+
+
+def save_card_results(username: str, card_name: str, raw_sales: list,
+                      scraped_at: str = None, confidence: str = '',
+                      image_url: str = '', image_hash: str = '',
+                      image_url_back: str = '', search_url: str = '',
+                      is_estimated: bool = False,
+                      price_source: str = 'direct') -> None:
+    """Upsert raw sales + scrape metadata for one card in Supabase.
+
+    Args:
+        username: Username whose card_results row to upsert.
+        card_name: Exact card name key.
+        raw_sales: List of sale dicts from the scraper.
+        scraped_at: ISO timestamp string of when the scrape ran.
+        confidence: Confidence level string (e.g. ``'high'``).
+        image_url: eBay or CDN image URL for the card front.
+        image_hash: eBay image hash used to build the CDN URL.
+        image_url_back: eBay or CDN image URL for the card back.
+        search_url: eBay search URL used to find the card.
+        is_estimated: True when the price was estimated (not from direct comps).
+        price_source: Source of the price ('direct', 'raw_estimate', etc.).
+    """
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO card_results
+                    (user_id, card_name, raw_sales, scraped_at, confidence,
+                     image_url, image_hash, image_url_back, search_url,
+                     is_estimated, price_source)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (user_id, card_name) DO UPDATE SET
+                    raw_sales      = EXCLUDED.raw_sales,
+                    scraped_at     = EXCLUDED.scraped_at,
+                    confidence     = EXCLUDED.confidence,
+                    image_url      = EXCLUDED.image_url,
+                    image_hash     = EXCLUDED.image_hash,
+                    image_url_back = EXCLUDED.image_url_back,
+                    search_url     = EXCLUDED.search_url,
+                    is_estimated   = EXCLUDED.is_estimated,
+                    price_source   = EXCLUDED.price_source,
+                    updated_at     = NOW()
+            """, (
+                username, card_name,
+                json.dumps(raw_sales),
+                scraped_at or datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                confidence or '', image_url or '', image_hash or '',
+                image_url_back or '', search_url or '',
+                bool(is_estimated), price_source or 'direct',
+            ))
+
+
+def load_sales_history(username: str, card_name: str) -> list:
     """Load the raw eBay sold-listing history for a single card.
 
     Args:
-        card_name: The card name key as stored in the results JSON.
-        results_json_path: Path to ``card_prices_results.json``.  Defaults to
-            ``RESULTS_JSON_PATH``.
+        username: Username whose card_results to query.
+        card_name: The card name key.
 
     Returns:
         List of sale dicts (each with keys such as ``sold_date``, ``title``,
-        ``price_val``).  Returns an empty list when the file does not exist,
-        the card has no entry, or the file cannot be parsed.
+        ``price_val``).  Returns an empty list when no results found.
     """
-    results_json_path = results_json_path or RESULTS_JSON_PATH
-    if not os.path.exists(results_json_path):
-        return []
-    try:
-        with open(results_json_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        card_data = data.get(card_name, {})
-        return card_data.get('raw_sales', [])
-    except Exception:
-        return []
+    data = load_card_results(username, card_name)
+    return data.get('raw_sales', [])
 
 
-def append_price_history(card_name, fair_value, num_sales, history_path=None):
-    """Append a dated price snapshot for a card to the price history JSON.
+def append_price_history(username: str, card_name: str, fair_value: float,
+                         num_sales: int) -> None:
+    """Upsert a dated price snapshot for a card in ``card_price_history``.
 
-    Each snapshot stored is ``{"date": "YYYY-MM-DD", "fair_value": float,
-    "num_sales": int}``.  Multiple entries per day are allowed (no
-    deduplication).
+    At most one snapshot per (user, card, date) is kept (upsert on conflict).
 
     Args:
-        card_name: Card identifier used as the key in ``price_history.json``.
+        username: Username whose price history to update.
+        card_name: Card identifier.
         fair_value: Calculated fair market value to record.
         num_sales: Number of eBay sales used to compute the value.
-        history_path: Path to ``price_history.json``.  Defaults to
-            ``HISTORY_PATH``.
     """
-    history_path = history_path or HISTORY_PATH
-    history = {}
-    if os.path.exists(history_path):
-        try:
-            with open(history_path, 'r', encoding='utf-8') as f:
-                history = json.load(f)
-        except Exception:
-            history = {}
-
-    if card_name not in history:
-        history[card_name] = []
-
-    history[card_name].append({
-        'date': datetime.now().strftime('%Y-%m-%d'),
-        'fair_value': round(fair_value, 2),
-        'num_sales': num_sales
-    })
-
-    with open(history_path, 'w', encoding='utf-8') as f:
-        json.dump(history, f, indent=2, ensure_ascii=False)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO card_price_history (user_id, card_name, date, price, num_sales)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (user_id, card_name, date) DO UPDATE SET
+                    price     = EXCLUDED.price,
+                    num_sales = EXCLUDED.num_sales
+            """, (username, card_name, datetime.now().strftime('%Y-%m-%d'),
+                  round(float(fair_value), 2), int(num_sales)))
 
 
-def load_price_history(card_name, history_path=None):
+def load_price_history(username: str, card_name: str) -> list:
     """Load the fair-value price history for a single card.
 
     Args:
-        card_name: The card name key to look up in ``price_history.json``.
-        history_path: Path to ``price_history.json``.  Defaults to
-            ``HISTORY_PATH``.
+        username: Username whose price history to load.
+        card_name: The card name to look up.
 
     Returns:
-        List of snapshot dicts ``{"date", "fair_value", "num_sales"}``, oldest
-        first.  Returns an empty list when the file is missing or the card has
-        no recorded history.
+        List of snapshot dicts ``{"date", "fair_value", "num_sales"}``,
+        ordered oldest-first.  Returns an empty list when no history found.
     """
-    history_path = history_path or HISTORY_PATH
-    if not os.path.exists(history_path):
-        return []
-    try:
-        with open(history_path, 'r', encoding='utf-8') as f:
-            history = json.load(f)
-        return history.get(card_name, [])
-    except Exception:
-        return []
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT date, price, num_sales FROM card_price_history
+                WHERE user_id = %s AND card_name = %s ORDER BY date
+            """, (username, card_name))
+            rows = cur.fetchall()
+    return [{'date': str(r['date']), 'fair_value': r['price'], 'num_sales': r['num_sales']}
+            for r in rows]
 
 
-def append_portfolio_snapshot(total_value, total_cards, avg_value, portfolio_path=None):
-    """Append a daily portfolio value snapshot, replacing any existing entry for today.
+def load_all_price_history(username: str) -> dict:
+    """Load fair-value history for ALL active cards belonging to a user.
 
-    The snapshot written is ``{"date", "total_value", "total_cards",
-    "avg_value"}``.  At most one snapshot per calendar date is retained.
+    Returns a dict keyed by card_name for efficient batch use (e.g. portfolio
+    history chart which must aggregate across every card).
 
     Args:
+        username: Username whose card_price_history to query.
+
+    Returns:
+        Dict mapping card_name → list of ``{"date", "fair_value", "num_sales"}``
+        dicts ordered oldest-first.
+    """
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT card_name, date, price, num_sales FROM card_price_history
+                WHERE user_id = %s ORDER BY date
+            """, (username,))
+            rows = cur.fetchall()
+    result: dict = {}
+    for r in rows:
+        result.setdefault(r['card_name'], []).append({
+            'date':       str(r['date']),
+            'fair_value': r['price'],
+            'num_sales':  r['num_sales'],
+        })
+    return result
+
+
+def append_portfolio_snapshot(username: str, total_value: float,
+                              total_cards: int, avg_value: float) -> None:
+    """Upsert a daily portfolio value snapshot in Supabase.
+
+    At most one snapshot per (user, date) is kept (upsert on conflict).
+
+    Args:
+        username: Username whose portfolio history to update.
         total_value: Sum of fair values across the whole collection (CAD).
         total_cards: Number of cards in the collection.
         avg_value: Average fair value per card.
-        portfolio_path: Path to ``portfolio_history.json``.  Defaults to
-            ``<SCRIPT_DIR>/portfolio_history.json``.
     """
-    portfolio_path = portfolio_path or os.path.join(SCRIPT_DIR, "portfolio_history.json")
-    snapshots = []
-    if os.path.exists(portfolio_path):
-        try:
-            with open(portfolio_path, 'r', encoding='utf-8') as f:
-                snapshots = json.load(f)
-        except Exception:
-            snapshots = []
-
-    today = datetime.now().strftime('%Y-%m-%d')
-    snapshots = [s for s in snapshots if s['date'] != today]
-    snapshots.append({
-        'date': today,
-        'total_value': round(total_value, 2),
-        'total_cards': total_cards,
-        'avg_value': round(avg_value, 2),
-    })
-
-    with open(portfolio_path, 'w', encoding='utf-8') as f:
-        json.dump(snapshots, f, indent=2, ensure_ascii=False)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO portfolio_history (user_id, date, total_value, total_cards, avg_value)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (user_id, date) DO UPDATE SET
+                    total_value = EXCLUDED.total_value,
+                    total_cards = EXCLUDED.total_cards,
+                    avg_value   = EXCLUDED.avg_value
+            """, (username, datetime.now().strftime('%Y-%m-%d'),
+                  round(float(total_value), 2), int(total_cards), round(float(avg_value), 2)))
 
 
-def load_portfolio_history(portfolio_path=None):
-    """Load the full list of daily portfolio value snapshots.
+def load_portfolio_history(username: str) -> list:
+    """Load the full list of daily portfolio value snapshots from Supabase.
 
     Args:
-        portfolio_path: Path to ``portfolio_history.json``.  Defaults to
-            ``<SCRIPT_DIR>/portfolio_history.json``.
+        username: Username whose portfolio history to load.
 
     Returns:
         List of snapshot dicts ``{"date", "total_value", "total_cards",
-        "avg_value"}``, in the order they were appended.  Returns an empty
-        list when the file does not exist or cannot be parsed.
+        "avg_value"}``, ordered by date ascending.
     """
-    portfolio_path = portfolio_path or os.path.join(SCRIPT_DIR, "portfolio_history.json")
-    if not os.path.exists(portfolio_path):
-        return []
-    try:
-        with open(portfolio_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return []
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT date, total_value, total_cards, avg_value FROM portfolio_history
+                WHERE user_id = %s ORDER BY date
+            """, (username,))
+            rows = cur.fetchall()
+    return [{'date': str(r['date']), 'total_value': r['total_value'],
+             'total_cards': r['total_cards'], 'avg_value': r['avg_value']}
+            for r in rows]
 
 
 def scrape_graded_comparison(card_name):
@@ -965,128 +944,96 @@ def scrape_graded_comparison(card_name):
         driver.quit()
 
 
-def archive_card(df, card_name, archive_path=None):
-    """Remove a card from the active collection and append it to the archive CSV.
+def archive_card(df: pd.DataFrame, username: str, card_name: str) -> pd.DataFrame:
+    """Mark a card as archived in Supabase and remove it from the active DataFrame.
 
-    Display-only parsed columns are stripped before writing to the archive.
-    Monetary columns are formatted as ``"$X.XX"`` strings, and string values
-    are sanitised against CSV injection.  An ``"Archived Date"`` column
-    (``"YYYY-MM-DD HH:MM:SS"``) is added to the archived row.
-
+    Sets ``archived=TRUE`` and ``archived_date`` on the ``cards`` row.
     If the card is not found in ``df``, the DataFrame is returned unchanged.
 
     Args:
         df: Active card collection DataFrame (as returned by ``load_data``).
+        username: Username whose card to archive.
         card_name: Exact ``Card Name`` value of the card to archive.
-        archive_path: Path to the archive CSV.  Defaults to ``ARCHIVE_PATH``.
 
     Returns:
         Updated DataFrame with the specified card removed.
     """
-    archive_path = archive_path or ARCHIVE_PATH
-    card_rows = df[df['Card Name'] == card_name]
-    if len(card_rows) == 0:
+    if df[df['Card Name'] == card_name].empty:
         return df
 
-    archive_row = card_rows.copy()
-    archive_row = archive_row.drop(columns=[c for c in PARSED_COLS if c in archive_row.columns], errors='ignore')
-    archive_row['Archived Date'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE cards SET archived = TRUE, archived_date = NOW()
+                WHERE user_id = %s AND card_name = %s
+            """, (username, card_name))
+
+    return df[df['Card Name'] != card_name].reset_index(drop=True)
+
+
+def load_archive(username: str) -> pd.DataFrame:
+    """Load archived cards for a user from Supabase.
+
+    Args:
+        username: Username whose archive to load.
+
+    Returns:
+        DataFrame of archived cards with an ``Archived Date`` column,
+        or an empty DataFrame when none exist.
+    """
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT * FROM cards WHERE user_id = %s AND archived = TRUE",
+                (username,)
+            )
+            rows = cur.fetchall()
+    if not rows:
+        return pd.DataFrame()
+
+    df = pd.DataFrame([dict(r) for r in rows]).rename(columns=_COL_FROM_DB)
+    if 'archived_date' in df.columns:
+        df['Archived Date'] = df['archived_date']
+    for drop_col in ('id', 'user_id', 'archived', 'archived_date', 'created_at', 'updated_at'):
+        if drop_col in df.columns:
+            df = df.drop(columns=[drop_col])
     for col in MONEY_COLS:
-        if col not in archive_row.columns:
-            continue
-        archive_row[col] = archive_row[col].apply(lambda x: f"${x:.2f}" if pd.notna(x) else "$0.00")
-
-    # Sanitize string columns
-    object_cols = archive_row.select_dtypes(include=['object']).columns
-    for col in object_cols:
-        archive_row[col] = archive_row[col].apply(
-            lambda x: "'" + str(x) if isinstance(x, str) and str(x).startswith(('=', '+', '-', '@')) else x
-        )
-
-    if os.path.exists(archive_path):
-        archive_row.to_csv(archive_path, mode='a', header=False, index=False)
-    else:
-        archive_row.to_csv(archive_path, index=False)
-
-    df = df[df['Card Name'] != card_name].reset_index(drop=True)
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
     return df
 
 
-def load_archive(archive_path=None):
-    """Load the archive CSV as a DataFrame.
-
-    De-sanitises any CSV-injection-protected string values and converts
-    monetary columns back to numeric floats.
+def restore_card(username: str, card_name: str) -> dict | None:
+    """Clear the archived flag on a card and return its data for re-adding.
 
     Args:
-        archive_path: Path to the archive CSV.  Defaults to ``ARCHIVE_PATH``.
-
-    Returns:
-        DataFrame of archived cards, or an empty DataFrame when the file does
-        not exist or cannot be parsed.
-    """
-    archive_path = archive_path or ARCHIVE_PATH
-    if not os.path.exists(archive_path):
-        return pd.DataFrame()
-    try:
-        archive_df = pd.read_csv(archive_path)
-
-        # De-sanitize string columns
-        object_cols = archive_df.select_dtypes(include=['object']).columns
-        for col in object_cols:
-            archive_df[col] = archive_df[col].apply(
-                lambda x: str(x)[1:] if isinstance(x, str) and str(x).startswith("'") and len(str(x)) > 1 and str(x)[1] in ['=', '+', '-', '@'] else x
-            )
-
-        for col in MONEY_COLS:
-            if col in archive_df.columns:
-                archive_df[col] = archive_df[col].astype(str).str.replace('$', '', regex=False).str.replace(',', '', regex=False)
-                archive_df[col] = pd.to_numeric(archive_df[col], errors='coerce').fillna(0)
-        return archive_df
-    except Exception:
-        return pd.DataFrame()
-
-
-def restore_card(card_name, archive_path=None):
-    """Remove a card from the archive CSV and return its data for re-adding.
-
-    Rewrites the archive file without the restored card.  When the archive
-    becomes empty after removal, the file is deleted entirely.
-
-    Args:
+        username: Username whose archived card to restore.
         card_name: Exact ``Card Name`` value to restore.
-        archive_path: Path to the archive CSV.  Defaults to ``ARCHIVE_PATH``.
 
     Returns:
-        Dict of the first matching archived row (as returned by
-        ``DataFrame.iloc[0].to_dict()``), or ``None`` when the file does not
-        exist, the card is not found, or an error occurs.
+        Dict of the card row (with original column names), or ``None`` when
+        the card is not found in the archive.
     """
-    archive_path = archive_path or ARCHIVE_PATH
-    if not os.path.exists(archive_path):
-        return None
-    try:
-        archive_df = pd.read_csv(archive_path)
-        card_rows = archive_df[archive_df['Card Name'] == card_name]
-        if len(card_rows) == 0:
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT * FROM cards
+                WHERE user_id = %s AND card_name = %s AND archived = TRUE
+            """, (username, card_name))
+            row = cur.fetchone()
+        if not row:
             return None
-        archive_df = archive_df[archive_df['Card Name'] != card_name]
-        if len(archive_df) > 0:
-            archive_df.to_csv(archive_path, index=False)
-        else:
-            os.remove(archive_path)
-        return card_rows.iloc[0].to_dict()
-    except Exception:
-        return None
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE cards SET archived = FALSE, archived_date = NULL
+                WHERE user_id = %s AND card_name = %s
+            """, (username, card_name))
+
+    raw = dict(row)
+    return {_COL_FROM_DB.get(k, k): v for k, v in raw.items()}
 
 
 # ── Master DB ───────────────────────────────────────────────────
-
-YG_PRICE_HISTORY_PATH = os.path.join(MASTER_DB_DIR, "yg_price_history.json")
-YG_PORTFOLIO_HISTORY_PATH = os.path.join(MASTER_DB_DIR, "yg_portfolio_history.json")
-YG_RAW_SALES_PATH = os.path.join(MASTER_DB_DIR, "yg_raw_sales.json")
-NHL_STATS_PATH = os.path.join(MASTER_DB_DIR, "nhl_player_stats.json")
-YG_CORRELATION_HISTORY_PATH = os.path.join(MASTER_DB_DIR, "yg_correlation_history.json")
 CANADIAN_TEAM_ABBREVS = {'TOR', 'MTL', 'OTT', 'WPG', 'CGY', 'EDM', 'VAN'}
 
 TEAM_NAME_TO_ABBREV = {
@@ -1105,77 +1052,105 @@ TEAM_NAME_TO_ABBREV = {
 TEAM_ABBREV_TO_NAME = {v: k for k, v in TEAM_NAME_TO_ABBREV.items()}
 
 
-def load_nhl_player_stats(player_name=None, path=None):
-    """Load NHL player statistics from the stats JSON file.
+def load_player_stats(player_name=None, sport: str = 'NHL'):
+    """Load player statistics from Supabase for a given sport.
 
     Args:
-        player_name: If provided, return only the stats dict for this player
-            (looked up under the ``players`` key of the JSON).  Pass ``None``
-            to return the full JSON object.
-        path: Path to ``nhl_player_stats.json``.  Defaults to
-            ``NHL_STATS_PATH``.
+        player_name: If provided, return only the stats dict for this player.
+            Pass ``None`` to return the full ``{"players": ..., "standings": ...}``
+            dict (matching the old JSON file shape used by analytics callers).
+        sport: Sport code (default ``'NHL'``). Future values: ``'NBA'``, ``'NFL'``, ``'MLB'``.
 
     Returns:
         When ``player_name`` is given: the player's stats dict, or ``None``
         if the player is not found.
-        When ``player_name`` is ``None``: the full data dict (containing
-        ``players`` and ``standings``), or ``{}`` on error.
+        When ``player_name`` is ``None``: dict with keys ``players`` and
+        ``standings``, or ``{}`` on error.
     """
-    path = path or NHL_STATS_PATH
-    if not os.path.exists(path):
-        return {} if player_name is None else None
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        if player_name:
-            return data.get('players', {}).get(player_name)
-        return data
-    except Exception:
-        return {} if player_name is None else None
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            if player_name:
+                cur.execute(
+                    "SELECT data FROM player_stats WHERE sport = %s AND player = %s",
+                    (sport, player_name)
+                )
+                row = cur.fetchone()
+                return row['data'] if row else None
+            cur.execute("SELECT player, data FROM player_stats WHERE sport = %s", (sport,))
+            player_rows = cur.fetchall()
+            cur.execute("SELECT team, data FROM standings WHERE sport = %s", (sport,))
+            standing_rows = cur.fetchall()
+    return {
+        'players':   {r['player']: r['data'] for r in player_rows},
+        'standings': {r['team']:   r['data'] for r in standing_rows},
+    }
 
 
-def save_nhl_player_stats(data, path=None):
-    """Write the full NHL player stats dict to the stats JSON file.
+# Backward-compat alias used by scrape_nhl_stats.py callers
+load_nhl_player_stats = load_player_stats
 
-    Creates parent directories as needed.
+
+def save_player_stats(data: dict, sport: str = 'NHL') -> None:
+    """Write the full player stats dict to Supabase for a given sport.
+
+    Upserts every player into ``player_stats`` and every team into ``standings``.
 
     Args:
-        data: Complete stats dict (with ``players`` and ``standings`` keys)
-            to serialise.
-        path: Destination path.  Defaults to ``NHL_STATS_PATH``.
+        data: Complete stats dict with keys ``players`` and ``standings``.
+        sport: Sport code (default ``'NHL'``).
     """
-    path = path or NHL_STATS_PATH
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    player_rows = [(sport, name, json.dumps(pdata))
+                   for name, pdata in data.get('players', {}).items()]
+    standing_rows = [(sport, team, json.dumps(sdata))
+                     for team, sdata in data.get('standings', {}).items()]
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            for i in range(0, len(player_rows), 500):
+                execute_values(cur, """
+                    INSERT INTO player_stats (sport, player, data)
+                    VALUES %s
+                    ON CONFLICT (sport, player) DO UPDATE SET
+                        data = EXCLUDED.data, updated_at = NOW()
+                """, player_rows[i:i + 500])
+            for i in range(0, len(standing_rows), 500):
+                execute_values(cur, """
+                    INSERT INTO standings (sport, team, data)
+                    VALUES %s
+                    ON CONFLICT (sport, team) DO UPDATE SET
+                        data = EXCLUDED.data, updated_at = NOW()
+                """, standing_rows[i:i + 500])
 
 
-def load_nhl_standings(path=None):
-    """Load the NHL team standings dict from the stats JSON file.
+# Backward-compat alias
+save_nhl_player_stats = save_player_stats
 
-    Args:
-        path: Path to ``nhl_player_stats.json``.  Defaults to
-            ``NHL_STATS_PATH``.
+
+def load_standings(sport: str = 'NHL') -> dict:
+    """Load team standings from Supabase for a given sport.
 
     Returns:
         Dict mapping team abbreviation strings to standings data dicts.
-        Returns an empty dict when the file is missing or has no
-        ``standings`` key.
     """
-    data = load_nhl_player_stats(path=path)
-    return data.get('standings', {})
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT team, data FROM standings WHERE sport = %s", (sport,))
+            rows = cur.fetchall()
+    return {r['team']: r['data'] for r in rows}
 
 
-def get_player_stats_for_card(player_name, path=None):
+# Backward-compat alias
+load_nhl_standings = load_standings
+
+
+def get_player_stats_for_card(player_name, sport: str = 'NHL'):
     """Return a formatted current-season stats dict for a card's player.
 
-    Reads from the NHL stats JSON and reshapes the ``current_season`` block
-    into a flat dict that includes a pre-built human-readable ``summary``
-    string.  Skater and goalie stats are handled separately.
+    Reads from Supabase and reshapes the ``current_season`` block into a flat
+    dict that includes a pre-built human-readable ``summary`` string.  Skater
+    and goalie stats are handled separately.
 
     Args:
-        player_name: Full player name as stored in ``nhl_player_stats.json``.
-        path: Path to the stats JSON.  Defaults to ``NHL_STATS_PATH``.
+        player_name: Full player name as stored in ``nhl_player_stats``.
 
     Returns:
         Dict with keys ``type``, ``position``, ``current_team``, ``nhl_id``,
@@ -1184,7 +1159,7 @@ def get_player_stats_for_card(player_name, path=None):
         ``save_pct`` for goalies).  Returns ``None`` when the player is not
         found or has no current-season data.
     """
-    stats = load_nhl_player_stats(player_name, path=path)
+    stats = load_player_stats(player_name, sport='NHL')
     if not stats:
         return None
     current = stats.get('current_season', {})
@@ -1221,37 +1196,31 @@ def get_player_stats_for_card(player_name, path=None):
     return result
 
 
-def get_player_bio_for_card(player_name, path=None):
+def get_player_bio_for_card(player_name):
     """Return the biographical data dict for a card's player.
 
     Args:
-        player_name: Full player name as stored in ``nhl_player_stats.json``.
-        path: Path to the stats JSON.  Defaults to ``NHL_STATS_PATH``.
+        player_name: Full player name as stored in ``nhl_player_stats``.
 
     Returns:
         Bio dict with fields such as ``nationality``, ``draft_round``, and
         ``draft_overall``, or ``None`` when the player is not found or has
         no bio data.
     """
-    stats = load_nhl_player_stats(player_name, path=path)
+    stats = load_player_stats(player_name, sport='NHL')
     if not stats or not stats.get('bio'):
         return None
     return stats['bio']
 
 
-def get_all_player_bios(path=None):
+def get_all_player_bios():
     """Return biographical data for every player that has bio information.
-
-    Args:
-        path: Path to ``nhl_player_stats.json``.  Defaults to
-            ``NHL_STATS_PATH``.
 
     Returns:
         Dict mapping player name strings to their bio dicts.  Players with no
-        ``bio`` entry are excluded.  Returns an empty dict when the stats file
-        is missing or empty.
+        ``bio`` entry are excluded.  Returns an empty dict when no stats exist.
     """
-    data = load_nhl_player_stats(path=path)
+    data = load_nhl_player_stats()
     if not data:
         return {}
     players = data.get('players', {})
@@ -1449,454 +1418,434 @@ def compute_correlation_snapshot(cards_df, nhl_players, nhl_standings):
     }
 
 
-def load_correlation_history(path=None):
-    """Load the full correlation history from JSON.
-
-    The history is a dict keyed by ``"YYYY-MM-DD"`` date strings, each
-    mapping to the snapshot produced by ``compute_correlation_snapshot``.
+def load_correlation_history(sport: str = 'NHL') -> dict:
+    """Load the full correlation history from Supabase.
 
     Args:
-        path: Path to ``yg_correlation_history.json``.  Defaults to
-            ``YG_CORRELATION_HISTORY_PATH``.
+        sport: Sport code (default ``'NHL'``).
 
     Returns:
-        Dict of dated snapshots, or an empty dict when the file does not
-        exist or cannot be parsed.
+        Dict keyed by ``"YYYY-MM-DD"`` date strings, each mapping to the
+        snapshot produced by ``compute_correlation_snapshot``.
+        Returns an empty dict when no history is stored.
     """
-    path = path or YG_CORRELATION_HISTORY_PATH
-    if not os.path.exists(path):
-        return {}
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return {}
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                "SELECT date, data FROM rookie_correlation_history WHERE sport = %s",
+                (sport,)
+            )
+            rows = cur.fetchall()
+    return {str(r['date']): r['data'] for r in rows}
 
 
-def save_correlation_snapshot(snapshot, path=None):
-    """Append or overwrite today's correlation snapshot in the history file.
-
-    Reads the existing history, sets today's date key to ``snapshot``, and
-    writes the updated dict back.  Creates parent directories if needed.
+def save_correlation_snapshot(snapshot: dict, sport: str = 'NHL') -> None:
+    """Upsert today's correlation snapshot in Supabase.
 
     Args:
         snapshot: Snapshot dict as returned by ``compute_correlation_snapshot``.
-        path: Path to ``yg_correlation_history.json``.  Defaults to
-            ``YG_CORRELATION_HISTORY_PATH``.
+        sport: Sport code (default ``'NHL'``).
     """
-    path = path or YG_CORRELATION_HISTORY_PATH
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    history = load_correlation_history(path)
     today = datetime.now().strftime('%Y-%m-%d')
-    history[today] = snapshot
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(history, f, indent=2, ensure_ascii=False)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO rookie_correlation_history (sport, date, data)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (sport, date) DO UPDATE SET data = EXCLUDED.data
+            """, (sport, today, json.dumps(snapshot)))
 
 
-def append_yg_price_history(card_name, fair_value, num_sales, history_path=None,
-                            graded_prices=None):
-    """Append a price snapshot for a Young Guns card to the YG history log.
+def append_rookie_price_history(card_name: str, fair_value: float, num_sales: int,
+                               graded_prices: dict = None, sport: str = 'NHL') -> None:
+    """Upsert a price snapshot for a rookie card in Supabase.
+
+    Merges ``graded_prices`` with any existing graded data for today.
 
     Args:
-        card_name: Card identifier
-        fair_value: Raw/ungraded fair value
-        num_sales: Number of raw sales found
-        history_path: Override path for history JSON
-        graded_prices: Optional dict of graded price data, e.g.
-            {'PSA 10': {'fair_value': 150.0, 'num_sales': 5}, 'BGS 9.5': {...}}
+        card_name: Full CardName string used as the ``player`` key.
+        fair_value: Raw/ungraded fair value.
+        num_sales: Number of raw sales found.
+        graded_prices: Optional dict of graded price data.
+        sport: Sport code (default ``'NHL'``).
     """
-    history_path = history_path or YG_PRICE_HISTORY_PATH
-    os.makedirs(os.path.dirname(history_path), exist_ok=True)
-    history = {}
-    if os.path.exists(history_path):
-        try:
-            with open(history_path, 'r', encoding='utf-8') as f:
-                history = json.load(f)
-        except Exception:
-            history = {}
-
-    if card_name not in history:
-        history[card_name] = []
-
     today = datetime.now().strftime('%Y-%m-%d')
-    # Deduplicate: replace today's entry if it exists
-    existing = [h for h in history[card_name] if h.get('date') == today]
-    history[card_name] = [h for h in history[card_name] if h.get('date') != today]
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT graded_data FROM rookie_price_history
+                WHERE sport = %s AND player = %s AND season = '' AND date = %s
+            """, (sport, card_name, today))
+            existing = cur.fetchone()
+        merged_graded = (existing['graded_data'] or {}) if existing else {}
+        if graded_prices:
+            merged_graded.update(graded_prices)
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO rookie_price_history
+                    (sport, player, season, date, fair_value, num_sales, graded_data)
+                VALUES (%s, %s, '', %s, %s, %s, %s)
+                ON CONFLICT (sport, player, season, date) DO UPDATE SET
+                    fair_value  = EXCLUDED.fair_value,
+                    num_sales   = EXCLUDED.num_sales,
+                    graded_data = EXCLUDED.graded_data
+            """, (sport, card_name, today,
+                  round(float(fair_value), 2), int(num_sales),
+                  json.dumps(merged_graded)))
 
-    entry = {
-        'date': today,
-        'fair_value': round(fair_value, 2),
-        'num_sales': num_sales,
-    }
 
-    # Merge graded prices: if we have existing graded data from today, keep it
-    if existing and existing[0].get('graded') and not graded_prices:
-        entry['graded'] = existing[0]['graded']
-    elif graded_prices:
-        # Merge with any existing graded data from today
-        merged_graded = existing[0].get('graded', {}) if existing else {}
-        merged_graded.update(graded_prices)
-        entry['graded'] = merged_graded
-
-    history[card_name].append(entry)
-
-    with open(history_path, 'w', encoding='utf-8') as f:
-        json.dump(history, f, indent=2, ensure_ascii=False)
+# Backward-compat alias
+append_yg_price_history = append_rookie_price_history
 
 
-def load_yg_price_history(card_name=None, history_path=None):
-    """Load Young Guns price history from the YG history JSON.
+def load_rookie_price_history(card_name=None, sport: str = 'NHL') -> list | dict:
+    """Load rookie card price history from Supabase.
 
     Args:
-        card_name: If provided, return only the price snapshot list for this
-            card.  Pass ``None`` to return the full history dict for all cards.
-        history_path: Path to ``yg_price_history.json``.  Defaults to
-            ``YG_PRICE_HISTORY_PATH``.
+        card_name: If provided, return the price snapshot list for this card.
+            Pass ``None`` to return the full history dict keyed by card name.
+        sport: Sport code (default ``'NHL'``).
 
     Returns:
-        When ``card_name`` is given: list of snapshot dicts (``{"date",
-        "fair_value", "num_sales"[, "graded"]}``), or ``[]`` if not found.
-        When ``card_name`` is ``None``: full history dict keyed by card name,
-        or ``{}`` on error.
+        When ``card_name`` is given: list of snapshot dicts.
+        When ``card_name`` is ``None``: full history dict keyed by card name.
     """
-    history_path = history_path or YG_PRICE_HISTORY_PATH
-    if not os.path.exists(history_path):
-        return [] if card_name else {}
-    try:
-        with open(history_path, 'r', encoding='utf-8') as f:
-            history = json.load(f)
-        if card_name:
-            return history.get(card_name, [])
-        return history
-    except Exception:
-        return [] if card_name else {}
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            if card_name:
+                cur.execute("""
+                    SELECT date, fair_value, num_sales, graded_data
+                    FROM rookie_price_history
+                    WHERE sport = %s AND player = %s ORDER BY date
+                """, (sport, card_name))
+                rows = cur.fetchall()
+                return [{'date': str(r['date']), 'fair_value': r['fair_value'],
+                         'num_sales': r['num_sales'], 'graded': r.get('graded_data') or {}}
+                        for r in rows]
+            cur.execute("""
+                SELECT player, date, fair_value, num_sales, graded_data
+                FROM rookie_price_history WHERE sport = %s ORDER BY date
+            """, (sport,))
+            rows = cur.fetchall()
+    result: dict = {}
+    for r in rows:
+        result.setdefault(r['player'], []).append({
+            'date': str(r['date']), 'fair_value': r['fair_value'],
+            'num_sales': r['num_sales'], 'graded': r.get('graded_data') or {}
+        })
+    return result
 
 
-def append_yg_portfolio_snapshot(total_value, total_cards, avg_value, cards_scraped,
-                                 portfolio_path=None):
-    """Append a daily Young Guns market snapshot, replacing any entry for today.
+# Backward-compat alias
+load_yg_price_history = load_rookie_price_history
 
-    The snapshot written is ``{"date", "total_value", "total_cards",
-    "avg_value", "cards_scraped"}``.  Creates parent directories if needed.
+
+def append_rookie_portfolio_snapshot(total_value: float, total_cards: int,
+                                     avg_value: float, cards_scraped: int,
+                                     sport: str = 'NHL') -> None:
+    """Upsert a daily rookie market portfolio snapshot in Supabase.
 
     Args:
-        total_value: Aggregate fair value of all YG cards in the master DB.
-        total_cards: Total number of YG cards tracked.
-        avg_value: Average fair value per YG card.
+        total_value: Aggregate fair value of all rookie cards.
+        total_cards: Total number of rookie cards tracked.
+        avg_value: Average fair value per card.
         cards_scraped: Number of cards with fresh price data in this run.
-        portfolio_path: Path to ``yg_portfolio_history.json``.  Defaults to
-            ``YG_PORTFOLIO_HISTORY_PATH``.
+        sport: Sport code (default ``'NHL'``).
     """
-    portfolio_path = portfolio_path or YG_PORTFOLIO_HISTORY_PATH
-    os.makedirs(os.path.dirname(portfolio_path), exist_ok=True)
-    snapshots = []
-    if os.path.exists(portfolio_path):
-        try:
-            with open(portfolio_path, 'r', encoding='utf-8') as f:
-                snapshots = json.load(f)
-        except Exception:
-            snapshots = []
-
-    today = datetime.now().strftime('%Y-%m-%d')
-    snapshots = [s for s in snapshots if s['date'] != today]
-    snapshots.append({
-        'date': today,
-        'total_value': round(total_value, 2),
-        'total_cards': total_cards,
-        'avg_value': round(avg_value, 2),
-        'cards_scraped': cards_scraped,
-    })
-
-    with open(portfolio_path, 'w', encoding='utf-8') as f:
-        json.dump(snapshots, f, indent=2, ensure_ascii=False)
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO rookie_portfolio_history
+                    (sport, date, total_value, total_cards, avg_value, cards_scraped)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (sport, date) DO UPDATE SET
+                    total_value   = EXCLUDED.total_value,
+                    total_cards   = EXCLUDED.total_cards,
+                    avg_value     = EXCLUDED.avg_value,
+                    cards_scraped = EXCLUDED.cards_scraped
+            """, (sport, datetime.now().strftime('%Y-%m-%d'),
+                  round(float(total_value), 2), int(total_cards),
+                  round(float(avg_value), 2), int(cards_scraped)))
 
 
-def load_yg_portfolio_history(portfolio_path=None):
-    """Load the full list of daily Young Guns market snapshots.
+# Backward-compat alias
+append_yg_portfolio_snapshot = append_rookie_portfolio_snapshot
+
+
+def load_rookie_portfolio_history(sport: str = 'NHL') -> list:
+    """Load daily rookie market portfolio snapshots from Supabase.
 
     Args:
-        portfolio_path: Path to ``yg_portfolio_history.json``.  Defaults to
-            ``YG_PORTFOLIO_HISTORY_PATH``.
+        sport: Sport code (default ``'NHL'``).
 
     Returns:
-        List of snapshot dicts ``{"date", "total_value", "total_cards",
-        "avg_value", "cards_scraped"}``, in appended order.  Returns an empty
-        list when the file does not exist or cannot be parsed.
+        List of snapshot dicts ordered by date ascending.
     """
-    portfolio_path = portfolio_path or YG_PORTFOLIO_HISTORY_PATH
-    if not os.path.exists(portfolio_path):
-        return []
-    try:
-        with open(portfolio_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return []
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT date, total_value, total_cards, avg_value, cards_scraped
+                FROM rookie_portfolio_history WHERE sport = %s ORDER BY date
+            """, (sport,))
+            rows = cur.fetchall()
+    return [{'date': str(r['date']), 'total_value': r['total_value'],
+             'total_cards': r['total_cards'], 'avg_value': r['avg_value'],
+             'cards_scraped': r['cards_scraped']} for r in rows]
 
 
-def save_yg_raw_sales(card_name, sales, path=None):
-    """Save raw eBay sales for a Young Guns card, merging with existing data.
+# Backward-compat alias
+load_yg_portfolio_history = load_rookie_portfolio_history
 
-    Only sales that have both a ``sold_date`` and a ``price_val`` are kept.
-    New sales are merged with any existing sales using ``(sold_date, title)``
-    as the deduplication key.  The merged list is sorted by ``sold_date``
-    descending and written back to the JSON file.
+
+def save_rookie_raw_sales(card_name: str, sales: list, sport: str = 'NHL') -> None:
+    """Insert raw eBay sales for a rookie card into Supabase.
 
     Args:
-        card_name: Card identifier used as the key in the sales JSON.
-        sales: List of sale dicts (each with at least ``sold_date``,
-            ``price_val``, and optionally ``title``).
-        path: Path to ``yg_raw_sales.json``.  Defaults to
-            ``YG_RAW_SALES_PATH``.
+        card_name: Full CardName string stored in the ``player`` column.
+        sales: List of sale dicts (each with at least ``sold_date``, ``price_val``).
+        sport: Sport code (default ``'NHL'``).
     """
-    path = path or YG_RAW_SALES_PATH
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    data = {}
-    if os.path.exists(path):
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-        except Exception:
-            data = {}
-
-    # Filter to sales with valid sold_date and price
-    new_sales = [
-        {'sold_date': s['sold_date'], 'price_val': s['price_val'], 'title': s.get('title', '')}
+    rows = [
+        (sport, card_name, '', s['sold_date'], float(s['price_val']), s.get('title', ''))
         for s in sales
         if s.get('sold_date') and s.get('price_val')
     ]
-
-    existing = data.get(card_name, [])
-    # Merge: use (sold_date, title) as dedup key
-    seen = {(s['sold_date'], s['title']) for s in existing}
-    for s in new_sales:
-        key = (s['sold_date'], s['title'])
-        if key not in seen:
-            existing.append(s)
-            seen.add(key)
-
-    existing.sort(key=lambda x: x['sold_date'], reverse=True)
-    data[card_name] = existing
-
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    if not rows:
+        return
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            for i in range(0, len(rows), 500):
+                execute_values(cur, """
+                    INSERT INTO rookie_raw_sales
+                        (sport, player, season, sold_date, price_val, title)
+                    VALUES %s
+                """, rows[i:i + 500])
 
 
-def load_yg_raw_sales(card_name=None, path=None):
-    """Load raw eBay sales for one or all Young Guns cards.
+# Backward-compat alias
+save_yg_raw_sales = save_rookie_raw_sales
+
+
+def load_rookie_raw_sales(card_name=None, sport: str = 'NHL') -> list | dict:
+    """Load raw eBay sales for one or all rookie cards from Supabase.
 
     Args:
         card_name: If provided, return only the sales list for this card.
-            Pass ``None`` to return the full dict for all cards.
-        path: Path to ``yg_raw_sales.json``.  Defaults to
-            ``YG_RAW_SALES_PATH``.
+            Pass ``None`` to return the full dict keyed by card name.
+        sport: Sport code (default ``'NHL'``).
 
     Returns:
-        When ``card_name`` is given: list of sale dicts (``{"sold_date",
-        "price_val", "title"}``), or ``[]`` if the card is not present.
-        When ``card_name`` is ``None``: full dict keyed by card name, or
-        ``{}`` on error.
+        When ``card_name`` is given: list of sale dicts.
+        When ``card_name`` is ``None``: full dict keyed by card name.
     """
-    path = path or YG_RAW_SALES_PATH
-    if not os.path.exists(path):
-        return [] if card_name else {}
-    try:
-        with open(path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        if card_name:
-            return data.get(card_name, [])
-        return data
-    except Exception:
-        return [] if card_name else {}
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            if card_name:
+                cur.execute("""
+                    SELECT sold_date, price_val, title FROM rookie_raw_sales
+                    WHERE sport = %s AND player = %s ORDER BY sold_date DESC
+                """, (sport, card_name))
+                rows = cur.fetchall()
+                return [{'sold_date': str(r['sold_date']), 'price_val': r['price_val'],
+                         'title': r['title']} for r in rows]
+            cur.execute("""
+                SELECT player, sold_date, price_val, title FROM rookie_raw_sales
+                WHERE sport = %s ORDER BY sold_date DESC
+            """, (sport,))
+            rows = cur.fetchall()
+    result: dict = {}
+    for r in rows:
+        result.setdefault(r['player'], []).append(
+            {'sold_date': str(r['sold_date']), 'price_val': r['price_val'], 'title': r['title']}
+        )
+    return result
 
 
-def batch_save_yg_raw_sales(all_sales_dict, path=None):
-    """Batch-save raw eBay sales for multiple Young Guns cards in one file write.
+# Backward-compat alias
+load_yg_raw_sales = load_rookie_raw_sales
 
-    Merges each card's new sales with its existing stored sales using the
-    same ``(sold_date, title)`` deduplication logic as ``save_yg_raw_sales``.
-    More efficient than calling ``save_yg_raw_sales`` in a loop because the
-    JSON file is read and written only once.
+
+def batch_save_rookie_raw_sales(all_sales_dict: dict, sport: str = 'NHL') -> None:
+    """Batch-insert raw eBay sales for multiple rookie cards.
 
     Args:
         all_sales_dict: Dict mapping card name strings to lists of sale dicts.
-        path: Path to ``yg_raw_sales.json``.  Defaults to
-            ``YG_RAW_SALES_PATH``.
+        sport: Sport code (default ``'NHL'``).
     """
-    path = path or YG_RAW_SALES_PATH
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    data = {}
-    if os.path.exists(path):
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-        except Exception:
-            data = {}
-
+    rows = []
     for card_name, sales in all_sales_dict.items():
-        new_sales = [
-            {'sold_date': s['sold_date'], 'price_val': s['price_val'], 'title': s.get('title', '')}
-            for s in sales
-            if s.get('sold_date') and s.get('price_val')
-        ]
-        existing = data.get(card_name, [])
-        seen = {(s['sold_date'], s['title']) for s in existing}
-        for s in new_sales:
-            key = (s['sold_date'], s['title'])
-            if key not in seen:
-                existing.append(s)
-                seen.add(key)
-        existing.sort(key=lambda x: x['sold_date'], reverse=True)
-        data[card_name] = existing
-
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+        for s in sales:
+            if not s.get('sold_date') or not s.get('price_val'):
+                continue
+            rows.append((sport, card_name, '', s['sold_date'],
+                         float(s['price_val']), s.get('title', '')))
+    if not rows:
+        return
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            for i in range(0, len(rows), 500):
+                execute_values(cur, """
+                    INSERT INTO rookie_raw_sales
+                        (sport, player, season, sold_date, price_val, title)
+                    VALUES %s
+                """, rows[i:i + 500])
 
 
-def batch_append_yg_price_history(updates, path=None):
-    """Batch-append price history for multiple Young Guns cards in one file write.
+# Backward-compat alias
+batch_save_yg_raw_sales = batch_save_rookie_raw_sales
 
-    Applies the same today-deduplication and graded-price merging logic as
-    ``append_yg_price_history`` for every card in ``updates``, then writes
-    the result in a single JSON dump.
+
+def batch_append_rookie_price_history(updates: dict, sport: str = 'NHL') -> None:
+    """Batch-upsert price history for multiple rookie cards in Supabase.
 
     Args:
-        updates: Dict mapping card name strings to update dicts with keys:
-
-            * ``fair_value`` (float): New ungraded fair value.
-            * ``num_sales`` (int): Number of raw sales found.
-            * ``graded_prices`` (dict | None): Optional graded price data,
-              e.g. ``{"PSA 10": {"fair_value": 150.0, "num_sales": 5}}``.
-
-        path: Path to ``yg_price_history.json``.  Defaults to
-            ``YG_PRICE_HISTORY_PATH``.
+        updates: Dict mapping card name strings to update dicts with keys
+            ``fair_value``, ``num_sales``, and optional ``graded_prices``.
+        sport: Sport code (default ``'NHL'``).
     """
-    path = path or YG_PRICE_HISTORY_PATH
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    history = {}
-    if os.path.exists(path):
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                history = json.load(f)
-        except Exception:
-            history = {}
-
     today = datetime.now().strftime('%Y-%m-%d')
+    card_names = list(updates.keys())
 
-    for card_name, info in updates.items():
-        if card_name not in history:
-            history[card_name] = []
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT player, graded_data FROM rookie_price_history
+                WHERE sport = %s AND player = ANY(%s) AND season = '' AND date = %s
+            """, (sport, card_names, today))
+            existing_rows = cur.fetchall()
+        existing_graded = {r['player']: r.get('graded_data') or {} for r in existing_rows}
 
-        existing = [h for h in history[card_name] if h.get('date') == today]
-        history[card_name] = [h for h in history[card_name] if h.get('date') != today]
+        rows = []
+        for card_name, info in updates.items():
+            merged_graded = existing_graded.get(card_name, {})
+            if info.get('graded_prices'):
+                merged_graded.update(info['graded_prices'])
+            rows.append((sport, card_name, '', today,
+                         round(float(info['fair_value']), 2), int(info['num_sales']),
+                         json.dumps(merged_graded)))
 
-        entry = {
-            'date': today,
-            'fair_value': round(info['fair_value'], 2),
-            'num_sales': info['num_sales'],
-        }
-
-        graded_prices = info.get('graded_prices')
-        if existing and existing[0].get('graded') and not graded_prices:
-            entry['graded'] = existing[0]['graded']
-        elif graded_prices:
-            merged_graded = existing[0].get('graded', {}) if existing else {}
-            merged_graded.update(graded_prices)
-            entry['graded'] = merged_graded
-
-        history[card_name].append(entry)
-
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(history, f, indent=2, ensure_ascii=False)
+        with conn.cursor() as cur:
+            for i in range(0, len(rows), 500):
+                execute_values(cur, """
+                    INSERT INTO rookie_price_history
+                        (sport, player, season, date, fair_value, num_sales, graded_data)
+                    VALUES %s
+                    ON CONFLICT (sport, player, season, date) DO UPDATE SET
+                        fair_value  = EXCLUDED.fair_value,
+                        num_sales   = EXCLUDED.num_sales,
+                        graded_data = EXCLUDED.graded_data
+                """, rows[i:i + 500])
 
 
-def load_yg_market_timeline(path=None):
-    """Aggregate all YG raw sales into a daily market price timeline.
+# Backward-compat alias
+batch_append_yg_price_history = batch_append_rookie_price_history
 
-    Reads ``yg_raw_sales.json`` and groups every individual sale by its
-    ``sold_date``.  Computes summary statistics per day across all cards.
+
+def load_rookie_market_timeline(sport: str = 'NHL') -> list:
+    """Aggregate all rookie raw sales into a daily market price timeline.
 
     Args:
-        path: Path to ``yg_raw_sales.json``.  Defaults to
-            ``YG_RAW_SALES_PATH``.
+        sport: Sport code (default ``'NHL'``).
 
     Returns:
-        List of dicts sorted by ``date`` ascending, each containing:
-        ``date`` (str), ``avg_price`` (float), ``total_volume`` (int),
-        ``min_price`` (float), ``max_price`` (float).
-        Returns an empty list when there are no sales.
+        List of dicts sorted by ``date`` ascending with ``date``,
+        ``avg_price``, ``total_volume``, ``min_price``, ``max_price``.
     """
-    all_sales = load_yg_raw_sales(path=path)
-    if not all_sales:
+    all_sales_dict = load_rookie_raw_sales(sport=sport)
+    if not all_sales_dict:
         return []
 
-    # Collect all sales by date
-    by_date = {}
-    for card_name, sales in all_sales.items():
+    by_date: dict = {}
+    for sales in all_sales_dict.values():
         for s in sales:
             d = s.get('sold_date')
             p = s.get('price_val')
             if d and p:
-                by_date.setdefault(d, []).append(p)
+                by_date.setdefault(str(d), []).append(float(p))
 
-    timeline = []
-    for date, prices in sorted(by_date.items()):
-        timeline.append({
-            'date': date,
-            'avg_price': round(sum(prices) / len(prices), 2),
+    return [
+        {
+            'date':         date,
+            'avg_price':    round(sum(prices) / len(prices), 2),
             'total_volume': len(prices),
-            'min_price': round(min(prices), 2),
-            'max_price': round(max(prices), 2),
-        })
+            'min_price':    round(min(prices), 2),
+            'max_price':    round(max(prices), 2),
+        }
+        for date, prices in sorted(by_date.items())
+    ]
 
-    return timeline
+
+# Backward-compat alias
+load_yg_market_timeline = load_rookie_market_timeline
 
 
-def load_master_db(path=MASTER_DB_PATH):
-    """Load the Young Guns master database CSV with mtime-based caching.
+def load_rookie_cards(sport: str = 'NHL') -> pd.DataFrame:
+    """Load the Young Guns master database from Supabase.
 
-    Normalises the ``Team``, ``Position``, ``Owned``, ``CostBasis``, and
-    ``PurchaseDate`` columns, adding them with sensible defaults when absent.
-    Results are cached in ``_MASTER_DB_CACHE``; the cache is bypassed when
-    the file's mtime has changed.
-
-    Args:
-        path: Path to ``young_guns.csv``.  Defaults to ``MASTER_DB_PATH``.
+    Reconstructs the DataFrame from ``row_data JSONB`` stored per card,
+    normalising ``Team``, ``Position``, ``Owned``, ``CostBasis``, and
+    ``PurchaseDate`` columns.
 
     Returns:
-        DataFrame of Young Guns cards, or an empty DataFrame when the file
-        does not exist.
+        DataFrame of Young Guns cards, or an empty DataFrame when none exist.
     """
-    if not os.path.exists(path):
+    with get_db() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT row_data FROM rookie_cards WHERE sport = %s", (sport,))
+            rows = cur.fetchall()
+    if not rows:
         return pd.DataFrame()
-    mt = _file_mtime(path)
-    cached = _MASTER_DB_CACHE.get(path)
-    if cached and cached['mt'] == mt:
-        return cached['df'].copy()
-    df = pd.read_csv(path)
-    df['Team'] = df['Team'].fillna('').str.strip()
-    df['Position'] = df['Position'].fillna('').str.strip()
-    # Ensure cost basis / ownership columns exist
+
+    records = [r['row_data'] for r in rows]
+    df = pd.DataFrame(records)
+
+    # Ensure key columns exist with sensible defaults
+    if 'Team' in df.columns:
+        df['Team'] = df['Team'].fillna('').str.strip()
+    if 'Position' in df.columns:
+        df['Position'] = df['Position'].fillna('').str.strip()
     for col, default in [('Owned', 0), ('CostBasis', 0), ('PurchaseDate', '')]:
         if col not in df.columns:
             df[col] = default
     df['Owned'] = pd.to_numeric(df['Owned'], errors='coerce').fillna(0).astype(int)
     df['CostBasis'] = pd.to_numeric(df['CostBasis'], errors='coerce').fillna(0)
     df['PurchaseDate'] = df['PurchaseDate'].fillna('').astype(str)
-    _MASTER_DB_CACHE[path] = {'mt': mt, 'df': df}
-    return df.copy()
+    return df
 
 
-def save_master_db(df, path=MASTER_DB_PATH):
-    """Write the Young Guns master database DataFrame to CSV.
+def save_rookie_cards(df: pd.DataFrame, sport: str = 'NHL') -> None:
+    """Upsert the rookie cards DataFrame to Supabase.
 
-    Creates parent directories if they do not already exist.
+    Serialises each row as ``row_data JSONB``, keyed by ``(sport, player, season)``.
 
     Args:
-        df: Young Guns DataFrame (as returned by ``load_master_db``).
-        path: Destination path.  Defaults to ``MASTER_DB_PATH``.
+        df: Rookie cards DataFrame (as returned by ``load_rookie_cards``).
+        sport: Sport code (default ``'NHL'``).
     """
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    df.to_csv(path, index=False)
+    rows = []
+    for rec in df.to_dict('records'):
+        player = str(rec.get('PlayerName', ''))
+        season = str(rec.get('Season', ''))
+        card_name = str(rec.get('CardName', ''))
+        cleaned = {k: (None if isinstance(v, float) and pd.isna(v) else v)
+                   for k, v in rec.items()}
+        rows.append((sport, player, season, card_name, json.dumps(cleaned)))
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            for i in range(0, len(rows), 500):
+                execute_values(cur, """
+                    INSERT INTO rookie_cards (sport, player, season, card_name, row_data)
+                    VALUES %s
+                    ON CONFLICT (sport, player, season) DO UPDATE SET
+                        card_name  = EXCLUDED.card_name,
+                        row_data   = EXCLUDED.row_data,
+                        updated_at = NOW()
+                """, rows[i:i + 500])
+
+
+# Backward-compat aliases
+load_master_db = load_rookie_cards
+save_master_db = save_rookie_cards
 
 
 # ============================================================

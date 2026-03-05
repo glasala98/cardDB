@@ -107,6 +107,179 @@ def _extract_player_name(last_segment):
     return last.strip()
 
 
+# Canonical list of variant/parallel keywords that materially affect card value.
+# Order matters — more specific multi-word variants should appear before single-word ones.
+_VARIANT_KEYWORDS = [
+    # === O-Pee-Chee Platinum / Upper Deck Hockey ===
+    'Red Prism', 'Arctic Freeze', 'Violet Pixels', 'Emerald Surge',
+    'Seismic Gold', 'Pond Hockey', 'NHL Shield', 'Clear Cut',
+    'Outburst', 'Silver Foil', 'Deluxe', 'Exclusives',
+    'Blue Foil', 'Photo Variation', 'Photo Driven',
+    'Color Flow', 'Orange Yellow Spectrum', 'Blue Luster',
+    'Purple Parallax', 'Hypnosis', 'High Gloss',
+    'French', 'Speckled Rainbow', 'Retro Rainbow',
+    'UD Canvas', 'Clear Cut Acetate',
+    'Fluorescence', 'Fluorescent', 'Buyback',
+    'Printing Plate', 'Black Diamond',
+    # OPC Platinum parallel names sellers commonly use
+    'Sunset', 'Matte Pink', 'Color Wheel', 'Rainbow Color Wheel',
+    # Upper Deck Exclusives & numbered
+    'Young Guns Exclusives', 'High Series Exclusives',
+    'Exclusives Die Cut', 'Update Exclusives',
+    # Upper Deck SP / SPx
+    'Spectrum', 'Holoview FX', 'Finite',
+    # Upper Deck Ice
+    'Ice Premieres', 'Glacial Graphs', 'Ice Gems',
+    # Upper Deck Artifacts
+    'Ruby', 'Emerald', 'Sapphire', 'Copper', 'Silver',
+    # Upper Deck general parallels
+    'Platinum', 'Diamond', 'Onyx',
+    # === Panini Prizm ===
+    'Silver Prizm', 'Red Prizm', 'Blue Prizm', 'Green Prizm',
+    'Gold Prizm', 'Orange Prizm', 'Purple Prizm', 'Pink Prizm',
+    'Black Prizm', 'White Prizm',
+    'Disco', 'Disco Prizm',
+    'Neon Green', 'Neon Orange', 'Neon Pink', 'Neon Blue',
+    'Hyper', 'Hyper Prizm',
+    'Mojo', 'Snakeskin', 'Camo', 'Tiger Stripe',
+    'Zebra', 'Tiger', 'Dragon Scale',
+    'Checkerboard', 'Marble',
+    'Tie-Dye', 'Scope', 'Fast Break',
+    'Ice', 'Cracked Ice', 'Choice',
+    'Stained Glass', 'Color Blast', 'Shimmer',
+    'Flashback', 'No Huddle', 'Fireworks',
+    'Red White Blue', 'Red White & Blue',
+    'Black Gold', 'Black Finite',
+    'Laser', 'Sparkle', 'Wave',
+    # === Panini Select ===
+    'Red Shock', 'Orange Shock', 'Blue Shock',
+    'Green Shock', 'Purple Shock', 'White Shock',
+    'Copper Shock', 'Black Shock',
+    'Red & Yellow Shock', 'Green & Yellow Shock',
+    'Black & Red Shock',
+    'Die-Cut', 'Select Die-Cut',
+    'Tri-Color', 'Tri Color',
+    'Light Blue', 'Courtside', 'Field Level',
+    'Purple Die-Cut', 'Silver Die-Cut', 'Gold Die-Cut',
+    # === Panini Donruss / Optic ===
+    'Optic', 'Optic Holo', 'Optic Rated Rookie',
+    'Red Velocity', 'Blue Velocity', 'Pink Velocity',
+    'Aqua', 'Lime Green', 'Orange Laser',
+    'Purple Stars', 'Blue Hyper', 'Black Velocity',
+    'Press Proof', 'Diamond Kings',
+    'Downtown', 'Kaboom',
+    # === Panini Mosaic ===
+    'Mosaic', 'Mosaic Prizm',
+    'Genesis', 'Reactive Blue', 'Reactive Gold',
+    'Reactive Orange', 'Reactive Green',
+    'Green Fluorescent', 'Pink Fluorescent',
+    'National Pride', 'Stained Glass Mosaic',
+    # === Panini Contenders ===
+    'Cracked Ice Ticket', 'Championship Ticket',
+    'Playoff Ticket', 'Super Bowl Ticket',
+    'Variation', 'Photo Variation',
+    # === Panini general ===
+    'Holo', 'Holofoil', 'Refractor',
+    'Auto', 'Autograph', 'Patch Auto',
+    'RPA', 'Rookie Patch Auto',
+    'Memorabilia', 'Jersey', 'Patch',
+    # === Topps Chrome ===
+    'Gold Refractor', 'Orange Refractor',
+    'Red Refractor', 'Blue Refractor', 'Green Refractor',
+    'Purple Refractor', 'Pink Refractor', 'Black Refractor',
+    'Sepia Refractor', 'Prism Refractor', 'Refractor',
+    'X-Fractor', 'Xfractor',
+    'SuperFractor', 'Super Refractor',
+    'Atomic Refractor', 'Wave Refractor',
+    'Negative Refractor', 'Aqua Refractor',
+    'Rose Gold Refractor',
+    'Gold Wave', 'Red Wave', 'Blue Wave',
+    'Speckle', 'Raywave',
+    # === Topps base / flagship ===
+    'Rainbow Foil', 'Rainbow',
+    'Foilboard', 'Silver Pack',
+    'Vintage Stock', 'Independence Day',
+    'Platinum Anniversary', "Mother's Day Pink",
+    "Father's Day Blue", 'Memorial Day Camo',
+    'Mini', 'Clear', 'Silk', 'Wood',
+    # === Topps Finest ===
+    'Finest Refractor', 'Superfractor',
+    # === Topps Bowman ===
+    'Bowman Chrome', 'Chrome Refractor',
+    'Bowman 1st', 'First Bowman',
+    'Atomic', 'Mojo Refractor',
+    'Sky Blue', 'Orange', 'Cream',
+    # === Topps Heritage ===
+    'Chrome Heritage', 'Real One Auto',
+    'Red Ink Auto', 'Blue Ink Auto',
+    'French Text', 'Action Variation',
+    'Nickname Variation', 'Error',
+    # === Topps general inserts ===
+    'SP', 'SSP', 'Short Print', 'Image Variation',
+    'Bat Down', 'Rookie Debut',
+    # === Generic value parallels ===
+    'Black', 'Gold', 'Silver', 'Sapphire',
+    'Printing Plate',
+]
+
+
+def _extract_variant_keyword(card_name):
+    """Extract the variant/parallel keyword from a card name.
+
+    Strips grade/condition brackets and parses dash-delimited segments to find
+    the first segment that matches a known parallel name from _VARIANT_KEYWORDS.
+
+    Args:
+        card_name: Full card name string in the standard format.
+
+    Returns:
+        The matched keyword string (e.g. "Red Prism", "Pond Hockey"), or an
+        empty string for base cards or unrecognised variants.
+    """
+    clean = re.sub(r'\[PSA [^\]]*\]', '', card_name)
+    clean = re.sub(r'\[BGS [^\]]*\]', '', clean)
+    clean = re.sub(r'\[Passed Pre[^\]]*\]', '', clean)
+    clean = re.sub(r'\[Poor to Fair\]', '', clean)
+    clean = re.sub(r'\bPSA\s+\d+\b', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\bBGS\s+\d+(?:\.\d+)?\b', '', clean, flags=re.IGNORECASE)
+    parts = [p.strip() for p in clean.split(' - ')]
+    for part in parts[1:]:
+        part_clean = re.sub(r'\[Base\]', '', part, flags=re.IGNORECASE).strip()
+        part_clean = re.sub(r'#\S+', '', part_clean).strip()
+        if part_clean.lower() in ['', 'rookies', 'marquee rookies']:
+            continue
+        for v in _VARIANT_KEYWORDS:
+            if v.lower() in part_clean.lower():
+                return v
+    return ""
+
+
+def _apply_variant_filter(card_name, sales):
+    """Filter sales to only those whose titles include the card's variant keyword.
+
+    Extracts the variant keyword via _extract_variant_keyword() and keeps only
+    sales where that keyword appears (case-insensitive) in the listing title.
+    Base cards (no recognised variant) are returned unchanged.
+
+    The filter uses the full phrase (e.g. "red prism") rather than individual
+    words to avoid false positives such as "Rainbow" matching "red" or "Prism".
+
+    Args:
+        card_name: Full card name string in the standard format.
+        sales: List of eBay sale dicts, each with at least a "title" key.
+
+    Returns:
+        Filtered list of sale dicts. May be empty — callers should treat an
+        empty result as "no comps found" and fall through to the next stage.
+    """
+    if not sales:
+        return sales
+    variant = _extract_variant_keyword(card_name)
+    if not variant:
+        return sales  # Base card — no variant filter needed
+    return [s for s in sales if variant.lower() in s.get('title', '').lower()]
+
+
 def clean_card_name_for_search(card_name):
     """Build a focused eBay sold-listing search query from a card name.
 
@@ -191,115 +364,7 @@ def clean_card_name_for_search(card_name):
         if part_clean.lower() in ['', 'rookies', 'marquee rookies']:
             continue
         # Keep value-relevant variants — comprehensive list across manufacturers
-        for v in [
-                   # === Upper Deck ===
-                   'Red Prism', 'Arctic Freeze', 'Violet Pixels', 'Emerald Surge',
-                   'Seismic Gold', 'Pond Hockey', 'NHL Shield', 'Clear Cut',
-                   'Outburst', 'Silver Foil', 'Deluxe', 'Exclusives',
-                   'Blue Foil', 'Photo Variation', 'Photo Driven',
-                   'Color Flow', 'Orange Yellow Spectrum', 'Blue Luster',
-                   'Purple Parallax', 'Hypnosis', 'High Gloss',
-                   'French', 'Speckled Rainbow', 'Retro Rainbow',
-                   'UD Canvas', 'Clear Cut Acetate',
-                   'Fluorescence', 'Fluorescent', 'Buyback',
-                   'Printing Plate', 'Black Diamond',
-                   # Upper Deck Exclusives & numbered
-                   'Young Guns Exclusives', 'High Series Exclusives',
-                   'Exclusives Die Cut', 'Update Exclusives',
-                   # Upper Deck SP / SPx
-                   'Spectrum', 'Holoview FX', 'Finite',
-                   # Upper Deck Ice
-                   'Ice Premieres', 'Glacial Graphs', 'Ice Gems',
-                   # Upper Deck Artifacts
-                   'Ruby', 'Emerald', 'Sapphire', 'Copper', 'Silver',
-                   # Upper Deck general parallels
-                   'Platinum', 'Diamond', 'Onyx',
-                   # === Panini Prizm ===
-                   'Silver Prizm', 'Red Prizm', 'Blue Prizm', 'Green Prizm',
-                   'Gold Prizm', 'Orange Prizm', 'Purple Prizm', 'Pink Prizm',
-                   'Black Prizm', 'White Prizm',
-                   'Disco', 'Disco Prizm',
-                   'Neon Green', 'Neon Orange', 'Neon Pink', 'Neon Blue',
-                   'Hyper', 'Hyper Prizm',
-                   'Mojo', 'Snakeskin', 'Camo', 'Tiger Stripe',
-                   'Zebra', 'Tiger', 'Dragon Scale',
-                   'Checkerboard', 'Marble',
-                   'Tie-Dye', 'Scope', 'Fast Break',
-                   'Ice', 'Cracked Ice', 'Choice',
-                   'Stained Glass', 'Color Blast', 'Shimmer',
-                   'Flashback', 'No Huddle', 'Fireworks',
-                   'Red White Blue', 'Red White & Blue',
-                   'Black Gold', 'Black Finite',
-                   'Laser', 'Sparkle', 'Wave',
-                   # === Panini Select ===
-                   'Red Shock', 'Orange Shock', 'Blue Shock',
-                   'Green Shock', 'Purple Shock', 'White Shock',
-                   'Copper Shock', 'Black Shock',
-                   'Red & Yellow Shock', 'Green & Yellow Shock',
-                   'Black & Red Shock',
-                   'Die-Cut', 'Select Die-Cut',
-                   'Tri-Color', 'Tri Color',
-                   'Light Blue', 'Courtside', 'Field Level',
-                   'Purple Die-Cut', 'Silver Die-Cut', 'Gold Die-Cut',
-                   # === Panini Donruss / Optic ===
-                   'Optic', 'Optic Holo', 'Optic Rated Rookie',
-                   'Red Velocity', 'Blue Velocity', 'Pink Velocity',
-                   'Aqua', 'Lime Green', 'Orange Laser',
-                   'Purple Stars', 'Blue Hyper', 'Black Velocity',
-                   'Press Proof', 'Diamond Kings',
-                   'Downtown', 'Kaboom',
-                   # === Panini Mosaic ===
-                   'Mosaic', 'Mosaic Prizm',
-                   'Genesis', 'Reactive Blue', 'Reactive Gold',
-                   'Reactive Orange', 'Reactive Green',
-                   'Green Fluorescent', 'Pink Fluorescent',
-                   'National Pride', 'Stained Glass Mosaic',
-                   # === Panini Contenders ===
-                   'Cracked Ice Ticket', 'Championship Ticket',
-                   'Playoff Ticket', 'Super Bowl Ticket',
-                   'Variation', 'Photo Variation',
-                   # === Panini general ===
-                   'Holo', 'Holofoil', 'Refractor',
-                   'Auto', 'Autograph', 'Patch Auto',
-                   'RPA', 'Rookie Patch Auto',
-                   'Memorabilia', 'Jersey', 'Patch',
-                   # === Topps Chrome ===
-                   'Refractor', 'Gold Refractor', 'Orange Refractor',
-                   'Red Refractor', 'Blue Refractor', 'Green Refractor',
-                   'Purple Refractor', 'Pink Refractor', 'Black Refractor',
-                   'Sepia Refractor', 'Prism Refractor',
-                   'X-Fractor', 'Xfractor',
-                   'SuperFractor', 'Super Refractor',
-                   'Atomic Refractor', 'Wave Refractor',
-                   'Negative Refractor', 'Aqua Refractor',
-                   'Rose Gold Refractor', 'Sapphire',
-                   'Gold Wave', 'Red Wave', 'Blue Wave',
-                   'Speckle', 'Raywave',
-                   # === Topps base / flagship ===
-                   'Gold', 'Rainbow Foil', 'Rainbow',
-                   'Foilboard', 'Silver Pack', 'Silver',
-                   'Vintage Stock', 'Independence Day',
-                   'Platinum Anniversary', 'Mother\'s Day Pink',
-                   'Father\'s Day Blue', 'Memorial Day Camo',
-                   'Black', 'Mini', 'Printing Plate',
-                   'Clear', 'Silk', 'Wood',
-                   # === Topps Finest ===
-                   'Finest Refractor', 'Green Refractor', 'Gold Refractor',
-                   'Superfractor',
-                   # === Topps Bowman ===
-                   'Bowman Chrome', 'Chrome Refractor',
-                   'Bowman 1st', 'First Bowman',
-                   'Shimmer', 'Atomic', 'Mojo Refractor',
-                   'Sky Blue', 'Orange', 'Cream',
-                   # === Topps Heritage ===
-                   'Chrome Heritage', 'Real One Auto',
-                   'Red Ink Auto', 'Blue Ink Auto',
-                   'French Text', 'Action Variation',
-                   'Nickname Variation', 'Error',
-                   # === Topps general inserts ===
-                   'SP', 'SSP', 'Short Print', 'Image Variation',
-                   'Photo Variation', 'Bat Down', 'Rookie Debut',
-                   ]:
+        for v in _VARIANT_KEYWORDS:
             if v.lower() in part_clean.lower():
                 variant = v
                 break
@@ -1285,18 +1350,21 @@ def process_card(card):
 
     # Stage 1: full query — variant + subset + serial + set
     pricing_sales = search_ebay_sold(driver, card)
+    pricing_sales = _apply_variant_filter(card, pricing_sales)
 
     if not pricing_sales:
         # Stage 2: drop parallel/subset name, keep serial + set
         time.sleep(random.uniform(0.5, 1.0))
         confidence = 'medium'
         pricing_sales = search_ebay_sold(driver, card, search_query=build_set_query(card))
+        pricing_sales = _apply_variant_filter(card, pricing_sales)
 
     if not pricing_sales:
         # Stage 3: drop set — player + card# + serial + year only
         time.sleep(random.uniform(0.5, 1.0))
         confidence = 'low'
         pricing_sales = search_ebay_sold(driver, card, search_query=build_simplified_query(card))
+        pricing_sales = _apply_variant_filter(card, pricing_sales)
 
     if pricing_sales:
         # Stages 1-3: these are direct comps — store historically

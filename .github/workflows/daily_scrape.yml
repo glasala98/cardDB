@@ -24,30 +24,18 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
 
-      - name: Set up SSH
+      - name: Open SSH tunnel to home server DB
         run: |
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H southwestsportscards.ca >> ~/.ssh/known_hosts
-          echo "Host southwestsportscards.ca" >> ~/.ssh/config
-          echo "  IdentityFile ~/.ssh/id_ed25519" >> ~/.ssh/config
-          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
-          chmod 600 ~/.ssh/config
-
-      - name: Download current data from server
-        run: |
-          mkdir -p data/admin
-          scp root@southwestsportscards.ca:/opt/card-dashboard/users.yaml .
-          scp root@southwestsportscards.ca:/opt/card-dashboard/data/admin/card_prices_summary.csv data/admin/
-          scp root@southwestsportscards.ca:/opt/card-dashboard/data/admin/card_prices_results.json data/admin/
-          scp root@southwestsportscards.ca:/opt/card-dashboard/data/admin/price_history.json data/admin/ || true
+          ssh-keyscan -p ${{ secrets.SERVER_SSH_PORT }} ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+          ssh -fN -L 5432:localhost:5432 \
+            -p ${{ secrets.SERVER_SSH_PORT }} \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} \
+            -i ~/.ssh/id_ed25519
 
       - name: Run scraper
         run: python daily_scrape.py --workers 3
-
-      - name: Upload results to server
-        run: |
-          scp data/admin/card_prices_summary.csv root@southwestsportscards.ca:/opt/card-dashboard/data/admin/card_prices_summary.csv
-          scp data/admin/card_prices_results.json root@southwestsportscards.ca:/opt/card-dashboard/data/admin/card_prices_results.json
-          scp data/admin/price_history.json root@southwestsportscards.ca:/opt/card-dashboard/data/admin/price_history.json
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

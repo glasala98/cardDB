@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
 """Daily scrape job — rescrapes all cards in the existing database,
-updates prices, and appends fair-value deltas to price_history.json.
+updates prices, and appends fair-value snapshots to Supabase.
 
 Usage:
     python daily_scrape.py                  # scrape all users
     python daily_scrape.py --user admin     # scrape one user
     python daily_scrape.py --workers 3      # limit parallel browsers
-
-Set up as a cron job on the server:
-    0 6 * * * cd /opt/card-dashboard && /usr/bin/python3 daily_scrape.py >> /var/log/daily_scrape.log 2>&1
 """
 
 import os
 import sys
-import json
 import argparse
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -21,62 +17,51 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 os.chdir(SCRIPT_DIR)
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from scrape_card_prices import process_card
 from dashboard_utils import (
-    load_data, save_data, backup_data, append_price_history, append_portfolio_snapshot,
-    get_user_paths, load_users,
-    CSV_PATH, RESULTS_JSON_PATH
+    load_data, save_data,
+    load_all_card_results, save_card_results,
+    append_price_history, append_portfolio_snapshot,
+    load_users,
 )
 
 
-def daily_scrape_user(csv_path, results_path, history_path, backup_dir, max_workers=3):
+def daily_scrape_user(username: str, max_workers: int = 3) -> None:
     """Scrape and update prices for all cards belonging to one user.
 
     Workflow:
-      1. Creates a timestamped backup of the user's CSV and results JSON.
-      2. Loads all card names from the CSV via load_data().
+      1. Loads all card names from Supabase via load_data().
+      2. Pre-loads all existing card results (raw_sales, image_url, etc.)
+         in a single bulk query.
       3. Scrapes each card in parallel using process_card() across up to
          max_workers Chrome instances.
-      4. Merges new eBay sales with the existing raw_sales list in the results
-         JSON (deduplicates by sold_date + title, sorts most-recent-first).
+      4. Merges new eBay sales with the existing raw_sales list
+         (deduplicates by sold_date + title, sorts most-recent-first).
       5. Updates Fair Value, Trend, Median, Min, Max, Num Sales, and Top 3
          Prices columns in the DataFrame for any card with sales found.
-      6. Appends a per-card price-history entry to price_history.json.
-      7. Saves the updated CSV and results JSON.
-      8. Appends a portfolio snapshot (total value, card count, average value)
-         to portfolio_history.json.
+      6. Upserts updated card stats and results back to Supabase.
+      7. Appends a portfolio snapshot (total value, card count, avg value)
+         to Supabase.
 
     Args:
-        csv_path: Absolute path to the user's cards CSV file.
-        results_path: Absolute path to the user's results JSON file.
-        history_path: Absolute path to the user's price_history.json file.
-        backup_dir: Directory where timestamped backups are written.
+        username: Username whose collection to scrape.
         max_workers: Number of parallel Chrome browser instances to use.
-            Defaults to 3.
     """
     start = datetime.now()
-    print(f"[{start.strftime('%Y-%m-%d %H:%M:%S')}] Scrape starting")
+    print(f"[{start.strftime('%Y-%m-%d %H:%M:%S')}] Scrape starting for {username}")
 
-    # Backup before scraping
-    ts = backup_data(label="daily", csv_path=csv_path, results_path=results_path, backup_dir=backup_dir)
-    print(f"Backup saved: {ts}")
-
-    # Load current card list
-    df = load_data(csv_path, results_path)
+    df = load_data(username)
     card_names = df['Card Name'].tolist()
     if not card_names:
         print("  No cards to scrape.")
         return
     print(f"Scraping {len(card_names)} cards with {max_workers} workers")
 
-    # Load existing results JSON to merge into
-    results = {}
-    if os.path.exists(results_path):
-        try:
-            with open(results_path, 'r', encoding='utf-8') as f:
-                results = json.load(f)
-        except Exception:
-            results = {}
+    # Bulk-load existing results (single Supabase query)
+    existing_results = load_all_card_results(username)
 
     completed = 0
     total = len(card_names)
@@ -96,7 +81,8 @@ def daily_scrape_user(csv_path, results_path, history_path, backup_dir, max_work
                 fair_price = stats.get('fair_price', 0)
 
                 # Merge new sales with existing (accumulate history)
-                existing_sales = results.get(card_name, {}).get('raw_sales', [])
+                existing = existing_results.get(card_name, {})
+                existing_sales = existing.get('raw_sales', []) or []
                 new_sales = result.get('raw_sales', [])
                 seen = set()
                 merged = []
@@ -106,12 +92,23 @@ def daily_scrape_user(csv_path, results_path, history_path, backup_dir, max_work
                         seen.add(key)
                         merged.append(sale)
                 merged.sort(key=lambda s: s.get('sold_date') or '0000-00-00', reverse=True)
-                result['raw_sales'] = merged
-                result['scraped_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+                scraped_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 # Preserve existing image_url — only fetch once (first scrape that finds one)
-                if not result.get('image_url'):
-                    result['image_url'] = results.get(card_name, {}).get('image_url')
-                results[card_name] = result
+                image_url = result.get('image_url') or existing.get('image_url') or ''
+
+                save_card_results(
+                    username, card_name,
+                    raw_sales=merged,
+                    scraped_at=scraped_at,
+                    confidence=stats.get('confidence', ''),
+                    image_url=image_url,
+                    image_hash=existing.get('image_hash') or '',
+                    image_url_back=existing.get('image_url_back') or '',
+                    search_url=existing.get('search_url') or '',
+                    is_estimated=stats.get('is_estimated', False),
+                    price_source=stats.get('price_source', 'direct'),
+                )
 
                 # Update the dataframe row
                 idx = df[df['Card Name'] == card_name].index
@@ -121,16 +118,15 @@ def daily_scrape_user(csv_path, results_path, history_path, backup_dir, max_work
                         trend = stats.get('trend', 'no data')
                         if trend in ('insufficient data', 'unknown'):
                             trend = 'no data'
-                        df.at[i, 'Fair Value'] = fair_price
-                        df.at[i, 'Trend'] = trend
+                        df.at[i, 'Fair Value']   = fair_price
+                        df.at[i, 'Trend']        = trend
                         df.at[i, 'Median (All)'] = stats.get('median_all', 0)
-                        df.at[i, 'Min'] = stats.get('min', 0)
-                        df.at[i, 'Max'] = stats.get('max', 0)
-                        df.at[i, 'Num Sales'] = num_sales
+                        df.at[i, 'Min']          = stats.get('min', 0)
+                        df.at[i, 'Max']          = stats.get('max', 0)
+                        df.at[i, 'Num Sales']    = num_sales
                         df.at[i, 'Top 3 Prices'] = ' | '.join(stats.get('top_3_prices', []))
 
-                        # Append to price history
-                        append_price_history(card_name, fair_price, num_sales, history_path=history_path)
+                        append_price_history(username, card_name, fair_price, num_sales)
                         updated += 1
 
                     status = f"${fair_price:.2f} ({num_sales} sales)" if num_sales > 0 else "no sales"
@@ -140,20 +136,15 @@ def daily_scrape_user(csv_path, results_path, history_path, backup_dir, max_work
                 failed += 1
                 print(f"  [{completed}/{total}] {card[:60]}... ERROR: {e}")
 
-    # Save updated CSV
-    save_data(df, csv_path)
-
-    # Save updated results JSON
-    with open(results_path, 'w', encoding='utf-8') as f:
-        json.dump(results, f, indent=2, ensure_ascii=False)
+    # Save updated card collection
+    save_data(df, username)
 
     # Append portfolio snapshot
     found = df[df['Num Sales'] > 0]
     total_value = found['Fair Value'].sum()
     total_cards = len(df)
     avg_value = total_value / total_cards if total_cards > 0 else 0
-    portfolio_path = os.path.join(os.path.dirname(history_path), "portfolio_history.json")
-    append_portfolio_snapshot(total_value, total_cards, avg_value, portfolio_path=portfolio_path)
+    append_portfolio_snapshot(username, total_value, total_cards, avg_value)
     print(f"  Portfolio snapshot: ${total_value:,.2f} ({total_cards} cards)")
 
     elapsed = (datetime.now() - start).total_seconds()
@@ -161,49 +152,36 @@ def daily_scrape_user(csv_path, results_path, history_path, backup_dir, max_work
     print(f"  Updated: {updated} | No sales: {total - updated - failed} | Failed: {failed}")
 
 
-def daily_scrape(max_workers=3, user=None):
+def daily_scrape(max_workers: int = 3, user: str = None) -> None:
     """Scrape price data for one user or all users defined in users.yaml.
 
-    Loads users.yaml to discover per-user data paths. If users.yaml is absent
-    (legacy single-user mode), falls back to the global CSV_PATH and
-    RESULTS_JSON_PATH constants. When a specific user is requested but not
-    found in users.yaml, the process exits with a non-zero status.
+    Loads users.yaml to discover usernames. If users.yaml is absent
+    (legacy single-user mode), falls back to 'admin'. When a specific user
+    is requested but not found, the process exits with a non-zero status.
 
     Args:
         max_workers: Number of parallel Chrome browser instances per user.
-            Defaults to 3.
         user: Username to scrape exclusively, or None to scrape all users.
-            Defaults to None.
     """
     users = load_users()
 
     if not users:
-        # Legacy mode: no users.yaml, use global paths
-        print("=== Daily scrape (legacy single-user mode) ===")
-        daily_scrape_user(CSV_PATH, RESULTS_JSON_PATH,
-                          os.path.join(SCRIPT_DIR, "price_history.json"),
-                          os.path.join(SCRIPT_DIR, "backups"),
-                          max_workers)
+        # No users.yaml — default to admin
+        print("=== Daily scrape (admin) ===")
+        daily_scrape_user("admin", max_workers)
         return
 
     if user:
-        # Scrape a single user
         if user not in users:
             print(f"Error: user '{user}' not found in users.yaml")
             sys.exit(1)
         targets = [user]
     else:
-        # Scrape all users
         targets = list(users.keys())
 
     for username in targets:
-        paths = get_user_paths(username)
-        if not os.path.exists(paths['csv']):
-            print(f"\n=== Skipping {username} (no data) ===")
-            continue
         print(f"\n=== Scraping {username}'s collection ===")
-        daily_scrape_user(paths['csv'], paths['results'], paths['history'],
-                          paths['backup_dir'], max_workers)
+        daily_scrape_user(username, max_workers)
 
 
 if __name__ == "__main__":
