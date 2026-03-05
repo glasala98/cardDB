@@ -32,6 +32,7 @@
 .moverPct {
   font-size: 18px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 .moverUp   .moverPct { color: var(--success); }
 .moverDown .moverPct { color: var(--danger); }
@@ -78,7 +79,8 @@
 .pmActive {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: #090e17;
+  font-weight: 700;
 }
 
 /* ── Filters ─────────────────────────────────────────────────── */
@@ -156,20 +158,24 @@
 }
 
 .th {
-  background: var(--bg-card);
+  background: var(--bg-secondary);
   color: var(--text-secondary);
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   text-align: left;
   padding: 9px 10px;
   border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   white-space: nowrap;
   cursor: pointer;
   user-select: none;
+  transition: color 0.12s;
 }
 .th:hover { color: var(--text-primary); }
 .activeCol { color: var(--accent) !important; }
 
-.arrow { color: var(--accent); }
+.arrow { color: var(--accent); margin-left: 3px; }
 
 .td {
   padding: 7px 10px;
@@ -177,6 +183,7 @@
   color: var(--text-primary);
   vertical-align: middle;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .tr:last-child .td { border-bottom: none; }
