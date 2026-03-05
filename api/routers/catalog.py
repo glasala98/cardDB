@@ -93,7 +93,6 @@ def browse_catalog(
         {where_sql}
     """
 
-    count_sql = f"SELECT COUNT(*) {base_query}"
     data_sql = f"""
         SELECT
             cc.id,
@@ -124,9 +123,15 @@ def browse_catalog(
 
     with get_db() as conn:
         cur = conn.cursor()
+        cur.execute("SET statement_timeout = '8s'")
 
-        cur.execute(count_sql, params)
-        total = cur.fetchone()[0]
+        # Use fast pg_class estimate when no filters are active; exact COUNT otherwise
+        if where_parts:
+            cur.execute(f"SELECT COUNT(*) {base_query}", params)
+            total = cur.fetchone()[0]
+        else:
+            cur.execute("SELECT reltuples::bigint FROM pg_class WHERE relname = 'card_catalog'")
+            total = cur.fetchone()[0] or 0
 
         cur.execute(data_sql, params + [per_page, offset])
         rows = cur.fetchall()
