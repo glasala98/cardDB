@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
-Scrape NHL player stats from the public NHL API and match to Young Guns card database.
+Scrape NHL player stats from the public NHL API and store in PostgreSQL.
+
+Reads players from card_catalog (sport='NHL'), matches to live NHL API data,
+and writes to player_stats + standings + rookie_correlation_history tables.
 
 Usage:
-    python scrape_nhl_stats.py                    # Scrape all stats, match to 2020+ cards
-    python scrape_nhl_stats.py --season 2025-26   # Only match cards from one season
-    python scrape_nhl_stats.py --dry-run           # Show matches without saving
-    python scrape_nhl_stats.py --verbose           # Print detailed match info
+    python scrape_nhl_stats.py                    # Scrape all stats
+    python scrape_nhl_stats.py --fetch-bios       # Also fetch birth/draft info
+    python scrape_nhl_stats.py --dry-run          # Print matches without saving
+    python scrape_nhl_stats.py --verbose          # Detailed match output
 """
 
 import argparse
@@ -15,7 +18,7 @@ import os
 import sys
 import time
 import unicodedata
-from datetime import datetime
+from datetime import datetime, date
 from difflib import get_close_matches
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
@@ -23,37 +26,24 @@ from urllib.error import URLError, HTTPError
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, SCRIPT_DIR)
 
-from dashboard_utils import (
-    load_master_db, save_master_db,
-    load_nhl_player_stats, save_nhl_player_stats,
-    compute_correlation_snapshot, save_correlation_snapshot,
-    TEAM_NAME_TO_ABBREV, TEAM_ABBREV_TO_NAME,
-)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(SCRIPT_DIR, '.env'))
+except ImportError:
+    pass
+
+from db import get_db
 
 NHL_API_BASE = "https://api-web.nhle.com/v1"
-MIN_SEASON = "2020-21"  # kept for --season flag default; full run ignores this
 
+
+# ── NHL API helpers ───────────────────────────────────────────────────────────
 
 def fetch_json(url, retries=2):
-    """Perform an HTTP GET request and return the parsed JSON response.
-
-    Retries up to retries times on URLError or HTTPError, sleeping 1 s
-    between attempts. Sets a browser-like User-Agent header to avoid
-    rejection by the NHL API.
-
-    Args:
-        url: Fully-qualified URL string to fetch.
-        retries: Number of additional attempts after the first failure.
-            Defaults to 2 (3 total attempts).
-
-    Returns:
-        Parsed JSON as a dict or list, or None if all attempts fail.
-    """
     for attempt in range(retries + 1):
         try:
             req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
             with urlopen(req, timeout=15) as resp:
-                # Handle redirects — read final URL content
                 return json.loads(resp.read().decode())
         except (URLError, HTTPError) as e:
             if attempt < retries:
@@ -64,38 +54,19 @@ def fetch_json(url, retries=2):
 
 
 def fetch_standings():
-    """Fetch the current NHL standings from the NHL API.
-
-    Calls the /standings/now endpoint, sorts teams by points descending to
-    determine league rank, and tracks per-division rank order as teams are
-    iterated. Teams with a missing abbreviation are skipped.
-
-    Returns:
-        A dict keyed by team abbreviation (str), where each value is a dict
-        with keys: 'team_name', 'wins', 'losses', 'otl', 'points',
-        'games_played', 'goal_diff', 'league_rank', 'division_rank',
-        'division', 'conference', 'streak'. Returns an empty dict if the API
-        call fails or returns no standings data.
-    """
     data = fetch_json(f"{NHL_API_BASE}/standings/now")
     if not data or 'standings' not in data:
         return {}
-
-    standings = {}
     teams_list = data['standings']
-    # Sort by points descending to determine league rank
     teams_list.sort(key=lambda t: t.get('points', 0), reverse=True)
-
-    # Track division ranks
     div_ranks = {}
+    standings = {}
     for i, team in enumerate(teams_list):
         abbrev = team.get('teamAbbrev', {}).get('default', '')
         if not abbrev:
             continue
-
         div = team.get('divisionName', '')
         div_ranks[div] = div_ranks.get(div, 0) + 1
-
         standings[abbrev] = {
             'team_name': team.get('teamName', {}).get('default', ''),
             'wins': team.get('wins', 0),
@@ -110,104 +81,19 @@ def fetch_standings():
             'conference': team.get('conferenceName', ''),
             'streak': f"{team.get('streakCode', '')}{team.get('streakCount', '')}",
         }
-
     return standings
 
 
 def fetch_team_stats(team_abbrev):
-    """Fetch the current-season roster stats for one NHL team.
-
-    Calls the /club-stats/{team_abbrev}/now endpoint. The returned skaters
-    and goalies lists contain the raw API dicts for each player.
-
-    Args:
-        team_abbrev: Three-letter NHL team abbreviation, e.g. "TOR".
-
-    Returns:
-        A tuple (skaters, goalies) where each element is a list of player
-        stat dicts from the NHL API. Returns ([], []) on failure.
-    """
     data = fetch_json(f"{NHL_API_BASE}/club-stats/{team_abbrev}/now")
     if not data:
         return [], []
     return data.get('skaters', []), data.get('goalies', [])
 
 
-def normalize_name(name):
-    """Strip diacritics and lowercase a player name for fuzzy comparison.
-
-    Applies NFKD Unicode normalization and removes all combining characters,
-    so accented letters like 'é' become 'e'. Used as a pre-processing step in
-    match_player() to handle names like "Martin St-Louis".
-
-    Args:
-        name: Player name string, possibly containing accented characters.
-
-    Returns:
-        A lowercased ASCII-safe version of name with leading/trailing whitespace
-        removed.
-    """
-    nfkd = unicodedata.normalize('NFKD', name)
-    return ''.join(c for c in nfkd if not unicodedata.combining(c)).strip().lower()
-
-
-def fetch_player_bio(nhl_id):
-    """Fetch biographical and draft information for a player from the NHL API.
-
-    Calls the /player/{nhl_id}/landing endpoint. Handles both dict-style and
-    plain-string fields for birth location data, as the NHL API returns
-    inconsistent shapes for some players.
-
-    Args:
-        nhl_id: Numeric NHL player ID as returned in roster stats.
-
-    Returns:
-        A dict with keys: 'birth_country', 'birth_city', 'birth_state_province',
-        'birth_date', 'draft_year', 'draft_round', 'draft_overall', 'draft_team',
-        'height_inches', 'weight_pounds', 'shoots_catches'. Returns None if the
-        API call fails.
-    """
-    data = fetch_json(f"{NHL_API_BASE}/player/{nhl_id}/landing")
-    if not data:
-        return None
-    draft = data.get('draftDetails', {}) or {}
-    return {
-        'birth_country': data.get('birthCountry', {}).get('default', '') if isinstance(data.get('birthCountry'), dict) else data.get('birthCountry', ''),
-        'birth_city': data.get('birthCity', {}).get('default', '') if isinstance(data.get('birthCity'), dict) else data.get('birthCity', ''),
-        'birth_state_province': data.get('birthStateProvince', {}).get('default', '') if isinstance(data.get('birthStateProvince'), dict) else data.get('birthStateProvince', ''),
-        'birth_date': data.get('birthDate', ''),
-        'draft_year': draft.get('year'),
-        'draft_round': draft.get('round'),
-        'draft_overall': draft.get('overallPick'),
-        'draft_team': draft.get('teamAbbrev', ''),
-        'height_inches': data.get('heightInInches'),
-        'weight_pounds': data.get('weightInPounds'),
-        'shoots_catches': data.get('shootsCatches', ''),
-    }
-
-
 def build_player_index(all_teams_data):
-    """Build a name-keyed lookup of all NHL players from all 32 teams' roster data.
-
-    Iterates the raw API dicts from fetch_team_stats() for all teams, extracts
-    skater and goalie stats, and indexes them by "First Last" full name.
-    Players with an empty name are skipped.
-
-    Args:
-        all_teams_data: Dict mapping team abbreviation (str) to a (skaters, goalies)
-            tuple as returned by fetch_team_stats().
-
-    Returns:
-        A tuple (skaters_by_name, goalies_by_name) where each element is a dict
-        keyed by player full name (str). Skater dicts contain: 'nhl_id', 'team',
-        'position', 'games_played', 'goals', 'assists', 'points', 'plus_minus',
-        'shots', 'shooting_pct', 'powerplay_goals', 'game_winning_goals'.
-        Goalie dicts contain: 'nhl_id', 'team', 'position', 'games_played',
-        'games_started', 'wins', 'losses', 'otl', 'save_pct', 'gaa', 'shutouts'.
-    """
     skaters = {}
     goalies = {}
-
     for team_abbrev, (team_skaters, team_goalies) in all_teams_data.items():
         for s in team_skaters:
             first = s.get('firstName', {}).get('default', '')
@@ -229,7 +115,6 @@ def build_player_index(all_teams_data):
                 'powerplay_goals': s.get('powerPlayGoals', 0),
                 'game_winning_goals': s.get('gameWinningGoals', 0),
             }
-
         for g in team_goalies:
             first = g.get('firstName', {}).get('default', '')
             last = g.get('lastName', {}).get('default', '')
@@ -249,182 +134,280 @@ def build_player_index(all_teams_data):
                 'gaa': round(g.get('goalsAgainstAverage', 0), 3),
                 'shutouts': g.get('shutouts', 0),
             }
-
     return skaters, goalies
 
 
+def normalize_name(name):
+    nfkd = unicodedata.normalize('NFKD', name)
+    return ''.join(c for c in nfkd if not unicodedata.combining(c)).strip().lower()
+
+
 def match_player(player_name, skaters, goalies):
-    """Match a card's player name to an entry in the NHL API player index.
-
-    Tries three matching strategies in order, stopping at the first success:
-      1. Exact string match against skaters, then goalies.
-      2. Normalized match (diacritics stripped, lowercased) via normalize_name().
-      3. Fuzzy match using difflib.get_close_matches() with an 85% similarity
-         cutoff across the combined skater + goalie name pool.
-
-    Skaters are checked before goalies at each stage since they are more common.
-
-    Args:
-        player_name: Player name string as it appears in the card database.
-        skaters: Dict of skater data keyed by full name, from build_player_index().
-        goalies: Dict of goalie data keyed by full name, from build_player_index().
-
-    Returns:
-        A tuple (api_data, player_type) where api_data is the matching player's
-        stat dict and player_type is 'skater' or 'goalie'. Returns (None, None)
-        if no match is found at any stage.
-    """
-    # Exact match — skaters first (more common)
     if player_name in skaters:
         return skaters[player_name], 'skater'
     if player_name in goalies:
         return goalies[player_name], 'goalie'
-
-    # Normalized match (strip diacritics)
-    norm_name = normalize_name(player_name)
+    norm = normalize_name(player_name)
     for name, data in skaters.items():
-        if normalize_name(name) == norm_name:
+        if normalize_name(name) == norm:
             return data, 'skater'
     for name, data in goalies.items():
-        if normalize_name(name) == norm_name:
+        if normalize_name(name) == norm:
             return data, 'goalie'
-
-    # Fuzzy match as last resort
     all_names = list(skaters.keys()) + list(goalies.keys())
     matches = get_close_matches(player_name, all_names, n=1, cutoff=0.85)
     if matches:
-        match_name = matches[0]
-        if match_name in skaters:
-            return skaters[match_name], 'skater'
-        if match_name in goalies:
-            return goalies[match_name], 'goalie'
-
+        m = matches[0]
+        if m in skaters: return skaters[m], 'skater'
+        if m in goalies:  return goalies[m], 'goalie'
     return None, None
 
 
-def build_player_entry(player_name, api_data, player_type, card_team, standings, existing_entry=None):
-    """Build or update a player stats entry for the nhl_player_stats.json output.
-
-    Constructs an entry with the player's current-season statistics. For
-    goalies, also attaches their team's current standings. Appends today's
-    snapshot to an append-only history list; if a snapshot for today already
-    exists in the previous entry it is replaced (idempotent on same-day runs).
-    History is kept sorted by date ascending.
-
-    Args:
-        player_name: Player full name string (used only for context; not stored
-            in the returned dict).
-        api_data: Stat dict for the player from build_player_index().
-        player_type: Either 'skater' or 'goalie'.
-        card_team: Team abbreviation string from the card database (may differ
-            from api_data['team'] for traded players).
-        standings: Dict of team standings keyed by abbreviation, as returned by
-            fetch_standings().
-        existing_entry: Previously stored player entry dict (used to preserve
-            the history list), or None for a new player.
-
-    Returns:
-        A dict suitable for storage under players[player_name] in the output
-        JSON. Contains keys: 'nhl_id', 'current_team', 'position', 'card_team',
-        'type', 'current_season', 'history', and for goalies 'team_standings'.
-    """
-    today = datetime.now().strftime('%Y-%m-%d')
-    team = api_data['team']
-
-    entry = {
-        'nhl_id': api_data['nhl_id'],
-        'current_team': team,
-        'position': api_data['position'],
-        'card_team': card_team,
-        'type': player_type,
+def fetch_player_bio(nhl_id):
+    data = fetch_json(f"{NHL_API_BASE}/player/{nhl_id}/landing")
+    if not data:
+        return None
+    draft = data.get('draftDetails', {}) or {}
+    def _str(field):
+        v = data.get(field, '')
+        return v.get('default', '') if isinstance(v, dict) else (v or '')
+    return {
+        'birth_country':         _str('birthCountry'),
+        'birth_city':            _str('birthCity'),
+        'birth_state_province':  _str('birthStateProvince'),
+        'birth_date':            data.get('birthDate', ''),
+        'draft_year':            draft.get('year'),
+        'draft_round':           draft.get('round'),
+        'draft_overall':         draft.get('overallPick'),
+        'draft_team':            draft.get('teamAbbrev', ''),
+        'height_inches':         data.get('heightInInches'),
+        'weight_pounds':         data.get('weightInPounds'),
+        'shoots_catches':        data.get('shootsCatches', ''),
     }
 
+
+def build_player_entry(api_data, player_type, card_team, standings, existing=None):
+    today = datetime.now().strftime('%Y-%m-%d')
+    team = api_data['team']
+    entry = {
+        'nhl_id':       api_data['nhl_id'],
+        'current_team': team,
+        'position':     api_data['position'],
+        'card_team':    card_team,
+        'type':         player_type,
+    }
     if player_type == 'skater':
         entry['current_season'] = {
-            'games_played': api_data['games_played'],
-            'goals': api_data['goals'],
-            'assists': api_data['assists'],
-            'points': api_data['points'],
-            'plus_minus': api_data['plus_minus'],
-            'shots': api_data['shots'],
-            'shooting_pct': api_data['shooting_pct'],
-            'powerplay_goals': api_data['powerplay_goals'],
+            'games_played':       api_data['games_played'],
+            'goals':              api_data['goals'],
+            'assists':            api_data['assists'],
+            'points':             api_data['points'],
+            'plus_minus':         api_data['plus_minus'],
+            'shots':              api_data['shots'],
+            'shooting_pct':       api_data['shooting_pct'],
+            'powerplay_goals':    api_data['powerplay_goals'],
             'game_winning_goals': api_data['game_winning_goals'],
         }
-        history_snapshot = {
+        snapshot = {
             'date': today,
             'games_played': api_data['games_played'],
-            'goals': api_data['goals'],
-            'assists': api_data['assists'],
-            'points': api_data['points'],
-            'plus_minus': api_data['plus_minus'],
+            'goals':        api_data['goals'],
+            'assists':      api_data['assists'],
+            'points':       api_data['points'],
+            'plus_minus':   api_data['plus_minus'],
         }
     else:
-        team_standing = standings.get(team, {})
+        ts = standings.get(team, {})
         entry['current_season'] = {
-            'games_played': api_data['games_played'],
+            'games_played':  api_data['games_played'],
             'games_started': api_data['games_started'],
-            'wins': api_data['wins'],
-            'losses': api_data['losses'],
-            'otl': api_data['otl'],
-            'save_pct': api_data['save_pct'],
-            'gaa': api_data['gaa'],
-            'shutouts': api_data['shutouts'],
+            'wins':          api_data['wins'],
+            'losses':        api_data['losses'],
+            'otl':           api_data['otl'],
+            'save_pct':      api_data['save_pct'],
+            'gaa':           api_data['gaa'],
+            'shutouts':      api_data['shutouts'],
         }
         entry['team_standings'] = {
-            'team_points': team_standing.get('points', 0),
-            'league_rank': team_standing.get('league_rank', 0),
-            'division_rank': team_standing.get('division_rank', 0),
+            'team_points':  ts.get('points', 0),
+            'league_rank':  ts.get('league_rank', 0),
+            'division_rank': ts.get('division_rank', 0),
         }
-        history_snapshot = {
-            'date': today,
+        snapshot = {
+            'date':         today,
             'games_played': api_data['games_played'],
-            'wins': api_data['wins'],
-            'save_pct': api_data['save_pct'],
-            'gaa': api_data['gaa'],
-            'team_points': team_standing.get('points', 0),
+            'wins':         api_data['wins'],
+            'save_pct':     api_data['save_pct'],
+            'gaa':          api_data['gaa'],
+            'team_points':  ts.get('points', 0),
         }
 
-    # Merge with existing history
     history = []
-    if existing_entry and 'history' in existing_entry:
-        history = [h for h in existing_entry['history'] if h.get('date') != today]
-    history.append(history_snapshot)
+    if existing and 'history' in existing:
+        history = [h for h in existing['history'] if h.get('date') != today]
+    history.append(snapshot)
     history.sort(key=lambda x: x['date'])
     entry['history'] = history
-
     return entry
 
 
+# ── DB helpers ────────────────────────────────────────────────────────────────
+
+def load_nhl_players_from_catalog():
+    """Return list of {player_name, team} dicts from card_catalog for NHL."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT DISTINCT player_name, team
+                FROM card_catalog
+                WHERE sport = 'NHL' AND player_name != ''
+                ORDER BY player_name
+            """)
+            return [{'player_name': r[0], 'team': r[1]} for r in cur.fetchall()]
+
+
+def load_existing_player_stats():
+    """Load previously stored player stats from player_stats table."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT player, data FROM player_stats WHERE sport = 'NHL'")
+            return {row[0]: row[1] for row in cur.fetchall()}
+
+
+def save_to_db(matched: dict, standings: dict, args):
+    """Upsert player stats and standings to PostgreSQL."""
+    if args.dry_run:
+        return
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            from psycopg2.extras import execute_values
+
+            # Upsert player stats
+            if matched:
+                execute_values(cur, """
+                    INSERT INTO player_stats (sport, player, data, updated_at)
+                    VALUES %s
+                    ON CONFLICT (sport, player) DO UPDATE SET
+                        data       = EXCLUDED.data,
+                        updated_at = NOW()
+                """, [('NHL', name, json.dumps(data)) for name, data in matched.items()])
+
+            # Upsert standings
+            if standings:
+                execute_values(cur, """
+                    INSERT INTO standings (sport, team, data, updated_at)
+                    VALUES %s
+                    ON CONFLICT (sport, team) DO UPDATE SET
+                        data       = EXCLUDED.data,
+                        updated_at = NOW()
+                """, [('NHL', team, json.dumps(data)) for team, data in standings.items()])
+
+        conn.commit()
+
+    print(f"  Saved {len(matched)} players to player_stats")
+    print(f"  Saved {len(standings)} teams to standings")
+
+
+def save_correlation_to_db(matched: dict, standings: dict):
+    """Compute and save a price-vs-performance correlation snapshot."""
+    try:
+        # Get card prices from market_prices + card_catalog
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT cc.player_name, mp.fair_value
+                    FROM card_catalog cc
+                    JOIN market_prices mp ON mp.card_catalog_id = cc.id
+                    WHERE cc.sport = 'NHL'
+                    AND cc.is_rookie = TRUE
+                    AND mp.fair_value > 0
+                    AND mp.confidence NOT IN ('none', '')
+                """)
+                price_rows = cur.fetchall()
+
+        if not price_rows:
+            print("  Skipping correlation — no market_prices data yet")
+            return
+
+        # Build player → avg_price map
+        player_prices: dict = {}
+        for player, value in price_rows:
+            if player not in player_prices:
+                player_prices[player] = []
+            player_prices[player].append(float(value))
+        player_avg = {p: sum(v) / len(v) for p, v in player_prices.items()}
+
+        # Build skater correlation data
+        skater_data = []
+        for name, entry in matched.items():
+            if entry.get('type') != 'skater':
+                continue
+            price = player_avg.get(name)
+            if not price:
+                continue
+            cs = entry.get('current_season', {})
+            skater_data.append({
+                'player': name,
+                'price': price,
+                'points': cs.get('points', 0),
+                'goals': cs.get('goals', 0),
+                'games_played': cs.get('games_played', 0),
+            })
+
+        if len(skater_data) < 5:
+            print(f"  Skipping correlation — only {len(skater_data)} skaters with prices")
+            return
+
+        # Simple Pearson r
+        def pearson_r(xs, ys):
+            n = len(xs)
+            if n < 2: return 0
+            mx, my = sum(xs)/n, sum(ys)/n
+            num = sum((x-mx)*(y-my) for x, y in zip(xs, ys))
+            den = (sum((x-mx)**2 for x in xs) * sum((y-my)**2 for y in ys)) ** 0.5
+            return round(num/den, 4) if den else 0
+
+        prices = [d['price'] for d in skater_data]
+        points = [d['points'] for d in skater_data]
+        goals  = [d['goals'] for d in skater_data]
+
+        snapshot = {
+            'meta': {
+                'date': date.today().isoformat(),
+                'skaters_with_price': len(skater_data),
+            },
+            'correlations': {
+                'points_vs_price': {'r': pearson_r(points, prices)},
+                'goals_vs_price':  {'r': pearson_r(goals, prices)},
+            },
+        }
+
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO rookie_correlation_history (sport, date, data)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (sport, date) DO UPDATE SET data = EXCLUDED.data
+                """, ('NHL', date.today(), json.dumps(snapshot)))
+            conn.commit()
+
+        pts_r = snapshot['correlations']['points_vs_price']['r']
+        goals_r = snapshot['correlations']['goals_vs_price']['r']
+        n = snapshot['meta']['skaters_with_price']
+        print(f"  Correlation saved: points r={pts_r}, goals r={goals_r} (n={n})")
+
+    except Exception as e:
+        print(f"  WARNING: Correlation snapshot failed: {e}")
+
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
 def main():
-    """Fetch NHL stats, match players to the Young Guns DB, and save results.
-
-    Full pipeline:
-      1. Fetch current standings for all 32 NHL teams.
-      2. Fetch per-team roster stats and build a unified player name index.
-      3. Load young_guns.csv and filter to seasons >= MIN_SEASON (2020-21)
-         or the --season argument.
-      4. Match each YG card player to the API index using match_player().
-      5. Build player stat entries via build_player_entry(), merging with any
-         previously stored history.
-      6. Back-fill empty Position values in young_guns.csv from API data.
-      7. Save combined output to nhl_player_stats.json (players + standings +
-         unmatched list + metadata).
-      8. Optionally fetch full player bios (--fetch-bios flag) and re-save.
-      9. Compute and save a price-vs-performance correlation snapshot.
-
-    CLI args:
-        --season: Restrict card matching to one season string (e.g. "2025-26").
-        --dry-run: Print match results without writing any files.
-        --fetch-bios: Fetch birth country, draft details, and physical info for
-            each matched player via fetch_player_bio().
-        --verbose: Print per-player match/miss details.
-    """
-    parser = argparse.ArgumentParser(description="Scrape NHL player stats and match to Young Guns DB")
-    parser.add_argument('--season', type=str, help="Only match cards from this season (e.g. 2025-26)")
-    parser.add_argument('--dry-run', action='store_true', help="Show matches without saving")
-    parser.add_argument('--fetch-bios', action='store_true', help="Fetch player bios (nationality, draft info)")
-    parser.add_argument('--verbose', action='store_true', help="Print detailed match info")
+    parser = argparse.ArgumentParser(description="Scrape NHL player stats → PostgreSQL")
+    parser.add_argument('--fetch-bios', action='store_true', help="Fetch birth/draft bios")
+    parser.add_argument('--dry-run',    action='store_true', help="Print without saving")
+    parser.add_argument('--verbose',    action='store_true', help="Detailed match output")
     args = parser.parse_args()
 
     print("=" * 60)
@@ -435,180 +418,113 @@ def main():
     print("\nFetching NHL standings...")
     standings = fetch_standings()
     if not standings:
-        print("ERROR: Could not fetch standings. Aborting.")
+        print("ERROR: Could not fetch standings.")
         sys.exit(1)
-    print(f"  {len(standings)} teams found")
+    print(f"  {len(standings)} teams")
 
     # Step 2: Fetch all team rosters
     print(f"\nFetching roster stats for {len(standings)} teams...")
     all_teams_data = {}
-    team_abbrevs = sorted(standings.keys())
-    for i, abbrev in enumerate(team_abbrevs):
-        team_name = standings[abbrev].get('team_name', abbrev)
+    for i, abbrev in enumerate(sorted(standings.keys())):
         skaters, goalies = fetch_team_stats(abbrev)
         all_teams_data[abbrev] = (skaters, goalies)
         if args.verbose:
-            print(f"  [{i+1}/{len(team_abbrevs)}] {abbrev} ({team_name}): {len(skaters)} skaters, {len(goalies)} goalies")
-        if i < len(team_abbrevs) - 1:
+            print(f"  [{i+1}/{len(standings)}] {abbrev}: {len(skaters)} skaters, {len(goalies)} goalies")
+        if i < len(standings) - 1:
             time.sleep(0.3)
 
-    # Step 3: Build player index
     skaters_idx, goalies_idx = build_player_index(all_teams_data)
-    total_api_players = len(skaters_idx) + len(goalies_idx)
-    print(f"  {len(skaters_idx)} skaters, {len(goalies_idx)} goalies indexed ({total_api_players} total)")
+    print(f"  {len(skaters_idx)} skaters, {len(goalies_idx)} goalies indexed")
 
-    # Step 4: Load card database
-    print("\nLoading Young Guns database...")
-    df = load_master_db()
-    if df.empty:
-        print("ERROR: No master database found. Aborting.")
-        sys.exit(1)
+    # Step 3: Load players from card_catalog
+    print("\nLoading NHL players from card_catalog...")
+    catalog_players = load_nhl_players_from_catalog()
+    print(f"  {len(catalog_players):,} distinct players")
 
-    # Filter by season if requested; otherwise match ALL cards in the DB.
-    # Active stars like McDavid have pre-2020 YG cards but are still in NHL rosters.
-    # Retired players simply won't be found in the current-season roster index.
-    if args.season:
-        candidates = df[df['Season'] == args.season].copy()
-        print(f"  Filtering to season {args.season}: {len(candidates)} cards")
-    else:
-        candidates = df.copy()
-        print(f"  Matching all {len(candidates)} cards in the database")
+    existing_stats = load_existing_player_stats()
+    print(f"  {len(existing_stats)} players already in player_stats")
 
-    # Step 5: Match players
+    # Step 4: Match players
     print("\nMatching players...")
-    existing_data = load_nhl_player_stats() or {}
-    existing_players = existing_data.get('players', {})
-
     matched = {}
     unmatched = []
-    positions_updated = 0
 
-    for idx, row in candidates.iterrows():
-        player_name = row['PlayerName']
-        card_team = str(row['Team']).split('/')[0].strip() if row['Team'] else ''
+    seen = set()
+    for row in catalog_players:
+        player_name = row['player_name']
+        if player_name in seen:
+            continue
+        seen.add(player_name)
 
+        card_team = (row['team'] or '').split('/')[0].strip()
         api_data, player_type = match_player(player_name, skaters_idx, goalies_idx)
 
         if api_data:
             entry = build_player_entry(
-                player_name, api_data, player_type,
-                card_team, standings,
-                existing_entry=existing_players.get(player_name),
+                api_data, player_type, card_team, standings,
+                existing=existing_stats.get(player_name),
             )
+            # Preserve existing bio
+            if player_name in existing_stats and existing_stats[player_name].get('bio'):
+                entry['bio'] = existing_stats[player_name]['bio']
             matched[player_name] = entry
-
-            # Update Position in CSV if empty
-            current_pos = row.get('Position', '')
-            if (not current_pos or str(current_pos).strip() == '' or str(current_pos) == 'nan'):
-                df.at[idx, 'Position'] = api_data['position']
-                positions_updated += 1
-
             if args.verbose:
-                team_abbrev = api_data['team']
                 if player_type == 'skater':
-                    print(f"  MATCH: {player_name} ({team_abbrev}) — {api_data['points']}pts ({api_data['goals']}G, {api_data['assists']}A)")
+                    print(f"  MATCH: {player_name} ({api_data['team']}) — {api_data['points']}pts")
                 else:
-                    print(f"  MATCH: {player_name} ({team_abbrev}) — {api_data['wins']}W, {api_data['save_pct']:.3f}SV%")
+                    print(f"  MATCH: {player_name} ({api_data['team']}) — {api_data['wins']}W {api_data['save_pct']:.3f}SV%")
         else:
-            unmatched.append({
-                'player': player_name,
-                'season': row['Season'],
-                'team': card_team,
-                'reason': 'not_in_nhl',
-            })
+            unmatched.append(player_name)
             if args.verbose:
-                print(f"  MISS:  {player_name} ({row['Season']}, {card_team})")
+                print(f"  MISS:  {player_name}")
 
-    # Summary
-    print(f"\n  Matched: {len(matched)}")
-    print(f"  Unmatched: {len(unmatched)}")
-    print(f"  Match rate: {len(matched)/(len(matched)+len(unmatched))*100:.1f}%")
-    if positions_updated:
-        print(f"  Positions updated: {positions_updated}")
-
-    if args.dry_run:
-        print("\n[DRY RUN] No files saved.")
-        if unmatched:
-            print(f"\nTop unmatched players:")
-            for u in unmatched[:20]:
-                print(f"  {u['player']} ({u['season']}, {u['team']})")
-        return
-
-    # Step 6: Save
-    # Merge with existing players (keep players from previous runs not in current candidates)
-    for name, entry in existing_players.items():
+    # Also keep previously matched players not in current candidates
+    for name, entry in existing_stats.items():
         if name not in matched:
             matched[name] = entry
-        elif entry.get('bio') and not matched[name].get('bio'):
-            # Preserve existing bio data
-            matched[name]['bio'] = entry['bio']
 
-    output = {
-        'meta': {
-            'last_scraped': datetime.now().strftime('%Y-%m-%d %H:%M'),
-            'season': '20252026',
-            'matched': len(matched),
-            'unmatched': len(unmatched),
-        },
-        'standings': standings,
-        'players': matched,
-        'unmatched': unmatched,
-    }
+    total = len(matched) + len(unmatched)
+    print(f"  Matched:   {len(matched)}")
+    print(f"  Unmatched: {len(unmatched)}")
+    print(f"  Match rate: {len(matched)/total*100:.1f}%")
 
-    save_nhl_player_stats(output)
-    print(f"\n  Saved to Supabase (nhl_player_stats + nhl_standings)")
+    if args.dry_run:
+        print("\n[DRY RUN] Not saving.")
+        for p in unmatched[:20]:
+            print(f"  MISS: {p}")
+        return
 
-    # Save updated positions to Supabase
-    if positions_updated > 0:
-        save_master_db(df)
-        print(f"  Updated {positions_updated} positions in Supabase (young_guns)")
+    # Step 5: Save to DB
+    print("\nSaving to PostgreSQL...")
+    save_to_db(matched, standings, args)
 
-    # Step 7: Fetch player bios (nationality, draft info)
+    # Step 6: Fetch bios
     if args.fetch_bios:
         print("\nFetching player bios...")
-        bio_count = 0
-        bio_skipped = 0
-        bio_errors = 0
-        for player_name, entry in matched.items():
+        fetched = skipped = errors = 0
+        for name, entry in matched.items():
             nhl_id = entry.get('nhl_id')
             if not nhl_id:
                 continue
-            # Skip if already have bio data
-            if entry.get('bio') and entry['bio'].get('birth_country'):
-                bio_skipped += 1
+            if entry.get('bio', {}).get('birth_country'):
+                skipped += 1
                 continue
             bio = fetch_player_bio(nhl_id)
             if bio:
                 entry['bio'] = bio
-                bio_count += 1
+                fetched += 1
                 if args.verbose:
-                    country = bio.get('birth_country', '?')
-                    draft = f"Rd {bio['draft_round']}, #{bio['draft_overall']}" if bio.get('draft_round') else "Undrafted"
-                    print(f"  BIO: {player_name} -- {country}, {draft}")
+                    print(f"  BIO: {name} — {bio.get('birth_country', '?')}")
             else:
-                bio_errors += 1
+                errors += 1
             time.sleep(0.3)
-        print(f"  Fetched {bio_count} bios, {bio_skipped} cached, {bio_errors} errors")
+        print(f"  Fetched {fetched}, cached {skipped}, errors {errors}")
+        # Re-save with bios
+        save_to_db(matched, standings, args)
 
-        # Re-save with bios included
-        output['players'] = matched
-        save_nhl_player_stats(output)
-        print(f"  Re-saved with bios to Supabase")
-
-    # Step 8: Compute and save correlation snapshot
+    # Step 7: Correlation snapshot
     print("\nComputing price-vs-performance correlations...")
-    try:
-        snapshot = compute_correlation_snapshot(df, matched, standings)
-        save_correlation_snapshot(snapshot)
-        corr = snapshot.get('correlations', {})
-        pts_r = corr.get('points_vs_price', {}).get('r', 0)
-        goals_r = corr.get('goals_vs_price', {}).get('r', 0)
-        n = snapshot['meta']['skaters_with_price']
-        print(f"  Points vs Price r={pts_r:.3f}, Goals vs Price r={goals_r:.3f} (n={n} skaters)")
-        print(f"  {len(snapshot.get('tiers', []))} price tiers, {len(snapshot.get('team_premiums', {}))} teams")
-        print(f"  Saved correlation snapshot for {datetime.now().strftime('%Y-%m-%d')}")
-    except Exception as e:
-        print(f"  WARNING: Could not compute correlations: {e}")
+    save_correlation_to_db(matched, standings)
 
     print("\n" + "=" * 60)
     print("DONE")
