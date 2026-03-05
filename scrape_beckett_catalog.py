@@ -770,8 +770,9 @@ def main():
         log.info("Checkpoint cleared.")
 
     # Build year list
-    # MLB/NFL/NBA use calendar years on CBC/CLI; NHL uses season format (2021-22)
-    CALENDAR_YEAR_SPORTS = {"MLB", "NFL", "NBA"}
+    # MLB/NFL use calendar years on CBC/CLI (e.g. "2024")
+    # NHL/NBA use season format (e.g. "2024-25") — NBA confirmed on CLI
+    CALENDAR_YEAR_SPORTS = {"MLB", "NFL"}
     if args.year:
         years = [args.year]
     else:

@@ -1,0 +1,94 @@
+name: Daily Catalog Update (New Sets)
+
+on:
+  schedule:
+    - cron: '0 4 * * *'  # 4am UTC daily — runs before price scraping at 6am
+  workflow_dispatch:
+    inputs:
+      year_from:
+        description: 'Start year (default: 2 years ago)'
+        required: false
+        default: ''
+      sport:
+        description: 'Sport to update (NHL/NBA/NFL/MLB/ALL)'
+        required: false
+        default: 'ALL'
+
+jobs:
+  update-nhl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ github.event.inputs.sport == 'NHL' || github.event.inputs.sport == 'ALL' || github.event.inputs.sport == '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Update NHL catalog (CLI — recent 3 seasons)
+        run: |
+          YEAR_FROM=${{ github.event.inputs.year_from || '2023' }}
+          python -u scrape_beckett_catalog.py --source cli --sport NHL --year-from $YEAR_FROM
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  update-mlb:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ github.event.inputs.sport == 'MLB' || github.event.inputs.sport == 'ALL' || github.event.inputs.sport == '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Update MLB catalog (CLI — 2023+)
+        run: |
+          YEAR_FROM=${{ github.event.inputs.year_from || '2023' }}
+          python -u scrape_beckett_catalog.py --source cli --sport MLB --year-from $YEAR_FROM
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Update MLB catalog (CBC — 2022+)
+        run: |
+          YEAR_FROM=${{ github.event.inputs.year_from || '2022' }}
+          python -u scrape_beckett_catalog.py --source cbc --sport MLB --year-from $YEAR_FROM
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  update-nfl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ github.event.inputs.sport == 'NFL' || github.event.inputs.sport == 'ALL' || github.event.inputs.sport == '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Update NFL catalog (CBC — 2022+)
+        run: |
+          YEAR_FROM=${{ github.event.inputs.year_from || '2022' }}
+          python -u scrape_beckett_catalog.py --source cbc --sport NFL --year-from $YEAR_FROM
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  update-nba:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ github.event.inputs.sport == 'NBA' || github.event.inputs.sport == 'ALL' || github.event.inputs.sport == '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Update NBA catalog (CLI — season format e.g. 2024-25)
+        run: |
+          YEAR_FROM=${{ github.event.inputs.year_from || '2022' }}
+          python -u scrape_beckett_catalog.py --source cli --sport NBA --year-from $YEAR_FROM
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
