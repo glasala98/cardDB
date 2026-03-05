@@ -756,6 +756,7 @@ def main():
     ap.add_argument("--sport",      default="NHL", choices=["NHL","NBA","NFL","MLB"])
     ap.add_argument("--year",       help="Single year e.g. 2024-25")
     ap.add_argument("--year-from",  type=int, help="Start year (default: 5 years ago)")
+    ap.add_argument("--year-to",    type=int, help="End year (inclusive), for splitting parallel runs")
     ap.add_argument("--no-headless",action="store_true", help="Show browser (Beckett only)")
     ap.add_argument("--debug",      action="store_true", help="Save HTML snapshots to catalog_debug/")
     ap.add_argument("--dry-run",    action="store_true", help="Print cards without writing to DB")
@@ -776,10 +777,11 @@ def main():
     else:
         cur   = datetime.now().year
         start = args.year_from or (cur - 5)
+        end   = (args.year_to or cur) + 1
         if args.sport in CALENDAR_YEAR_SPORTS and args.source in ("cli", "cbc"):
-            years = [str(y) for y in range(start, cur + 1)]
+            years = [str(y) for y in range(start, end)]
         else:
-            years = [f"{y}-{str(y+1)[-2:]}" for y in range(start, cur + 1)]
+            years = [f"{y}-{str(y+1)[-2:]}" for y in range(start, end)]
 
     log.info(f"Source: {args.source.upper()}  |  Sport: {args.sport}  |  Years: {years}")
 
