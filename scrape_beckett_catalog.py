@@ -295,7 +295,12 @@ def cli_get_cards(session: requests.Session, set_info: dict, sport: str, year: s
 # ════════════════════════════════════════════════════════════════════════════
 
 def cbc_expand_year(year: str) -> str:
-    """Convert short hockey year to full: '2021-22' → '2021-2022', '2024-25' → '2024-2025'."""
+    """Convert year to CBC URL format.
+    '2021-22' → '2021-2022' (hockey season)
+    '2009'    → '2009'       (calendar year sports like MLB/NFL/NBA)
+    """
+    if "-" not in year:
+        return year
     start, end = year.split("-")
     return f"{start}-{start[:2]}{end}"
 
@@ -686,8 +691,13 @@ def upsert_cards(cards: list[dict], dry_run: bool) -> int:
             source       = EXCLUDED.source,
             updated_at   = NOW()
     """
+    seen = set()
     rows = []
     for c in cards:
+        key = (c["sport"], c["year"], c["set_name"], c["card_number"], c["player_name"], c["variant"])
+        if key in seen:
+            continue
+        seen.add(key)
         sq = build_search_query(c["year"], c["brand"], c["set_name"],
                                 c["card_number"], c["player_name"], c["variant"])
         rows.append((
@@ -759,12 +769,17 @@ def main():
         log.info("Checkpoint cleared.")
 
     # Build year list
+    # MLB/NFL/NBA use calendar years on CBC/CLI; NHL uses season format (2021-22)
+    CALENDAR_YEAR_SPORTS = {"MLB", "NFL", "NBA"}
     if args.year:
         years = [args.year]
     else:
         cur   = datetime.now().year
         start = args.year_from or (cur - 5)
-        years = [f"{y}-{str(y+1)[-2:]}" for y in range(start, cur + 1)]
+        if args.sport in CALENDAR_YEAR_SPORTS and args.source in ("cli", "cbc"):
+            years = [str(y) for y in range(start, cur + 1)]
+        else:
+            years = [f"{y}-{str(y+1)[-2:]}" for y in range(start, cur + 1)]
 
     log.info(f"Source: {args.source.upper()}  |  Sport: {args.sport}  |  Years: {years}")
 
