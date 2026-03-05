@@ -153,11 +153,18 @@ def browse_catalog(
 
 
 @router.get("/filters")
-def catalog_filters(sport: Optional[str] = Query(None)):
-    """Return unique sports, years, and top set names for filter dropdowns.
+def catalog_filters(
+    sport: Optional[str] = Query(None),
+    year:  Optional[str] = Query(None),
+):
+    """Return unique sports, years, and set names for filter dropdowns.
+
+    Sets are scoped by both sport and year when supplied, so the dropdown
+    only shows sets that actually exist for the selected sport+year combo.
 
     Args:
-        sport: If supplied, years and sets are scoped to that sport.
+        sport: Scope years and sets to this sport.
+        year:  Scope sets to this year (requires sport to be useful).
 
     Returns:
         Dict with keys: sports (list), years (list desc), sets (list).
@@ -168,28 +175,31 @@ def catalog_filters(sport: Optional[str] = Query(None)):
         cur.execute("SELECT DISTINCT sport FROM card_catalog ORDER BY sport")
         sports = [r[0] for r in cur.fetchall()]
 
-        year_params = []
-        year_where = ""
+        year_conds, year_params = [], []
         if sport:
-            year_where = "WHERE sport = %s"
-            year_params = [sport.upper()]
+            year_conds.append("sport = %s")
+            year_params.append(sport.upper())
+        year_where = ("WHERE " + " AND ".join(year_conds)) if year_conds else ""
         cur.execute(
             f"SELECT DISTINCT year FROM card_catalog {year_where} ORDER BY year DESC",
             year_params
         )
         years = [r[0] for r in cur.fetchall()]
 
-        set_params = []
-        set_where = ""
+        set_conds, set_params = [], []
         if sport:
-            set_where = "WHERE sport = %s"
-            set_params = [sport.upper()]
+            set_conds.append("sport = %s")
+            set_params.append(sport.upper())
+        if year:
+            set_conds.append("year = %s")
+            set_params.append(year)
+        set_where = ("WHERE " + " AND ".join(set_conds)) if set_conds else ""
         cur.execute(
             f"""SELECT set_name, COUNT(*) cnt
                 FROM card_catalog {set_where}
                 GROUP BY set_name
                 ORDER BY cnt DESC
-                LIMIT 200""",
+                LIMIT 300""",
             set_params
         )
         sets = [r[0] for r in cur.fetchall()]
