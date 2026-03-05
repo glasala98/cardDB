@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
+from db import get_db
 from dashboard_utils import (
     load_master_db,
     save_master_db,
@@ -304,20 +305,42 @@ def grading_lookup(player_name: str):
 
 @router.get("/yg-price-history")
 def yg_price_history_by_name(name: str):
-    """Return YG price history for a card identified by query parameter.
-
-    Preferred over the path-parameter variant when the card name contains
-    characters that are problematic in URL paths (brackets, slashes, hashes).
-    Returns an empty history list rather than a 404 when no data is found.
+    """Return price history for a card — queries market_price_history first,
+    falls back to legacy JSON store if no DB records found.
 
     Args:
-        name: Exact card name to look up (query param).
+        name: Card name string (query param).
 
     Returns:
-        Dict with keys 'card' (the card name string) and 'history' (list of
-        snapshot dicts, each with 'date' and 'fair_value'). 'history' is []
-        if no data exists for this card.
+        Dict with keys 'card' and 'history' (list of {date, fair_value} dicts).
     """
+    # Try market_price_history (new DB-backed history)
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                # Extract player name from card name for fuzzy catalog match
+                cur.execute("""
+                    SELECT mph.scraped_at, mph.fair_value, mph.confidence, mph.num_sales
+                    FROM market_price_history mph
+                    JOIN card_catalog cc ON cc.id = mph.card_catalog_id
+                    WHERE cc.player_name ILIKE %s
+                    ORDER BY mph.scraped_at ASC
+                    LIMIT 365
+                """, (f"%{name.split(' - ')[-1].strip()}%",))
+                rows = cur.fetchall()
+                if rows:
+                    return {
+                        "card": name,
+                        "history": [
+                            {"date": str(r[0]), "fair_value": float(r[1]),
+                             "confidence": r[2], "num_sales": r[3]}
+                            for r in rows
+                        ]
+                    }
+    except Exception:
+        pass
+
+    # Fallback to legacy JSON
     history = load_yg_price_history()
     entries = history.get(name)
     if not entries:
