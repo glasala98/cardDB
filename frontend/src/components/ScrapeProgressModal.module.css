@@ -78,3 +78,11 @@
 
 .error   { font-size: 12px; color: var(--danger); }
 .waiting { font-size: 13px; color: var(--text-secondary); text-align: center; padding: 20px 0; }
+
+@media (max-width: 600px) {
+  .modal  { width: 100%; border-radius: 12px 12px 0 0; margin-top: auto; }
+  .overlay { align-items: flex-end; padding: 0; }
+  .body   { padding: 16px; }
+  .header { padding: 14px 16px 12px; }
+  .startedAt { display: none; }
+}

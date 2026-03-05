@@ -21,7 +21,7 @@ export default function CardInspect() {
   const [toast,    setToast]    = useState(null)
 
   // Grading ROI — costs hardcoded to current standard-tier pricing (2025)
-  const GRADING_COSTS = { psa: 25, bgs: 150, tag: 20 }
+  const GRADING_COSTS = { psa: 35, bgs: 18, tag: 20 }
   const [gradingData,   setGradingData]   = useState(null)
   const [gradingResult, setGradingResult] = useState(null)
 
@@ -62,7 +62,7 @@ export default function CardInspect() {
               setGradingData(cards)
               const raw = d?.card?.fair_value ?? 0
               const m = cards?.[0]
-              const { psa, bgs, tag } = { psa: 25, bgs: 150, tag: 20 }
+              const { psa, bgs, tag } = { psa: 35, bgs: 18, tag: 20 }
               setGradingResult({
                 raw,
                 psa: {

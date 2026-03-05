@@ -68,6 +68,7 @@ export default function CardLedger() {
   const [showScan,      setShowScan]      = useState(false)
   const [showBulk,      setShowBulk]      = useState(false)
   const [showTools,     setShowTools]     = useState(false)
+  const [showFilters,   setShowFilters]   = useState(false)
   const [toast,         setToast]         = useState(null)
   const [scrapeAll,          setScrapeAll]          = useState(false)
   const [scrapeEta,          setScrapeEta]          = useState(null)
@@ -272,6 +273,12 @@ export default function CardLedger() {
           {filtered.length !== cards.length && (
             <span className={styles.filteredBadge}>{filtered.length} shown</span>
           )}
+          <button
+            className={`${styles.filterToggleBtn} ${filtersActive ? styles.filterToggleActive : ''}`}
+            onClick={() => setShowFilters(true)}
+          >
+            ⚙ Filters{filtersActive ? ` (${filtered.length})` : ''}
+          </button>
         </div>
         <div className={styles.topBarRight}>
           <CurrencySelect />
@@ -327,8 +334,19 @@ export default function CardLedger() {
       {/* ── Layout: sidebar + table ───────────────────────────── */}
       <div className={styles.layout}>
 
-        {/* Filter sidebar */}
-        <aside className={styles.filterPanel}>
+        {/* Mobile overlay backdrop */}
+        {showFilters && (
+          <div className={styles.drawerOverlay} onClick={() => setShowFilters(false)} />
+        )}
+
+        {/* Filter sidebar / mobile bottom-sheet drawer */}
+        <aside className={`${styles.filterPanel} ${showFilters ? styles.drawerOpen : ''}`}>
+
+          {/* Drawer header — only visible on mobile */}
+          <div className={styles.drawerHeader}>
+            <span className={styles.drawerTitle}>Filters</span>
+            <button className={styles.drawerClose} onClick={() => setShowFilters(false)}>✕</button>
+          </div>
 
           <div className={styles.filterSection}>
             <input
