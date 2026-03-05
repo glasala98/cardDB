@@ -191,7 +191,12 @@ export default function Portfolio() {
             onClick={() => navigate(`/ledger/${encodeURIComponent(cotd.card.card_name)}`)}
             title="Click to inspect"
           >
-            <span className={styles.cotdIcon}>🃏</span>
+            <div className={styles.cotdIcon}>
+              <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" width="18" height="18">
+                <rect x="1" y="3" width="11" height="14" rx="2" fill="currentColor" opacity="0.9"/>
+                <rect x="6" y="1" width="11" height="14" rx="2" fill="currentColor" opacity="0.45"/>
+              </svg>
+            </div>
             <div className={styles.cotdBody}>
               <span className={styles.cotdLabel}>Card of the Day — {cotd.date}</span>
               <span className={styles.cotdName}>{cotd.card.card_name}</span>

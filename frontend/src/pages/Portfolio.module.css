@@ -1,7 +1,7 @@
 /* ── Stats bar ────────────────────────────────────────────────── */
 .stats {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 24px;
 }
@@ -9,6 +9,7 @@
 .stat {
   background: var(--bg-card);
   border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
   border-radius: 10px;
   padding: 14px 20px;
   display: flex;
@@ -16,12 +17,16 @@
   gap: 4px;
   min-width: 120px;
   flex: 1;
+  transition: box-shadow 0.15s;
+}
+.stat:hover {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.35);
 }
 
 .statLabel {
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.6px;
   color: var(--text-secondary);
   font-weight: 600;
 }
@@ -30,8 +35,11 @@
   font-size: 18px;
   font-weight: 700;
   color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
-.statValue.large { font-size: 24px; }
+.statValue.large {
+  font-size: 24px;
+}
 .success { color: var(--success); }
 .danger  { color: var(--danger);  }
 
@@ -43,8 +51,17 @@
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 32px;
+  padding: 48px 32px;
   text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.chartPlaceholder::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,212,170,0.2), transparent);
 }
 
 .placeholderMsg {
@@ -52,7 +69,6 @@
   font-size: 13px;
   line-height: 1.7;
 }
-
 .placeholderMsg strong {
   color: var(--text-primary);
 }
@@ -63,7 +79,6 @@
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
-
 @media (max-width: 900px) {
   .lower { grid-template-columns: 1fr; }
 }
@@ -74,14 +89,24 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 20px;
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,212,170,0.15), transparent);
+  pointer-events: none;
 }
 
 .cardTitle {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.6px;
   margin-bottom: 16px;
 }
 
@@ -101,7 +126,7 @@
 
 .trendBar {
   flex: 1;
-  height: 6px;
+  height: 5px;
   background: var(--bg-secondary);
   border-radius: 3px;
   overflow: hidden;
@@ -110,7 +135,7 @@
 .trendFill {
   height: 100%;
   border-radius: 3px;
-  transition: width 0.4s ease;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .trendCount {
@@ -119,6 +144,7 @@
   color: var(--text-secondary);
   min-width: 24px;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Top 10 table ────────────────────────────────────────────── */
@@ -130,10 +156,13 @@
 
 .topTh {
   color: var(--text-secondary);
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   text-align: left;
   padding: 6px 8px;
   border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   white-space: nowrap;
 }
 
@@ -152,9 +181,10 @@
 .topRow:hover .topTd { background: var(--bg-secondary); }
 
 .rankCell {
-  color: var(--text-secondary);
+  color: var(--text-muted);
   width: 24px;
-  font-weight: 600;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .nameCell {
@@ -169,24 +199,42 @@
   font-weight: 700;
   white-space: nowrap;
   color: var(--success);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Card of the Day ───────────────────────────────────────────── */
 .cotd {
   display: flex;
   align-items: center;
-  gap: 16px;
-  background: linear-gradient(135deg, rgba(29,191,191,0.08), rgba(29,191,191,0.04));
-  border: 1px solid rgba(29,191,191,0.3);
+  gap: 14px;
+  background: linear-gradient(135deg, rgba(0,212,170,0.07) 0%, rgba(0,212,170,0.03) 100%);
+  border: 1px solid rgba(0,212,170,0.25);
   border-radius: 12px;
-  padding: 14px 20px;
+  padding: 14px 18px;
   margin-bottom: 20px;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
-.cotd:hover { border-color: var(--accent); background: rgba(29,191,191,0.12); }
-.cotdIcon   { font-size: 28px; flex-shrink: 0; }
+.cotd:hover {
+  border-color: var(--accent);
+  background: rgba(0,212,170,0.10);
+  box-shadow: 0 0 20px rgba(0,212,170,0.08);
+}
+
+.cotdIcon {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #090e17;
+  box-shadow: 0 0 12px rgba(0,212,170,0.2);
+}
+
 .cotdBody   { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .cotdLabel  { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-secondary); font-weight: 600; }
 .cotdName   { font-size: 14px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cotdValue  { font-size: 16px; font-weight: 800; color: var(--accent); }
+.cotdValue  { font-size: 16px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }

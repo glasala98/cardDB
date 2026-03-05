@@ -103,14 +103,18 @@
   border: none;
   border-radius: 8px;
   padding: 8px 16px;
-  color: #fff;
+  color: #090e17;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
+  font-family: var(--font);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s, box-shadow 0.15s;
   white-space: nowrap;
 }
-.addBtn:hover { background: var(--accent-hover); }
+.addBtn:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 0 14px var(--accent-glow);
+}
 
 /* ── Stats strip ─────────────────────────────────────────────── */
 .statsStrip {
@@ -120,6 +124,15 @@
   border-radius: 10px;
   overflow: hidden;
   margin-bottom: 16px;
+  position: relative;
+}
+.statsStrip::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,212,170,0.25), transparent);
+  pointer-events: none;
 }
 
 .statChip {
@@ -136,7 +149,7 @@
 .statLabel {
   font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: 0.6px;
+  letter-spacing: 0.7px;
   color: var(--text-secondary);
   font-weight: 600;
   white-space: nowrap;
@@ -147,6 +160,7 @@
   font-weight: 700;
   color: var(--text-primary);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .statSub {
@@ -155,6 +169,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .gain { color: var(--success); }
@@ -321,28 +336,33 @@
 }
 
 .th {
-  background: var(--bg-card);
+  background: var(--bg-secondary);
   color: var(--text-secondary);
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   text-align: left;
-  padding: 10px 12px;
+  padding: 9px 12px;
   border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   white-space: nowrap;
   position: sticky;
   top: 0;
   z-index: 1;
   cursor: pointer;
   user-select: none;
+  transition: color 0.12s;
 }
 .th:hover { color: var(--text-primary); }
 
-.arrow { color: var(--accent); }
+.arrow { color: var(--accent); margin-left: 3px; }
 
 .td {
   padding: 9px 12px;
   border-bottom: 1px solid var(--border);
   color: var(--text-primary);
   vertical-align: middle;
+  font-variant-numeric: tabular-nums;
 }
 
 .compactCell {
