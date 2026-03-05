@@ -39,11 +39,10 @@ from scrape_card_prices import (
     process_card,
 )
 from dashboard_utils import (
+    load_master_db, save_master_db,
     append_yg_portfolio_snapshot,
     batch_save_yg_raw_sales, batch_append_yg_price_history,
 )
-
-MASTER_DB_PATH = os.path.join(SCRIPT_DIR, "data", "master_db", "young_guns.csv")
 
 # Grade column mappings: grade_key -> (value_col, sales_col)
 GRADE_COLUMNS = {
@@ -335,11 +334,10 @@ def main():
     args = parser.parse_args()
 
     # Load master DB
-    if not os.path.exists(MASTER_DB_PATH):
-        print(f"ERROR: Master DB not found at {MASTER_DB_PATH}")
+    df = load_master_db()
+    if df.empty:
+        print("ERROR: Master DB is empty. Run the migration script first.")
         sys.exit(1)
-
-    df = pd.read_csv(MASTER_DB_PATH)
     print(f"Loaded {len(df)} cards from Master DB")
 
     # Add price columns if missing
@@ -420,13 +418,13 @@ def _run_raw_scrape(df, args):
     total = len(to_scrape)
     if total == 0:
         print("No cards to scrape. Use --force to re-scrape.")
-        df.to_csv(MASTER_DB_PATH, index=False)
+        save_master_db(df)
         sys.exit(0)
 
     print(f"\nScraping {total} cards with {args.workers} workers...")
     print(f"Estimated time: ~{total * 5 / args.workers / 60:.0f} minutes\n")
 
-    df.to_csv(MASTER_DB_PATH, index=False)
+    save_master_db(df)
 
     start_time = time.time()
     checkpoint_counter = 0
@@ -496,14 +494,14 @@ def _run_raw_scrape(df, args):
 
             if checkpoint_counter >= 50:
                 checkpoint_counter = 0
-                df.to_csv(MASTER_DB_PATH, index=False)
+                save_master_db(df)
                 _flush_pending()
                 print(f"  ** Checkpoint saved ({done} cards done)", flush=True)
 
     # Final flush
     _flush_pending()
 
-    df.to_csv(MASTER_DB_PATH, index=False)
+    save_master_db(df)
     elapsed = time.time() - start_time
 
     scraped_count = len(df[df['LastScraped'].notna() & (df['LastScraped'] != '')])
@@ -524,7 +522,7 @@ def _run_raw_scrape(df, args):
     print(f"  Errors:           {_progress['errors']}")
     print(f"  Total DB scraped: {scraped_count}/{len(df)}")
     print(f"  Total value:      ${total_value:,.2f}")
-    print(f"  Saved to:         {MASTER_DB_PATH}")
+    print(f"  Saved to:         Supabase (young_guns)")
     print(f"{'='*60}")
 
 
@@ -563,7 +561,7 @@ def _run_graded_scrape(df, args, grades_to_scrape):
     total_cards = len(to_scrape)
     if total_cards == 0:
         print(f"No cards to graded-scrape (min raw value: ${min_val:.2f}). Use --force to re-scrape.")
-        df.to_csv(MASTER_DB_PATH, index=False)
+        save_master_db(df)
         sys.exit(0)
 
     # Each card gets up to len(grades_to_scrape) scrapes, but smart probing reduces this
@@ -576,7 +574,7 @@ def _run_graded_scrape(df, args, grades_to_scrape):
     print(f"  Workers:          {args.workers}")
     print(f"{'='*60}\n")
 
-    df.to_csv(MASTER_DB_PATH, index=False)
+    save_master_db(df)
 
     start_time = time.time()
     checkpoint_counter = 0
@@ -659,13 +657,13 @@ def _run_graded_scrape(df, args, grades_to_scrape):
                       f"~{remaining:.1f}m remaining", flush=True)
 
             if cards_done % 50 == 0:
-                df.to_csv(MASTER_DB_PATH, index=False)
+                save_master_db(df)
                 _flush_pending()
                 print(f"  ** Checkpoint saved ({cards_done} cards done)", flush=True)
 
     # Final flush
     _flush_pending()
-    df.to_csv(MASTER_DB_PATH, index=False)
+    save_master_db(df)
     elapsed = time.time() - start_time
 
     # Count cards with at least one graded price
@@ -684,7 +682,7 @@ def _run_graded_scrape(df, args, grades_to_scrape):
     print(f"  Not found:          {_progress['not_found']}")
     print(f"  Errors:             {_progress['errors']}")
     print(f"  Cards with graded:  {graded_with_data}/{total_cards}")
-    print(f"  Saved to:           {MASTER_DB_PATH}")
+    print(f"  Saved to:           Supabase (young_guns)")
     print(f"{'='*60}")
 
 

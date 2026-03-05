@@ -141,3 +141,10 @@
 }
 .save:hover:not(:disabled) { background: var(--accent-hover); }
 .save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@media (max-width: 600px) {
+  .modal  { padding: 20px 16px; border-radius: 12px; }
+  .actions { flex-direction: column-reverse; }
+  .cancel,
+  .save   { width: 100%; text-align: center; padding: 11px; }
+}

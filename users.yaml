@@ -1,0 +1,9 @@
+users:
+  admin:
+    display_name: Admin
+    role: admin
+    password_hash: "$2b$12$hYHsnDa7JksIhONoS93LMuqv5nulsggvUNPnHd4vNnCS5X7eGdAwq"
+  josh:
+    display_name: Josh
+    role: user
+    password_hash: "$2b$12$UwtcRG/XhJSXATZR.4c1nuFRiGKadBMmpUaQxTyWnzXfj4le2PBvS"

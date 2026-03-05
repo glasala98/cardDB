@@ -28,11 +28,10 @@ from dashboard_utils import (
     load_nhl_player_stats, save_nhl_player_stats,
     compute_correlation_snapshot, save_correlation_snapshot,
     TEAM_NAME_TO_ABBREV, TEAM_ABBREV_TO_NAME,
-    NHL_STATS_PATH,
 )
 
 NHL_API_BASE = "https://api-web.nhle.com/v1"
-MIN_SEASON = "2020-21"
+MIN_SEASON = "2020-21"  # kept for --season flag default; full run ignores this
 
 
 def fetch_json(url, retries=2):
@@ -465,13 +464,15 @@ def main():
         print("ERROR: No master database found. Aborting.")
         sys.exit(1)
 
-    # Filter to active-era seasons
+    # Filter by season if requested; otherwise match ALL cards in the DB.
+    # Active stars like McDavid have pre-2020 YG cards but are still in NHL rosters.
+    # Retired players simply won't be found in the current-season roster index.
     if args.season:
         candidates = df[df['Season'] == args.season].copy()
         print(f"  Filtering to season {args.season}: {len(candidates)} cards")
     else:
-        candidates = df[df['Season'] >= MIN_SEASON].copy()
-        print(f"  Filtering to seasons >= {MIN_SEASON}: {len(candidates)} cards")
+        candidates = df.copy()
+        print(f"  Matching all {len(candidates)} cards in the database")
 
     # Step 5: Match players
     print("\nMatching players...")
@@ -555,12 +556,12 @@ def main():
     }
 
     save_nhl_player_stats(output)
-    print(f"\n  Saved to: {NHL_STATS_PATH}")
+    print(f"\n  Saved to Supabase (nhl_player_stats + nhl_standings)")
 
-    # Save updated positions to CSV
+    # Save updated positions to Supabase
     if positions_updated > 0:
         save_master_db(df)
-        print(f"  Updated {positions_updated} positions in young_guns.csv")
+        print(f"  Updated {positions_updated} positions in Supabase (young_guns)")
 
     # Step 7: Fetch player bios (nationality, draft info)
     if args.fetch_bios:
@@ -592,7 +593,7 @@ def main():
         # Re-save with bios included
         output['players'] = matched
         save_nhl_player_stats(output)
-        print(f"  Re-saved with bios to: {NHL_STATS_PATH}")
+        print(f"  Re-saved with bios to Supabase")
 
     # Step 8: Compute and save correlation snapshot
     print("\nComputing price-vs-performance correlations...")

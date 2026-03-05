@@ -118,3 +118,7 @@ After the Supabase migration, harden the auth and data layer:
 - [x] Admin password changed to lasala8324
 - [x] Full documentation pass (README rewrite, api/README, frontend/README, docs/, docstrings on all Python functions)
 - [x] All dev changes deployed to production (frontend dist, users.yaml, git pull, API restart)
+- [x] Dead code removed (dashboard_prod.py, deploy/, run_all_scrapes.sh, test artifacts)
+- [x] Auto-hide empty columns in Card Ledger (Cost Basis, Tags only show when data exists)
+- [x] Scraper confidence improvements (player name parsing fix, Stage 5 fallback)
+- [x] Dev → main PR merged (#34)

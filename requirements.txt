@@ -2,6 +2,9 @@
 pandas
 selenium
 requests
+beautifulsoup4
+webdriver-manager
+curl_cffi
 
 # API
 fastapi
@@ -17,3 +20,6 @@ anthropic
 
 # Misc
 bcrypt
+
+# Database
+psycopg2-binary>=2.9

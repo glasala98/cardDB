@@ -6,7 +6,7 @@ data/*
 !data/master_db/
 
 # Personal data - keep off GitHub
-users.yaml
+# users.yaml now tracked (repo is private)
 hockey_cards.csv
 card_prices_summary.csv
 card_prices_results.json

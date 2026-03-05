@@ -7,7 +7,7 @@ import urllib.error
 import json as _json
 
 from fastapi import APIRouter, HTTPException
-from dashboard_utils import get_market_alerts, load_data, get_user_paths
+from dashboard_utils import get_market_alerts, load_data
 
 router = APIRouter()
 
@@ -89,8 +89,7 @@ def trigger_scrape():
 
     # Estimate runtime based on card count and worker parallelism
     try:
-        paths = get_user_paths("admin")
-        df = load_data(paths["csv"], paths["results"])
+        df = load_data("admin")
         n_cards = len(df)
     except Exception:
         n_cards = 0
