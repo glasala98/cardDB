@@ -65,9 +65,6 @@ export default function Catalog() {
   const [sport,    setSport]    = useState('')
   const [year,     setYear]     = useState('')
   const [setName,  setSetName]  = useState('')
-  const [isRookie, setIsRookie] = useState('')
-  const [hasPrice, setHasPrice] = useState('')
-
   // Sort
   const [sortKey, setSortKey] = useState('year')
   const [sortDir, setSortDir] = useState('desc')
@@ -111,9 +108,7 @@ export default function Catalog() {
       ...(sport    && { sport }),
       ...(year     && { year }),
       ...(setName  && { set_name: setName }),
-      ...(isRookie && { is_rookie: isRookie === 'true' }),
-      ...(hasPrice && { has_price: hasPrice === 'true' }),
-      ...overrides,
+...overrides,
     }
     getCatalog(params)
       .then(data => {
@@ -124,7 +119,7 @@ export default function Catalog() {
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [search, sport, year, setName, isRookie, hasPrice, sortKey, sortDir])
+  }, [search, sport, year, setName, sortKey, sortDir])
 
   // Re-fetch on filter/sort change (debounce search)
   useEffect(() => {
@@ -134,7 +129,7 @@ export default function Catalog() {
       fetchPage(1)
     }, search ? 350 : 0)
     return () => clearTimeout(searchTimer.current)
-  }, [search, sport, year, setName, isRookie, hasPrice, sortKey, sortDir]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [search, sport, year, setName, sortKey, sortDir]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSort = (key) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -152,13 +147,11 @@ export default function Catalog() {
     setSport('')
     setYear('')
     setSetName('')
-    setIsRookie('')
-    setHasPrice('')
-    setSortKey('year')
+setSortKey('year')
     setSortDir('desc')
   }
 
-  const hasFilters = search || sport || year || setName || isRookie || hasPrice
+  const hasFilters = search || sport || year || setName
 
   return (
     <div className={pageStyles.page}>
@@ -216,26 +209,6 @@ export default function Catalog() {
               {s.length > 30 ? s.slice(0, 28) + '…' : s}
             </option>
           ))}
-        </select>
-
-        <select
-          className={pageStyles.filterSelect}
-          value={isRookie}
-          onChange={e => setIsRookie(e.target.value)}
-        >
-          <option value="">All Cards</option>
-          <option value="true">Rookies Only</option>
-          <option value="false">Non-Rookies</option>
-        </select>
-
-        <select
-          className={pageStyles.filterSelect}
-          value={hasPrice}
-          onChange={e => setHasPrice(e.target.value)}
-        >
-          <option value="">All Prices</option>
-          <option value="true">With Price</option>
-          <option value="false">No Price Yet</option>
         </select>
 
         {hasFilters && (
