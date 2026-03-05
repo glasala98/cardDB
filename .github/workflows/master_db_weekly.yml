@@ -17,6 +17,7 @@ on:
 jobs:
   graded-nhl:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -41,8 +42,9 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-  graded-other:
+  graded-nba:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -54,10 +56,51 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Scrape NBA/NFL/MLB rookies (priority refresh)
+      - name: Scrape NBA rookies + graded
         run: |
-          python -u scrape_master_db.py --sport NBA --rookies --workers 5 --limit 200
-          python -u scrape_master_db.py --sport NFL --rookies --workers 5 --limit 200
-          python -u scrape_master_db.py --sport MLB --rookies --workers 5 --limit 200
+          python -u scrape_master_db.py --sport NBA --rookies --workers 5 --limit 300
+          python -u scrape_master_db.py --sport NBA --graded --workers 5 --limit 300
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  graded-nfl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Scrape NFL rookies + graded
+        run: |
+          python -u scrape_master_db.py --sport NFL --rookies --workers 5 --limit 300
+          python -u scrape_master_db.py --sport NFL --graded --workers 5 --limit 300
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  graded-mlb:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Scrape MLB rookies + graded
+        run: |
+          python -u scrape_master_db.py --sport MLB --rookies --workers 5 --limit 300
+          python -u scrape_master_db.py --sport MLB --graded --workers 5 --limit 300
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

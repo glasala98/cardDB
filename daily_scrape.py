@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Daily scrape job — rescrapes all cards in the existing database,
-updates prices, and appends fair-value snapshots to Supabase.
+updates prices, and appends fair-value snapshots to PostgreSQL.
 
 Usage:
     python daily_scrape.py                  # scrape all users
@@ -42,9 +42,9 @@ def daily_scrape_user(username: str, max_workers: int = 3) -> None:
          (deduplicates by sold_date + title, sorts most-recent-first).
       5. Updates Fair Value, Trend, Median, Min, Max, Num Sales, and Top 3
          Prices columns in the DataFrame for any card with sales found.
-      6. Upserts updated card stats and results back to Supabase.
+      6. Upserts updated card stats and results back to PostgreSQL.
       7. Appends a portfolio snapshot (total value, card count, avg value)
-         to Supabase.
+         to PostgreSQL.
 
     Args:
         username: Username whose collection to scrape.
