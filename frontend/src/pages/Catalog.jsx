@@ -78,14 +78,14 @@ export default function Catalog() {
 
   // Reload years when sport changes; reset dependent filters
   useEffect(() => {
-    getCatalogFilters(sport || null, null)
-      .then(data => {
-        setYears(data.years || [])
-        setSets(data.sets || [])
-      })
-      .catch(() => {})
     setYear('')
     setSetName('')
+    setYears([])
+    setSets([])
+    if (!sport) return
+    getCatalogFilters(sport, null)
+      .then(data => setYears(data.years || []))
+      .catch(() => {})
   }, [sport])
 
   // Reload sets when year changes

@@ -176,29 +176,27 @@ def catalog_filters(
     """
     with get_db() as conn:
         cur = conn.cursor()
+        cur.execute("SET statement_timeout = '8s'")
 
         cur.execute("SELECT DISTINCT sport FROM card_catalog ORDER BY sport")
         sports = [r[0] for r in cur.fetchall()]
 
-        year_conds, year_params = [], []
-        if sport:
-            year_conds.append("sport = %s")
-            year_params.append(sport.upper())
-        year_where = ("WHERE " + " AND ".join(year_conds)) if year_conds else ""
+        # Only load years/sets when a sport is selected — too expensive unfiltered
+        if not sport:
+            return {"sports": sports, "years": [], "sets": []}
+
         cur.execute(
-            f"SELECT DISTINCT year FROM card_catalog {year_where} ORDER BY year DESC",
-            year_params
+            "SELECT DISTINCT year FROM card_catalog WHERE sport = %s ORDER BY year DESC",
+            [sport.upper()]
         )
         years = [r[0] for r in cur.fetchall()]
 
-        set_conds, set_params = [], []
-        if sport:
-            set_conds.append("sport = %s")
-            set_params.append(sport.upper())
+        set_conds = ["sport = %s"]
+        set_params = [sport.upper()]
         if year:
             set_conds.append("year = %s")
             set_params.append(year)
-        set_where = ("WHERE " + " AND ".join(set_conds)) if set_conds else ""
+        set_where = "WHERE " + " AND ".join(set_conds)
         cur.execute(
             f"""SELECT set_name, COUNT(*) cnt
                 FROM card_catalog {set_where}
