@@ -26,6 +26,7 @@ import pathlib
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from api.routers import cards, master_db, stats, auth, scan, admin, catalog
 
@@ -62,4 +63,13 @@ def health():
 # Serve React frontend for all non-API routes (SPA support)
 _dist = pathlib.Path(__file__).parent.parent / "frontend" / "dist"
 if _dist.exists():
-    app.mount("/", StaticFiles(directory=str(_dist), html=True), name="static")
+    # Serve /assets/* and other static files directly
+    app.mount("/assets", StaticFiles(directory=str(_dist / "assets")), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str):
+        """Serve index.html for all non-API routes so React Router handles navigation."""
+        file = _dist / full_path
+        if file.is_file():
+            return FileResponse(str(file))
+        return FileResponse(str(_dist / "index.html"))
