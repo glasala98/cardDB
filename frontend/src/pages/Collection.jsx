@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getCollection, updateCollectionItem, removeFromCollection } from '../api/collection'
 import { useCurrency } from '../context/CurrencyContext'
-import CurrencySelect from '../components/CurrencySelect'
 import PageTabs from '../components/PageTabs'
 import styles from './Collection.module.css'
 import pageStyles from './Page.module.css'
@@ -109,7 +108,6 @@ export default function Collection() {
         <h1 className={pageStyles.title}>My Collection</h1>
         <span className={pageStyles.count}>{summary.total_cards.toLocaleString()} cards</span>
         <div style={{ marginLeft: 'auto' }}>
-          <CurrencySelect />
         </div>
       </div>
 

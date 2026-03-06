@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react'
 import CardTable from '../components/CardTable'
 import { getNHLStats } from '../api/masterDb'
 import { useCurrency } from '../context/CurrencyContext'
-import CurrencySelect from '../components/CurrencySelect'
 import styles from './Page.module.css'
 
 const COLUMNS = (fmtPrice) => [
@@ -86,7 +85,6 @@ export default function NHLStats() {
         {!loading && withStats > 0 && (
           <span className={styles.count}>{withStats} with stats · {withValues} with card value</span>
         )}
-        <CurrencySelect />
       </div>
 
       <div className={styles.toolbar}>

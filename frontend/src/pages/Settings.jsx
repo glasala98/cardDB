@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { usePreferences } from '../context/PreferencesContext'
+import { useCurrency } from '../context/CurrencyContext'
 import { getUsers, createUser, deleteUser, changePassword } from '../api/admin'
 import pageStyles from './Page.module.css'
 import styles from './Settings.module.css'
@@ -8,12 +9,34 @@ import styles from './Settings.module.css'
 /* ── Appearance section ─────────────────────────────────────── */
 function AppearanceSection() {
   const { density, setDensity } = usePreferences()
+  const { currency, toggle } = useCurrency()
 
   return (
     <section className={styles.section}>
       <h2 className={styles.sectionTitle}>Appearance</h2>
 
       <div className={styles.settingRow}>
+        <div className={styles.settingInfo}>
+          <span className={styles.settingLabel}>Currency</span>
+          <span className={styles.settingDesc}>Display prices in Canadian or US dollars. Applied across all pages.</span>
+        </div>
+        <div className={styles.btnGroup}>
+          <button
+            className={`${styles.densityBtn} ${currency === 'CAD' ? styles.active : ''}`}
+            onClick={() => currency !== 'CAD' && toggle()}
+          >
+            CAD
+          </button>
+          <button
+            className={`${styles.densityBtn} ${currency === 'USD' ? styles.active : ''}`}
+            onClick={() => currency !== 'USD' && toggle()}
+          >
+            USD
+          </button>
+        </div>
+      </div>
+
+      <div className={styles.settingRow} style={{ marginTop: 16 }}>
         <div className={styles.settingInfo}>
           <span className={styles.settingLabel}>Display density</span>
           <span className={styles.settingDesc}>Compact mode fits more rows on screen — great for tablets and smaller displays.</span>

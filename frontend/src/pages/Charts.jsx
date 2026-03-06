@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts'
 import { getCards } from '../api/cards'
 import { useCurrency } from '../context/CurrencyContext'
-import CurrencySelect from '../components/CurrencySelect'
 import PageTabs from '../components/PageTabs'
 import pageStyles from './Page.module.css'
 import styles from './Charts.module.css'
@@ -105,7 +104,6 @@ export default function Charts() {
           <h1 className={pageStyles.title}>Charts & Analytics</h1>
           <p className={styles.subtitle}>Visual breakdown of your collection</p>
         </div>
-        <CurrencySelect />
       </div>
 
       {/* Summary stats */}

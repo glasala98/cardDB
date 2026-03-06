@@ -6,7 +6,6 @@ import PriceChart from '../components/PriceChart'
 import { getYoungGuns, getMarketMovers, getNHLStats, getSeasonalTrends,
          getYGPriceHistoryByName, updateYGOwnership, scrapeYGCard } from '../api/masterDb'
 import { useCurrency } from '../context/CurrencyContext'
-import CurrencySelect from '../components/CurrencySelect'
 import styles from './MasterDB.module.css'
 import pageStyles from './Page.module.css'
 
@@ -124,7 +123,6 @@ export default function MasterDB() {
       <div className={pageStyles.header}>
         <h1 className={pageStyles.title}>Young Guns Master DB</h1>
         <span className={pageStyles.count}>{cards.length.toLocaleString()} cards</span>
-        <CurrencySelect />
       </div>
 
       {/* ── Market Movers Banner ── */}

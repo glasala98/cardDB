@@ -6,7 +6,6 @@ import TrendBadge from '../components/TrendBadge'
 import { getCardDetail, scrapeCard, updateCard, fetchImage } from '../api/cards'
 import { getGradingLookup } from '../api/masterDb'
 import { useCurrency } from '../context/CurrencyContext'
-import CurrencySelect from '../components/CurrencySelect'
 import pageStyles from './Page.module.css'
 import styles from './CardInspect.module.css'
 
@@ -146,7 +145,6 @@ export default function CardInspect() {
 
       <div className={styles.topBar}>
         <Link to="/ledger" className={styles.back}>← Back to Ledger</Link>
-        <CurrencySelect />
       </div>
 
       <div className={styles.cardHeader}>

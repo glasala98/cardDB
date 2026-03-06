@@ -3,7 +3,6 @@ import CardTable from '../components/CardTable'
 import { getCatalog, getCatalogFilters } from '../api/catalog'
 import { getOwnedIds, addToCollection, getGrades } from '../api/collection'
 import { useCurrency } from '../context/CurrencyContext'
-import CurrencySelect from '../components/CurrencySelect'
 import PageTabs from '../components/PageTabs'
 import styles from './Catalog.module.css'
 import pageStyles from './Page.module.css'
@@ -218,7 +217,6 @@ setSortKey('year')
           {total.toLocaleString()} cards
         </span>
         <div style={{ marginLeft: 'auto' }}>
-          <CurrencySelect />
         </div>
       </div>
 

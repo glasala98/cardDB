@@ -12,7 +12,6 @@ import { getCards, archiveCard, scrapeCard, updateCard } from '../api/cards'
 import { triggerScrape } from '../api/stats'
 import { useCurrency } from '../context/CurrencyContext'
 import { usePublicMode } from '../context/PublicModeContext'
-import CurrencySelect from '../components/CurrencySelect'
 import PageTabs from '../components/PageTabs'
 import styles from './CardLedger.module.css'
 import pageStyles from './Page.module.css'
@@ -288,7 +287,6 @@ export default function CardLedger() {
           </button>
         </div>
         <div className={styles.topBarRight}>
-          <CurrencySelect />
           {isPublic && (
             <button className={styles.toolsBtn} onClick={exportCsv}>↓ Export</button>
           )}
