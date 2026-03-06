@@ -16,6 +16,13 @@ card_archive.csv
 .env
 scrape_and_upload.bat
 
+# Scraper debug/output files
+catalog_debug/
+catalog_checkpoint.json
+batch_price_output.csv
+batch_price_report.xlsx
+db_backups/
+
 # IDE / tooling
 .claude/
 .vscode/

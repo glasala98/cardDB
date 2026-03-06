@@ -106,16 +106,44 @@ const Icons = {
   ),
 }
 
-const NAV_ITEMS = [
-  { to: '/ledger',    label: 'Card Ledger',  Icon: Icons.Ledger    },
-  { to: '/portfolio', label: 'Portfolio',    Icon: Icons.Portfolio  },
-  { to: '/master-db', label: 'Master DB',    Icon: Icons.Database   },
-  { to: '/catalog',    label: 'Card Catalog',   Icon: Icons.Catalog     },
-  { to: '/collection', label: 'My Collection',  Icon: Icons.Collection  },
-  { to: '/charts',    label: 'Charts',       Icon: Icons.Charts     },
-  { to: '/nhl-stats', label: 'NHL Stats',    Icon: Icons.Stats      },
-  { to: '/archive',   label: 'Archive',      Icon: Icons.Archive    },
+const CATALOG_ITEMS = [
+  { to: '/catalog',    label: 'Card Catalog',  Icon: Icons.Catalog    },
+  { to: '/collection', label: 'My Collection', Icon: Icons.Collection },
 ]
+
+const ACCOUNT_ITEMS = [
+  { to: '/ledger',    label: 'Card Ledger', Icon: Icons.Ledger   },
+  { to: '/portfolio', label: 'Portfolio',   Icon: Icons.Portfolio },
+  { to: '/master-db', label: 'Master DB',   Icon: Icons.Database  },
+  { to: '/charts',    label: 'Charts',      Icon: Icons.Charts    },
+  { to: '/nhl-stats', label: 'NHL Stats',   Icon: Icons.Stats     },
+]
+
+const ADMIN_ITEMS = [
+  { to: '/archive', label: 'Archive', Icon: Icons.Archive },
+  { to: '/admin',   label: 'Admin',   Icon: Icons.Admin   },
+]
+
+function NavGroup({ label, items }) {
+  return (
+    <div className={styles.navGroup}>
+      <span className={styles.groupLabel}>{label}</span>
+      <ul className={styles.links}>
+        {items.map(({ to, label: itemLabel, Icon }) => (
+          <li key={to}>
+            <NavLink
+              to={to}
+              className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}
+            >
+              <span className={styles.icon}><Icon /></span>
+              <span className={styles.label}>{itemLabel}</span>
+            </NavLink>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
 
 export default function Navbar() {
   const { user, logout } = useAuth()
@@ -144,30 +172,13 @@ export default function Navbar() {
         {isPublic && <span className={styles.publicBadge}>View Only</span>}
       </div>
 
-      <ul className={styles.links}>
-        {NAV_ITEMS.map(({ to, label, Icon }) => (
-          <li key={to}>
-            <NavLink
-              to={to}
-              className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}
-            >
-              <span className={styles.icon}><Icon /></span>
-              <span className={styles.label}>{label}</span>
-            </NavLink>
-          </li>
-        ))}
+      <div className={styles.navGroups}>
+        <NavGroup label="Catalog" items={CATALOG_ITEMS} />
+        <NavGroup label="My Account" items={ACCOUNT_ITEMS} />
         {isAdmin && !isPublic && (
-          <li>
-            <NavLink
-              to="/admin"
-              className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}
-            >
-              <span className={styles.icon}><Icons.Admin /></span>
-              <span className={styles.label}>Admin</span>
-            </NavLink>
-          </li>
+          <NavGroup label="Admin" items={ADMIN_ITEMS} />
         )}
-      </ul>
+      </div>
 
       {user && !isPublic && (
         <div className={styles.userArea}>

@@ -80,6 +80,31 @@
   white-space: nowrap;
 }
 
+/* ── Nav groups ────────────────────────────────────────────── */
+.navGroups {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 8px;
+}
+
+.navGroup {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 4px;
+}
+
+.groupLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  padding: 12px 18px 4px;
+  opacity: 0.6;
+}
+
 /* ── Nav links ─────────────────────────────────────────────── */
 .links {
   list-style: none;
