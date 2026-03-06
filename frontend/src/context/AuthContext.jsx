@@ -51,3 +51,9 @@ export function AuthProvider({ children }) {
 export function useAuth() {
   return useContext(AuthContext)
 }
+
+/** Returns true when the logged-in user has the 'guest' role. */
+export function useIsGuest() {
+  const { user } = useContext(AuthContext)
+  return user?.role === 'guest'
+}

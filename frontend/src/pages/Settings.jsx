@@ -194,6 +194,7 @@ function UserManagementSection({ me }) {
           <select className={styles.input} value={newUser.role}
             onChange={e => setNewUser(p => ({ ...p, role: e.target.value }))}>
             <option value="user">user</option>
+            <option value="guest">guest</option>
             <option value="admin">admin</option>
           </select>
           <button className={styles.addBtn} onClick={handleAdd}

@@ -12,6 +12,7 @@ import { getCards, archiveCard, scrapeCard, updateCard } from '../api/cards'
 import { triggerScrape } from '../api/stats'
 import { useCurrency } from '../context/CurrencyContext'
 import { usePublicMode } from '../context/PublicModeContext'
+import { useIsGuest } from '../context/AuthContext'
 import PageTabs from '../components/PageTabs'
 import styles from './CardLedger.module.css'
 import pageStyles from './Page.module.css'
@@ -47,6 +48,7 @@ export default function CardLedger() {
   const navigate   = useNavigate()
   const { fmtPrice } = useCurrency()
   const isPublic   = usePublicMode()
+  const isGuest    = useIsGuest()
 
   const [cards,   setCards]   = useState([])
   const [loading, setLoading] = useState(true)
@@ -290,7 +292,8 @@ export default function CardLedger() {
           {isPublic && (
             <button className={styles.toolsBtn} onClick={exportCsv}>↓ Export</button>
           )}
-          {!isPublic && (
+          {/* Tools menu — guests see scan only, full users see everything */}
+          {!isPublic && !isGuest && (
             <div className={styles.toolsWrap} ref={toolsRef}>
               <button className={styles.toolsBtn} onClick={() => setShowTools(v => !v)}>
                 Tools {showTools ? '▴' : '▾'}
@@ -317,7 +320,13 @@ export default function CardLedger() {
               )}
             </div>
           )}
-          {!isPublic && (
+          {/* Guests can open scanner (to see it) but cannot use it */}
+          {!isPublic && isGuest && (
+            <button className={styles.toolsBtn} onClick={() => setShowScan(true)}>
+              📷 Scan Card
+            </button>
+          )}
+          {!isPublic && !isGuest && (
             <button className={styles.addBtn} onClick={() => setShowAdd(true)}>+ Add Card</button>
           )}
         </div>

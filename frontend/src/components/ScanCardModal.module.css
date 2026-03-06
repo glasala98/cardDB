@@ -377,3 +377,14 @@
   color: var(--text-primary);
   word-break: break-word;
 }
+
+.guestBanner {
+  background: rgba(240, 180, 60, 0.1);
+  border: 1px solid rgba(240, 180, 60, 0.35);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--warning, #f0b43c);
+  line-height: 1.5;
+  margin-bottom: 16px;
+}

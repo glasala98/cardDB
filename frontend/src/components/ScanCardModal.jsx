@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { analyzeCard } from '../api/scan'
 import { addCard, scrapeCard } from '../api/cards'
+import { useIsGuest } from '../context/AuthContext'
 import styles from './ScanCardModal.module.css'
 
 // Build structured card name: "YEAR BRAND - SUBSET PARALLEL #NUM - PLAYER [GRADE] #SERIAL"
@@ -20,6 +21,7 @@ function buildCardName(data, serialOverride) {
 }
 
 export default function ScanCardModal({ onClose, onAdded }) {
+  const isGuest = useIsGuest()
   const [frontFile,  setFrontFile]  = useState(null)
   const [backFile,   setBackFile]   = useState(null)
   const [frontPreview, setFrontPreview] = useState(null)
@@ -153,6 +155,13 @@ export default function ScanCardModal({ onClose, onAdded }) {
         </div>
 
         <div className={styles.body}>
+          {/* ── Guest lock banner ── */}
+          {isGuest && (
+            <div className={styles.guestBanner}>
+              <strong>Guest access only.</strong> You can view the scanner but scanning cards requires a full account. Contact an admin to upgrade.
+            </div>
+          )}
+
           {/* ── Image upload (full) — shown before analysis ── */}
           {!saved && !analyzed && (
             <>
@@ -195,7 +204,8 @@ export default function ScanCardModal({ onClose, onAdded }) {
               <button
                 className={styles.analyzeBtn}
                 onClick={handleAnalyze}
-                disabled={!frontFile || analyzing}
+                disabled={!frontFile || analyzing || isGuest}
+                title={isGuest ? 'Guest accounts cannot use the scanner' : undefined}
               >
                 {analyzing ? 'Analyzing…' : 'Analyze Card'}
               </button>
