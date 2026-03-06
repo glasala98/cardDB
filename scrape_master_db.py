@@ -10,6 +10,7 @@ Usage:
     python -u scrape_master_db.py --year 2024-25        # One year only
     python -u scrape_master_db.py --rookies             # is_rookie=true only
     python -u scrape_master_db.py --force               # Re-scrape already-scraped cards
+    python -u scrape_master_db.py --stale-days 30       # Only re-scrape cards older than 30 days
     python -u scrape_master_db.py --limit 500           # Cap at N cards per run
     python -u scrape_master_db.py --graded              # Scrape PSA/BGS graded prices
     python -u scrape_master_db.py --min-raw-value 5.0   # Min raw value for graded scraping
@@ -46,7 +47,7 @@ ALL_GRADES = PSA_PROBE_ORDER + BGS_PROBE_ORDER
 # Thread-local Chrome drivers + shared progress counters
 _thread_local = threading.local()
 _lock = threading.Lock()
-_progress = {"done": 0, "found": 0, "not_found": 0, "errors": 0}
+_progress = {"done": 0, "found": 0, "not_found": 0, "errors": 0, "deltas": 0}
 
 
 # ── Chrome driver ─────────────────────────────────────────────────────────────
@@ -119,7 +120,16 @@ def build_card_name(row: dict) -> str:
 # ── DB helpers ────────────────────────────────────────────────────────────────
 
 def load_cards(args) -> list:
-    """Query card_catalog for cards to scrape, prioritising unscraped + rookies."""
+    """Query card_catalog for cards to scrape, prioritising unscraped + rookies.
+
+    SCD Type 2 delta strategy:
+      - Never-scraped cards are always included.
+      - Previously-scraped cards are only included when their price is stale
+        (older than --stale-days, default 7).  This avoids firing up Chrome for
+        cards whose price hasn't had time to meaningfully change.
+      - The existing fair_value is returned alongside each card so callers can
+        log or compare against the newly scraped result.
+    """
     conditions = ["cc.player_name != ''", "cc.set_name != ''"]
     params = []
 
@@ -129,7 +139,32 @@ def load_cards(args) -> list:
     if args.year:
         conditions.append("cc.year = %s")
         params.append(args.year)
-    if args.rookies:
+
+    # --tier shorthand
+    tier = getattr(args, 'tier', None)
+    if tier == 'rookies':
+        conditions.append("cc.is_rookie = TRUE")
+    elif tier == 'recent':
+        conditions.append("SPLIT_PART(cc.year,'-',1) ~ '^[0-9]{4}$'")
+        conditions.append("SPLIT_PART(cc.year,'-',1)::int >= 2015")
+    elif tier == 'rookie_recent':
+        conditions.append("cc.is_rookie = TRUE")
+        conditions.append("SPLIT_PART(cc.year,'-',1) ~ '^[0-9]{4}$'")
+        conditions.append("SPLIT_PART(cc.year,'-',1)::int >= 2015")
+    elif tier == 'serialized':
+        conditions.append("cc.print_run IS NOT NULL")
+
+    # --year-from / --year-to for range scraping
+    if getattr(args, 'year_from', None):
+        conditions.append("SPLIT_PART(cc.year,'-',1) ~ '^[0-9]{4}$'")
+        conditions.append("SPLIT_PART(cc.year,'-',1)::int >= %s")
+        params.append(args.year_from)
+    if getattr(args, 'year_to', None):
+        conditions.append("SPLIT_PART(cc.year,'-',1) ~ '^[0-9]{4}$'")
+        conditions.append("SPLIT_PART(cc.year,'-',1)::int <= %s")
+        params.append(args.year_to)
+
+    if getattr(args, 'rookies', False):
         conditions.append("cc.is_rookie = TRUE")
 
     where = " AND ".join(conditions)
@@ -137,18 +172,23 @@ def load_cards(args) -> list:
 
     if args.force:
         join_clause = ""
+        select_extra = "NULL::numeric AS existing_price, NULL::timestamptz AS last_scraped"
         order_clause = "cc.is_rookie DESC, cc.year DESC, cc.player_name"
     else:
-        # Skip cards already scraped today
+        # Delta gate: only pick up cards whose price is stale (or never scraped).
+        # --stale-days controls the recency window (default 7 days).
+        stale_days = getattr(args, 'stale_days', 7)
         join_clause = "LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id"
-        conditions.append("(mp.scraped_at IS NULL OR mp.scraped_at < NOW() - INTERVAL '23 hours')")
+        conditions.append(f"(mp.scraped_at IS NULL OR mp.scraped_at < NOW() - INTERVAL '{stale_days} days')")
         where = " AND ".join(conditions)
+        select_extra = "mp.fair_value AS existing_price, mp.scraped_at AS last_scraped"
         order_clause = "mp.scraped_at NULLS FIRST, cc.is_rookie DESC, cc.year DESC"
 
     sql = f"""
         SELECT cc.id, cc.sport, cc.year, cc.brand, cc.set_name,
                cc.card_number, cc.player_name, cc.team,
-               cc.variant, cc.print_run, cc.is_rookie, cc.search_query
+               cc.variant, cc.print_run, cc.is_rookie, cc.search_query,
+               {select_extra}
         FROM card_catalog cc
         {join_clause}
         WHERE {where}
@@ -159,7 +199,12 @@ def load_cards(args) -> list:
         with conn.cursor() as cur:
             cur.execute(sql, params)
             cols = [d[0] for d in cur.description]
-            return [dict(zip(cols, row)) for row in cur.fetchall()]
+            rows = [dict(zip(cols, row)) for row in cur.fetchall()]
+
+    never_scraped = sum(1 for r in rows if r['last_scraped'] is None)
+    stale         = len(rows) - never_scraped
+    print(f"  Delta check: {never_scraped:,} never scraped, {stale:,} stale — {len(rows):,} total to scrape")
+    return rows
 
 
 def save_prices_batch(results: list):
@@ -232,16 +277,26 @@ def save_prices_batch(results: list):
 # ── Scrape workers ────────────────────────────────────────────────────────────
 
 def scrape_one(card: dict) -> tuple:
-    """Scrape a single raw (ungraded) card. Returns (catalog_id, result_dict)."""
+    """Scrape a single raw (ungraded) card. Returns (catalog_id, result_dict).
+
+    After fetching from eBay, compares new fair_value against the card's
+    existing_price (loaded from market_prices).  A 'delta' is recorded in
+    _progress only when the price actually changed — confirming the SCD Type 2
+    history row will be written.
+    """
     card_name = build_card_name(card)
     for attempt in range(2):
         try:
             _, result = process_card(card_name)
             stats = result.get('stats', {})
+            new_price = round(stats.get('fair_price', 0), 2)
+            old_price = card.get('existing_price')
             with _lock:
                 _progress['done'] += 1
                 if stats.get('num_sales', 0) > 0:
                     _progress['found'] += 1
+                    if old_price is None or abs(float(old_price) - new_price) > 0.01:
+                        _progress['deltas'] += 1
                 else:
                     _progress['not_found'] += 1
             return card['id'], result
@@ -311,13 +366,21 @@ def main():
     parser = argparse.ArgumentParser(description="Scrape eBay prices for card_catalog")
     parser.add_argument('--workers',       type=int,   default=5,    help="Parallel Chrome instances")
     parser.add_argument('--sport',         type=str,   default=None, help="NHL|NBA|NFL|MLB")
-    parser.add_argument('--year',          type=str,   default=None, help="Year filter e.g. 2024-25")
-    parser.add_argument('--rookies',       action='store_true',      help="Rookies only")
-    parser.add_argument('--force',         action='store_true',      help="Re-scrape all cards")
+    parser.add_argument('--year',          type=str,   default=None, help="Exact year e.g. 2024-25")
+    parser.add_argument('--year-from',     type=int,   default=None, dest='year_from', help="Start year e.g. 2015")
+    parser.add_argument('--year-to',       type=int,   default=None, dest='year_to',   help="End year e.g. 2024")
+    parser.add_argument('--tier',          type=str,   default=None,
+                        choices=['rookies','recent','rookie_recent','serialized'],
+                        help="Scrape tier: rookies=RC only, recent=2015+, rookie_recent=RC 2015+, serialized=print_run set")
+    parser.add_argument('--rookies',       action='store_true',      help="Rookies only (alias for --tier rookies)")
+    parser.add_argument('--force',         action='store_true',      help="Re-scrape already-scraped cards")
     parser.add_argument('--limit',         type=int,   default=0,    help="Max cards per run (0=all)")
     parser.add_argument('--graded',        action='store_true',      help="Scrape PSA/BGS graded prices")
     parser.add_argument('--grades',        type=str,   default=None, help="Grades e.g. 'PSA 10,BGS 9.5'")
     parser.add_argument('--min-raw-value', type=float, default=5.0,  help="Min raw value for graded")
+    parser.add_argument('--stale-days',    type=int,   default=7,    dest='stale_days',
+                        help="Re-scrape cards not updated in this many days (default 7). "
+                             "Use --force to ignore entirely.")
     args = parser.parse_args()
 
     if args.graded:
@@ -338,11 +401,15 @@ def main():
     mode = "GRADED" if args.graded else "RAW"
     print(f"\n{'='*60}")
     print(f"{mode} SCRAPE — {total:,} cards | {args.workers} workers")
-    if args.sport:  print(f"  Sport:  {args.sport}")
-    if args.year:   print(f"  Year:   {args.year}")
-    if args.rookies: print(f"  Rookies only")
-    if args.graded: print(f"  Grades: {grades}")
-    print(f"  Est. time: ~{total * 5 / args.workers / 60:.0f} min")
+    if args.sport:      print(f"  Sport:      {args.sport}")
+    if args.year:       print(f"  Year:       {args.year}")
+    if args.year_from:  print(f"  Year from:  {args.year_from}")
+    if args.year_to:    print(f"  Year to:    {args.year_to}")
+    if args.tier:       print(f"  Tier:       {args.tier}")
+    elif args.rookies:  print(f"  Rookies only")
+    if not args.force:  print(f"  Stale days: {args.stale_days} (skip cards priced within {args.stale_days}d)")
+    if args.graded:     print(f"  Grades:     {grades}")
+    print(f"  Est. time:  ~{total * 5 / args.workers / 60:.0f} min")
     print(f"{'='*60}\n")
 
     start = time.time()
@@ -417,6 +484,7 @@ def main():
                     rate = done_count / elapsed if elapsed > 0 else 0
                     remaining = (total - done_count) / rate / 60 if rate > 0 else 0
                     print(f"  [{done_count}/{total}] Found: {_progress['found']} | "
+                          f"Deltas: {_progress['deltas']} | "
                           f"Not found: {_progress['not_found']} | "
                           f"Errors: {_progress['errors']} | "
                           f"~{remaining:.1f}m remaining", flush=True)
@@ -428,6 +496,7 @@ def main():
     print(f"DONE in {elapsed/60:.1f} minutes")
     print(f"  Scraped:    {_progress['done']:,}")
     print(f"  Found:      {_progress['found']:,}")
+    print(f"  Deltas:     {_progress['deltas']:,}  (price changed → history row written)")
     print(f"  Not found:  {_progress['not_found']:,}")
     print(f"  Errors:     {_progress['errors']:,}")
     print(f"  Written to: market_prices + market_price_history (PostgreSQL)")
