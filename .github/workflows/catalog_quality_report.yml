@@ -1,0 +1,80 @@
+name: Catalog Quality Report
+
+on:
+  schedule:
+    - cron: '0 10 * * 1'   # Every Monday 10am UTC
+  workflow_dispatch:
+    inputs:
+      sport:
+        description: 'Sport to analyse (ALL / NHL / NBA / NFL / MLB)'
+        required: false
+        default: 'ALL'
+
+jobs:
+  quality-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install psycopg2-binary python-dotenv pytest pytest-md
+
+      - name: Run unit tests
+        id: pytest
+        run: |
+          pytest tests/test_catalog_quality.py -v --tb=short \
+            --md=test_report.md 2>&1 | tee test_output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        continue-on-error: true
+
+      - name: Run gap analysis (Markdown)
+        run: |
+          python -X utf8 catalog_gap_analysis.py \
+            --sport ${{ github.event.inputs.sport || 'ALL' }} \
+            --markdown \
+            --output gap_report.md
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Publish to GitHub Step Summary
+        run: |
+          echo "# CardDB Catalog Quality Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Test results
+          echo "## Unit Tests" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.pytest.outputs.exit_code }}" = "0" ]; then
+            echo "✅ **All tests passed**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Some tests failed — see details below**" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat test_output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+          # Gap analysis
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat gap_report.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload reports as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-reports-${{ github.run_number }}
+          path: |
+            test_report.md
+            gap_report.md
+            test_output.txt
+          retention-days: 90
+
+      - name: Fail if tests failed
+        if: steps.pytest.outputs.exit_code != '0'
+        run: exit 1
