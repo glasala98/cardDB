@@ -205,11 +205,24 @@ def save_prices_batch(results: list):
                     updated_at = NOW()
             """, mp_rows)
 
+            # SCD Type 2: only insert history row when fair_value changed
             execute_values(cur, """
                 INSERT INTO market_price_history
                     (card_catalog_id, scraped_at, fair_value, confidence, num_sales,
                      top_3_prices, min_price, max_price, source)
-                VALUES %s
+                SELECT i.card_catalog_id, i.scraped_at, i.fair_value, i.confidence,
+                       i.num_sales, i.top_3_prices, i.min_price, i.max_price, i.source
+                FROM (VALUES %s) AS i(card_catalog_id, scraped_at, fair_value, confidence,
+                                      num_sales, top_3_prices, min_price, max_price, source)
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM market_price_history h
+                    WHERE h.card_catalog_id = i.card_catalog_id
+                      AND h.fair_value = i.fair_value
+                      AND h.scraped_at = (
+                          SELECT MAX(scraped_at) FROM market_price_history
+                          WHERE card_catalog_id = i.card_catalog_id
+                      )
+                )
                 ON CONFLICT (card_catalog_id, scraped_at) DO NOTHING
             """, [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], 'ebay')
                   for r in hist_rows])
