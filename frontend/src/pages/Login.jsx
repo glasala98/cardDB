@@ -9,8 +9,8 @@ export default function Login() {
   const location  = useLocation()
   const { login } = useAuth()
 
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
+  const [username, setUsername] = useState('guest')
+  const [password, setPassword] = useState('guest')
   const [error,    setError]    = useState(null)
   const [loading,  setLoading]  = useState(false)
 
@@ -84,6 +84,10 @@ export default function Login() {
           >
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
+
+          <p className={styles.guestHint}>
+            No account? The form is pre-filled with guest access — just hit Sign in.
+          </p>
         </form>
       </div>
     </div>
