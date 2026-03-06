@@ -120,7 +120,7 @@ def build_card_name(row: dict) -> str:
 
 def load_cards(args) -> list:
     """Query card_catalog for cards to scrape, prioritising unscraped + rookies."""
-    conditions = ["cc.search_query != ''", "cc.player_name != ''"]
+    conditions = ["cc.player_name != ''", "cc.set_name != ''"]
     params = []
 
     if args.sport:
