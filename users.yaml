@@ -1,9 +1,13 @@
 users:
   admin:
     display_name: Admin
+    password_hash: $2b$12$hYHsnDa7JksIhONoS93LMuqv5nulsggvUNPnHd4vNnCS5X7eGdAwq
     role: admin
-    password_hash: "$2b$12$hYHsnDa7JksIhONoS93LMuqv5nulsggvUNPnHd4vNnCS5X7eGdAwq"
+  guest:
+    display_name: Guest
+    password_hash: $2b$12$nhZgmwiRz.quDlOzG.VkU.a1iSPTmHLFZZN3GrZDQD11GEbbcaFsS
+    role: guest
   josh:
     display_name: Josh
+    password_hash: $2b$12$UwtcRG/XhJSXATZR.4c1nuFRiGKadBMmpUaQxTyWnzXfj4le2PBvS
     role: user
-    password_hash: "$2b$12$UwtcRG/XhJSXATZR.4c1nuFRiGKadBMmpUaQxTyWnzXfj4le2PBvS"
