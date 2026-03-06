@@ -1,74 +1,108 @@
-# CardDB — Data Architecture & Flow
+# CardDB — Architecture & Data Flow
 
-> **Status:** Current state documented below. Target (Supabase) state is planned — see [TODO.md](../TODO.md).
+> **Status:** Production on Railway (Pro plan). PostgreSQL + FastAPI + React. No file-based storage.
 
 ---
 
-## Current Architecture
+## System Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        BROWSER                                  │
-│   React 18 + Vite  (http://localhost:5173 dev / nginx prod)     │
-│                                                                 │
-│  Pages: /ledger  /portfolio  /master-db  /charts  /admin  etc.  │
-│  Contexts: AuthContext  CurrencyContext  PublicModeContext       │
-│  API clients: src/api/*.js  (axios, auto-unwrap res.data)        │
-└────────────────────────┬────────────────────────────────────────┘
-                         │ HTTP/JSON  (Bearer JWT)
-                         │ /api/*  proxied by nginx in prod
+┌──────────────────────────────────────────────────────────────┐
+│                        BROWSER                               │
+│   React 18 + Vite  (southwestsportscards.ca)                 │
+│                                                              │
+│  Pages:                                                      │
+│   /ledger          Card Ledger (personal owned cards)        │
+│   /ledger/:name    Card detail + price history               │
+│   /portfolio       Portfolio value over time                 │
+│   /collection      My Collection (catalog-linked ownership)  │
+│   /catalog         Card Catalog (2.6M cards, browse/search)  │
+│   /master-db       YG/Rookie market analytics                │
+│   /charts          Value distribution + trend charts         │
+│   /nhl-stats       NHL player stats with card values         │
+│   /archive         Archived cards                            │
+│   /admin           User management (admin only)              │
+│                                                              │
+│  Contexts: AuthContext · CurrencyContext · PublicModeContext  │
+│  API:      src/api/*.js  (axios, Bearer JWT, auto-unwrap)     │
+└────────────────────────┬─────────────────────────────────────┘
+                         │ HTTPS/JSON  (Bearer JWT)
                          ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    FASTAPI  (port 8000)                         │
-│                    api/main.py                                  │
-│                                                                 │
-│  Routers:                                                       │
-│  /api/auth      → auth.py      (login, /me, logout)            │
-│  /api/cards     → cards.py     (CRUD, scrape, scan, import)    │
-│  /api/master-db → master_db.py (YG market DB, NHL stats)       │
-│  /api/stats     → stats.py     (alerts, GH Actions dispatch)   │
-│  /api/admin     → admin.py     (user management)               │
-│  /api/scan      → scan.py      (Claude Vision analysis)        │
-└────────────┬───────────────────────────┬────────────────────────┘
-             │ import                    │ import
-             ▼                           ▼
-┌────────────────────────┐  ┌───────────────────────────────────┐
-│   dashboard_utils.py   │  │    scrape_card_prices.py          │
-│   (shared utility)     │  │    (Selenium eBay scraper)        │
-│                        │  │                                   │
-│  - load_data()         │  │  - process_card()                 │
-│  - save_data()         │  │  - search_ebay_sold()             │
-│  - parse_card_name()   │  │  - calculate_fair_price()         │
-│  - archive_card()      │  │  - 4-stage search strategy        │
-│  - load_users()        │  │  - serial comp estimation         │
-│  - analyze_card_images()│  └───────────────────────────────────┘
-│  - load_master_db()    │
-│  - NHL stats helpers   │
-│  - Correlation funcs   │
-└────────────┬───────────┘
-             │ read/write
+┌──────────────────────────────────────────────────────────────┐
+│                  FASTAPI  (Railway — port $PORT)              │
+│                  api/main.py                                 │
+│                                                              │
+│  Routers:                                                    │
+│  /api/auth        auth.py       login · /me · logout         │
+│  /api/cards       cards.py      CRUD · scrape · scan · import│
+│  /api/catalog     catalog.py    browse 2.6M catalog, filters │
+│  /api/collection  collection.py ownership layer              │
+│  /api/master-db   master_db.py  YG/Rookie market analytics   │
+│  /api/stats       stats.py      portfolio · GH Actions       │
+│  /api/scan        scan.py       Claude Vision card scan      │
+│  /api/admin       admin.py      user CRUD (admin only)       │
+│                                                              │
+│  Static: React build served via SPA catch-all fallback       │
+└────────────┬─────────────────────────────────────────────────┘
+             │ psycopg2 (ThreadedConnectionPool 1–10)
              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     DATA FILES                                  │
-│                                                                 │
-│  data/                                                          │
-│  ├── admin/                     (per-user, one folder each)    │
-│  │   ├── card_prices_summary.csv    main card collection       │
-│  │   ├── card_prices_results.json   raw eBay sales + images    │
-│  │   ├── price_history.json         price snapshots over time  │
-│  │   ├── portfolio_history.json     daily portfolio value      │
-│  │   └── card_archive.csv           soft-deleted cards         │
-│  ├── josh/                      (same structure per user)      │
-│  └── master_db/                 (shared across all users)      │
-│      ├── young_guns.csv             YG market DB               │
-│      ├── young_guns_price_history.json                         │
-│      ├── young_guns_raw_sales.json                             │
-│      ├── nhl_stats.json             cached NHL API data        │
-│      └── nhl_standings.json         cached team standings      │
-│                                                                 │
-│  users.yaml   (gitignored — user credentials, bcrypt hashes)   │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│             RAILWAY PostgreSQL  (Pro — 10GB)                 │
+│                                                              │
+│  ── Personal Collection ──────────────────────────────────── │
+│  cards               Ledger: user_id + card_name (text key)  │
+│  card_results        Raw eBay sales + image URLs             │
+│  card_price_history  Per-card fair-value snapshots           │
+│  portfolio_history   Daily portfolio totals                  │
+│                                                              │
+│  collection          Ownership layer (user → card_catalog)   │
+│    user_id · card_catalog_id FK · grade · quantity           │
+│    cost_basis · purchase_date · notes                        │
+│                                                              │
+│  ── Card Reference ───────────────────────────────────────── │
+│  card_catalog        2.6M cards (TCDB / CLI / CBC)           │
+│    sport · year · brand · set_name · card_number             │
+│    player_name · team · variant · is_rookie · is_parallel    │
+│                                                              │
+│  market_prices       Current price per card (FK→catalog)     │
+│  market_price_history  Delta-only SCD Type 2 price history   │
+│                                                              │
+│  ── Market / Analytics ───────────────────────────────────── │
+│  rookie_cards              YG/Rookie market DB               │
+│  rookie_price_history      Price snapshots per rookie        │
+│  rookie_portfolio_history  Daily YG portfolio totals         │
+│  rookie_raw_sales          Raw eBay sales per rookie         │
+│  player_stats              NHL/NBA/NFL/MLB stats (JSONB)     │
+│  standings                 Team standings per sport          │
+│  rookie_correlation_history  Analytics snapshots             │
+└──────────────────────────────────────────────────────────────┘
+             ↑ writes
+┌──────────────────────────────────────────────────────────────┐
+│       Scraper Scripts  (local CLI / GitHub Actions)          │
+│                                                              │
+│  scrape_card_prices.py      eBay Selenium engine (shared)    │
+│  daily_scrape.py            Scrape ledger cards → cards table│
+│  scrape_master_db.py        Scrape catalog → market_prices   │
+│  scrape_beckett_catalog.py  Populate card_catalog (TCDB/CLI) │
+│  scrape_nhl_stats.py        NHL API → player_stats table     │
+└──────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Deployment (Railway)
+
+| Setting | Value |
+|---------|-------|
+| Platform | Railway Pro plan |
+| Builder | Dockerfile (python:3.11-slim + Node 20) |
+| Build step | `pip install -r requirements.txt` + `npm run build` |
+| Start | `uvicorn api.main:app --host 0.0.0.0 --port $PORT` |
+| Auto-deploy | Push/merge to `main` → Railway rebuilds |
+| Custom domain | southwestsportscards.ca |
+| Database | Railway internal PostgreSQL (same project, 10GB) |
+
+**Key gotcha:** use `PyJWT` not `python-jose` — `import jwt` / `jwt.PyJWTError`.
 
 ---
 
@@ -76,178 +110,106 @@
 
 ### 1. User Login
 ```
-Browser → POST /api/auth/login {username, password}
+POST /api/auth/login {username, password}
   → verify_password() checks bcrypt hash in users.yaml
-  → returns JWT (24h expiry, signed with JWT_SECRET)
+  → returns JWT (24h, signed with JWT_SECRET env var)
   → stored in localStorage
-  → axios interceptor adds "Authorization: Bearer <token>" to all requests
+  → axios sets "Authorization: Bearer <token>" on all requests
 ```
 
-### 2. Card Ledger Load
+### 2. Card Ledger
 ```
-Browser → GET /api/cards
-  → get_current_user() validates JWT → extracts username
-  → get_user_paths(username) → resolves data/{username}/*.csv|json
-  → load_data(csv_path, results_json_path)
-      → checks _DATA_CACHE (mtime-based) — skips re-parse if unchanged
-      → merges CSV + results JSON → adds parsed fields (Player, Year, Set, Grade, Confidence)
+GET /api/cards
+  → validates JWT → extracts username
+  → SELECT FROM cards WHERE user_id=? + card_results JOIN
   → returns {cards: [...]}
+
+Price updates: scraper writes to cards.fair_value + appends card_price_history.
 ```
 
-### 3. Card Scan → Add
+### 3. Card Catalog Browse
 ```
-Browser (ScanCardModal)
-  → POST /api/scan/analyze (multipart: front.jpg, [back.jpg])
-  → analyze_card_images() → sends to Claude Vision (claude-3-5-sonnet)
-  → Claude returns: player, year, brand, subset, card#, parallel, serial, grade, confidence
-  → Browser shows pre-filled form
-  → POST /api/cards {card_name, cost_basis, ...}
-  → add_card() appends row to card_prices_summary.csv
-  → auto-triggers POST /api/cards/scrape?name= (background task)
-      → scrape_single_card() → process_card() → eBay scrape
-      → updates results JSON + CSV with fair_value, trend, etc.
+GET /api/catalog?sport=NHL&year=2024-25&page=1
+  → SELECT FROM card_catalog cc
+    LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
+    WHERE cc.sport='NHL' AND cc.year='2024-25'
+    ORDER BY year DESC LIMIT 50
+
+Total count: pg_class estimate (unfiltered) to avoid full-scan timeout on 2.6M rows.
+Filter dropdowns: GET /api/catalog/filters?sport=NHL → years + sets.
 ```
 
-### 4. Rescrape All (GitHub Actions)
+### 4. My Collection
 ```
-Browser → POST /api/stats/trigger-scrape
-  → GitHub API: POST /repos/{owner}/{repo}/actions/workflows/daily_scrape.yml/dispatches
-  → GitHub Actions runner:
-      1. Checkout code
-      2. SSH: download data files from server (scp)
-      3. Run: python daily_scrape.py --workers 3
-          → process_card() for each card (parallel, Selenium Chrome)
-          → merges new sales, updates CSV, appends price/portfolio history
-      4. SSH: upload updated data files back to server
-  → Browser polls GET /api/stats/scrape-status (every 15s)
-      → checks GitHub API for run status + step log
-      → ScrapeProgressModal shows progress bar + steps
+POST /api/collection {card_catalog_id, grade, cost_basis, ...}
+  → INSERT INTO collection (user_id, card_catalog_id, grade, ...)
+    ON CONFLICT (user_id, card_catalog_id, grade) DO UPDATE quantity += 1
+
+GET /api/collection/owned-ids → Set of card_catalog_ids (for ✓ badges in Catalog page)
+GET /api/collection           → Full list joined with card_catalog + market_prices
 ```
 
-### 5. Daily Scrape (Cron)
+### 5. Market Price Scraping — SCD Type 2
 ```
-GitHub Actions (cron: 0 8 * * *)
-  → Same as "Rescrape All" above but scheduled automatically
-  → Also runs scrape_master_db.py (YG prices) and scrape_nhl_stats.py
-```
-
-### 6. Multi-User Data Isolation (Current)
-```
-users.yaml defines usernames + bcrypt hashes
-Each user gets their own folder: data/{username}/
-FastAPI resolves paths via get_user_paths(username) on every request
-No cross-user data access at the filesystem level
-master_db/ is shared (read/write by all users + scrapers)
+scrape_master_db.py --sport NHL --limit 500
+  → SELECT FROM card_catalog WHERE player_name!='' AND set_name!=''
+  → For each card: eBay Selenium via scrape_card_prices.process_card()
+  → UPSERT market_prices (latest fair_value, trend, confidence)
+  → INSERT market_price_history ONLY when fair_value changed from last row
+    (delta-only insert = no consecutive duplicate prices = SCD Type 2)
 ```
 
----
-
-## Auth Flow Detail
+### 6. Rescrape All (via GitHub Actions)
 ```
-┌──────────┐   POST /login    ┌───────────┐  verify_password()  ┌──────────────┐
-│ Browser  │ ──────────────→  │  FastAPI  │ ──────────────────→ │  users.yaml  │
-│          │ ←──────────────  │  auth.py  │ ←──────────────────  │  (bcrypt)    │
-│ JWT token│   {token, user}  └───────────┘  True / False       └──────────────┘
-│ stored in│
-│localStorage
-│          │   GET /api/cards  ┌───────────┐  _decode_token()
-│          │ ──────────────→  │  FastAPI  │ ──────────────→  username
-│  + Bearer│                  │  cards.py │
-│   token  │ ←──────────────  │           │  get_user_paths(username) → file paths
-│          │   {cards: [...]} └───────────┘
-└──────────┘
+POST /api/stats/trigger-scrape
+  → GitHub API dispatches daily_scrape.yml
+  → Runner: python daily_scrape.py --workers 3
+      → eBay Selenium for each ledger card
+      → Updates cards + card_price_history + portfolio_history
+  → Browser polls GET /api/stats/scrape-status every 15s
+      → ScrapeProgressModal: live step log + progress bar
+```
+
+### 7. Catalog Quality Reports (weekly CI)
+```
+.github/workflows/catalog_quality_report.yml  (Monday 10am UTC + manual)
+  → pytest tests/test_catalog_quality.py  (23 assertions)
+  → python catalog_gap_analysis.py --markdown --output gap_report.md
+  → Publish to $GITHUB_STEP_SUMMARY
+  → Upload artifacts: test_report.md + gap_report.md (90-day retention)
 ```
 
 ---
 
-## Target Architecture (Post-Supabase)
+## Auth & Users
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        BROWSER                                  │
-│          React (same — minimal changes)                         │
-└────────────────────────┬────────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    FASTAPI  (port 8000)                         │
-│           auth → Supabase Auth  (replaces users.yaml+JWT)       │
-└────────────┬────────────────────────────────────────────────────┘
-             │ supabase-py (service role key)
-             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                  SUPABASE (PostgreSQL)                          │
-│                                                                 │
-│  Tables:                                                        │
-│  cards             (replaces card_prices_summary.csv)           │
-│  card_results      (replaces card_prices_results.json)          │
-│  price_history     (replaces price_history.json)                │
-│  portfolio_history (replaces portfolio_history.json)            │
-│  card_archive      (replaces card_archive.csv)                  │
-│  master_cards      (replaces young_guns.csv — all sports)       │
-│                                                                 │
-│  Row Level Security: each user reads/writes only their rows     │
-│  Supabase Auth: email/password, OAuth, self-registration        │
-│  Supabase Storage: card images (replaces eBay hash approach)    │
-└─────────────────────────────────────────────────────────────────┘
-             ↑
-             │ write (service role — GitHub Actions scraper)
-┌─────────────────────────────────────────────────────────────────┐
-│              GitHub Actions Scraper                             │
-│  daily_scrape.py → writes directly to Supabase                 │
-│  scrape_master_db.py → writes to master_cards table            │
-│  scrape_nhl_stats.py → writes to nhl_stats table               │
-│  No more scp! Data lives in cloud, accessible everywhere.       │
-└─────────────────────────────────────────────────────────────────┘
+users.yaml  (gitignored — bcrypt hashes)
+  admin: { display_name, role: admin, password_hash }
+  josh:  { display_name, role: user,  password_hash }
+
+Dev fallback: admin/admin when users.yaml absent
+?public=true URL param → read-only share mode
 ```
 
-### Schema (planned)
+---
 
-```sql
--- User collection
-cards (
-  id uuid PRIMARY KEY,
-  user_id uuid REFERENCES auth.users,  -- RLS key
-  card_name text,
-  player text, year text, set_name text, grade text,
-  fair_value numeric, cost_basis numeric, trend text,
-  num_sales int, confidence text, tags text,
-  purchase_date date, last_scraped timestamptz,
-  created_at timestamptz DEFAULT now()
-)
+## Multi-User Data Isolation
 
--- Raw eBay sales per card
-card_results (
-  id uuid PRIMARY KEY,
-  card_id uuid REFERENCES cards,
-  user_id uuid REFERENCES auth.users,
-  title text, price_val numeric, sold_date date,
-  listing_url text, image_url text, scraped_at timestamptz
-)
+Every personal table has a `user_id TEXT` column. All queries filter by the JWT username.
+`card_catalog`, `market_prices`, `rookie_cards`, and `player_stats` are shared read-only.
 
--- Per-card price snapshots
-price_history (
-  id uuid PRIMARY KEY,
-  user_id uuid REFERENCES auth.users,
-  card_name text, fair_value numeric, num_sales int,
-  snapshot_date date
-)
+---
 
--- Daily portfolio totals
-portfolio_history (
-  id uuid PRIMARY KEY,
-  user_id uuid REFERENCES auth.users,
-  total_value numeric, total_cards int, avg_value numeric,
-  snapshot_date date
-)
+## card_catalog Coverage (as of 2026-03)
 
--- Market DB (shared, all sports)
-master_cards (
-  id uuid PRIMARY KEY,
-  sport text, season text, brand text, card_number text,
-  player text, team text, position text,
-  fair_value numeric, num_sales int, trend text,
-  graded_prices jsonb,  -- {PSA10: {value, sales}, ...}
-  last_scraped timestamptz
-)
-```
+| Sport | Cards | Sources | Era |
+|-------|-------|---------|-----|
+| NHL | ~310K | TCDB + CLI | 1951–2026 |
+| NBA | ~278K | TCDB | 1967–2026 |
+| NFL | ~643K | TCDB + CBC | 1948–2026 |
+| MLB | ~1.4M | TCDB + CBC + CLI | 1907–2026 |
+| **Total** | **~2.6M** | | |
+
+Sources: **TCDB** (curl_cffi, bypasses Cloudflare) · **CLI** (checklistinsider.com, 2022+) · **CBC** (cardboardconnection.com, 2008–2023).
+Checkpoint: `catalog_checkpoint.json` — resumes interrupted runs without re-scraping completed sets.

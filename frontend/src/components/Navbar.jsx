@@ -62,6 +62,14 @@ const Icons = {
       <rect x="10" y="10" width="6" height="6" rx="1"/>
     </svg>
   ),
+  Collection: () => (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="4" width="9" height="11" rx="1.5"/>
+      <rect x="7" y="2" width="9" height="11" rx="1.5"/>
+      <line x1="5" y1="8" x2="9" y2="8"/>
+      <line x1="5" y1="11" x2="8" y2="11"/>
+    </svg>
+  ),
   Admin: () => (
     <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
       <circle cx="9" cy="9" r="2.5"/>
@@ -102,7 +110,8 @@ const NAV_ITEMS = [
   { to: '/ledger',    label: 'Card Ledger',  Icon: Icons.Ledger    },
   { to: '/portfolio', label: 'Portfolio',    Icon: Icons.Portfolio  },
   { to: '/master-db', label: 'Master DB',    Icon: Icons.Database   },
-  { to: '/catalog',   label: 'Card Catalog', Icon: Icons.Catalog    },
+  { to: '/catalog',    label: 'Card Catalog',   Icon: Icons.Catalog     },
+  { to: '/collection', label: 'My Collection',  Icon: Icons.Collection  },
   { to: '/charts',    label: 'Charts',       Icon: Icons.Charts     },
   { to: '/nhl-stats', label: 'NHL Stats',    Icon: Icons.Stats      },
   { to: '/archive',   label: 'Archive',      Icon: Icons.Archive    },

@@ -1,366 +1,152 @@
 # dashboard_utils.py — Reference
 
-Core data/utility layer shared by the FastAPI backend (`api/routers/`) and the legacy Streamlit dashboard. All data reads/writes, card parsing, scraping, archiving, and NHL stats go through this module.
+Core utility layer shared by `api/routers/` and scraper scripts. Handles auth, card data I/O, scraping, parsing, and legacy YG market DB access.
 
 ---
 
-## Constants
+## Auth
 
-| Constant | Value | Purpose |
-|----------|-------|---------|
-| `DATA_ROOT` | `data/` | Base directory for all data files |
-| `CSV_PATH` | `data/admin/card_prices_summary.csv` | Default (legacy single-user) card CSV |
-| `RESULTS_JSON_PATH` | `data/admin/card_prices_results.json` | Default results JSON |
-| `HISTORY_PATH` | `data/admin/price_history.json` | Default price history |
-| `ARCHIVE_PATH` | `data/admin/card_archive.csv` | Default archive CSV |
-| `MASTER_DB_PATH` | `data/master_db/young_guns.csv` | Young Guns market DB |
-| `MONEY_COLS` | list of str | Columns that hold monetary values (Fair Value, Cost Basis, Min, Max, etc.) |
-| `_DATA_CACHE` | dict | In-process mtime-based cache for `load_data()` |
-| `_MASTER_DB_CACHE` | dict | In-process mtime-based cache for `load_master_db()` |
+**`load_users() → dict | None`**
+Loads `users.yaml` from project root. Returns `{username: {display_name, role, password_hash}}` or `None` (triggers dev fallback).
+
+**`verify_password(username, password) → bool`**
+Checks password against bcrypt hash in `users.yaml`.
+
+**`get_user_paths(username) → dict`**
+Returns per-user file paths under `data/{username}/`: `csv`, `results`, `history`, `portfolio`, `archive`, `backup_dir`. (Legacy — new code uses PostgreSQL directly.)
 
 ---
 
-## Caching
+## Card Data I/O  (PostgreSQL-backed via `db.py`)
 
-Two in-process DataFrame caches prevent repeated CSV/JSON parsing on every API request. Each cache entry stores `(mtime_tuple, dataframe)`. On every call, file mtimes are checked; if unchanged, the cached DataFrame copy is returned without re-reading disk.
+The FastAPI routers call `db.get_db()` directly for all database access. `dashboard_utils` retains helpers for the scraper scripts and legacy compatibility.
 
-```python
-_DATA_CACHE     # key: (csv_path, results_json_path)  → (mtime_tuple, df)
-_MASTER_DB_CACHE  # key: csv_path  → (mtime_tuple, df)
-```
+**`load_data(csv_path, results_json_path) → DataFrame`**
+Loads legacy CSV + results JSON, merges, returns DataFrame. Uses mtime-based cache `_DATA_CACHE`. Still used by `daily_scrape.py`.
 
-```python
-def _file_mtime(path: str) -> float
-```
-Returns `os.path.getmtime(path)` or `0` if the file doesn't exist.
+**`save_data(df, csv_path)`**
+Writes DataFrame to CSV. Converts money columns to 2dp floats.
 
----
-
-## Auth Helpers
-
-```python
-def load_users() -> dict | None
-```
-Loads `users.yaml` from the project root. Returns a dict of `{username: {display_name, role, password_hash}}`, or `None` if the file doesn't exist (triggers dev fallback in the auth router).
+**`backup_data(label, csv_path, results_path, backup_dir)`**
+Timestamped backup of CSV + results JSON. Used by `daily_scrape.py` before each run.
 
 ---
 
-```python
-def verify_password(username: str, password: str) -> bool
-```
-Looks up the user in `users.yaml` and checks the provided password against the stored bcrypt hash. Returns `False` if the user doesn't exist.
+## Card Name Parsing
 
----
-
-```python
-def get_user_paths(username: str) -> dict
-```
-Resolves per-user data file paths under `data/{username}/`. Returns a dict with keys: `csv`, `results`, `history`, `portfolio`, `archive`, `backup_dir`.
-
----
-
-## Data I/O
-
-```python
-def init_user_data(csv_path: str) -> None
-```
-Creates an empty CSV with the correct column headers at `csv_path` if the file doesn't already exist. Used when a new user logs in for the first time.
-
----
-
-```python
-def load_data(csv_path: str, results_json_path: str) -> pd.DataFrame
-```
-Loads the card collection as a DataFrame. Merges the CSV (`card_prices_summary.csv`) with the results JSON (`card_prices_results.json`) to add parsed fields: `Player`, `Year`, `Set Name`, `Grade`, `Confidence`, `Last Scraped`. Uses `_DATA_CACHE` to skip re-parsing if files haven't changed. Returns a `.copy()` of the cached DataFrame.
-
----
-
-```python
-def save_data(df: pd.DataFrame, csv_path: str) -> None
-```
-Writes the DataFrame back to `csv_path`. Converts monetary columns to 2dp floats before writing.
-
----
-
-```python
-def backup_data(label: str, csv_path: str, results_path: str, backup_dir: str) -> None
-```
-Creates timestamped copies of the CSV and results JSON in `backup_dir/`. Label is included in the filename (e.g., `"pre-scrape"`).
-
-Args:
-- `label`: Short string included in the backup filename.
-- `csv_path`: Source CSV to back up.
-- `results_path`: Source results JSON to back up.
-- `backup_dir`: Directory to write backups into (created if needed).
-
----
-
-## Card Parsing
-
-```python
-def parse_card_name(card_name: str) -> dict
-```
-Parses a structured card name string into its component fields. Expected format:
+**`parse_card_name(card_name) → dict`**
+Parses structured card name into components. Expected format:
 ```
 "YEAR BRAND - SUBSET #CARDNUM - PLAYER [GRADE] /SERIAL"
 ```
-
-Returns a dict with keys: `player`, `year`, `brand`, `set_name`, `subset`, `card_number`, `serial`, `grade`, `tags`.
-
-Examples:
-- `"2023-24 Upper Deck - Young Guns #201 - Connor Bedard"` → `{player: "Connor Bedard", year: "2023-24", brand: "Upper Deck", subset: "Young Guns", card_number: "201", ...}`
-- `"2021-22 O-Pee-Chee #15 - Auston Matthews [PSA 9] /99"` → `{..., grade: "PSA 9", serial: "99"}`
+Returns: `player`, `year`, `brand`, `set_name`, `subset`, `card_number`, `serial`, `grade`, `tags`.
 
 ---
 
 ## Scraping
 
-```python
-def scrape_single_card(card_name: str, results_json_path: str = None) -> dict
-```
-Scrapes eBay sold listings for a single card by calling `process_card()` from `scrape_card_prices.py`. Updates the results JSON with new sales, image URL, and timestamp. Returns the result dict with `estimated_value`, `confidence`, `stats`, `raw_sales`.
+**`scrape_single_card(card_name, results_json_path=None) → dict`**
+Calls `process_card()` from `scrape_card_prices.py`. Updates results JSON. Returns `{estimated_value, confidence, stats, raw_sales}`.
 
-Args:
-- `card_name`: Full card name string (must match format `parse_card_name` expects).
-- `results_json_path`: Path to the results JSON to read/write. Defaults to `RESULTS_JSON_PATH`.
+**`scrape_graded_comparison(card_name) → dict`**
+PSA 8/9/10 + BGS 9/9.5/10 price comparison. Used by CardInspect grading ROI calculator.
 
----
-
-```python
-def scrape_graded_comparison(card_name: str) -> dict
-```
-Runs graded price comparisons for a card (PSA 8, 9, 10 and BGS 9, 9.5, 10). Used by the CardInspect grading ROI calculator. Returns a dict keyed by grade string with `fair_value` and `num_sales`.
+**`analyze_card_images(front_bytes, back_bytes=None) → dict`**
+Sends images to Claude Vision (claude-sonnet-4-5). Returns: `player_name`, `year`, `brand`, `subset`, `card_number`, `parallel`, `serial_number`, `grade`, `confidence`, `is_sports_card`.
 
 ---
 
-```python
-def analyze_card_images(
-    front_image_bytes: bytes,
-    back_image_bytes: bytes = None
-) -> dict
-```
-Sends card image(s) to Claude Vision (claude-3-5-sonnet) and extracts: `player_name`, `year`, `brand`, `subset`, `card_number`, `parallel`, `serial_number`, `grade`, `confidence`, `is_sports_card`, `validation_reason`, `raw_text`, `parse_error`.
+## Price & Portfolio History  (legacy JSON files)
 
-Args:
-- `front_image_bytes`: Raw image bytes for the card front (required).
-- `back_image_bytes`: Raw image bytes for the card back (optional, improves accuracy).
+These functions are used by `daily_scrape.py`. New code writes directly to PostgreSQL tables (`card_price_history`, `portfolio_history`).
 
----
+**`append_price_history(card_name, fair_value, num_sales, history_path)`**
+**`load_price_history(card_name, history_path) → list`**
+Per-card price snapshots. Each entry: `{date, fair_value, num_sales}`.
 
-## Sales History
-
-```python
-def load_sales_history(card_name: str, results_json_path: str) -> list
-```
-Returns the raw eBay sales list for a card from the results JSON. Each entry is a dict with `title`, `price_val`, `sold_date`, `listing_url`, `image_url`, etc. Returns `[]` if not found.
-
----
-
-## Price History
-
-```python
-def append_price_history(
-    card_name: str,
-    fair_value: float,
-    num_sales: int,
-    history_path: str
-) -> None
-```
-Appends a dated price snapshot for one card to `price_history.json`. Structure per entry: `{date, fair_value, num_sales}`.
-
----
-
-```python
-def load_price_history(card_name: str, history_path: str) -> list
-```
-Returns the list of price snapshots for a card from `price_history.json`. Each entry: `{date, fair_value, num_sales}`. Returns `[]` if not found.
-
----
-
-## Portfolio History
-
-```python
-def append_portfolio_snapshot(
-    total_value: float,
-    total_cards: int,
-    avg_value: float,
-    portfolio_path: str
-) -> None
-```
-Appends a daily portfolio snapshot to `portfolio_history.json`. Entry: `{date, total_value, total_cards, avg_value}`.
-
----
-
-```python
-def load_portfolio_history(portfolio_path: str) -> list
-```
-Returns the list of daily portfolio snapshots. Each entry: `{date, total_value, total_cards, avg_value}`.
+**`append_portfolio_snapshot(total_value, total_cards, avg_value, portfolio_path)`**
+**`load_portfolio_history(portfolio_path) → list`**
+Daily portfolio totals.
 
 ---
 
 ## Archive
 
-```python
-def archive_card(df: pd.DataFrame, card_name: str, archive_path: str) -> pd.DataFrame
-```
-Soft-deletes a card by removing it from the DataFrame and appending it to `card_archive.csv` with an `ArchivedAt` timestamp. Returns the updated DataFrame (card removed).
+**`archive_card(df, card_name, archive_path) → DataFrame`**
+Removes card from DataFrame, appends to `card_archive.csv` with `ArchivedAt` timestamp.
 
-Args:
-- `df`: Current collection DataFrame.
-- `card_name`: Exact card name to archive.
-- `archive_path`: Path to the archive CSV.
+**`load_archive(archive_path) → DataFrame`**
 
----
-
-```python
-def load_archive(archive_path: str) -> pd.DataFrame
-```
-Loads the archive CSV and returns it as a DataFrame. Returns an empty DataFrame if the file doesn't exist.
-
----
-
-```python
-def restore_card(card_name: str, archive_path: str) -> dict
-```
-Removes a card from the archive CSV and returns its row as a dict (ready to add back to the collection). Raises `ValueError` if the card isn't in the archive.
+**`restore_card(card_name, archive_path) → dict`**
+Removes from archive, returns row dict for re-adding to collection.
 
 ---
 
 ## Market Alerts
 
-```python
-def get_market_alerts(
-    history: dict = None,
-    top_n: int = 10,
-    min_pct: float = 5.0
-) -> dict
-```
-Compares the most recent and previous price snapshots per card and returns top gainers and losers. Returns `{gainers: [...], losers: [...]}` where each entry is `{card_name, current, previous, change_pct}`.
-
-Args:
-- `history`: Pre-loaded price history dict. If `None`, loads from `HISTORY_PATH`.
-- `top_n`: Number of top movers to return per side.
-- `min_pct`: Minimum percentage change to include.
+**`get_market_alerts(history=None, top_n=10, min_pct=5.0) → list`**
+Compares latest vs previous price per card. Returns list of `{card_name, direction, pct_change, current, previous}` sorted by magnitude.
 
 ---
 
-## Master DB / Young Guns
+## Master DB / Young Guns  (CSV-backed legacy)
 
-```python
-def load_master_db(path: str = MASTER_DB_PATH) -> pd.DataFrame
-```
-Loads `young_guns.csv` as a DataFrame. Uses `_MASTER_DB_CACHE` to avoid re-parsing on every request.
+Still used by `api/routers/master_db.py` for the MasterDB analytics page.
 
----
+**`load_master_db(path=MASTER_DB_PATH) → DataFrame`**
+Loads `young_guns.csv`. Mtime-cached.
 
-```python
-def save_master_db(df: pd.DataFrame, path: str = MASTER_DB_PATH) -> None
-```
-Writes the Young Guns DataFrame back to CSV.
+**`save_master_db(df, path=MASTER_DB_PATH)`**
 
----
+**`append_yg_price_history(card_name, fair_value, num_sales, history_path, graded_prices=None)`**
+**`load_yg_price_history(...) → dict`**
+**`append_yg_portfolio_snapshot(...) / load_yg_portfolio_history(...)`**
+**`save_yg_raw_sales / load_yg_raw_sales / batch_save_yg_raw_sales / batch_append_yg_price_history`**
 
-```python
-def append_yg_price_history(
-    card_name: str,
-    fair_value: float,
-    num_sales: int,
-    history_path: str,
-    graded_prices: dict = None
-) -> None
-```
-Appends a dated price snapshot for a YG card. `graded_prices` is an optional dict keyed by grade (e.g., `{"PSA 10": {fair_value, num_sales}}`).
-
----
-
-```python
-def load_yg_price_history(card_name: str, history_path: str) -> list
-```
-Returns price snapshots for a YG card. Each entry: `{date, fair_value, num_sales, [graded_prices]}`.
-
----
-
-```python
-def append_yg_portfolio_snapshot(
-    total_value: float,
-    total_cards: int,
-    avg_value: float,
-    portfolio_path: str
-) -> None
-```
-Appends a daily snapshot of the YG portfolio total value.
-
----
-
-```python
-def load_yg_portfolio_history(portfolio_path: str) -> list
-```
-Returns the YG portfolio history list.
-
----
-
-```python
-def save_yg_raw_sales(card_name: str, sales: list, path: str) -> None
-def load_yg_raw_sales(card_name: str, path: str) -> list
-def batch_save_yg_raw_sales(all_sales_dict: dict, path: str) -> None
-def batch_append_yg_price_history(updates: list, path: str) -> None
-```
-Raw sales I/O for the Young Guns master DB. Batch variants accumulate multiple cards before writing to reduce I/O.
+Note: `market_price_history` (PostgreSQL) is the preferred price history for `card_catalog`-linked cards. The YG JSON history is legacy, retained for the MasterDB page until fully migrated.
 
 ---
 
 ## NHL Stats
 
-```python
-def load_nhl_player_stats(player_name: str, path: str) -> dict
-```
-Returns the stats dict for a specific player from the cached NHL stats JSON. Keys: `nhl_id`, `current_team`, `position`, `type`, `current_season`, `history`, optionally `bio`.
+**`load_nhl_player_stats(player_name, path) → dict`**
+Returns `{current_season, history, bio}` from cached stats JSON.
 
----
+**`save_nhl_player_stats(data, path)`**
 
-```python
-def save_nhl_player_stats(data: dict, path: str) -> None
-```
-Writes the full NHL stats dict (including meta, standings, players, unmatched) back to disk.
+**`get_player_stats_for_card(player_name, path) → dict | None`**
+Returns just `current_season` sub-dict.
 
----
+**`get_player_bio_for_card(player_name, path) → dict | None`**
+Returns `bio` sub-dict (nationality, draft info, height/weight).
 
-```python
-def get_player_stats_for_card(player_name: str, path: str) -> dict | None
-```
-Convenience wrapper — loads NHL stats and returns just the `current_season` sub-dict for a player, or `None` if not found.
-
----
-
-```python
-def get_player_bio_for_card(player_name: str, path: str) -> dict | None
-```
-Returns the `bio` sub-dict (nationality, draft info, height/weight) for a player, or `None`.
-
----
-
-```python
-def get_all_player_bios(path: str) -> dict
-```
-Returns `{player_name: bio_dict}` for all players that have bio data in the stats JSON.
+**`get_all_player_bios(path) → dict`**
+Returns `{player_name: bio_dict}` for all players with bio data.
 
 ---
 
 ## Correlation Analytics
 
-```python
-def compute_correlation_snapshot(
-    cards_df: pd.DataFrame,
-    nhl_players: dict,
-    nhl_standings: dict
-) -> dict
-```
-Computes statistical correlations between card prices and NHL performance metrics. Returns a snapshot dict with: `r2_points`, `r2_goals`, `price_tiers`, `team_premiums`, `position_breakdown`, `nationality_breakdown`, `draft_round_breakdown`.
+**`compute_correlation_snapshot(cards_df, nhl_players, nhl_standings) → dict`**
+Price vs performance R² correlations. Returns: `r2_points`, `r2_goals`, `price_tiers`, `team_premiums`, `position_breakdown`, `nationality_breakdown`, `draft_round_breakdown`.
+
+**`load_correlation_history(path) → list`**
+**`save_correlation_snapshot(snapshot, path)`**
 
 ---
 
+## db.py — Database Connection Pool
+
 ```python
-def load_correlation_history(path: str) -> list
-def save_correlation_snapshot(snapshot: dict, path: str) -> None
+from db import get_db
+
+with get_db() as conn:
+    cur = conn.cursor()
+    cur.execute("SELECT ...")
+    rows = cur.fetchall()
+    conn.commit()
 ```
-Append-only correlation history I/O. Each snapshot is dated.
+
+`get_db()` is a context manager over a `psycopg2.ThreadedConnectionPool` (min 1, max 10).
+`DATABASE_URL` env var required (set in Railway or local `.env`).
+Returns a `RealDictCursor`-like connection; commit is explicit.

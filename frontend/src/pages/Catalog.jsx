@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
 import CardTable from '../components/CardTable'
 import { getCatalog, getCatalogFilters } from '../api/catalog'
+import { getOwnedIds, addToCollection, getGrades } from '../api/collection'
 import { useCurrency } from '../context/CurrencyContext'
 import CurrencySelect from '../components/CurrencySelect'
 import styles from './Catalog.module.css'
@@ -8,7 +9,7 @@ import pageStyles from './Page.module.css'
 
 const SPORTS = ['NHL', 'NBA', 'NFL', 'MLB']
 
-const COLUMNS = (fmtPrice) => [
+const COLUMNS = (fmtPrice, ownedIds, onAdd) => [
   { key: 'sport',       label: 'Sport' },
   { key: 'year',        label: 'Year',       render: v => v || '—' },
   { key: 'set_name',    label: 'Set',        render: v => v || '—' },
@@ -46,6 +47,13 @@ const COLUMNS = (fmtPrice) => [
       : null,
   },
   { key: 'num_sales', label: 'Sales', render: v => v ?? '—' },
+  {
+    key: 'id',
+    label: '',
+    render: (v, row) => ownedIds.has(v)
+      ? <span className={styles.ownedBadge} title="In your collection">✓ Owned</span>
+      : <button className={styles.addBtn} onClick={e => { e.stopPropagation(); onAdd(row) }} title="Add to collection">+ Add</button>,
+  },
 ]
 
 const PER_PAGE = 50
@@ -72,6 +80,43 @@ export default function Catalog() {
   // Filter options
   const [years, setYears] = useState([])
   const [sets,  setSets]  = useState([])
+
+  // Collection: owned card IDs + add-to-collection modal
+  const [ownedIds,  setOwnedIds]  = useState(new Set())
+  const [grades,    setGrades]    = useState([])
+  const [addTarget, setAddTarget] = useState(null)   // card row being added
+  const [addForm,   setAddForm]   = useState({ grade: 'Raw', quantity: '1', cost_basis: '', purchase_date: '' })
+  const [addSaving, setAddSaving] = useState(false)
+
+  useEffect(() => {
+    getOwnedIds().then(d => setOwnedIds(new Set(d.owned_ids || []))).catch(() => {})
+    getGrades().then(d => setGrades(d.grades || [])).catch(() => {})
+  }, [])
+
+  const handleAdd = (row) => {
+    setAddTarget(row)
+    setAddForm({ grade: 'Raw', quantity: '1', cost_basis: '', purchase_date: '' })
+  }
+
+  const submitAdd = async () => {
+    if (!addTarget) return
+    setAddSaving(true)
+    try {
+      await addToCollection({
+        card_catalog_id: addTarget.id,
+        grade:           addForm.grade,
+        quantity:        parseInt(addForm.quantity) || 1,
+        cost_basis:      addForm.cost_basis ? parseFloat(addForm.cost_basis) : null,
+        purchase_date:   addForm.purchase_date || null,
+      })
+      setOwnedIds(prev => new Set([...prev, addTarget.id]))
+      setAddTarget(null)
+    } catch (e) {
+      alert(e.message)
+    } finally {
+      setAddSaving(false)
+    }
+  }
 
   const searchTimer = useRef(null)
   const [showTip, setShowTip] = useState(false)
@@ -248,7 +293,7 @@ setSortKey('year')
       ) : (
         <>
           <CardTable
-            columns={COLUMNS(fmtPrice)}
+            columns={COLUMNS(fmtPrice, ownedIds, handleAdd)}
             rows={cards}
             sortKey={sortKey}
             sortDir={sortDir}
@@ -298,6 +343,64 @@ setSortKey('year')
             </div>
           )}
         </>
+      )}
+
+      {/* Add to Collection modal */}
+      {addTarget && (
+        <div className={styles.modalOverlay} onClick={() => setAddTarget(null)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <span>Add to Collection</span>
+              <button className={styles.modalClose} onClick={() => setAddTarget(null)}>✕</button>
+            </div>
+            <div className={styles.modalCard}>
+              <strong>{addTarget.player_name}</strong>
+              <span>{addTarget.year} · {addTarget.set_name}</span>
+              {addTarget.card_number && <span>#{addTarget.card_number}</span>}
+            </div>
+            <div className={styles.modalFields}>
+              <label>
+                Grade
+                <select
+                  value={addForm.grade}
+                  onChange={e => setAddForm(p => ({ ...p, grade: e.target.value }))}
+                >
+                  {grades.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </label>
+              <label>
+                Qty
+                <input
+                  type="number" min="1"
+                  value={addForm.quantity}
+                  onChange={e => setAddForm(p => ({ ...p, quantity: e.target.value }))}
+                />
+              </label>
+              <label>
+                Cost Paid
+                <input
+                  type="number" step="0.01" placeholder="0.00"
+                  value={addForm.cost_basis}
+                  onChange={e => setAddForm(p => ({ ...p, cost_basis: e.target.value }))}
+                />
+              </label>
+              <label>
+                Purchase Date
+                <input
+                  type="date"
+                  value={addForm.purchase_date}
+                  onChange={e => setAddForm(p => ({ ...p, purchase_date: e.target.value }))}
+                />
+              </label>
+            </div>
+            <div className={styles.modalActions}>
+              <button className={styles.modalCancel} onClick={() => setAddTarget(null)}>Cancel</button>
+              <button className={styles.modalSave} onClick={submitAdd} disabled={addSaving}>
+                {addSaving ? 'Adding…' : 'Add to Collection'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -14,6 +14,7 @@ import Archive from './pages/Archive'
 import Charts from './pages/Charts'
 import Admin from './pages/Admin'
 import Catalog from './pages/Catalog'
+import Collection from './pages/Collection'
 import styles from './App.module.css'
 
 function AppShell() {
@@ -32,6 +33,7 @@ function AppShell() {
           <Route path="/charts"          element={<ProtectedRoute><Charts /></ProtectedRoute>} />
           <Route path="/admin"           element={<ProtectedRoute><Admin /></ProtectedRoute>} />
           <Route path="/catalog"         element={<ProtectedRoute><Catalog /></ProtectedRoute>} />
+          <Route path="/collection"     element={<ProtectedRoute><Collection /></ProtectedRoute>} />
         </Routes>
       </main>
     </div>
