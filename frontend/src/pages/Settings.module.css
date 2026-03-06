@@ -1,0 +1,117 @@
+/* ── Sections ───────────────────────────────────────────────── */
+.section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── Setting row ────────────────────────────────────────────── */
+.settingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.settingInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settingLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settingDesc {
+  font-size: 12px;
+  color: var(--text-muted);
+  max-width: 380px;
+  line-height: 1.5;
+}
+
+/* ── Density toggle ─────────────────────────────────────────── */
+.btnGroup {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.densityBtn {
+  background: transparent;
+  border: none;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.densityBtn + .densityBtn {
+  border-left: 1px solid var(--border);
+}
+.densityBtn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+.densityBtn.active {
+  background: var(--accent-muted);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ── User management (reuse Admin styles) ───────────────────── */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; padding: 12px 20px;
+  border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 300;
+  max-width: 360px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+.toast.success { background: rgba(76,175,130,0.15); border: 1px solid rgba(76,175,130,0.4); color: var(--success); }
+.toast.error   { background: rgba(224,92,92,0.15);  border: 1px solid rgba(224,92,92,0.4);  color: var(--danger); }
+
+.tableWrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 20px; }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.th { background: var(--bg-secondary); color: var(--text-secondary); font-weight: 600; padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+.td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-primary); }
+.tr:last-child .td { border-bottom: none; }
+.tr:hover .td { background: rgba(0,212,170,0.04); }
+
+.youBadge { font-size: 10px; font-weight: 600; color: var(--accent); background: var(--accent-muted); padding: 2px 6px; border-radius: 10px; margin-left: 6px; }
+.roleBadge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: rgba(154,160,180,0.12); color: var(--text-secondary); }
+.admin { background: var(--accent-muted); color: var(--accent); }
+
+.actions { display: flex; gap: 8px; align-items: center; }
+.pwBtn { background: var(--accent-muted); color: var(--accent); border: 1px solid var(--accent-border); border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; }
+.delBtn { background: rgba(224,92,92,0.1); color: var(--danger); border: 1px solid rgba(224,92,92,0.3); border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; }
+
+.pwBox { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; font-size: 13px; }
+.pwRow { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+
+.addSection { border-top: 1px solid var(--border); padding-top: 20px; margin-top: 4px; }
+.addTitle { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 14px; }
+.addForm { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+
+.input { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary); font-size: 13px; min-width: 140px; flex: 1; font-family: var(--font); }
+.input:focus { outline: 1px solid var(--accent); }
+
+.saveBtn, .addBtn { background: var(--accent); border: none; border-radius: 8px; padding: 8px 18px; color: #090e17; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.saveBtn:disabled, .addBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.cancelBtn { background: transparent; border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; color: var(--text-secondary); font-size: 13px; cursor: pointer; font-family: var(--font); }

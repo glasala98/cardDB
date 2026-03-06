@@ -124,6 +124,19 @@ tbody tr:last-child { border-bottom: none; }
   border-radius: var(--radius-sm);
 }
 
+/* ── Compact density mode ──────────────────────────────────── */
+body.compact {
+  font-size: 12px;
+}
+body.compact thead th {
+  padding: 6px 10px;
+  font-size: 10px;
+}
+body.compact tbody td {
+  padding: 5px 10px;
+}
+body.compact tbody tr { line-height: 1.3; }
+
 /* ── Badge utility ─────────────────────────────────────────── */
 .badge {
   display: inline-flex;

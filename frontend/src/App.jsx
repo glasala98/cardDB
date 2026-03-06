@@ -15,6 +15,8 @@ import Charts from './pages/Charts'
 import Admin from './pages/Admin'
 import Catalog from './pages/Catalog'
 import Collection from './pages/Collection'
+import Settings from './pages/Settings'
+import { PreferencesProvider } from './context/PreferencesContext'
 import styles from './App.module.css'
 
 function AppShell() {
@@ -24,7 +26,7 @@ function AppShell() {
       <main className={styles.main}>
         <Routes>
           <Route path="/" element={<Navigate to="/catalog" replace />} />
-          <Route path="/settings" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/ledger"          element={<ProtectedRoute><CardLedger /></ProtectedRoute>} />
           <Route path="/ledger/:cardName" element={<ProtectedRoute><CardInspect /></ProtectedRoute>} />
           <Route path="/portfolio"       element={<ProtectedRoute><Portfolio /></ProtectedRoute>} />
@@ -45,6 +47,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <PreferencesProvider>
         <CurrencyProvider>
           <PublicModeProvider>
             <Routes>
@@ -53,6 +56,7 @@ export default function App() {
             </Routes>
           </PublicModeProvider>
         </CurrencyProvider>
+        </PreferencesProvider>
       </AuthProvider>
     </BrowserRouter>
   )

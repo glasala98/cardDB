@@ -124,11 +124,9 @@ export default function Navbar() {
               <Icons.Help />
             </button>
             <ShareBtn />
-            {isAdmin && (
-              <button className={styles.iconBtn} onClick={() => navigate('/admin')} title="Settings">
-                <Icons.Settings />
-              </button>
-            )}
+            <button className={styles.iconBtn} onClick={() => navigate('/settings')} title="Settings">
+              <Icons.Settings />
+            </button>
             <button className={styles.logoutBtn} onClick={handleLogout} title="Sign out">
               <Icons.Logout />
               Sign out
