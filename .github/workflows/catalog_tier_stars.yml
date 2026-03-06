@@ -1,0 +1,96 @@
+name: Catalog Tier — Stars (Monthly)
+
+on:
+  schedule:
+    - cron: '0 10 1 * *'  # 10am UTC 1st of each month
+  workflow_dispatch:
+    inputs:
+      sport:
+        description: 'Sport (NHL/NBA/NFL/MLB, blank=all)'
+        required: false
+        default: ''
+      limit:
+        description: 'Max cards per sport (0=all)'
+        required: false
+        default: '0'
+
+jobs:
+  scrape-stars-nhl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NHL' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Scrape NHL stars prices
+        run: python -u scrape_master_db.py --catalog-tier stars --sport NHL --workers 5 --stale-days 30 --limit ${{ github.event.inputs.limit || '0' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  scrape-stars-nba:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NBA' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Scrape NBA stars prices
+        run: python -u scrape_master_db.py --catalog-tier stars --sport NBA --workers 5 --stale-days 30 --limit ${{ github.event.inputs.limit || '0' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  scrape-stars-nfl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NFL' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Scrape NFL stars prices
+        run: python -u scrape_master_db.py --catalog-tier stars --sport NFL --workers 5 --stale-days 30 --limit ${{ github.event.inputs.limit || '0' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  scrape-stars-mlb:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'MLB' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Scrape MLB stars prices
+        run: python -u scrape_master_db.py --catalog-tier stars --sport MLB --workers 5 --stale-days 30 --limit ${{ github.event.inputs.limit || '0' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

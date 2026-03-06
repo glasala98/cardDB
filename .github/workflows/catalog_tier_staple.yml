@@ -1,0 +1,115 @@
+name: Catalog Tier — Staple (Daily)
+
+on:
+  schedule:
+    - cron: '0 8 * * *'  # 8am UTC daily (3am EST) — after master_db_daily at 6am
+  workflow_dispatch:
+    inputs:
+      sport:
+        description: 'Sport (NHL/NBA/NFL/MLB, blank=all)'
+        required: false
+        default: ''
+      limit:
+        description: 'Max cards per sport (0=all)'
+        required: false
+        default: '0'
+
+jobs:
+  assign-tiers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Assign/refresh catalog tiers
+        run: python assign_catalog_tiers.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  scrape-staple-nhl:
+    needs: assign-tiers
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NHL' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Scrape NHL staple prices
+        run: python -u scrape_master_db.py --catalog-tier staple --sport NHL --workers 5 --stale-days 1 --year-from 2000 --limit ${{ github.event.inputs.limit || '0' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  scrape-staple-nba:
+    needs: assign-tiers
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NBA' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Scrape NBA staple prices
+        run: python -u scrape_master_db.py --catalog-tier staple --sport NBA --workers 5 --stale-days 1 --year-from 2000 --limit ${{ github.event.inputs.limit || '0' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  scrape-staple-nfl:
+    needs: assign-tiers
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NFL' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Scrape NFL staple prices
+        run: python -u scrape_master_db.py --catalog-tier staple --sport NFL --workers 5 --stale-days 1 --year-from 2000 --limit ${{ github.event.inputs.limit || '0' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  scrape-staple-mlb:
+    needs: assign-tiers
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'MLB' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Scrape MLB staple prices
+        run: python -u scrape_master_db.py --catalog-tier staple --sport MLB --workers 5 --stale-days 1 --year-from 2000 --limit ${{ github.event.inputs.limit || '0' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

@@ -140,7 +140,7 @@ def load_cards(args) -> list:
         conditions.append("cc.year = %s")
         params.append(args.year)
 
-    # --tier shorthand
+    # --tier shorthand (legacy)
     tier = getattr(args, 'tier', None)
     if tier == 'rookies':
         conditions.append("cc.is_rookie = TRUE")
@@ -153,6 +153,12 @@ def load_cards(args) -> list:
         conditions.append("SPLIT_PART(cc.year,'-',1)::int >= 2015")
     elif tier == 'serialized':
         conditions.append("cc.print_run IS NOT NULL")
+
+    # --catalog-tier: filter by assigned scrape_tier column
+    catalog_tier = getattr(args, 'catalog_tier', None)
+    if catalog_tier:
+        conditions.append("cc.scrape_tier = %s")
+        params.append(catalog_tier)
 
     # --year-from / --year-to for range scraping
     if getattr(args, 'year_from', None):
@@ -205,6 +211,47 @@ def load_cards(args) -> list:
     stale         = len(rows) - never_scraped
     print(f"  Delta check: {never_scraped:,} never scraped, {stale:,} stale — {len(rows):,} total to scrape")
     return rows
+
+
+def bump_tiers_by_sales(catalog_ids: list):
+    """After scraping, demote cards whose actual sales don't support their tier.
+
+    Thresholds (30-day sales window):
+      >= 10 sales  → stay/become staple
+       3–9 sales   → premium
+       1–2 sales   → stars
+         0 sales   → base (on-demand only)
+
+    Cards are only ever moved DOWN, never promoted by this function.
+    Promotion (e.g. a base card that suddenly has 15 sales) can be done
+    by re-running assign_catalog_tiers.py --all.
+    """
+    if not catalog_ids:
+        return
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE card_catalog cc
+                SET scrape_tier = CASE
+                    WHEN mp.num_sales >= 10 THEN 'staple'
+                    WHEN mp.num_sales >= 3  THEN 'premium'
+                    WHEN mp.num_sales >= 1  THEN 'stars'
+                    ELSE 'base'
+                END
+                FROM market_prices mp
+                WHERE mp.card_catalog_id = cc.id
+                  AND cc.id = ANY(%s)
+                  AND CASE
+                        WHEN mp.num_sales >= 10 THEN 'staple'
+                        WHEN mp.num_sales >= 3  THEN 'premium'
+                        WHEN mp.num_sales >= 1  THEN 'stars'
+                        ELSE 'base'
+                      END < cc.scrape_tier  -- only demote, never promote
+            """, (catalog_ids,))
+            bumped = cur.rowcount
+        conn.commit()
+    if bumped:
+        print(f"  Tier bumps: {bumped} card(s) demoted based on sales data")
 
 
 def save_prices_batch(results: list):
@@ -372,6 +419,9 @@ def main():
     parser.add_argument('--tier',          type=str,   default=None,
                         choices=['rookies','recent','rookie_recent','serialized'],
                         help="Scrape tier: rookies=RC only, recent=2015+, rookie_recent=RC 2015+, serialized=print_run set")
+    parser.add_argument('--catalog-tier', type=str,   default=None, dest='catalog_tier',
+                        choices=['staple','premium','stars','base'],
+                        help="Filter by assigned scrape_tier (set by assign_catalog_tiers.py)")
     parser.add_argument('--rookies',       action='store_true',      help="Rookies only (alias for --tier rookies)")
     parser.add_argument('--force',         action='store_true',      help="Re-scrape already-scraped cards")
     parser.add_argument('--limit',         type=int,   default=0,    help="Max cards per run (0=all)")
@@ -405,8 +455,9 @@ def main():
     if args.year:       print(f"  Year:       {args.year}")
     if args.year_from:  print(f"  Year from:  {args.year_from}")
     if args.year_to:    print(f"  Year to:    {args.year_to}")
-    if args.tier:       print(f"  Tier:       {args.tier}")
-    elif args.rookies:  print(f"  Rookies only")
+    if args.catalog_tier: print(f"  Catalog tier: {args.catalog_tier}")
+    elif args.tier:       print(f"  Tier:         {args.tier}")
+    elif args.rookies:    print(f"  Rookies only")
     if not args.force:  print(f"  Stale days: {args.stale_days} (skip cards priced within {args.stale_days}d)")
     if args.graded:     print(f"  Grades:     {grades}")
     print(f"  Est. time:  ~{total * 5 / args.workers / 60:.0f} min")
@@ -421,6 +472,8 @@ def main():
         if batch:
             try:
                 save_prices_batch(batch)
+                if args.catalog_tier:
+                    bump_tiers_by_sales([cid for cid, _ in batch])
             except Exception as e:
                 print(f"  WARNING: DB write error: {e}")
             batch = []

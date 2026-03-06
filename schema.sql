@@ -189,6 +189,7 @@ CREATE TABLE card_catalog (
     print_run    INT,                                  -- NULL=unlimited, 99=/99 parallel
     is_rookie    BOOLEAN      NOT NULL DEFAULT FALSE,
     is_parallel  BOOLEAN      NOT NULL DEFAULT FALSE,
+    scrape_tier  TEXT         NOT NULL DEFAULT 'base',   -- 'staple','premium','stars','base' — set by assign_catalog_tiers.py
     source       TEXT         NOT NULL DEFAULT 'manual', -- 'beckett','ebay_discovery','manual'
     source_id    TEXT         NOT NULL DEFAULT '',     -- Beckett card ID or external ref
     search_query TEXT         NOT NULL DEFAULT '',     -- pre-built eBay search string
