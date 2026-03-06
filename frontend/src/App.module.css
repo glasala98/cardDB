@@ -15,5 +15,6 @@
   }
   .main {
     padding: 16px;
+    padding-bottom: 80px; /* clearance for bottom tab bar */
   }
 }

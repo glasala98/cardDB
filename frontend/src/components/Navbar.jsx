@@ -67,9 +67,9 @@ const Icons = {
 }
 
 const NAV_ITEMS = [
-  { to: '/catalog',   label: 'Card Catalog', Icon: Icons.Catalog   },
-  { to: '/ledger',    label: 'Card Ledger',  Icon: Icons.Ledger    },
-  { to: '/portfolio', label: 'Portfolio',    Icon: Icons.Portfolio  },
+  { to: '/catalog',   label: 'Catalog',   Icon: Icons.Catalog   },
+  { to: '/ledger',    label: 'Ledger',    Icon: Icons.Ledger    },
+  { to: '/portfolio', label: 'Portfolio', Icon: Icons.Portfolio  },
 ]
 
 export default function Navbar() {
@@ -111,6 +111,16 @@ export default function Navbar() {
             </NavLink>
           </li>
         ))}
+        {/* Settings tab — visible only on mobile via CSS */}
+        <li className={styles.mobileSettingsTab}>
+          <NavLink
+            to="/settings"
+            className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}
+          >
+            <span className={styles.icon}><Icons.Settings /></span>
+            <span className={styles.label}>Settings</span>
+          </NavLink>
+        </li>
       </ul>
 
       {user && !isPublic && (
