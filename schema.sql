@@ -229,6 +229,27 @@ CREATE TABLE market_price_history (
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- PERSONAL COLLECTION  (ownership layer — links users to card_catalog entries)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- One row per owned card+grade combination per user.
+-- Allows the same card to be tracked at multiple grades (e.g. Raw + PSA 10).
+-- card_catalog_id is the foreign key so all card metadata stays in card_catalog.
+CREATE TABLE collection (
+    id              BIGSERIAL    PRIMARY KEY,
+    user_id         TEXT         NOT NULL,
+    card_catalog_id BIGINT       NOT NULL REFERENCES card_catalog(id) ON DELETE CASCADE,
+    grade           TEXT         NOT NULL DEFAULT 'Raw',
+    quantity        INT          NOT NULL DEFAULT 1,
+    cost_basis      NUMERIC      DEFAULT NULL,
+    purchase_date   DATE         DEFAULT NULL,
+    notes           TEXT         NOT NULL DEFAULT '',
+    created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, card_catalog_id, grade)
+);
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- INDEXES
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE INDEX idx_cards_user_id              ON cards (user_id);
@@ -251,3 +272,5 @@ CREATE INDEX idx_card_catalog_rookie        ON card_catalog (sport, is_rookie) W
 CREATE INDEX idx_market_prices_catalog      ON market_prices (card_catalog_id);
 CREATE INDEX idx_market_price_history_card  ON market_price_history (card_catalog_id, scraped_at);
 CREATE INDEX idx_market_price_history_date  ON market_price_history (scraped_at);
+CREATE INDEX idx_collection_user            ON collection (user_id);
+CREATE INDEX idx_collection_catalog        ON collection (user_id, card_catalog_id);
