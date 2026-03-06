@@ -29,12 +29,12 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Scrape NHL rookies (priority refresh)
-        run: python -u scrape_master_db.py --sport NHL --rookies --workers 5 --limit ${{ github.event.inputs.limit || '500' }}
+      - name: Scrape NHL rookies (full weekly refresh)
+        run: python -u scrape_master_db.py --sport NHL --tier rookies --workers 5 --stale-days 7
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Scrape NHL graded prices (PSA/BGS)
-        run: python -u scrape_master_db.py --sport NHL --graded --workers 5 --limit ${{ github.event.inputs.limit || '500' }}
+        run: python -u scrape_master_db.py --sport NHL --graded --workers 5 --stale-days 30 --limit ${{ github.event.inputs.limit || '500' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Scrape NHL stats + player bios
@@ -58,8 +58,8 @@ jobs:
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NBA rookies + graded
         run: |
-          python -u scrape_master_db.py --sport NBA --rookies --workers 5 --limit 300
-          python -u scrape_master_db.py --sport NBA --graded --workers 5 --limit 300
+          python -u scrape_master_db.py --sport NBA --tier rookies --workers 5 --stale-days 7
+          python -u scrape_master_db.py --sport NBA --graded --workers 5 --stale-days 30 --limit 300
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -79,8 +79,8 @@ jobs:
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NFL rookies + graded
         run: |
-          python -u scrape_master_db.py --sport NFL --rookies --workers 5 --limit 300
-          python -u scrape_master_db.py --sport NFL --graded --workers 5 --limit 300
+          python -u scrape_master_db.py --sport NFL --tier rookies --workers 5 --stale-days 7
+          python -u scrape_master_db.py --sport NFL --graded --workers 5 --stale-days 30 --limit 300
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -100,7 +100,7 @@ jobs:
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape MLB rookies + graded
         run: |
-          python -u scrape_master_db.py --sport MLB --rookies --workers 5 --limit 300
-          python -u scrape_master_db.py --sport MLB --graded --workers 5 --limit 300
+          python -u scrape_master_db.py --sport MLB --tier rookies --workers 5 --stale-days 7
+          python -u scrape_master_db.py --sport MLB --graded --workers 5 --stale-days 30 --limit 300
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
