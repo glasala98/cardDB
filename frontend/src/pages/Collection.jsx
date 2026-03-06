@@ -2,8 +2,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { getCollection, updateCollectionItem, removeFromCollection } from '../api/collection'
 import { useCurrency } from '../context/CurrencyContext'
 import CurrencySelect from '../components/CurrencySelect'
+import PageTabs from '../components/PageTabs'
 import styles from './Collection.module.css'
 import pageStyles from './Page.module.css'
+
+const CATALOG_TABS = [
+  { to: '/catalog',    label: 'Browse'        },
+  { to: '/collection', label: 'My Collection' },
+]
 
 const SPORTS = ['NHL', 'NBA', 'NFL', 'MLB']
 
@@ -97,6 +103,7 @@ export default function Collection() {
 
   return (
     <div className={pageStyles.page}>
+      <PageTabs tabs={CATALOG_TABS} />
       {/* Header */}
       <div className={pageStyles.header}>
         <h1 className={pageStyles.title}>My Collection</h1>

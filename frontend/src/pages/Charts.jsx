@@ -3,8 +3,14 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieCha
 import { getCards } from '../api/cards'
 import { useCurrency } from '../context/CurrencyContext'
 import CurrencySelect from '../components/CurrencySelect'
+import PageTabs from '../components/PageTabs'
 import pageStyles from './Page.module.css'
 import styles from './Charts.module.css'
+
+const PORTFOLIO_TABS = [
+  { to: '/portfolio', label: 'Overview' },
+  { to: '/charts',    label: 'Charts'   },
+]
 
 const TREND_COLORS = { up: '#4caf82', stable: '#4f8ef7', down: '#e05c5c', 'no data': '#9aa0b4' }
 const GRADE_COLORS = ['#4f8ef7','#7c5cbf','#e0a43c','#4caf82','#e05c5c','#9aa0b4']
@@ -93,6 +99,7 @@ export default function Charts() {
 
   return (
     <div className={pageStyles.page}>
+      <PageTabs tabs={PORTFOLIO_TABS} />
       <div className={pageStyles.header}>
         <div>
           <h1 className={pageStyles.title}>Charts & Analytics</h1>

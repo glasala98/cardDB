@@ -13,8 +13,14 @@ import { triggerScrape } from '../api/stats'
 import { useCurrency } from '../context/CurrencyContext'
 import { usePublicMode } from '../context/PublicModeContext'
 import CurrencySelect from '../components/CurrencySelect'
+import PageTabs from '../components/PageTabs'
 import styles from './CardLedger.module.css'
 import pageStyles from './Page.module.css'
+
+const LEDGER_TABS = [
+  { to: '/ledger',  label: 'Active'  },
+  { to: '/archive', label: 'Archive' },
+]
 
 const TRENDS = ['up', 'stable', 'down', 'no data']
 
@@ -262,6 +268,7 @@ export default function CardLedger() {
 
   return (
     <div className={pageStyles.page}>
+      <PageTabs tabs={LEDGER_TABS} />
 
       {toast && <div className={`${styles.toast} ${styles[toast.type]}`}>{toast.msg}</div>}
 

@@ -4,8 +4,14 @@ import { getCatalog, getCatalogFilters } from '../api/catalog'
 import { getOwnedIds, addToCollection, getGrades } from '../api/collection'
 import { useCurrency } from '../context/CurrencyContext'
 import CurrencySelect from '../components/CurrencySelect'
+import PageTabs from '../components/PageTabs'
 import styles from './Catalog.module.css'
 import pageStyles from './Page.module.css'
+
+const CATALOG_TABS = [
+  { to: '/catalog',    label: 'Browse'        },
+  { to: '/collection', label: 'My Collection' },
+]
 
 const SPORTS = ['NHL', 'NBA', 'NFL', 'MLB']
 
@@ -204,6 +210,7 @@ setSortKey('year')
 
   return (
     <div className={pageStyles.page}>
+      <PageTabs tabs={CATALOG_TABS} />
       {/* Header */}
       <div className={pageStyles.header}>
         <h1 className={pageStyles.title}>Card Catalog</h1>

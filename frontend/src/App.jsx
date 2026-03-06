@@ -23,7 +23,8 @@ function AppShell() {
       <Navbar />
       <main className={styles.main}>
         <Routes>
-          <Route path="/" element={<Navigate to="/ledger" replace />} />
+          <Route path="/" element={<Navigate to="/catalog" replace />} />
+          <Route path="/settings" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
           <Route path="/ledger"          element={<ProtectedRoute><CardLedger /></ProtectedRoute>} />
           <Route path="/ledger/:cardName" element={<ProtectedRoute><CardInspect /></ProtectedRoute>} />
           <Route path="/portfolio"       element={<ProtectedRoute><Portfolio /></ProtectedRoute>} />

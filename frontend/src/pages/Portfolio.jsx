@@ -6,8 +6,14 @@ import TrendBadge from '../components/TrendBadge'
 import { getPortfolioHistory, getCards, getCardOfTheDay } from '../api/cards'
 import { useCurrency } from '../context/CurrencyContext'
 import CurrencySelect from '../components/CurrencySelect'
+import PageTabs from '../components/PageTabs'
 import pageStyles from './Page.module.css'
 import styles from './Portfolio.module.css'
+
+const PORTFOLIO_TABS = [
+  { to: '/portfolio', label: 'Overview' },
+  { to: '/charts',    label: 'Charts'   },
+]
 
 const TREND_COLORS = {
   up:       '#4caf82',
@@ -70,6 +76,7 @@ export default function Portfolio() {
 
   return (
     <div className={pageStyles.page}>
+      <PageTabs tabs={PORTFOLIO_TABS} />
       <div className={pageStyles.header}>
         <h1 className={pageStyles.title}>Portfolio</h1>
         <CurrencySelect />
