@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
 import CardTable from '../components/CardTable'
 import { getCatalog, getCatalogFilters } from '../api/catalog'
 import { useCurrency } from '../context/CurrencyContext'
@@ -74,6 +74,10 @@ export default function Catalog() {
   const [sets,  setSets]  = useState([])
 
   const searchTimer = useRef(null)
+  const [showTip, setShowTip] = useState(false)
+  useLayoutEffect(() => {
+    setShowTip(localStorage.getItem('catalog_tip_dismissed') !== '1')
+  }, [])
 
   // Reload years when sport changes; reset dependent filters
   useEffect(() => {
@@ -217,6 +221,24 @@ setSortKey('year')
           </button>
         )}
       </div>
+
+      {/* Tips */}
+      {showTip && (
+        <div className={styles.tipBar}>
+          <span className={styles.tipIcon}>💡</span>
+          <span className={styles.tipText}>
+            <strong>Navigating the catalog:</strong> Pick a sport tab, then narrow by Year and Set.
+            The Year and Set dropdowns update based on your sport selection.
+            Use the search box to find any player or set name across the entire catalog.
+            Click any column header to sort.
+          </span>
+          <button
+            className={styles.tipClose}
+            onClick={() => { localStorage.setItem('catalog_tip_dismissed', '1'); setShowTip(false) }}
+            title="Dismiss"
+          >✕</button>
+        </div>
+      )}
 
       {error && <div className={pageStyles.error}>{error}</div>}
 

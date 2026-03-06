@@ -110,6 +110,36 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Tips bar */
+.tipBar {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(0, 212, 170, 0.07);
+  border: 1px solid rgba(0, 212, 170, 0.2);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+.tipIcon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+.tipText { flex: 1; }
+.tipText strong { color: var(--text-primary); }
+.tipClose {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 2px;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-top: 2px;
+}
+.tipClose:hover { color: var(--text-primary); }
+
 /* Loading bar (while paginating with existing data visible) */
 .loadingBar {
   height: 2px;
