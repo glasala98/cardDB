@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { usePublicMode } from '../context/PublicModeContext'
-import { useCurrency } from '../context/CurrencyContext'
 import HelpModal from './HelpModal'
 import styles from './Navbar.module.css'
 
@@ -77,7 +76,6 @@ export default function Navbar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const isPublic = usePublicMode()
-  const { currency, toggle: toggleCurrency } = useCurrency()
   const [showHelp, setShowHelp] = useState(false)
 
   const handleLogout = async () => {
@@ -131,30 +129,21 @@ export default function Navbar() {
             <div className={styles.userAvatar}>{initials}</div>
             <span className={styles.userName}>{user.display_name || user.username}</span>
           </div>
-          <div className={styles.actionRow}>
-            <button
-              className={styles.currencyBtn}
-              onClick={toggleCurrency}
-              title={`Switch to ${currency === 'CAD' ? 'USD' : 'CAD'}`}
-            >
-              {currency}
-            </button>
-            {!isPublic && (
-              <>
-                <button className={styles.iconBtn} onClick={() => setShowHelp(true)} title="Help">
-                  <Icons.Help />
-                </button>
-                <ShareBtn />
-                <button className={styles.iconBtn} onClick={() => navigate('/settings')} title="Settings">
-                  <Icons.Settings />
-                </button>
-                <button className={styles.logoutBtn} onClick={handleLogout} title="Sign out">
-                  <Icons.Logout />
-                  Sign out
-                </button>
-              </>
-            )}
-          </div>
+          {!isPublic && (
+            <div className={styles.actionRow}>
+              <button className={styles.iconBtn} onClick={() => setShowHelp(true)} title="Help">
+                <Icons.Help />
+              </button>
+              <ShareBtn />
+              <button className={styles.iconBtn} onClick={() => navigate('/settings')} title="Settings">
+                <Icons.Settings />
+              </button>
+              <button className={styles.logoutBtn} onClick={handleLogout} title="Sign out">
+                <Icons.Logout />
+                Sign out
+              </button>
+            </div>
+          )}
         </div>
       )}
 

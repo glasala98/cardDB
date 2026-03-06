@@ -214,29 +214,6 @@
   color: var(--accent);
 }
 
-.currencyBtn {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  width: 36px;
-  height: 28px;
-  color: var(--text-secondary);
-  font-size: 10px;
-  font-weight: 700;
-  font-family: var(--font);
-  letter-spacing: 0.5px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-.currencyBtn:hover {
-  background: var(--accent-muted);
-  border-color: var(--accent-border);
-  color: var(--accent);
-}
 
 .logoutBtn {
   flex: 1;
