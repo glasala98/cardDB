@@ -399,4 +399,7 @@
 
   /* Show the settings tab on mobile */
   .mobileSettingsTab { display: flex; flex: 1; }
+
+  /* Sub-nav only belongs in the desktop sidebar — hide on mobile */
+  .subLinks { display: none; }
 }
