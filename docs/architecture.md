@@ -245,9 +245,11 @@ GET /api/master-db/grading-lookup?player=Bedard
 
 | Document | What it covers |
 |---|---|
+| [concepts.md](concepts.md) | Key vocabulary and mental models (card format, tiers, confidence, etc.) |
 | [backend.md](backend.md) | FastAPI routers — endpoints, inputs, outputs, auth |
 | [database.md](database.md) | PostgreSQL tables, schema, query patterns |
 | [frontend.md](frontend.md) | React pages, components, contexts, API layer |
 | [scrapers.md](scrapers.md) | eBay scraping engine, variant filter, bulk scraper |
+| [scrape_engine.md](scrape_engine.md) | Deep function-level reference for the scraping pipeline |
 | [workflows.md](workflows.md) | GitHub Actions schedules, triggers, env vars |
 | [dashboard_utils.md](dashboard_utils.md) | Shared Python utility layer |
