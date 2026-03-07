@@ -107,6 +107,19 @@
   white-space: nowrap;
 }
 
+.flagshipBadge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  background: rgba(255,179,50,0.12);
+  color: #ffb332;
+  border: 1px solid rgba(255,179,50,0.3);
+}
+
 .momentumBadge {
   font-size: 10px;
   font-weight: 700;

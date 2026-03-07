@@ -117,6 +117,11 @@ export default function Releases() {
                     {s.sport}
                   </span>
                   <div className={styles.headerRight}>
+                    {s.flagship_count > 0 && (
+                      <span className={styles.flagshipBadge} title={`${s.staple_count} staple cards`}>
+                        Flagship
+                      </span>
+                    )}
                     {s.momentum_pct != null && (
                       <span className={`${styles.momentumBadge} ${s.momentum_pct >= 0 ? styles.momentumUp : styles.momentumDown}`}>
                         {s.momentum_pct >= 0 ? '+' : ''}{s.momentum_pct}%

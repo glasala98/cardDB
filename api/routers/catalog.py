@@ -253,20 +253,23 @@ def new_releases(
                 cc.year,
                 cc.set_name,
                 cc.brand,
-                COUNT(*)                                              AS card_count,
-                COUNT(mp.id)                                          AS priced_count,
-                MAX(mp.fair_value)                                    AS top_value,
-                AVG(mp.fair_value)                                    AS avg_value,
-                AVG(mp.prev_value) FILTER (WHERE mp.prev_value > 0)  AS avg_prev_value,
-                CAST(SUBSTRING(cc.year FROM '^\\d+') AS INTEGER)     AS year_num,
-                COALESCE(SUM(mp.num_sales), 0)                        AS total_sales,
-                MAX(mp.scraped_at)                                    AS last_scraped
+                COUNT(*)                                                          AS card_count,
+                COUNT(mp.id)                                                      AS priced_count,
+                MAX(mp.fair_value)                                                AS top_value,
+                AVG(mp.fair_value)                                                AS avg_value,
+                AVG(mp.prev_value) FILTER (WHERE mp.prev_value > 0)              AS avg_prev_value,
+                CAST(SUBSTRING(cc.year FROM '^\\d+') AS INTEGER)                 AS year_num,
+                COALESCE(SUM(mp.num_sales), 0)                                    AS total_sales,
+                MAX(mp.scraped_at)                                                AS last_scraped,
+                COUNT(*) FILTER (WHERE cc.scrape_tier = 'staple')                AS staple_count,
+                COUNT(*) FILTER (WHERE cc.scrape_tier IN ('staple','premium'))   AS flagship_count
             FROM card_catalog cc
             LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
             {where_sql}
             GROUP BY cc.sport, cc.year, cc.set_name, cc.brand
             ORDER BY
                 year_num DESC,
+                COUNT(*) FILTER (WHERE cc.scrape_tier IN ('staple','premium')) DESC,
                 COALESCE(SUM(mp.num_sales), 0) DESC,
                 MAX(mp.fair_value) DESC NULLS LAST,
                 COUNT(mp.id) DESC
@@ -316,8 +319,10 @@ def new_releases(
                 "top_value":    float(s["top_value"]) if s["top_value"] is not None else None,
                 "avg_value":    avg_val,
                 "momentum_pct": momentum_pct,
-                "total_sales":  int(s["total_sales"]) if s["total_sales"] else 0,
-                "top_cards":    top_cards,
+                "total_sales":    int(s["total_sales"])    if s["total_sales"]    else 0,
+                "staple_count":   int(s["staple_count"])   if s["staple_count"]   else 0,
+                "flagship_count": int(s["flagship_count"]) if s["flagship_count"] else 0,
+                "top_cards":      top_cards,
             })
 
     return {"sets": result_sets}
