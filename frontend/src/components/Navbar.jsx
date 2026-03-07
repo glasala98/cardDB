@@ -67,9 +67,9 @@ const Icons = {
 }
 
 const NAV_ITEMS = [
-  { to: '/catalog',   label: 'Catalog',   Icon: Icons.Catalog   },
-  { to: '/ledger',    label: 'Ledger',    Icon: Icons.Ledger    },
-  { to: '/portfolio', label: 'Portfolio', Icon: Icons.Portfolio  },
+  { to: '/catalog',   label: 'Catalog',   Icon: Icons.Catalog,   public: true  },
+  { to: '/ledger',    label: 'Ledger',    Icon: Icons.Ledger,    public: false },
+  { to: '/portfolio', label: 'Portfolio', Icon: Icons.Portfolio,  public: false },
 ]
 
 export default function Navbar() {
@@ -100,7 +100,7 @@ export default function Navbar() {
       </div>
 
       <ul className={styles.links}>
-        {NAV_ITEMS.map(({ to, label, Icon }) => (
+        {NAV_ITEMS.filter(item => user || item.public).map(({ to, label, Icon }) => (
           <li key={to}>
             <NavLink
               to={to}
@@ -111,19 +111,21 @@ export default function Navbar() {
             </NavLink>
           </li>
         ))}
-        {/* Settings tab — visible only on mobile via CSS */}
-        <li className={styles.mobileSettingsTab}>
-          <NavLink
-            to="/settings"
-            className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}
-          >
-            <span className={styles.icon}><Icons.Settings /></span>
-            <span className={styles.label}>Settings</span>
-          </NavLink>
-        </li>
+        {/* Settings tab — visible only on mobile via CSS, only when logged in */}
+        {user && (
+          <li className={styles.mobileSettingsTab}>
+            <NavLink
+              to="/settings"
+              className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}
+            >
+              <span className={styles.icon}><Icons.Settings /></span>
+              <span className={styles.label}>Settings</span>
+            </NavLink>
+          </li>
+        )}
       </ul>
 
-      {user && (
+      {user ? (
         <div className={styles.userArea}>
           <div className={styles.userRow}>
             <div className={styles.userAvatar}>{initials}</div>
@@ -144,6 +146,11 @@ export default function Navbar() {
               </button>
             </div>
           )}
+        </div>
+      ) : (
+        <div className={styles.authArea}>
+          <button className={styles.signInBtn} onClick={() => navigate('/login')}>Sign in</button>
+          <button className={styles.signUpBtn} onClick={() => navigate('/signup')}>Create account</button>
         </div>
       )}
 

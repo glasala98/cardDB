@@ -6,6 +6,19 @@
 -- the same schema supports Young Guns, NBA Prizm, NFL Topps Chrome, etc.
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- USERS
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS users (
+    id            BIGSERIAL    PRIMARY KEY,
+    username      TEXT         NOT NULL UNIQUE,
+    display_name  TEXT         NOT NULL DEFAULT '',
+    password_hash TEXT         NOT NULL,
+    role          TEXT         NOT NULL DEFAULT 'user',  -- 'admin','user','guest'
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- USER CARD COLLECTION  (sport-agnostic — personal collection)
 -- ─────────────────────────────────────────────────────────────────────────────
 

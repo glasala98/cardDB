@@ -5,6 +5,7 @@ import { PublicModeProvider } from './context/PublicModeContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Navbar from './components/Navbar'
 import Login from './pages/Login'
+import Signup from './pages/Signup'
 import CardLedger from './pages/CardLedger'
 import CardInspect from './pages/CardInspect'
 import Portfolio from './pages/Portfolio'
@@ -26,7 +27,9 @@ function AppShell() {
       <main className={styles.main}>
         <Routes>
           <Route path="/" element={<Navigate to="/catalog" replace />} />
-          <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/catalog"         element={<Catalog />} />
+          <Route path="/collection"      element={<ProtectedRoute><Collection /></ProtectedRoute>} />
+          <Route path="/settings"        element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/ledger"          element={<ProtectedRoute><CardLedger /></ProtectedRoute>} />
           <Route path="/ledger/:cardName" element={<ProtectedRoute><CardInspect /></ProtectedRoute>} />
           <Route path="/portfolio"       element={<ProtectedRoute><Portfolio /></ProtectedRoute>} />
@@ -35,8 +38,6 @@ function AppShell() {
           <Route path="/archive"         element={<ProtectedRoute><Archive /></ProtectedRoute>} />
           <Route path="/charts"          element={<ProtectedRoute><Charts /></ProtectedRoute>} />
           <Route path="/admin"           element={<ProtectedRoute><Admin /></ProtectedRoute>} />
-          <Route path="/catalog"         element={<ProtectedRoute><Catalog /></ProtectedRoute>} />
-          <Route path="/collection"     element={<ProtectedRoute><Collection /></ProtectedRoute>} />
         </Routes>
       </main>
     </div>
@@ -51,8 +52,9 @@ export default function App() {
         <CurrencyProvider>
           <PublicModeProvider>
             <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/*"     element={<AppShell />} />
+              <Route path="/login"  element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/*"      element={<AppShell />} />
             </Routes>
           </PublicModeProvider>
         </CurrencyProvider>

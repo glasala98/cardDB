@@ -1,0 +1,20 @@
+name: Migrate Users to DB
+
+on:
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run migration
+        run: python migrate_users_to_db.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
