@@ -27,6 +27,12 @@ def main():
     """)
     print("market_prices.image_url column added (or already existed)")
 
+    cur.execute("""
+        ALTER TABLE market_prices
+        ADD COLUMN IF NOT EXISTS ignored BOOLEAN NOT NULL DEFAULT FALSE;
+    """)
+    print("market_prices.ignored column added (or already existed)")
+
     # Migrate existing graded data from rookie_price_history into market_prices.
     # In PostgreSQL UPDATE...FROM, the target table must NOT be aliased —
     # reference it directly; JOIN condition uses market_prices.card_catalog_id.

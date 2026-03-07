@@ -1,3 +1,4 @@
+/* ── Toast ─────────────────────────────────────────────── */
 .toast {
   position: fixed; bottom: 24px; right: 24px; padding: 12px 20px;
   border-radius: 10px; font-size: 13px; font-weight: 500; z-index: 300;
@@ -6,16 +7,51 @@
 .toast.success { background: rgba(76,175,130,0.15); border: 1px solid rgba(76,175,130,0.4); color: var(--success); }
 .toast.error   { background: rgba(224,92,92,0.15);  border: 1px solid rgba(224,92,92,0.4);  color: var(--danger); }
 
+/* ── Tab bar ───────────────────────────────────────────── */
+.tabRow {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+
+.tabBtn {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font);
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tabBtn:hover { color: var(--text-primary); }
+.tabBtnActive {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ── Table ─────────────────────────────────────────────── */
 .tableWrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 24px; }
 .table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .th {
   background: var(--bg-card); color: var(--text-secondary); font-weight: 600;
   padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border);
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap;
 }
-.td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-primary); }
+.thRight { text-align: right; }
+.td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text-primary); vertical-align: middle; }
 .tr:last-child .td { border-bottom: none; }
+.tr { transition: background 0.1s; }
 .tr:hover .td { background: var(--bg-secondary); }
+.trIgnored .td { opacity: 0.45; }
+.trIgnored:hover .td { opacity: 0.6; }
 
+/* ── User badges / controls ────────────────────────────── */
 .youBadge {
   font-size: 10px; font-weight: 600; color: var(--accent);
   background: rgba(29,191,191,0.12); padding: 2px 6px; border-radius: 10px; margin-left: 6px;
@@ -25,6 +61,13 @@
   background: rgba(154,160,180,0.12); color: var(--text-secondary);
 }
 .admin { background: rgba(29,191,191,0.12); color: var(--accent); }
+
+.roleSelect {
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 8px; font-size: 12px; font-family: var(--font);
+  color: var(--text-primary); cursor: pointer; outline: none;
+}
+.roleSelect:focus { border-color: var(--accent); }
 
 .actions { display: flex; gap: 8px; align-items: center; }
 .pwBtn {
@@ -36,29 +79,178 @@
   border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer;
 }
 
+/* ── Password change box ───────────────────────────────── */
 .pwBox {
   background: var(--bg-card); border: 1px solid var(--border);
   border-radius: 10px; padding: 16px; margin-bottom: 20px; font-size: 13px;
 }
 .pwRow { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
 
+/* ── Add user section ──────────────────────────────────── */
 .addSection { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
 .addTitle { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 14px; }
 .addForm { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
 
+/* ── Shared input ──────────────────────────────────────── */
 .input {
   background: var(--bg-primary); border: 1px solid var(--border);
   border-radius: 8px; padding: 8px 12px; color: var(--text-primary); font-size: 13px;
-  min-width: 140px; flex: 1;
+  min-width: 140px; flex: 1; font-family: var(--font);
 }
 .input:focus { outline: 1px solid var(--accent); }
 
 .saveBtn, .addBtn {
   background: var(--accent); border: none; border-radius: 8px;
-  padding: 8px 18px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  padding: 8px 18px; color: #000; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  font-family: var(--font);
 }
 .saveBtn:disabled, .addBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 .cancelBtn {
   background: transparent; border: 1px solid var(--border); border-radius: 8px;
-  padding: 8px 14px; color: var(--text-secondary); font-size: 13px; cursor: pointer;
+  padding: 8px 14px; color: var(--text-secondary); font-size: 13px; cursor: pointer; font-family: var(--font);
 }
+
+/* ── Pipeline tab ──────────────────────────────────────── */
+.pipelineWrap { display: flex; flex-direction: column; gap: 0; }
+
+.statCards {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.statCard {
+  flex: 1;
+  min-width: 120px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.statAccent { border-color: rgba(0,212,170,0.4); background: rgba(0,212,170,0.05); }
+.statWarn   { border-color: rgba(255,179,50,0.4); background: rgba(255,179,50,0.05); }
+
+.statVal {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.statAccent .statVal { color: var(--accent); }
+.statWarn .statVal   { color: #ffb332; }
+
+.statLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+  margin-top: 4px;
+}
+
+/* ── Tier coverage bar ─────────────────────────────────── */
+.barWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.barFill {
+  height: 6px;
+  background: var(--accent);
+  border-radius: 3px;
+  min-width: 2px;
+  max-width: 120px;
+  transition: width 0.3s;
+}
+.barLabel { font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+/* ── Tier badges ───────────────────────────────────────── */
+.tierBadge {
+  font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px;
+  text-transform: uppercase; letter-spacing: 0.4px;
+}
+.tier_staple  { background: rgba(0,212,170,0.12); color: var(--accent); border: 1px solid rgba(0,212,170,0.25); }
+.tier_premium { background: rgba(255,179,50,0.12); color: #ffb332; border: 1px solid rgba(255,179,50,0.25); }
+.tier_stars   { background: rgba(160,120,255,0.12); color: #a07ff0; border: 1px solid rgba(160,120,255,0.25); }
+.tier_base    { background: var(--bg-secondary); color: var(--text-muted); border: 1px solid var(--border); }
+
+/* ── Sport last scraped ────────────────────────────────── */
+.sportGrid { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px; }
+.sportCard {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 16px; display: flex; flex-direction: column; gap: 3px; min-width: 130px;
+}
+.sportLabel { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+.sportTs    { font-size: 11px; color: var(--text-muted); }
+
+/* ── Workflow status cards ─────────────────────────────── */
+.workflowGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-bottom: 24px; }
+.wfCard {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px 14px; text-decoration: none;
+  transition: border-color 0.15s;
+}
+.wfCard:hover { border-color: var(--accent); }
+.wfHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.wfName { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.wfTs   { font-size: 11px; color: var(--text-muted); }
+.wfStatus {
+  font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px;
+  text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap;
+}
+.wf_success   { background: rgba(0,201,122,0.12); color: #00c97a; }
+.wf_failure   { background: rgba(240,80,80,0.12);  color: var(--danger); }
+.wf_in_progress { background: rgba(255,179,50,0.12); color: #ffb332; }
+.wf_no_runs   { background: var(--bg-secondary); color: var(--text-muted); }
+.wf_error     { background: rgba(240,80,80,0.12); color: var(--danger); }
+
+/* ── Outliers tab ──────────────────────────────────────── */
+.helpText {
+  font-size: 13px; color: var(--text-muted); margin-bottom: 16px;
+  padding: 12px 16px; background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 8px; line-height: 1.5;
+}
+
+.ratioBadge {
+  font-size: 12px; font-weight: 700;
+  background: rgba(240,80,80,0.12); color: var(--danger);
+  padding: 2px 7px; border-radius: 4px;
+}
+
+.ignoreBtn {
+  background: rgba(240,80,80,0.1); color: var(--danger);
+  border: 1px solid rgba(240,80,80,0.3); border-radius: 6px;
+  padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.restoreBtn {
+  background: rgba(0,212,170,0.1); color: var(--accent);
+  border: 1px solid rgba(0,212,170,0.3); border-radius: 6px;
+  padding: 4px 10px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+
+.danger { color: var(--danger); }
+.muted  { color: var(--text-muted); }
+
+/* ── Sport tags ────────────────────────────────────────── */
+.sportTag {
+  font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px;
+  letter-spacing: 0.5px; text-transform: uppercase;
+}
+.sport_NHL { background: rgba(74,158,255,0.12); color: #4a9eff; }
+.sport_NBA { background: rgba(255,107,53,0.12);  color: #ff6b35; }
+.sport_NFL { background: rgba(61,186,94,0.12);   color: #3dba5e; }
+.sport_MLB { background: rgba(224,85,85,0.12);   color: #e05555; }

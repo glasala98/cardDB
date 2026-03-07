@@ -222,6 +222,7 @@ CREATE TABLE market_prices (
     confidence      TEXT         NOT NULL DEFAULT '',
     num_sales       INT          NOT NULL DEFAULT 0,
     image_url       TEXT         NOT NULL DEFAULT '',
+    ignored         BOOLEAN      NOT NULL DEFAULT FALSE,  -- admin-flagged: exclude from browse/pricing
     scraped_at      TIMESTAMPTZ,
     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     UNIQUE (card_catalog_id)

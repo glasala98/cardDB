@@ -85,6 +85,9 @@ def browse_catalog(
     elif has_price is False:
         where_parts.append("mp.id IS NULL")
 
+    # Always exclude admin-ignored price entries from public browse
+    where_parts.append("(mp.ignored IS NULL OR mp.ignored = FALSE)")
+
     where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
 
     base_query = f"""

@@ -42,13 +42,13 @@ Before executing any task in the "Implementation Roadmap," you MUST perform a "P
 - [ ] **[AI] Outlier Quarantine:** Flag/quarantine prices deviating >50% from baseline.
 
 ## Admin & Health Dashboard (The Command Center)
-- [ ] **[Gate] Pre-Flight:** Verify Admin session tokens and Railway private networking paths.
-- [ ] **Delta Ingestion Monitor:** Visual tracking of ETL delta volume, success/fail rates, and watermark timestamps.
+- [x] **Pipeline Health UI:** Catalog coverage by tier, last scrape per sport, GitHub Actions workflow status cards.
+- [x] **Quarantine Manager:** Outlier detection (>5× player median), ignore/restore toggle, hidden from public catalog.
+- [x] **Role Management:** Admin can change any user's role (user/admin/guest) inline in user table.
+- [x] **Manual Delete/Ignore:** `market_prices.ignored` column, `PATCH /admin/market-prices/{id}/ignore` endpoint.
+- [ ] **Delta Ingestion Monitor:** Visual tracking of ETL delta volume per scrape run (needs scrape_runs table).
 - [ ] **AI Matcher Debugger:** Interface to inspect failed entity resolution attempts and manually map IDs.
-- [ ] **Quarantine Manager:** UI to bulk-approve, adjust, or delete records flagged by the Outlier Agent.
-- [ ] **ETL Snapshot Audit:** View last 5 snapshot versions to verify Type 2 integrity and data rollbacks.
-- [ ] **Pipeline Health UI:** Indicator dashboard for modular engine status and active scraper errors.
-- [ ] **PySpark Monitor:** View for PySpark job executions and SDLC Type 2 ETL status.
+- [ ] **ETL Snapshot Audit:** View last 5 price snapshots per card for Type 2 integrity review.
 
 ## UI/UX Design (Card Catalog Page)
 - [ ] **Layout Alignment:** Match Card Catalog format strictly to the Card Ledger layout.
