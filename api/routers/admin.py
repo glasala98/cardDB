@@ -270,3 +270,28 @@ def pipeline_health(_admin: str = Depends(_require_admin)):
         "tiers":         tiers,
         "last_scraped":  last_scraped,
     }
+
+
+@router.get("/scrape-runs")
+def get_scrape_runs(limit: int = 50, _admin: str = Depends(_require_admin)):
+    """Return recent scrape run history from the scrape_runs table."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, workflow, sport, tier, mode,
+                       started_at, finished_at,
+                       cards_total, cards_found, cards_delta, errors, status
+                FROM scrape_runs
+                ORDER BY started_at DESC
+                LIMIT %s
+            """, [limit])
+            cols = [d[0] for d in cur.description]
+            rows = cur.fetchall()
+
+    runs = []
+    for row in rows:
+        r = dict(zip(cols, row))
+        r["started_at"]  = r["started_at"].isoformat()  if r["started_at"]  else None
+        r["finished_at"] = r["finished_at"].isoformat() if r["finished_at"] else None
+        runs.append(r)
+    return {"runs": runs}

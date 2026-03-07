@@ -33,6 +33,24 @@ def main():
     """)
     print("market_prices.ignored column added (or already existed)")
 
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS scrape_runs (
+            id          BIGSERIAL    PRIMARY KEY,
+            workflow    TEXT         NOT NULL,
+            sport       TEXT,
+            tier        TEXT,
+            mode        TEXT         NOT NULL DEFAULT 'raw',
+            started_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+            finished_at TIMESTAMPTZ,
+            cards_total INT          NOT NULL DEFAULT 0,
+            cards_found INT          NOT NULL DEFAULT 0,
+            cards_delta INT          NOT NULL DEFAULT 0,
+            errors      INT          NOT NULL DEFAULT 0,
+            status      TEXT         NOT NULL DEFAULT 'running'
+        );
+    """)
+    print("scrape_runs table created (or already existed)")
+
     # Migrate existing graded data from rookie_price_history into market_prices.
     # In PostgreSQL UPDATE...FROM, the target table must NOT be aliased —
     # reference it directly; JOIN condition uses market_prices.card_catalog_id.

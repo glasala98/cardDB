@@ -325,6 +325,50 @@ def save_prices_batch(results: list):
         conn.commit()
 
 
+# ── Scrape run tracking ───────────────────────────────────────────────────────
+
+def create_scrape_run(workflow: str, sport: str | None, tier: str | None,
+                      mode: str, total: int) -> int | None:
+    """Insert a scrape_runs row and return its ID. Returns None on failure."""
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """INSERT INTO scrape_runs
+                       (workflow, sport, tier, mode, cards_total, status)
+                       VALUES (%s, %s, %s, %s, %s, 'running') RETURNING id""",
+                    (workflow, sport, tier, mode, total)
+                )
+                run_id = cur.fetchone()[0]
+            conn.commit()
+        return run_id
+    except Exception as e:
+        print(f"  WARNING: Could not create scrape_run row: {e}")
+        return None
+
+
+def finish_scrape_run(run_id: int | None, progress: dict, status: str = 'completed') -> None:
+    """Update a scrape_runs row with final stats. No-op if run_id is None."""
+    if run_id is None:
+        return
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """UPDATE scrape_runs
+                       SET finished_at = NOW(),
+                           cards_found = %s,
+                           cards_delta = %s,
+                           errors      = %s,
+                           status      = %s
+                       WHERE id = %s""",
+                    (progress['found'], progress['deltas'], progress['errors'], status, run_id)
+                )
+            conn.commit()
+    except Exception as e:
+        print(f"  WARNING: Could not update scrape_run row: {e}")
+
+
 # ── Scrape workers ────────────────────────────────────────────────────────────
 
 def scrape_one(card: dict) -> tuple:
@@ -467,6 +511,14 @@ def main():
     print(f"  Est. time:  ~{total * 5 / args.workers / 60:.0f} min")
     print(f"{'='*60}\n")
 
+    # Record this run in scrape_runs for the delta ingestion monitor
+    import os as _os
+    _workflow = _os.environ.get('GITHUB_WORKFLOW', 'manual')
+    _mode     = 'graded' if args.graded else 'raw'
+    _tier     = getattr(args, 'catalog_tier', None)
+    _sport    = getattr(args, 'sport', None)
+    run_id = create_scrape_run(_workflow, _sport, _tier, _mode, total)
+
     start = time.time()
     batch: list = []
     BATCH_SIZE = 50
@@ -570,6 +622,7 @@ def main():
 
     _flush_batch()
     elapsed = time.time() - start
+    finish_scrape_run(run_id, _progress)
 
     print(f"\n{'='*60}")
     print(f"DONE in {elapsed/60:.1f} minutes")

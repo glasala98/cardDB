@@ -250,11 +250,12 @@ def new_releases(
                 cc.year,
                 cc.set_name,
                 cc.brand,
-                COUNT(*)                        AS card_count,
-                COUNT(mp.id)                    AS priced_count,
-                MAX(mp.fair_value)              AS top_value,
-                AVG(mp.fair_value)              AS avg_value,
-                MAX(cc.created_at)              AS indexed_at
+                COUNT(*)                                          AS card_count,
+                COUNT(mp.id)                                      AS priced_count,
+                MAX(mp.fair_value)                                AS top_value,
+                AVG(mp.fair_value)                                AS avg_value,
+                AVG(mp.prev_value) FILTER (WHERE mp.prev_value > 0) AS avg_prev_value,
+                MAX(cc.created_at)                                AS indexed_at
             FROM card_catalog cc
             LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
             {where_sql}
@@ -289,6 +290,13 @@ def new_releases(
                 for r in cur.fetchall()
             ]
 
+            avg_val  = float(s["avg_value"])      if s["avg_value"]      is not None else None
+            avg_prev = float(s["avg_prev_value"]) if s["avg_prev_value"] is not None else None
+            if avg_val is not None and avg_prev and avg_prev > 0:
+                momentum_pct = round((avg_val - avg_prev) / avg_prev * 100, 1)
+            else:
+                momentum_pct = None
+
             result_sets.append({
                 "sport":        s["sport"],
                 "year":         s["year"],
@@ -297,7 +305,8 @@ def new_releases(
                 "card_count":   s["card_count"],
                 "priced_count": s["priced_count"],
                 "top_value":    float(s["top_value"]) if s["top_value"] is not None else None,
-                "avg_value":    float(s["avg_value"]) if s["avg_value"] is not None else None,
+                "avg_value":    avg_val,
+                "momentum_pct": momentum_pct,
                 "indexed_at":   s["indexed_at"].isoformat() if s["indexed_at"] else None,
                 "top_cards":    top_cards,
             })

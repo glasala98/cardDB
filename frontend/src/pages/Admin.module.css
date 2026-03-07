@@ -254,3 +254,29 @@
 .sport_NBA { background: rgba(255,107,53,0.12);  color: #ff6b35; }
 .sport_NFL { background: rgba(61,186,94,0.12);   color: #3dba5e; }
 .sport_MLB { background: rgba(224,85,85,0.12);   color: #e05555; }
+
+/* ── Scrape runs table ─────────────────────────────────── */
+.runWorkflow {
+  font-size: 11px; font-weight: 600; color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.modeBadge {
+  font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px;
+  text-transform: uppercase; letter-spacing: 0.3px;
+  background: var(--bg-secondary); color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+.modeGraded {
+  background: rgba(160,120,255,0.12); color: #a07ff0;
+  border-color: rgba(160,120,255,0.25);
+}
+
+.running {
+  font-size: 11px; font-weight: 600; color: #ffb332;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}

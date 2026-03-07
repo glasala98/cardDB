@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   getUsers, createUser, deleteUser, changePassword, changeRole,
-  getPipelineHealth, getWorkflowStatus, getOutliers, toggleIgnore,
+  getPipelineHealth, getWorkflowStatus, getOutliers, toggleIgnore, getScrapeRuns,
 } from '../api/admin'
 import { useAuth } from '../context/AuthContext'
 import pageStyles from './Page.module.css'
@@ -202,13 +202,18 @@ function UsersTab() {
 function PipelineTab() {
   const [health,    setHealth]    = useState(null)
   const [workflows, setWorkflows] = useState([])
+  const [runs,      setRuns]      = useState([])
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState(null)
 
   useEffect(() => {
     setLoading(true)
-    Promise.all([getPipelineHealth(), getWorkflowStatus()])
-      .then(([h, w]) => { setHealth(h); setWorkflows(w.workflows || []) })
+    Promise.all([getPipelineHealth(), getWorkflowStatus(), getScrapeRuns(30)])
+      .then(([h, w, r]) => {
+        setHealth(h)
+        setWorkflows(w.workflows || [])
+        setRuns(r.runs || [])
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
@@ -287,6 +292,57 @@ function PipelineTab() {
           </a>
         ))}
       </div>
+
+      <h3 className={styles.sectionTitle}>Recent Scrape Runs</h3>
+      {runs.length === 0 ? (
+        <p className={pageStyles.status}>No scrape runs recorded yet. Runs appear after the next scraper execution.</p>
+      ) : (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th className={styles.th}>Workflow</th>
+                <th className={styles.th}>Sport</th>
+                <th className={styles.th}>Tier</th>
+                <th className={styles.th}>Mode</th>
+                <th className={styles.th}>Started</th>
+                <th className={styles.th}>Duration</th>
+                <th className={`${styles.th} ${styles.thRight}`}>Total</th>
+                <th className={`${styles.th} ${styles.thRight}`}>Found</th>
+                <th className={`${styles.th} ${styles.thRight}`}>Deltas</th>
+                <th className={`${styles.th} ${styles.thRight}`}>Errors</th>
+                <th className={styles.th}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {runs.map(r => {
+                const duration = r.finished_at && r.started_at
+                  ? Math.round((new Date(r.finished_at) - new Date(r.started_at)) / 60000)
+                  : null
+                return (
+                  <tr key={r.id} className={styles.tr}>
+                    <td className={styles.td}><span className={styles.runWorkflow}>{r.workflow}</span></td>
+                    <td className={styles.td}>{r.sport || <span className={styles.muted}>all</span>}</td>
+                    <td className={styles.td}>{r.tier ? <span className={`${styles.tierBadge} ${styles['tier_' + r.tier]}`}>{r.tier}</span> : <span className={styles.muted}>—</span>}</td>
+                    <td className={styles.td}><span className={`${styles.modeBadge} ${r.mode === 'graded' ? styles.modeGraded : ''}`}>{r.mode}</span></td>
+                    <td className={styles.td}>{r.started_at ? new Date(r.started_at).toLocaleString() : '—'}</td>
+                    <td className={styles.td}>{duration != null ? `${duration}m` : r.status === 'running' ? <span className={styles.running}>running…</span> : '—'}</td>
+                    <td className={`${styles.td} ${styles.thRight}`}>{r.cards_total.toLocaleString()}</td>
+                    <td className={`${styles.td} ${styles.thRight}`}>{r.cards_found.toLocaleString()}</td>
+                    <td className={`${styles.td} ${styles.thRight}`}>{r.cards_delta.toLocaleString()}</td>
+                    <td className={`${styles.td} ${styles.thRight}`}>
+                      {r.errors > 0 ? <span className={styles.danger}>{r.errors}</span> : r.errors}
+                    </td>
+                    <td className={styles.td}>
+                      <span className={`${styles.wfStatus} ${styles['wf_' + r.status]}`}>{r.status}</span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

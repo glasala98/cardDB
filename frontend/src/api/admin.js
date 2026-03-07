@@ -10,3 +10,4 @@ export const toggleIgnore    = (priceId)             => client.patch(`/admin/mar
 export const getOutliers     = (limit = 50)          => client.get('/admin/outliers', { params: { limit } })
 export const getPipelineHealth = ()                  => client.get('/admin/pipeline-health')
 export const getWorkflowStatus = ()                  => client.get('/stats/workflow-status')
+export const getScrapeRuns     = (limit = 50)        => client.get('/admin/scrape-runs', { params: { limit } })

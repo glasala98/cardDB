@@ -228,6 +228,22 @@ CREATE TABLE market_prices (
     UNIQUE (card_catalog_id)
 );
 
+-- Scrape run audit log — one row per scraper invocation.
+CREATE TABLE scrape_runs (
+    id          BIGSERIAL    PRIMARY KEY,
+    workflow    TEXT         NOT NULL,           -- GH Actions workflow name or 'manual'
+    sport       TEXT,                            -- NHL/NBA/NFL/MLB or NULL for all
+    tier        TEXT,                            -- staple/premium/stars/base or NULL
+    mode        TEXT         NOT NULL DEFAULT 'raw',  -- raw/graded
+    started_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    finished_at TIMESTAMPTZ,
+    cards_total INT          NOT NULL DEFAULT 0,
+    cards_found INT          NOT NULL DEFAULT 0,
+    cards_delta INT          NOT NULL DEFAULT 0,
+    errors      INT          NOT NULL DEFAULT 0,
+    status      TEXT         NOT NULL DEFAULT 'running'  -- running/completed/failed
+);
+
 -- Append-only price history — one row per card per day scraped.
 -- This is the core historic dataset: never update, only INSERT.
 CREATE TABLE market_price_history (

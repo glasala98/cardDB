@@ -124,7 +124,14 @@ export default function Releases() {
                   >
                     {s.sport}
                   </span>
-                  <span className={styles.indexedAt}>{daysAgo(s.indexed_at)}</span>
+                  <div className={styles.headerRight}>
+                    {s.momentum_pct != null && (
+                      <span className={`${styles.momentumBadge} ${s.momentum_pct >= 0 ? styles.momentumUp : styles.momentumDown}`}>
+                        {s.momentum_pct >= 0 ? '+' : ''}{s.momentum_pct}%
+                      </span>
+                    )}
+                    <span className={styles.indexedAt}>{daysAgo(s.indexed_at)}</span>
+                  </div>
                 </div>
 
                 {/* Set name + year */}
