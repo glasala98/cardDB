@@ -6,10 +6,10 @@ import styles from './Releases.module.css'
 import pageStyles from './Page.module.css'
 
 const SPORTS = ['NHL', 'NBA', 'NFL', 'MLB']
-const DAY_OPTIONS = [
-  { label: 'Last 30 days', value: 30 },
-  { label: 'Last 60 days', value: 60 },
-  { label: 'Last 90 days', value: 90 },
+const SEASON_OPTIONS = [
+  { label: 'Current Season', value: 1 },
+  { label: 'Last 2 Seasons', value: 2 },
+  { label: 'Last 3 Seasons', value: 3 },
 ]
 
 const SPORT_COLORS = {
@@ -19,14 +19,6 @@ const SPORT_COLORS = {
   MLB: { bg: 'rgba(224,85,85,0.12)',   color: '#e05555', border: 'rgba(224,85,85,0.3)' },
 }
 
-function daysAgo(isoStr) {
-  if (!isoStr) return null
-  const diff = Date.now() - new Date(isoStr).getTime()
-  const d = Math.floor(diff / 86400000)
-  if (d === 0) return 'Today'
-  if (d === 1) return '1 day ago'
-  return `${d} days ago`
-}
 
 export default function Releases() {
   const { fmtPrice } = useCurrency()
@@ -36,18 +28,18 @@ export default function Releases() {
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState(null)
   const [sport,   setSport]   = useState('')
-  const [days,    setDays]    = useState(60)
+  const [seasons, setSeasons] = useState(2)
 
   useEffect(() => {
     setLoading(true)
     setError(null)
-    const params = { days }
+    const params = { seasons }
     if (sport) params.sport = sport
     getNewReleases(params)
       .then(data => setSets(data.sets || []))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [sport, days])
+  }, [sport, seasons])
 
   const goToCatalog = (s, e) => {
     e.stopPropagation()
@@ -74,13 +66,13 @@ export default function Releases() {
         ))}
       </div>
 
-      {/* Days filter */}
+      {/* Season filter */}
       <div className={styles.toolbar}>
-        {DAY_OPTIONS.map(opt => (
+        {SEASON_OPTIONS.map(opt => (
           <button
             key={opt.value}
-            className={`${styles.dayBtn} ${days === opt.value ? styles.dayBtnActive : ''}`}
-            onClick={() => setDays(opt.value)}
+            className={`${styles.dayBtn} ${seasons === opt.value ? styles.dayBtnActive : ''}`}
+            onClick={() => setSeasons(opt.value)}
           >
             {opt.label}
           </button>
@@ -105,7 +97,7 @@ export default function Releases() {
           ))}
         </div>
       ) : sets.length === 0 ? (
-        <div className={pageStyles.status}>No new sets found in the last {days} days.</div>
+        <div className={pageStyles.status}>No sets found for the selected season range.</div>
       ) : (
         <div className={styles.grid}>
           {sets.map((s, i) => {
@@ -130,7 +122,6 @@ export default function Releases() {
                         {s.momentum_pct >= 0 ? '+' : ''}{s.momentum_pct}%
                       </span>
                     )}
-                    <span className={styles.indexedAt}>{daysAgo(s.indexed_at)}</span>
                   </div>
                 </div>
 

@@ -212,26 +212,29 @@ def catalog_card_history(catalog_id: int):
 @router.get("/releases")
 def new_releases(
     sport:   Optional[str] = Query(None),
-    days:    int           = Query(60, ge=1, le=365),
-    limit:   int           = Query(30, ge=1, le=100),
+    seasons: int           = Query(2, ge=1, le=5),
+    limit:   int           = Query(60, ge=1, le=200),
 ):
-    """Return recently indexed sets grouped by (sport, year, set_name).
+    """Return recent sets grouped by (sport, year, set_name), filtered by card release year.
 
-    Ordered by the date the set first appeared in the catalog (MAX created_at DESC).
-    Joins market_prices to surface top_value (highest priced card) and avg_value.
+    Uses the card's year field (e.g. '2024-25', '2024') to determine recency —
+    NOT the catalog import date — so that sets appear based on when they were
+    actually released, not when we scraped them.
 
     Args:
-        sport: Filter to one sport.
-        days:  Look-back window in days (default 60).
-        limit: Max number of sets to return.
+        sport:   Filter to one sport.
+        seasons: How many seasons back to include (1 = current only, 2 = last 2, etc.)
+        limit:   Max number of sets to return.
 
     Returns:
         Dict with key 'sets', each entry containing sport/year/set_name/brand,
         card_count, priced_count, top_value, avg_value, indexed_at (ISO string),
         and top_cards (list of up to 5 cards with name + fair_value + is_rookie).
     """
-    where_parts = ["cc.created_at >= NOW() - INTERVAL '%s days'"]
-    params: list = [days]
+    where_parts = [
+        "CAST(SUBSTRING(cc.year FROM '^\\d+') AS INTEGER) >= EXTRACT(YEAR FROM NOW())::INTEGER - %s"
+    ]
+    params: list = [seasons]
 
     if sport:
         where_parts.append("cc.sport = %s")
@@ -255,12 +258,12 @@ def new_releases(
                 MAX(mp.fair_value)                                AS top_value,
                 AVG(mp.fair_value)                                AS avg_value,
                 AVG(mp.prev_value) FILTER (WHERE mp.prev_value > 0) AS avg_prev_value,
-                MAX(cc.created_at)                                AS indexed_at
+                CAST(SUBSTRING(cc.year FROM '^\\d+') AS INTEGER) AS year_num
             FROM card_catalog cc
             LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
             {where_sql}
             GROUP BY cc.sport, cc.year, cc.set_name, cc.brand
-            ORDER BY indexed_at DESC
+            ORDER BY year_num DESC, cc.set_name ASC
             LIMIT %s
         """, params + [limit])
 
@@ -307,7 +310,6 @@ def new_releases(
                 "top_value":    float(s["top_value"]) if s["top_value"] is not None else None,
                 "avg_value":    avg_val,
                 "momentum_pct": momentum_pct,
-                "indexed_at":   s["indexed_at"].isoformat() if s["indexed_at"] else None,
                 "top_cards":    top_cards,
             })
 
