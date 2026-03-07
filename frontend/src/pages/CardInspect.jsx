@@ -32,6 +32,8 @@ export default function CardInspect() {
   const [imageUrlBack, setImageUrlBack] = useState(null)
   const [flipped,      setFlipped]      = useState(false)
   const [fetchingImg,  setFetchingImg]  = useState(false)
+  const [lightbox,     setLightbox]     = useState(false)   // true = open
+  const [lbFlipped,    setLbFlipped]    = useState(false)   // lightbox face
 
   const load = () => {
     setLoading(true)
@@ -151,26 +153,15 @@ export default function CardInspect() {
         <div className={styles.cardImageWrap}>
           {imageUrl ? (
             <div
-              className={`${styles.cardFlipper} ${flipped ? styles.flipped : ''} ${imageUrlBack ? styles.cardFlippable : ''}`}
-              onClick={() => imageUrlBack && setFlipped(f => !f)}
-              title={imageUrlBack ? (flipped ? 'Click to see front' : 'Click to see back') : undefined}
+              className={`${styles.cardFlipper} ${flipped ? styles.flipped : ''} ${styles.cardFlippable}`}
+              onClick={() => { setLbFlipped(false); setLightbox(true) }}
+              title="Click to enlarge"
             >
               <div className={styles.cardFront}>
                 <img src={imageUrl} alt={name}
                   onError={e => { e.currentTarget.style.display = 'none' }} />
-                {imageUrlBack && !flipped && (
-                  <span className={styles.flipHint}>flip ↻</span>
-                )}
+                <span className={styles.flipHint}>🔍 enlarge</span>
               </div>
-              {imageUrlBack && (
-                <div className={styles.cardBackFace}>
-                  <img src={imageUrlBack} alt={`${name} back`}
-                    onError={e => { e.currentTarget.style.display = 'none' }} />
-                  {flipped && (
-                    <span className={styles.flipHint}>flip ↺</span>
-                  )}
-                </div>
-              )}
             </div>
           ) : (
             <div className={styles.cardImagePlaceholder}>
@@ -178,6 +169,31 @@ export default function CardInspect() {
             </div>
           )}
         </div>
+
+        {/* Lightbox */}
+        {lightbox && imageUrl && (
+          <div className={styles.lbOverlay} onClick={() => setLightbox(false)}>
+            <div className={styles.lbCard} onClick={e => e.stopPropagation()}>
+              <div
+                className={`${styles.lbFlipper} ${lbFlipped ? styles.lbFlipped : ''} ${imageUrlBack ? styles.lbFlippable : ''}`}
+                onClick={() => imageUrlBack && setLbFlipped(f => !f)}
+                title={imageUrlBack ? (lbFlipped ? 'Click to see front' : 'Click to see back') : undefined}
+              >
+                <div className={styles.lbFront}>
+                  <img src={imageUrl} alt={name} onError={e => { e.currentTarget.style.display = 'none' }} />
+                  {imageUrlBack && !lbFlipped && <span className={styles.lbHint}>flip ↻</span>}
+                </div>
+                {imageUrlBack && (
+                  <div className={styles.lbBack}>
+                    <img src={imageUrlBack} alt={`${name} back`} onError={e => { e.currentTarget.style.display = 'none' }} />
+                    {lbFlipped && <span className={styles.lbHint}>flip ↺</span>}
+                  </div>
+                )}
+              </div>
+              <button className={styles.lbClose} onClick={() => setLightbox(false)}>✕</button>
+            </div>
+          </div>
+        )}
         <div className={styles.titleRow}>
           <h1 className={styles.cardTitle}>{name}</h1>
           <div className={styles.headerActions}>

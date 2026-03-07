@@ -277,7 +277,22 @@ def _apply_variant_filter(card_name, sales):
     variant = _extract_variant_keyword(card_name)
     if not variant:
         return sales  # Base card — no variant filter needed
-    return [s for s in sales if variant.lower() in s.get('title', '').lower()]
+
+    v_lower = variant.lower()
+    # Keywords that are more specific supersets of this variant
+    # e.g. for "Rainbow" → ["Rainbow Color Wheel", "Rainbow Foil", "Speckled Rainbow", "Retro Rainbow"]
+    # Titles matching a superset belong to a *different* parallel and must be excluded.
+    supersets = [kw.lower() for kw in _VARIANT_KEYWORDS if kw.lower() != v_lower and v_lower in kw.lower()]
+
+    filtered = []
+    for s in sales:
+        title = s.get('title', '').lower()
+        if v_lower not in title:
+            continue
+        if supersets and any(sup in title for sup in supersets):
+            continue
+        filtered.append(s)
+    return filtered
 
 
 def clean_card_name_for_search(card_name):
