@@ -29,22 +29,12 @@
   margin-bottom: 8px;
 }
 
-.logoMark {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%);
+.logoImg {
+  width: 36px;
+  height: 36px;
   border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  object-fit: cover;
   flex-shrink: 0;
-  box-shadow: 0 0 16px var(--accent-glow);
-}
-
-.logoMark svg {
-  width: 18px;
-  height: 18px;
-  color: #090e17;
 }
 
 .logoText {

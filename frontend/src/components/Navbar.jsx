@@ -89,9 +89,7 @@ export default function Navbar() {
   return (
     <nav className={styles.nav}>
       <div className={styles.logo}>
-        <div className={styles.logoMark}>
-          <Icons.Logo />
-        </div>
+        <img src="/logo.png" alt="CardDB" className={styles.logoImg} />
         <div className={styles.logoText}>
           <span className={styles.logoName}>CardDB</span>
           <span className={styles.logoSub}>Market Tracker</span>
