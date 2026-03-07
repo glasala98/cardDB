@@ -106,6 +106,11 @@ export default function Navbar() {
   const isAdmin = user?.role === 'admin'
   const initials = (user?.display_name || user?.username || '?').slice(0, 2).toUpperCase()
 
+  const activeItem = NAV_ITEMS.find(({ sub }) =>
+    sub?.some(s => pathname === s.to || pathname.startsWith(s.to + '/'))
+  )
+  const subLinks = (activeItem?.sub || []).filter(s => !s.auth || user)
+
   return (
     <nav className={styles.nav}>
       <div className={styles.logo}>
@@ -189,6 +194,22 @@ export default function Navbar() {
         <div className={styles.authArea}>
           <button className={styles.signInBtn} onClick={() => navigate('/login')}>Sign in</button>
           <button className={styles.signUpBtn} onClick={() => navigate('/signup')}>Create account</button>
+        </div>
+      )}
+
+      {/* Mobile sub-nav: second row above main tabs, hidden on desktop */}
+      {subLinks.length > 1 && (
+        <div className={styles.subNav}>
+          {subLinks.map(s => (
+            <NavLink
+              key={s.to}
+              to={s.to}
+              end
+              className={({ isActive }) => `${styles.subNavLink} ${isActive ? styles.subNavActive : ''}`}
+            >
+              {s.label}
+            </NavLink>
+          ))}
         </div>
       )}
 

@@ -297,8 +297,9 @@
   background: rgba(240, 80, 80, 0.06);
 }
 
-/* Desktop — hide the mobile-only settings tab */
+/* Desktop — hide the mobile-only settings tab and sub-nav */
 .mobileSettingsTab { display: none; }
+.subNav { display: none; }
 
 /* ── Mobile — bottom tab bar ────────────────────────────────── */
 @media (max-width: 768px) {
@@ -354,7 +355,7 @@
     gap: 0;
     align-items: stretch;
     height: 62px;
-    order: 1;
+    order: 2;
   }
   .links li {
     flex: 1;
@@ -402,4 +403,38 @@
 
   /* Sub-nav only belongs in the desktop sidebar — hide on mobile */
   .subLinks { display: none; }
+
+  /* Mobile sub-nav: pill row above main tabs */
+  .subNav {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 44px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+    order: 1;
+  }
+  /* Tab bar moves below sub-nav */
+  .links { order: 2; }
+  /* User/auth area stays on top */
+  .userArea, .authArea { order: 0; }
+
+  .subNavLink {
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border: 1px solid transparent;
+    transition: color 0.12s, border-color 0.12s, background 0.12s;
+  }
+  .subNavLink:hover { color: var(--text-primary); }
+  .subNavActive {
+    color: var(--accent) !important;
+    background: var(--accent-muted);
+    border-color: var(--accent-border);
+  }
 }
