@@ -1,0 +1,196 @@
+Loading cards from catalog...
+
+============================================================
+RAW SCRAPE — 3,701 cards | 10 workers
+  Sport:     NHL
+  Tier:      rookies
+  Est. time: ~31 min
+============================================================
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: 15.000
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b531
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: -0.015
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b531
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: 9.619
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b941
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: -0.007
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b531
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: -95.847
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b531
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  [50/3701] Found: 20 | Not found: 31 | Errors: 0 | ~248.2m remaining
+  Error fetching data: Message: 
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10fc20a
+	0x10fc4ab
+	0x113de32
+	0x111ea84
+	0x113b621
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+

@@ -1,0 +1,525 @@
+Loading cards from catalog...
+
+============================================================
+RAW SCRAPE — 67,996 cards | 10 workers
+  Sport:     NFL
+  Tier:      rookies
+  Est. time: ~567 min
+============================================================
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: 15.000
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b531
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: 15.000
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b531
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: 13.908
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b941
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: 15.000
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b531
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: 7.142
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b941
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: 13.912
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b941
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: 9.469
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b941
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: -0.032
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b531
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: 14.620
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b941
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: 15.000
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b531
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: 11.898
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b941
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: 14.515
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x10beeaa
+	0x113b941
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: 15.000
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b941
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: 14.608
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b941
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: 15.000
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b531
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  Error fetching data: Message: timeout: Timed out receiving message from renderer: 15.000
+  (Session info: chrome=145.0.7632.160)
+Stacktrace:
+Symbols not available. Dumping unresolved backtrace:
+	0x12a7dd3
+	0x12a7e14
+	0x10b1db0
+	0x10a2173
+	0x10a1ea5
+	0x109ffb8
+	0x10a0806
+	0x10ad65b
+	0x10bf38e
+	0x10c4df6
+	0x10a0e8c
+	0x10bf10f
+	0x113b531
+	0x111e7d6
+	0x10f0049
+	0x10f0e04
+	0x1506924
+	0x1501bf7
+	0x151f5a0
+	0x12c0f58
+	0x12c891d
+	0x12b0648
+	0x12b0812
+	0x129a21a
+	0x7626fcc9
+	0x77a182ae
+	0x77a1827e
+
+  [50/67996] Found: 47 | Not found: 3 | Errors: 0 | ~5449.5m remaining
+  Error fetching data: ('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None))
+  Error fetching data: ('Connection aborted.', ConnectionResetError(10054, 'An existing connection was forcibly closed by the remote host', None, 10054, None))
