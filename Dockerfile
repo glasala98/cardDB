@@ -21,4 +21,4 @@ RUN cd frontend && npm run build
 
 EXPOSE 8000
 # Run DB migrations on every deploy (all scripts use IF NOT EXISTS — safe to re-run)
-CMD ["sh", "-c", "python migrate_add_graded_data.py && uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "python migrate_add_graded_data.py && python migrate_add_perf_indexes.py && uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
