@@ -24,3 +24,8 @@
   color: var(--accent);
   border-bottom-color: var(--accent);
 }
+
+/* MobileSubNav handles sub-route tabs on mobile — hide in-page tabs */
+@media (max-width: 768px) {
+  .tabs { display: none; }
+}
