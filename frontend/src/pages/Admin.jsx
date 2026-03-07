@@ -1,4 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid,
+} from 'recharts'
 import {
   getUsers, createUser, deleteUser, changePassword, changeRole,
   getPipelineHealth, getWorkflowStatus, getOutliers, toggleIgnore, getScrapeRuns,
@@ -7,7 +10,9 @@ import { useAuth } from '../context/AuthContext'
 import pageStyles from './Page.module.css'
 import styles from './Admin.module.css'
 
-const TABS = ['Users', 'Pipeline', 'Outliers']
+const TABS = ['Users', 'Pipeline', 'Runs', 'Outliers']
+
+const WF_COLORS = ['#00d4aa', '#4a9eff', '#ff6b35', '#ffb332', '#a07ff0', '#e05555', '#3dba5e', '#ff9ff3']
 
 export default function Admin() {
   const [tab, setTab] = useState('Users')
@@ -32,6 +37,7 @@ export default function Admin() {
 
       {tab === 'Users'    && <UsersTab />}
       {tab === 'Pipeline' && <PipelineTab />}
+      {tab === 'Runs'     && <RunsTab />}
       {tab === 'Outliers' && <OutliersTab />}
     </div>
   )
@@ -202,17 +208,15 @@ function UsersTab() {
 function PipelineTab() {
   const [health,    setHealth]    = useState(null)
   const [workflows, setWorkflows] = useState([])
-  const [runs,      setRuns]      = useState([])
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState(null)
 
   useEffect(() => {
     setLoading(true)
-    Promise.all([getPipelineHealth(), getWorkflowStatus(), getScrapeRuns(30)])
-      .then(([h, w, r]) => {
+    Promise.all([getPipelineHealth(), getWorkflowStatus()])
+      .then(([h, w]) => {
         setHealth(h)
         setWorkflows(w.workflows || [])
-        setRuns(r.runs || [])
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
@@ -293,9 +297,116 @@ function PipelineTab() {
         ))}
       </div>
 
-      <h3 className={styles.sectionTitle}>Recent Scrape Runs</h3>
+    </div>
+  )
+}
+
+/* ── Runs tab ──────────────────────────────────────────────────────────────── */
+function RunsTab() {
+  const [runs,    setRuns]    = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error,   setError]   = useState(null)
+
+  useEffect(() => {
+    getScrapeRuns(100)
+      .then(d => setRuns(d.runs || []))
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const uniqueWorkflows = useMemo(() => [...new Set(runs.map(r => r.workflow))], [runs])
+
+  const wfColor = useMemo(() => {
+    const m = {}
+    uniqueWorkflows.forEach((w, i) => { m[w] = WF_COLORS[i % WF_COLORS.length] })
+    return m
+  }, [uniqueWorkflows])
+
+  const wfStats = useMemo(() => {
+    const map = {}
+    runs.forEach(r => {
+      if (!map[r.workflow]) map[r.workflow] = { runs: 0, delta: 0, found: 0, errors: 0 }
+      map[r.workflow].runs++
+      map[r.workflow].delta += r.cards_delta
+      map[r.workflow].found += r.cards_found
+      map[r.workflow].errors += r.errors
+    })
+    return Object.entries(map)
+      .map(([name, s]) => ({ name, ...s }))
+      .sort((a, b) => b.runs - a.runs)
+  }, [runs])
+
+  const chartData = useMemo(() =>
+    [...runs].reverse().slice(0, 60).map(r => ({
+      date:     new Date(r.started_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }),
+      delta:    r.cards_delta,
+      found:    r.cards_found,
+      errors:   r.errors,
+      workflow: r.workflow,
+    })),
+    [runs]
+  )
+
+  if (loading) return <p className={pageStyles.status}>Loading scrape runs…</p>
+  if (error)   return <p className={pageStyles.error}>Error: {error}</p>
+
+  return (
+    <div className={styles.runsWrap}>
+
+      {/* Workflow summary cards */}
+      <h3 className={styles.sectionTitle}>By Workflow</h3>
+      <div className={styles.wfSummaryGrid}>
+        {wfStats.map(w => (
+          <div key={w.name} className={styles.wfSummaryCard} style={{ borderLeftColor: wfColor[w.name] }}>
+            <div className={styles.wfSummaryName}>{w.name}</div>
+            <div className={styles.wfSummaryStats}>
+              <span><strong>{w.runs}</strong> runs</span>
+              <span><strong>+{w.delta.toLocaleString()}</strong> Δ</span>
+              <span><strong>{w.found.toLocaleString()}</strong> priced</span>
+              {w.errors > 0 && <span className={styles.danger}><strong>{w.errors}</strong> errors</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Delta volume bar chart */}
+      {chartData.length > 0 && (
+        <>
+          <h3 className={styles.sectionTitle}>Delta Volume Per Run</h3>
+          <div className={styles.chartWrap}>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
+                  axisLine={false} tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
+                  axisLine={false} tickLine={false} width={38}
+                />
+                <Tooltip
+                  contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
+                  itemStyle={{ color: 'var(--text-primary)' }}
+                  labelStyle={{ color: 'var(--text-muted)', marginBottom: 4 }}
+                  formatter={(v, _) => [v.toLocaleString(), 'Δ updates']}
+                />
+                <Bar dataKey="delta" radius={[3, 3, 0, 0]} maxBarSize={24}>
+                  {chartData.map((d, i) => (
+                    <Cell key={i} fill={wfColor[d.workflow] || '#00d4aa'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
+
+      {/* Run history table */}
+      <h3 className={styles.sectionTitle}>Run History</h3>
       {runs.length === 0 ? (
-        <p className={pageStyles.status}>No scrape runs recorded yet. Runs appear after the next scraper execution.</p>
+        <p className={pageStyles.status}>No scrape runs recorded yet.</p>
       ) : (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
@@ -309,7 +420,7 @@ function PipelineTab() {
                 <th className={styles.th}>Duration</th>
                 <th className={`${styles.th} ${styles.thRight}`}>Total</th>
                 <th className={`${styles.th} ${styles.thRight}`}>Found</th>
-                <th className={`${styles.th} ${styles.thRight}`}>Deltas</th>
+                <th className={`${styles.th} ${styles.thRight}`}>Δ</th>
                 <th className={`${styles.th} ${styles.thRight}`}>Errors</th>
                 <th className={styles.th}>Status</th>
               </tr>
@@ -321,12 +432,30 @@ function PipelineTab() {
                   : null
                 return (
                   <tr key={r.id} className={styles.tr}>
-                    <td className={styles.td}><span className={styles.runWorkflow}>{r.workflow}</span></td>
+                    <td className={styles.td}>
+                      <span className={styles.runWorkflow} style={{ color: wfColor[r.workflow] }}>
+                        {r.workflow}
+                      </span>
+                    </td>
                     <td className={styles.td}>{r.sport || <span className={styles.muted}>all</span>}</td>
-                    <td className={styles.td}>{r.tier ? <span className={`${styles.tierBadge} ${styles['tier_' + r.tier]}`}>{r.tier}</span> : <span className={styles.muted}>—</span>}</td>
-                    <td className={styles.td}><span className={`${styles.modeBadge} ${r.mode === 'graded' ? styles.modeGraded : ''}`}>{r.mode}</span></td>
+                    <td className={styles.td}>
+                      {r.tier
+                        ? <span className={`${styles.tierBadge} ${styles['tier_' + r.tier]}`}>{r.tier}</span>
+                        : <span className={styles.muted}>—</span>}
+                    </td>
+                    <td className={styles.td}>
+                      <span className={`${styles.modeBadge} ${r.mode === 'graded' ? styles.modeGraded : ''}`}>
+                        {r.mode}
+                      </span>
+                    </td>
                     <td className={styles.td}>{r.started_at ? new Date(r.started_at).toLocaleString() : '—'}</td>
-                    <td className={styles.td}>{duration != null ? `${duration}m` : r.status === 'running' ? <span className={styles.running}>running…</span> : '—'}</td>
+                    <td className={styles.td}>
+                      {duration != null
+                        ? `${duration}m`
+                        : r.status === 'running'
+                          ? <span className={styles.running}>running…</span>
+                          : '—'}
+                    </td>
                     <td className={`${styles.td} ${styles.thRight}`}>{r.cards_total.toLocaleString()}</td>
                     <td className={`${styles.td} ${styles.thRight}`}>{r.cards_found.toLocaleString()}</td>
                     <td className={`${styles.td} ${styles.thRight}`}>{r.cards_delta.toLocaleString()}</td>
