@@ -221,6 +221,7 @@ CREATE TABLE market_prices (
     trend           TEXT         NOT NULL DEFAULT 'no data',
     confidence      TEXT         NOT NULL DEFAULT '',
     num_sales       INT          NOT NULL DEFAULT 0,
+    image_url       TEXT         NOT NULL DEFAULT '',
     scraped_at      TIMESTAMPTZ,
     updated_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     UNIQUE (card_catalog_id)

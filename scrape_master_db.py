@@ -258,7 +258,7 @@ def save_prices_batch(results: list):
     """Write a batch of scrape results to market_prices + market_price_history.
 
     Args:
-        results: list of (catalog_id, stats_dict) tuples with num_sales > 0
+        results: list of (catalog_id, stats_dict, image_url) tuples with num_sales > 0
     """
     if not results:
         return
@@ -267,7 +267,9 @@ def save_prices_batch(results: list):
 
     mp_rows = []
     hist_rows = []
-    for catalog_id, stats in results:
+    for entry in results:
+        catalog_id, stats = entry[0], entry[1]
+        image_url = entry[2] if len(entry) > 2 else ''
         fair_value = round(stats.get('fair_price', 0), 2)
         num_sales  = stats.get('num_sales', 0)
         confidence = stats.get('confidence', 'none')
@@ -276,7 +278,7 @@ def save_prices_batch(results: list):
         top_3      = ' | '.join(str(p) for p in stats.get('top_3_prices', []))
         trend      = stats.get('trend', 'no data')
 
-        mp_rows.append((catalog_id, fair_value, trend, confidence, num_sales, now))
+        mp_rows.append((catalog_id, fair_value, trend, confidence, num_sales, now, image_url or ''))
         hist_rows.append((catalog_id, today, fair_value, confidence, num_sales,
                           top_3, min_price, max_price))
 
@@ -285,7 +287,7 @@ def save_prices_batch(results: list):
             from psycopg2.extras import execute_values
             execute_values(cur, """
                 INSERT INTO market_prices
-                    (card_catalog_id, fair_value, trend, confidence, num_sales, scraped_at)
+                    (card_catalog_id, fair_value, trend, confidence, num_sales, scraped_at, image_url)
                 VALUES %s
                 ON CONFLICT (card_catalog_id) DO UPDATE SET
                     prev_value = market_prices.fair_value,
@@ -294,6 +296,8 @@ def save_prices_batch(results: list):
                     confidence = EXCLUDED.confidence,
                     num_sales  = EXCLUDED.num_sales,
                     scraped_at = EXCLUDED.scraped_at,
+                    image_url  = CASE WHEN EXCLUDED.image_url != '' THEN EXCLUDED.image_url
+                                      ELSE market_prices.image_url END,
                     updated_at = NOW()
             """, mp_rows)
 
@@ -551,7 +555,7 @@ def main():
                 stats = result.get('stats', {})
 
                 if stats.get('num_sales', 0) > 0:
-                    batch.append((catalog_id, stats))
+                    batch.append((catalog_id, stats, result.get('image_url') or ''))
 
                 if done_count % BATCH_SIZE == 0 or done_count == total:
                     _flush_batch()

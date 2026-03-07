@@ -14,12 +14,18 @@ def main():
     conn.autocommit = True
     cur = conn.cursor()
 
-    # Add column if it doesn't exist
+    # Add columns if they don't exist
     cur.execute("""
         ALTER TABLE market_prices
         ADD COLUMN IF NOT EXISTS graded_data JSONB NOT NULL DEFAULT '{}';
     """)
     print("market_prices.graded_data column added (or already existed)")
+
+    cur.execute("""
+        ALTER TABLE market_prices
+        ADD COLUMN IF NOT EXISTS image_url TEXT NOT NULL DEFAULT '';
+    """)
+    print("market_prices.image_url column added (or already existed)")
 
     # Migrate existing graded data from rookie_price_history into market_prices.
     # In PostgreSQL UPDATE...FROM, the target table must NOT be aliased —
