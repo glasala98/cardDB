@@ -46,9 +46,10 @@ Before executing any task in the "Implementation Roadmap," you MUST perform a "P
 - [x] **Quarantine Manager:** Outlier detection (>5× player median), ignore/restore toggle, hidden from public catalog.
 - [x] **Role Management:** Admin can change any user's role (user/admin/guest) inline in user table.
 - [x] **Manual Delete/Ignore:** `market_prices.ignored` column, `PATCH /admin/market-prices/{id}/ignore` endpoint.
-- [ ] **Delta Ingestion Monitor:** Visual tracking of ETL delta volume per scrape run (needs scrape_runs table).
+- [x] **Delta Ingestion Monitor:** Runs tab with KPI strip, workflow health cards, delta + hit-rate charts, anomaly feed, filtered run history table.
 - [ ] **AI Matcher Debugger:** Interface to inspect failed entity resolution attempts and manually map IDs.
 - [ ] **ETL Snapshot Audit:** View last 5 price snapshots per card for Type 2 integrity review.
+- [ ] **Crowdsourced Price Gap Filler:** Allow users to submit missing card prices for cards with no eBay data. Submissions go into a review queue; admin (or AI bot) validates legitimacy before accepting. Fills gaps for obscure/low-volume cards the scraper can't find.
 
 ## UI/UX Design (Card Catalog Page)
 - [ ] **Layout Alignment:** Match Card Catalog format strictly to the Card Ledger layout.

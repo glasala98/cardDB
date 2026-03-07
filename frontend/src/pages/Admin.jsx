@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid,
+  LineChart, Line, ReferenceLine,
 } from 'recharts'
 import {
   getUsers, createUser, deleteUser, changePassword, changeRole,
-  getPipelineHealth, getWorkflowStatus, getOutliers, toggleIgnore, getScrapeRuns,
+  getPipelineHealth, getWorkflowStatus, getOutliers, toggleIgnore,
+  getScrapeRuns, getScrapeRunsSummary,
 } from '../api/admin'
 import { useAuth } from '../context/AuthContext'
 import pageStyles from './Page.module.css'
@@ -302,19 +304,31 @@ function PipelineTab() {
 }
 
 /* ── Runs tab ──────────────────────────────────────────────────────────────── */
+const ANOMALY_LABELS = {
+  run_error:    'Run failed',
+  zero_delta:   'Zero Δ — no new prices',
+  low_hit_rate: 'Low hit rate (<10%)',
+  high_errors:  'High error count',
+}
+
 function RunsTab() {
   const [runs,    setRuns]    = useState([])
+  const [summary, setSummary] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(null)
+  const [wfFilter,    setWfFilter]    = useState('')
+  const [sportFilter, setSportFilter] = useState('')
 
   useEffect(() => {
-    getScrapeRuns(100)
-      .then(d => setRuns(d.runs || []))
+    setLoading(true)
+    Promise.all([getScrapeRuns(200), getScrapeRunsSummary()])
+      .then(([rd, sd]) => { setRuns(rd.runs || []); setSummary(sd) })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
 
-  const uniqueWorkflows = useMemo(() => [...new Set(runs.map(r => r.workflow))], [runs])
+  const uniqueWorkflows = useMemo(() => [...new Set(runs.map(r => r.workflow))].sort(), [runs])
+  const uniqueSports    = useMemo(() => [...new Set(runs.map(r => r.sport).filter(Boolean))].sort(), [runs])
 
   const wfColor = useMemo(() => {
     const m = {}
@@ -322,91 +336,196 @@ function RunsTab() {
     return m
   }, [uniqueWorkflows])
 
-  const wfStats = useMemo(() => {
-    const map = {}
-    runs.forEach(r => {
-      if (!map[r.workflow]) map[r.workflow] = { runs: 0, delta: 0, found: 0, errors: 0 }
-      map[r.workflow].runs++
-      map[r.workflow].delta += r.cards_delta
-      map[r.workflow].found += r.cards_found
-      map[r.workflow].errors += r.errors
-    })
-    return Object.entries(map)
-      .map(([name, s]) => ({ name, ...s }))
-      .sort((a, b) => b.runs - a.runs)
-  }, [runs])
-
-  const chartData = useMemo(() =>
-    [...runs].reverse().slice(0, 60).map(r => ({
-      date:     new Date(r.started_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }),
-      delta:    r.cards_delta,
-      found:    r.cards_found,
-      errors:   r.errors,
-      workflow: r.workflow,
-    })),
-    [runs]
+  const filteredRuns = useMemo(() =>
+    runs.filter(r =>
+      (!wfFilter    || r.workflow === wfFilter) &&
+      (!sportFilter || r.sport    === sportFilter)
+    ), [runs, wfFilter, sportFilter]
   )
 
-  if (loading) return <p className={pageStyles.status}>Loading scrape runs…</p>
+  const chartData = useMemo(() =>
+    [...filteredRuns].reverse().slice(-60).map(r => ({
+      date:     new Date(r.started_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }),
+      delta:    r.cards_delta,
+      hitRate:  r.cards_total > 0 ? Math.round(r.cards_found / r.cards_total * 100) : null,
+      workflow: r.workflow,
+    })), [filteredRuns]
+  )
+
+  const kpis = useMemo(() => {
+    if (!summary) return null
+    const wfs = wfFilter ? summary.workflows.filter(w => w.workflow === wfFilter) : summary.workflows
+    const totalRuns   = wfs.reduce((s, w) => s + w.total_runs, 0)
+    const successRuns = wfs.reduce((s, w) => s + w.success_runs, 0)
+    const hitRates    = wfs.filter(w => w.avg_hit_rate != null).map(w => w.avg_hit_rate)
+    return {
+      totalRuns,
+      successRate:  totalRuns > 0 ? Math.round(successRuns / totalRuns * 100) : 0,
+      avgHitRate:   hitRates.length > 0 ? Math.round(hitRates.reduce((s, v) => s + v, 0) / hitRates.length) : null,
+      totalDelta:   wfs.reduce((s, w) => s + w.total_delta, 0),
+      totalErrors:  wfs.reduce((s, w) => s + w.total_errors, 0),
+      anomalyCount: (wfFilter ? summary.anomalies.filter(a => a.workflow === wfFilter) : summary.anomalies).length,
+    }
+  }, [summary, wfFilter])
+
+  const visibleAnomalies = useMemo(() => {
+    if (!summary) return []
+    return wfFilter ? summary.anomalies.filter(a => a.workflow === wfFilter) : summary.anomalies
+  }, [summary, wfFilter])
+
+  if (loading) return <p className={pageStyles.status}>Loading runs…</p>
   if (error)   return <p className={pageStyles.error}>Error: {error}</p>
 
   return (
     <div className={styles.runsWrap}>
 
-      {/* Workflow summary cards */}
-      <h3 className={styles.sectionTitle}>By Workflow</h3>
-      <div className={styles.wfSummaryGrid}>
-        {wfStats.map(w => (
-          <div key={w.name} className={styles.wfSummaryCard} style={{ borderLeftColor: wfColor[w.name] }}>
-            <div className={styles.wfSummaryName}>{w.name}</div>
-            <div className={styles.wfSummaryStats}>
-              <span><strong>{w.runs}</strong> runs</span>
-              <span><strong>+{w.delta.toLocaleString()}</strong> Δ</span>
-              <span><strong>{w.found.toLocaleString()}</strong> priced</span>
-              {w.errors > 0 && <span className={styles.danger}><strong>{w.errors}</strong> errors</span>}
-            </div>
-          </div>
-        ))}
+      {/* Filter bar */}
+      <div className={styles.runsFilterBar}>
+        <select className={styles.runsSelect} value={wfFilter} onChange={e => setWfFilter(e.target.value)}>
+          <option value="">All Workflows</option>
+          {uniqueWorkflows.map(w => <option key={w} value={w}>{w}</option>)}
+        </select>
+        <select className={styles.runsSelect} value={sportFilter} onChange={e => setSportFilter(e.target.value)}>
+          <option value="">All Sports</option>
+          {uniqueSports.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        {(wfFilter || sportFilter) && (
+          <button className={styles.clearFilterBtn} onClick={() => { setWfFilter(''); setSportFilter('') }}>Clear</button>
+        )}
+        <span className={styles.runsCount}>{filteredRuns.length} runs</span>
       </div>
 
-      {/* Delta volume bar chart */}
-      {chartData.length > 0 && (
+      {/* KPI strip */}
+      {kpis && (
+        <div className={styles.kpiStrip}>
+          <KpiCard label="Total Runs"   value={kpis.totalRuns} />
+          <KpiCard label="Success Rate" value={`${kpis.successRate}%`} accent={kpis.successRate >= 90} warn={kpis.successRate < 75} />
+          <KpiCard label="Avg Hit Rate" value={kpis.avgHitRate != null ? `${kpis.avgHitRate}%` : '—'} warn={kpis.avgHitRate != null && kpis.avgHitRate < 30} />
+          <KpiCard label="Total Δ"      value={kpis.totalDelta.toLocaleString()} />
+          <KpiCard label="Errors"       value={kpis.totalErrors.toLocaleString()} warn={kpis.totalErrors > 0} />
+          <KpiCard label="Anomalies"    value={kpis.anomalyCount} warn={kpis.anomalyCount > 0} />
+        </div>
+      )}
+
+      {/* Workflow health cards */}
+      {summary && summary.workflows.length > 0 && (
         <>
-          <h3 className={styles.sectionTitle}>Delta Volume Per Run</h3>
-          <div className={styles.chartWrap}>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+          <h3 className={styles.sectionTitle}>Workflow Health</h3>
+          <div className={styles.wfHealthGrid}>
+            {summary.workflows.map(w => {
+              const isSelected = wfFilter === w.workflow
+              const dotClass = w.last_run_status === 'error' ? 'error'
+                : (w.zero_delta_runs > 0 || w.success_rate < 75) ? 'warn'
+                : 'healthy'
+              const daysSince = w.last_run_at
+                ? Math.floor((Date.now() - new Date(w.last_run_at)) / 86400000)
+                : null
+              return (
+                <div
+                  key={w.workflow}
+                  className={`${styles.wfHealthCard} ${isSelected ? styles.wfHealthSelected : ''}`}
+                  onClick={() => setWfFilter(isSelected ? '' : w.workflow)}
+                >
+                  <div className={styles.wfHealthHeader}>
+                    <span className={`${styles.statusDot} ${styles['dot_' + dotClass]}`} />
+                    <span className={styles.wfHealthName}>{w.workflow}</span>
+                  </div>
+                  <div className={styles.wfHealthMeta}>
+                    <span>{w.total_runs} runs</span>
+                    <span className={w.success_rate >= 90 ? styles.textSuccess : w.success_rate < 75 ? styles.textDanger : ''}>
+                      {w.success_rate}% ok
+                    </span>
+                    {w.avg_hit_rate != null && (
+                      <span className={w.avg_hit_rate < 30 ? styles.textWarn : ''}>{w.avg_hit_rate}% hit</span>
+                    )}
+                    {w.zero_delta_runs > 0 && (
+                      <span className={styles.textWarn}>{w.zero_delta_runs} Δ=0</span>
+                    )}
+                  </div>
+                  <div className={styles.wfHealthFooter}>
+                    <span>
+                      {daysSince === 0 ? 'Today' : daysSince === 1 ? 'Yesterday'
+                        : daysSince != null ? `${daysSince}d ago` : 'Never'}
+                    </span>
+                    {w.last_run_status && (
+                      <span className={`${styles.wfStatus} ${styles['wf_' + w.last_run_status]}`}>
+                        {w.last_run_status}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
+
+      {/* Two charts side by side */}
+      {chartData.length > 0 && (
+        <div className={styles.chartsRow}>
+          <div className={styles.chartBox}>
+            <div className={styles.chartTitle}>Delta Volume Per Run</div>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
-                  axisLine={false} tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
-                  axisLine={false} tickLine={false} width={38}
-                />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                <YAxis tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={36} />
                 <Tooltip
                   contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
-                  itemStyle={{ color: 'var(--text-primary)' }}
-                  labelStyle={{ color: 'var(--text-muted)', marginBottom: 4 }}
-                  formatter={(v, _) => [v.toLocaleString(), 'Δ updates']}
+                  itemStyle={{ color: 'var(--text-primary)' }} labelStyle={{ color: 'var(--text-muted)', marginBottom: 4 }}
+                  formatter={v => [v.toLocaleString(), 'Δ updates']}
                 />
-                <Bar dataKey="delta" radius={[3, 3, 0, 0]} maxBarSize={24}>
-                  {chartData.map((d, i) => (
-                    <Cell key={i} fill={wfColor[d.workflow] || '#00d4aa'} />
-                  ))}
+                <Bar dataKey="delta" radius={[3, 3, 0, 0]} maxBarSize={20}>
+                  {chartData.map((d, i) => <Cell key={i} fill={wfColor[d.workflow] || '#00d4aa'} />)}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+          </div>
+          <div className={styles.chartBox}>
+            <div className={styles.chartTitle}>Hit Rate % Per Run</div>
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={36} tickFormatter={v => `${v}%`} />
+                <Tooltip
+                  contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
+                  itemStyle={{ color: 'var(--text-primary)' }} labelStyle={{ color: 'var(--text-muted)', marginBottom: 4 }}
+                  formatter={v => [`${v}%`, 'Hit Rate']}
+                />
+                <ReferenceLine y={30} stroke="rgba(255,179,50,0.4)" strokeDasharray="4 4" />
+                <Line type="monotone" dataKey="hitRate" stroke="#00d4aa" strokeWidth={1.5} dot={false} connectNulls={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Anomaly feed */}
+      {visibleAnomalies.length > 0 && (
+        <>
+          <h3 className={styles.sectionTitle}>Anomalies Detected ({visibleAnomalies.length})</h3>
+          <div className={styles.anomalyFeed}>
+            {visibleAnomalies.slice(0, 15).map(a => (
+              <div key={a.id} className={`${styles.anomalyRow} ${styles['anomaly_' + a.reason]}`}>
+                <span className={styles.anomalyLabel}>{ANOMALY_LABELS[a.reason] || a.reason}</span>
+                <span className={styles.anomalyDetail}>
+                  <strong>{a.workflow}</strong>{a.sport && <> · {a.sport}</>}{a.tier && <> · {a.tier}</>}
+                </span>
+                <span className={styles.anomalyTs}>{a.started_at ? new Date(a.started_at).toLocaleString() : '—'}</span>
+                <span className={styles.anomalyStats}>
+                  {a.cards_total > 0 && <>{a.cards_found}/{a.cards_total} found · </>}Δ {a.cards_delta}{a.errors > 0 && <> · {a.errors} err</>}
+                </span>
+              </div>
+            ))}
           </div>
         </>
       )}
 
       {/* Run history table */}
       <h3 className={styles.sectionTitle}>Run History</h3>
-      {runs.length === 0 ? (
-        <p className={pageStyles.status}>No scrape runs recorded yet.</p>
+      {filteredRuns.length === 0 ? (
+        <p className={pageStyles.status}>No runs match the current filters.</p>
       ) : (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
@@ -417,50 +536,57 @@ function RunsTab() {
                 <th className={styles.th}>Tier</th>
                 <th className={styles.th}>Mode</th>
                 <th className={styles.th}>Started</th>
-                <th className={styles.th}>Duration</th>
+                <th className={styles.th}>Dur</th>
                 <th className={`${styles.th} ${styles.thRight}`}>Total</th>
                 <th className={`${styles.th} ${styles.thRight}`}>Found</th>
+                <th className={`${styles.th} ${styles.thRight}`}>Hit%</th>
                 <th className={`${styles.th} ${styles.thRight}`}>Δ</th>
-                <th className={`${styles.th} ${styles.thRight}`}>Errors</th>
+                <th className={`${styles.th} ${styles.thRight}`}>Err</th>
                 <th className={styles.th}>Status</th>
               </tr>
             </thead>
             <tbody>
-              {runs.map(r => {
+              {filteredRuns.map(r => {
                 const duration = r.finished_at && r.started_at
-                  ? Math.round((new Date(r.finished_at) - new Date(r.started_at)) / 60000)
-                  : null
+                  ? Math.round((new Date(r.finished_at) - new Date(r.started_at)) / 60000) : null
+                const hitRate = r.cards_total > 0
+                  ? Math.round(r.cards_found / r.cards_total * 100) : null
+                const isError = r.status === 'error'
+                const isWarn  = !isError && (
+                  (r.status === 'completed' && r.cards_delta === 0 && r.cards_total > 0) ||
+                  (hitRate != null && hitRate < 10) || r.errors > 10
+                )
                 return (
-                  <tr key={r.id} className={styles.tr}>
+                  <tr key={r.id} className={`${styles.tr} ${isError ? styles.trError : isWarn ? styles.trWarn : ''}`}>
                     <td className={styles.td}>
-                      <span className={styles.runWorkflow} style={{ color: wfColor[r.workflow] }}>
-                        {r.workflow}
-                      </span>
+                      <span className={styles.runWorkflow} style={{ color: wfColor[r.workflow] }}>{r.workflow}</span>
                     </td>
                     <td className={styles.td}>{r.sport || <span className={styles.muted}>all</span>}</td>
                     <td className={styles.td}>
-                      {r.tier
-                        ? <span className={`${styles.tierBadge} ${styles['tier_' + r.tier]}`}>{r.tier}</span>
-                        : <span className={styles.muted}>—</span>}
+                      {r.tier ? <span className={`${styles.tierBadge} ${styles['tier_' + r.tier]}`}>{r.tier}</span>
+                              : <span className={styles.muted}>—</span>}
                     </td>
                     <td className={styles.td}>
-                      <span className={`${styles.modeBadge} ${r.mode === 'graded' ? styles.modeGraded : ''}`}>
-                        {r.mode}
-                      </span>
+                      <span className={`${styles.modeBadge} ${r.mode === 'graded' ? styles.modeGraded : ''}`}>{r.mode}</span>
                     </td>
                     <td className={styles.td}>{r.started_at ? new Date(r.started_at).toLocaleString() : '—'}</td>
                     <td className={styles.td}>
-                      {duration != null
-                        ? `${duration}m`
-                        : r.status === 'running'
-                          ? <span className={styles.running}>running…</span>
-                          : '—'}
+                      {duration != null ? `${duration}m` : r.status === 'running' ? <span className={styles.running}>running…</span> : '—'}
                     </td>
                     <td className={`${styles.td} ${styles.thRight}`}>{r.cards_total.toLocaleString()}</td>
                     <td className={`${styles.td} ${styles.thRight}`}>{r.cards_found.toLocaleString()}</td>
-                    <td className={`${styles.td} ${styles.thRight}`}>{r.cards_delta.toLocaleString()}</td>
                     <td className={`${styles.td} ${styles.thRight}`}>
-                      {r.errors > 0 ? <span className={styles.danger}>{r.errors}</span> : r.errors}
+                      {hitRate != null
+                        ? <span className={hitRate < 10 ? styles.textDanger : hitRate < 30 ? styles.textWarn : styles.textSuccess}>{hitRate}%</span>
+                        : <span className={styles.muted}>—</span>}
+                    </td>
+                    <td className={`${styles.td} ${styles.thRight}`}>
+                      {r.cards_delta === 0 && r.status === 'completed' && r.cards_total > 0
+                        ? <span className={styles.textWarn}>0</span>
+                        : r.cards_delta.toLocaleString()}
+                    </td>
+                    <td className={`${styles.td} ${styles.thRight}`}>
+                      {r.errors > 0 ? <span className={styles.textDanger}>{r.errors}</span> : r.errors}
                     </td>
                     <td className={styles.td}>
                       <span className={`${styles.wfStatus} ${styles['wf_' + r.status]}`}>{r.status}</span>
@@ -472,6 +598,15 @@ function RunsTab() {
           </table>
         </div>
       )}
+    </div>
+  )
+}
+
+function KpiCard({ label, value, accent, warn }) {
+  return (
+    <div className={`${styles.kpiCard} ${accent ? styles.kpiAccent : ''} ${warn ? styles.kpiWarn : ''}`}>
+      <span className={styles.kpiVal}>{value}</span>
+      <span className={styles.kpiLabel}>{label}</span>
     </div>
   )
 }

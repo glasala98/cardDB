@@ -272,19 +272,109 @@ def pipeline_health(_admin: str = Depends(_require_admin)):
     }
 
 
-@router.get("/scrape-runs")
-def get_scrape_runs(limit: int = 50, _admin: str = Depends(_require_admin)):
-    """Return recent scrape run history from the scrape_runs table."""
+@router.get("/scrape-runs/summary")
+def get_scrape_runs_summary(_admin: str = Depends(_require_admin)):
+    """Per-workflow aggregated stats + anomaly detection for the monitoring dashboard."""
     with get_db() as conn:
         with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = '15s'")
+
             cur.execute("""
+                SELECT
+                    workflow,
+                    COUNT(*) AS total_runs,
+                    COUNT(*) FILTER (WHERE status = 'completed') AS success_runs,
+                    COUNT(*) FILTER (WHERE status = 'error') AS error_runs,
+                    COUNT(*) FILTER (
+                        WHERE status = 'completed' AND cards_delta = 0 AND cards_total > 0
+                    ) AS zero_delta_runs,
+                    ROUND(AVG(
+                        CASE WHEN cards_total > 0
+                             THEN cards_found::float / cards_total * 100
+                        END
+                    )::numeric, 1) AS avg_hit_rate,
+                    ROUND(AVG(cards_delta)::numeric, 0) AS avg_delta,
+                    SUM(cards_delta) AS total_delta,
+                    SUM(errors) AS total_errors,
+                    MAX(started_at) AS last_run_at,
+                    (ARRAY_AGG(status ORDER BY started_at DESC NULLS LAST))[1] AS last_run_status
+                FROM scrape_runs
+                GROUP BY workflow
+                ORDER BY last_run_at DESC NULLS LAST
+            """)
+            wf_cols = [d[0] for d in cur.description]
+            wf_rows = cur.fetchall()
+
+            cur.execute("""
+                SELECT
+                    id, workflow, sport, tier, mode,
+                    started_at, cards_total, cards_found, cards_delta, errors, status,
+                    CASE
+                        WHEN status = 'error' THEN 'run_error'
+                        WHEN status = 'completed' AND cards_delta = 0 AND cards_total > 0
+                             THEN 'zero_delta'
+                        WHEN status = 'completed' AND cards_total > 0
+                             AND cards_found::float / cards_total < 0.10
+                             THEN 'low_hit_rate'
+                        WHEN errors > 10 THEN 'high_errors'
+                    END AS reason
+                FROM scrape_runs
+                WHERE
+                    status = 'error'
+                    OR (status = 'completed' AND cards_delta = 0 AND cards_total > 0)
+                    OR (status = 'completed' AND cards_total > 0
+                        AND cards_found::float / cards_total < 0.10)
+                    OR errors > 10
+                ORDER BY started_at DESC
+                LIMIT 50
+            """)
+            anomaly_cols = [d[0] for d in cur.description]
+            anomaly_rows = cur.fetchall()
+
+    workflows = []
+    for row in wf_rows:
+        r = dict(zip(wf_cols, row))
+        r['avg_hit_rate']  = float(r['avg_hit_rate'])  if r['avg_hit_rate']  is not None else None
+        r['avg_delta']     = int(r['avg_delta'])        if r['avg_delta']     is not None else 0
+        r['total_delta']   = int(r['total_delta'])      if r['total_delta']   is not None else 0
+        r['total_errors']  = int(r['total_errors'])     if r['total_errors']  is not None else 0
+        r['last_run_at']   = r['last_run_at'].isoformat() if r['last_run_at'] else None
+        r['success_rate']  = round(r['success_runs'] / r['total_runs'] * 100, 1) if r['total_runs'] else 0
+        workflows.append(r)
+
+    anomalies = []
+    for row in anomaly_rows:
+        r = dict(zip(anomaly_cols, row))
+        r['started_at'] = r['started_at'].isoformat() if r['started_at'] else None
+        anomalies.append(r)
+
+    return {"workflows": workflows, "anomalies": anomalies}
+
+
+@router.get("/scrape-runs")
+def get_scrape_runs(
+    limit: int = 50,
+    workflow: str = None,
+    _admin: str = Depends(_require_admin),
+):
+    """Return recent scrape run history from the scrape_runs table."""
+    where_parts, params = [], []
+    if workflow:
+        where_parts.append("workflow = %s")
+        params.append(workflow)
+    where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"""
                 SELECT id, workflow, sport, tier, mode,
                        started_at, finished_at,
                        cards_total, cards_found, cards_delta, errors, status
                 FROM scrape_runs
+                {where_sql}
                 ORDER BY started_at DESC
                 LIMIT %s
-            """, [limit])
+            """, params + [limit])
             cols = [d[0] for d in cur.description]
             rows = cur.fetchall()
 
