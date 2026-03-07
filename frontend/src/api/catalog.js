@@ -11,3 +11,7 @@ export const getCatalogFilters = (sport = null, year = null) => {
   if (year)  params.year  = year
   return client.get('/catalog/filters', { params })
 }
+
+/** Get price history for a single catalog card. */
+export const getCatalogCardHistory = (catalogId) =>
+  client.get(`/catalog/${catalogId}/history`)

@@ -107,6 +107,7 @@ def browse_catalog(
             cc.print_run,
             cc.is_rookie,
             cc.is_parallel,
+            cc.scrape_tier,
             mp.fair_value,
             mp.prev_value,
             mp.trend,
@@ -155,6 +156,53 @@ def browse_catalog(
         "pages":    math.ceil(total / per_page) if per_page else 1,
         "per_page": per_page,
     }
+
+
+@router.get("/{catalog_id}/history")
+def catalog_card_history(catalog_id: int):
+    """Return price history for a single catalog card."""
+    with get_db() as conn:
+        cur = conn.cursor()
+
+        cur.execute("""
+            SELECT cc.id, cc.sport, cc.year, cc.brand, cc.set_name, cc.card_number,
+                   cc.player_name, cc.team, cc.variant, cc.print_run, cc.is_rookie,
+                   cc.scrape_tier,
+                   mp.fair_value, mp.prev_value, mp.trend, mp.confidence,
+                   mp.num_sales, mp.scraped_at
+            FROM card_catalog cc
+            LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
+            WHERE cc.id = %s
+        """, [catalog_id])
+        row = cur.fetchone()
+        if not row:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Card not found")
+        cols = [d[0] for d in cur.description]
+        card = dict(zip(cols, row))
+        for k in ("fair_value", "prev_value"):
+            if card[k] is not None:
+                card[k] = float(card[k])
+        if card.get("scraped_at"):
+            card["scraped_at"] = card["scraped_at"].isoformat()
+
+        cur.execute("""
+            SELECT scraped_at, fair_value, confidence, num_sales, min_price, max_price
+            FROM market_price_history
+            WHERE card_catalog_id = %s
+            ORDER BY scraped_at ASC
+        """, [catalog_id])
+        hist_cols = [d[0] for d in cur.description]
+        history = []
+        for r in cur.fetchall():
+            h = dict(zip(hist_cols, r))
+            h["fair_value"] = float(h["fair_value"]) if h["fair_value"] is not None else None
+            h["min_price"]  = float(h["min_price"])  if h["min_price"]  is not None else None
+            h["max_price"]  = float(h["max_price"])  if h["max_price"]  is not None else None
+            h["scraped_at"] = h["scraped_at"].isoformat() if h["scraped_at"] else None
+            history.append(h)
+
+    return {"card": card, "history": history}
 
 
 @router.get("/filters")

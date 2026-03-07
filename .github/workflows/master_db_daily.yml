@@ -12,12 +12,12 @@ on:
       limit:
         description: 'Max cards per sport (0=all)'
         required: false
-        default: '2000'
+        default: '1000'
 
 jobs:
   scrape-nhl:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -30,7 +30,7 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NHL prices
-        run: python -u scrape_master_db.py --sport NHL --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '2000' }}
+        run: python -u scrape_master_db.py --sport NHL --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '1000' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Scrape NHL player stats
@@ -40,7 +40,7 @@ jobs:
 
   scrape-nba:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -53,13 +53,13 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NBA prices
-        run: python -u scrape_master_db.py --sport NBA --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '2000' }}
+        run: python -u scrape_master_db.py --sport NBA --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '1000' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   scrape-nfl:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -72,13 +72,13 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NFL prices
-        run: python -u scrape_master_db.py --sport NFL --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '2000' }}
+        run: python -u scrape_master_db.py --sport NFL --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '1000' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   scrape-mlb:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -91,6 +91,6 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape MLB prices
-        run: python -u scrape_master_db.py --sport MLB --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '2000' }}
+        run: python -u scrape_master_db.py --sport MLB --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '1000' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

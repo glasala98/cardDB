@@ -26,6 +26,17 @@
 }
 
 /* Badges */
+.tierBadge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.4px;
+}
+.tier_staple  { background: rgba(0, 212, 170, 0.15); color: var(--accent); border: 1px solid rgba(0, 212, 170, 0.3); }
+.tier_premium { background: rgba(255, 179, 50, 0.12); color: #ffb332; border: 1px solid rgba(255, 179, 50, 0.3); }
+.tier_stars   { background: rgba(160, 120, 255, 0.12); color: #a07ff0; border: 1px solid rgba(160, 120, 255, 0.3); }
+
 .rcBadge {
   font-size: 10px;
   font-weight: 700;
@@ -165,6 +176,15 @@
   font-weight: 600;
   color: var(--accent);
   white-space: nowrap;
+}
+
+.signInToAdd {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* Add to Collection modal */

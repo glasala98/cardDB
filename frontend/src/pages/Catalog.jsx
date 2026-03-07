@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import CardTable from '../components/CardTable'
-import { getCatalog, getCatalogFilters } from '../api/catalog'
+import { getCatalog, getCatalogFilters, getCatalogCardHistory } from '../api/catalog'
 import { getOwnedIds, addToCollection, getGrades } from '../api/collection'
 import { useCurrency } from '../context/CurrencyContext'
+import { useAuth } from '../context/AuthContext'
 import PageTabs from '../components/PageTabs'
+import CatalogCardDetail from '../components/CatalogCardDetail'
 import styles from './Catalog.module.css'
 import pageStyles from './Page.module.css'
 
@@ -14,7 +17,9 @@ const CATALOG_TABS = [
 
 const SPORTS = ['NHL', 'NBA', 'NFL', 'MLB']
 
-const COLUMNS = (fmtPrice, ownedIds, onAdd) => [
+const TIER_LABELS = { staple: 'Staple', premium: 'Premium', stars: 'Stars' }
+
+const COLUMNS = (fmtPrice, ownedIds, onAdd, isLoggedIn) => [
   { key: 'sport',       label: 'Sport' },
   { key: 'year',        label: 'Year',       render: v => v || '—' },
   { key: 'set_name',    label: 'Set',        render: v => v || '—' },
@@ -25,12 +30,21 @@ const COLUMNS = (fmtPrice, ownedIds, onAdd) => [
   {
     key: 'is_rookie',
     label: 'RC',
-    render: v => v ? <span className={styles.rcBadge}>RC</span> : null,
+    render: (v, row) => {
+      const tier = row.scrape_tier
+      const tierLabel = TIER_LABELS[tier]
+      return (
+        <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          {v ? <span className={styles.rcBadge}>RC</span> : null}
+          {tierLabel ? <span className={`${styles.tierBadge} ${styles['tier_' + tier]}`}>{tierLabel}</span> : null}
+        </span>
+      )
+    },
   },
   {
     key: 'fair_value',
     label: 'Price',
-    render: (v, row) => v != null
+    render: (v) => v != null
       ? <span className={styles.price}>{fmtPrice(v)}</span>
       : <span className={styles.noPrice}>—</span>,
   },
@@ -55,9 +69,12 @@ const COLUMNS = (fmtPrice, ownedIds, onAdd) => [
   {
     key: 'id',
     label: '',
-    render: (v, row) => ownedIds.has(v)
-      ? <span className={styles.ownedBadge} title="In your collection">✓ Owned</span>
-      : <button className={styles.addBtn} onClick={e => { e.stopPropagation(); onAdd(row) }} title="Add to collection">+ Add</button>,
+    render: (v, row) => {
+      if (!isLoggedIn) return <span className={styles.signInToAdd} title="Sign in to add to collection">+ Add</span>
+      return ownedIds.has(v)
+        ? <span className={styles.ownedBadge} title="In your collection">✓ Owned</span>
+        : <button className={styles.addBtn} onClick={e => { e.stopPropagation(); onAdd(row) }} title="Add to collection">+ Add</button>
+    },
   },
 ]
 
@@ -65,6 +82,9 @@ const PER_PAGE = 50
 
 export default function Catalog() {
   const { fmtPrice } = useCurrency()
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const isLoggedIn = !!user
 
   const [cards,     setCards]     = useState([])
   const [total,     setTotal]     = useState(0)
@@ -89,16 +109,36 @@ export default function Catalog() {
   // Collection: owned card IDs + add-to-collection modal
   const [ownedIds,  setOwnedIds]  = useState(new Set())
   const [grades,    setGrades]    = useState([])
-  const [addTarget, setAddTarget] = useState(null)   // card row being added
+  const [addTarget, setAddTarget] = useState(null)
   const [addForm,   setAddForm]   = useState({ grade: 'Raw', quantity: '1', cost_basis: '', purchase_date: '' })
   const [addSaving, setAddSaving] = useState(false)
 
+  // Card detail panel
+  const [detailCard,    setDetailCard]    = useState(null)
+  const [detailHistory, setDetailHistory] = useState([])
+  const [detailLoading, setDetailLoading] = useState(false)
+
   useEffect(() => {
+    if (!isLoggedIn) return
     getOwnedIds().then(d => setOwnedIds(new Set(d.owned_ids || []))).catch(() => {})
     getGrades().then(d => setGrades(d.grades || [])).catch(() => {})
-  }, [])
+  }, [isLoggedIn])
+
+  const handleRowClick = (row) => {
+    setDetailCard(row)
+    setDetailHistory([])
+    setDetailLoading(true)
+    getCatalogCardHistory(row.id)
+      .then(data => {
+        setDetailCard(data.card)
+        setDetailHistory(data.history || [])
+      })
+      .catch(() => {})
+      .finally(() => setDetailLoading(false))
+  }
 
   const handleAdd = (row) => {
+    if (!isLoggedIn) { navigate('/login'); return }
     setAddTarget(row)
     setAddForm({ grade: 'Raw', quantity: '1', cost_basis: '', purchase_date: '' })
   }
@@ -298,11 +338,12 @@ setSortKey('year')
       ) : (
         <>
           <CardTable
-            columns={COLUMNS(fmtPrice, ownedIds, handleAdd)}
+            columns={COLUMNS(fmtPrice, ownedIds, handleAdd, isLoggedIn)}
             rows={cards}
             sortKey={sortKey}
             sortDir={sortDir}
             onSort={handleSort}
+            onRowClick={handleRowClick}
           />
 
           {loading && <div className={styles.loadingBar} />}
@@ -348,6 +389,19 @@ setSortKey('year')
             </div>
           )}
         </>
+      )}
+
+      {/* Card detail panel */}
+      {detailCard && (
+        <CatalogCardDetail
+          card={detailCard}
+          history={detailHistory}
+          loading={detailLoading}
+          isLoggedIn={isLoggedIn}
+          isOwned={ownedIds.has(detailCard.id)}
+          onAdd={() => { setDetailCard(null); handleAdd(detailCard) }}
+          onClose={() => setDetailCard(null)}
+        />
       )}
 
       {/* Add to Collection modal */}
