@@ -149,6 +149,12 @@ export default function Releases() {
                       <span className={styles.statLabel}>avg</span>
                     </div>
                   )}
+                  {s.total_sales > 0 && (
+                    <div className={styles.stat}>
+                      <span className={styles.statVal}>{s.total_sales.toLocaleString()}</span>
+                      <span className={styles.statLabel}>sales</span>
+                    </div>
+                  )}
                   <div className={styles.stat}>
                     <span className={styles.statVal}>{coveragePercent}%</span>
                     <span className={styles.statLabel}>priced</span>
