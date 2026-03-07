@@ -6,13 +6,13 @@ import {
 import {
   getUsers, createUser, deleteUser, changePassword, changeRole,
   getPipelineHealth, getWorkflowStatus, getOutliers, toggleIgnore,
-  getScrapeRuns, getScrapeRunsSummary,
+  getScrapeRuns, getScrapeRunsSummary, getDataQuality,
 } from '../api/admin'
 import { useAuth } from '../context/AuthContext'
 import pageStyles from './Page.module.css'
 import styles from './Admin.module.css'
 
-const TABS = ['Users', 'Pipeline', 'Runs', 'Outliers']
+const TABS = ['Users', 'Pipeline', 'Quality', 'Runs', 'Outliers']
 
 const WF_COLORS = ['#00d4aa', '#4a9eff', '#ff6b35', '#ffb332', '#a07ff0', '#e05555', '#3dba5e', '#ff9ff3']
 
@@ -39,6 +39,7 @@ export default function Admin() {
 
       {tab === 'Users'    && <UsersTab />}
       {tab === 'Pipeline' && <PipelineTab />}
+      {tab === 'Quality'  && <QualityTab />}
       {tab === 'Runs'     && <RunsTab />}
       {tab === 'Outliers' && <OutliersTab />}
     </div>
@@ -311,21 +312,33 @@ const ANOMALY_LABELS = {
   high_errors:  'High error count',
 }
 
+const DATE_RANGES = [
+  { label: 'All', value: 'all' },
+  { label: 'Last 7d', value: '7d' },
+  { label: 'Last 30d', value: '30d' },
+  { label: 'Last 90d', value: '90d' },
+]
+
 function RunsTab() {
-  const [runs,    setRuns]    = useState([])
-  const [summary, setSummary] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState(null)
+  const [runs,       setRuns]       = useState([])
+  const [summary,    setSummary]    = useState(null)
+  const [loading,    setLoading]    = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error,      setError]      = useState(null)
   const [wfFilter,    setWfFilter]    = useState('')
   const [sportFilter, setSportFilter] = useState('')
+  const [dateRange,   setDateRange]   = useState('all')
 
-  useEffect(() => {
-    setLoading(true)
+  const load = useCallback((isRefresh = false) => {
+    if (isRefresh) setRefreshing(true)
+    else setLoading(true)
     Promise.all([getScrapeRuns(200), getScrapeRunsSummary()])
       .then(([rd, sd]) => { setRuns(rd.runs || []); setSummary(sd) })
       .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
+      .finally(() => { setLoading(false); setRefreshing(false) })
   }, [])
+
+  useEffect(() => { load() }, [load])
 
   const uniqueWorkflows = useMemo(() => [...new Set(runs.map(r => r.workflow))].sort(), [runs])
   const uniqueSports    = useMemo(() => [...new Set(runs.map(r => r.sport).filter(Boolean))].sort(), [runs])
@@ -336,12 +349,15 @@ function RunsTab() {
     return m
   }, [uniqueWorkflows])
 
-  const filteredRuns = useMemo(() =>
-    runs.filter(r =>
+  const filteredRuns = useMemo(() => {
+    const cutoff = dateRange === 'all' ? null
+      : new Date(Date.now() - (dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90) * 86400000)
+    return runs.filter(r =>
       (!wfFilter    || r.workflow === wfFilter) &&
-      (!sportFilter || r.sport    === sportFilter)
-    ), [runs, wfFilter, sportFilter]
-  )
+      (!sportFilter || r.sport    === sportFilter) &&
+      (!cutoff      || new Date(r.started_at) >= cutoff)
+    )
+  }, [runs, wfFilter, sportFilter, dateRange])
 
   const chartData = useMemo(() =>
     [...filteredRuns].reverse().slice(-60).map(r => ({
@@ -389,10 +405,25 @@ function RunsTab() {
           <option value="">All Sports</option>
           {uniqueSports.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
+        <div className={styles.dateRangePills}>
+          {DATE_RANGES.map(d => (
+            <button
+              key={d.value}
+              className={`${styles.dateRangePill} ${dateRange === d.value ? styles.dateRangePillActive : ''}`}
+              onClick={() => setDateRange(d.value)}
+            >{d.label}</button>
+          ))}
+        </div>
         {(wfFilter || sportFilter) && (
           <button className={styles.clearFilterBtn} onClick={() => { setWfFilter(''); setSportFilter('') }}>Clear</button>
         )}
         <span className={styles.runsCount}>{filteredRuns.length} runs</span>
+        <button
+          className={styles.refreshBtn}
+          onClick={() => load(true)}
+          disabled={refreshing}
+          title="Refresh"
+        >{refreshing ? '↻' : '↻'} Refresh</button>
       </div>
 
       {/* KPI strip */}
@@ -598,6 +629,176 @@ function RunsTab() {
           </table>
         </div>
       )}
+    </div>
+  )
+}
+
+/* ── Quality tab ────────────────────────────────────────────────────────────── */
+function QualityTab() {
+  const [data,     setData]     = useState(null)
+  const [loading,  setLoading]  = useState(true)
+  const [error,    setError]    = useState(null)
+  const [view,     setView]     = useState('stale')   // 'stale' | 'lowconf'
+
+  useEffect(() => {
+    getDataQuality()
+      .then(d => setData(d))
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <p className={pageStyles.status}>Loading quality data…</p>
+  if (error)   return <p className={pageStyles.error}>Error: {error}</p>
+  if (!data)   return null
+
+  const { stats, freshness_by_tier, stale_cards, low_confidence_cards } = data
+
+  return (
+    <div className={styles.qualityWrap}>
+
+      {/* KPI strip */}
+      <div className={styles.kpiStrip}>
+        <KpiCard label="Stale >30d"      value={stats.stale_30.toLocaleString()}      warn={stats.stale_30 > 100} />
+        <KpiCard label="Stale >90d"      value={stats.stale_90.toLocaleString()}      warn={stats.stale_90 > 50} />
+        <KpiCard label="Never Scraped"   value={stats.never_scraped.toLocaleString()} warn={stats.never_scraped > 0} />
+        <KpiCard label="Single Sale"     value={stats.single_sale.toLocaleString()}   warn={stats.single_sale > 50} />
+        <KpiCard label="Low Confidence"  value={stats.low_confidence.toLocaleString()} warn={stats.low_confidence > 100} />
+        <KpiCard label="Zero Price"      value={stats.zero_price.toLocaleString()}    warn={stats.zero_price > 0} />
+      </div>
+
+      {/* Freshness by tier */}
+      <h3 className={styles.sectionTitle}>Price Freshness by Tier</h3>
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th className={styles.th}>Tier</th>
+              <th className={`${styles.th} ${styles.thRight}`}>Total</th>
+              <th className={`${styles.th} ${styles.thRight}`}>Fresh &lt;7d</th>
+              <th className={`${styles.th} ${styles.thRight}`}>7–30d</th>
+              <th className={`${styles.th} ${styles.thRight}`}>Stale &gt;30d</th>
+              <th className={styles.th}>Distribution</th>
+            </tr>
+          </thead>
+          <tbody>
+            {freshness_by_tier.map(t => {
+              const total = t.total || 1
+              const pctFresh  = Math.round(t.fresh_7d  / total * 100)
+              const pctRecent = Math.round(t.fresh_30d / total * 100)
+              const pctStale  = Math.round(t.stale     / total * 100)
+              return (
+                <tr key={t.tier} className={styles.tr}>
+                  <td className={styles.td}>
+                    <span className={`${styles.tierBadge} ${styles['tier_' + t.tier]}`}>{t.tier}</span>
+                  </td>
+                  <td className={`${styles.td} ${styles.thRight}`}>{t.total.toLocaleString()}</td>
+                  <td className={`${styles.td} ${styles.thRight} ${styles.textSuccess}`}>{t.fresh_7d.toLocaleString()}</td>
+                  <td className={`${styles.td} ${styles.thRight}`} style={{ color: '#ffb332' }}>{t.fresh_30d.toLocaleString()}</td>
+                  <td className={`${styles.td} ${styles.thRight} ${t.stale > 0 ? styles.textDanger : ''}`}>{t.stale.toLocaleString()}</td>
+                  <td className={styles.td}>
+                    <div className={styles.freshnessBar}>
+                      <div className={`${styles.freshSeg} ${styles.freshGreen}`}  style={{ width: `${pctFresh}%` }}  title={`Fresh: ${pctFresh}%`} />
+                      <div className={`${styles.freshSeg} ${styles.freshYellow}`} style={{ width: `${pctRecent}%` }} title={`Recent: ${pctRecent}%`} />
+                      <div className={`${styles.freshSeg} ${styles.freshRed}`}    style={{ width: `${pctStale}%` }}  title={`Stale: ${pctStale}%`} />
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Sub-view toggle */}
+      <div className={styles.qualityToggle}>
+        <button
+          className={`${styles.qualityPill} ${view === 'stale' ? styles.qualityPillActive : ''}`}
+          onClick={() => setView('stale')}
+        >Priority Stale Cards ({stale_cards.length})</button>
+        <button
+          className={`${styles.qualityPill} ${view === 'lowconf' ? styles.qualityPillActive : ''}`}
+          onClick={() => setView('lowconf')}
+        >Low Confidence ({low_confidence_cards.length})</button>
+      </div>
+
+      {/* Stale cards table */}
+      {view === 'stale' && (
+        <>
+          <p className={styles.helpText}>
+            Staple &amp; premium cards not scraped in over 30 days — highest priority to re-scrape. Sorted oldest first.
+          </p>
+          <QualityCardTable cards={stale_cards} showStaleness />
+        </>
+      )}
+
+      {/* Low confidence table */}
+      {view === 'lowconf' && (
+        <>
+          <p className={styles.helpText}>
+            Cards with only 1 eBay sale driving the price (fair_value &gt; $5). These prices are less reliable and should be scraped again when possible.
+          </p>
+          <QualityCardTable cards={low_confidence_cards} />
+        </>
+      )}
+    </div>
+  )
+}
+
+function QualityCardTable({ cards, showStaleness }) {
+  if (cards.length === 0) return <p className={pageStyles.status}>No items.</p>
+
+  const daysSince = (ts) => {
+    if (!ts) return null
+    return Math.floor((Date.now() - new Date(ts)) / 86400000)
+  }
+
+  return (
+    <div className={styles.tableWrap}>
+      <table className={styles.table}>
+        <thead>
+          <tr>
+            <th className={styles.th}>Player</th>
+            <th className={styles.th}>Sport</th>
+            <th className={styles.th}>Year · Set</th>
+            <th className={styles.th}>Variant</th>
+            <th className={styles.th}>Tier</th>
+            <th className={`${styles.th} ${styles.thRight}`}>Price</th>
+            <th className={`${styles.th} ${styles.thRight}`}>Sales</th>
+            <th className={styles.th}>{showStaleness ? 'Last Scraped' : 'Scraped'}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cards.map((c, i) => {
+            const age = daysSince(c.scraped_at)
+            return (
+              <tr key={i} className={styles.tr}>
+                <td className={styles.td}><strong>{c.player_name}</strong></td>
+                <td className={styles.td}>
+                  <span className={`${styles.sportTag} ${styles['sport_' + c.sport]}`}>{c.sport}</span>
+                </td>
+                <td className={styles.td}>{c.year} · {c.set_name}</td>
+                <td className={styles.td}>
+                  {c.variant !== 'Base' ? c.variant : <span className={styles.muted}>Base</span>}
+                </td>
+                <td className={styles.td}>
+                  <span className={`${styles.tierBadge} ${styles['tier_' + c.scrape_tier]}`}>{c.scrape_tier}</span>
+                </td>
+                <td className={`${styles.td} ${styles.thRight}`}>${c.fair_value.toFixed(2)}</td>
+                <td className={`${styles.td} ${styles.thRight}`}>
+                  <span className={c.num_sales === 1 ? styles.textWarn : ''}>{c.num_sales ?? '—'}</span>
+                </td>
+                <td className={styles.td}>
+                  {c.scraped_at ? (
+                    <span className={showStaleness && age > 60 ? styles.textDanger : showStaleness && age > 30 ? styles.textWarn : ''}>
+                      {age != null ? `${age}d ago` : '—'}
+                    </span>
+                  ) : <span className={styles.textDanger}>Never</span>}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }

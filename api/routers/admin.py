@@ -351,6 +351,106 @@ def get_scrape_runs_summary(_admin: str = Depends(_require_admin)):
     return {"workflows": workflows, "anomalies": anomalies}
 
 
+@router.get("/data-quality")
+def get_data_quality(_admin: str = Depends(_require_admin)):
+    """Data quality metrics: freshness, confidence, gaps."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = '20s'")
+
+            # Global freshness / confidence stats
+            cur.execute("""
+                SELECT
+                    COUNT(*) FILTER (WHERE scraped_at < NOW() - INTERVAL '30 days')  AS stale_30,
+                    COUNT(*) FILTER (WHERE scraped_at < NOW() - INTERVAL '60 days')  AS stale_60,
+                    COUNT(*) FILTER (WHERE scraped_at < NOW() - INTERVAL '90 days')  AS stale_90,
+                    COUNT(*) FILTER (WHERE scraped_at IS NULL)                        AS never_scraped,
+                    COUNT(*) FILTER (WHERE num_sales = 1)                             AS single_sale,
+                    COUNT(*) FILTER (WHERE COALESCE(num_sales, 0) <= 2)               AS low_confidence,
+                    COUNT(*) FILTER (WHERE COALESCE(fair_value, 0) = 0)               AS zero_price
+                FROM market_prices
+                WHERE NOT COALESCE(ignored, FALSE)
+            """)
+            row = cur.fetchone()
+            stats = {
+                'stale_30':       row[0], 'stale_60':       row[1],
+                'stale_90':       row[2], 'never_scraped':  row[3],
+                'single_sale':    row[4], 'low_confidence': row[5],
+                'zero_price':     row[6],
+            }
+
+            # Freshness breakdown by tier
+            cur.execute("""
+                SELECT
+                    cc.scrape_tier,
+                    COUNT(mp.id)                                                                      AS total,
+                    COUNT(mp.id) FILTER (WHERE mp.scraped_at >= NOW() - INTERVAL '7 days')           AS fresh_7d,
+                    COUNT(mp.id) FILTER (WHERE mp.scraped_at >= NOW() - INTERVAL '30 days'
+                                           AND mp.scraped_at <  NOW() - INTERVAL '7 days')           AS fresh_30d,
+                    COUNT(mp.id) FILTER (WHERE mp.scraped_at <  NOW() - INTERVAL '30 days'
+                                           OR  mp.scraped_at IS NULL)                                AS stale
+                FROM market_prices mp
+                JOIN card_catalog cc ON cc.id = mp.card_catalog_id
+                WHERE NOT COALESCE(mp.ignored, FALSE)
+                GROUP BY cc.scrape_tier
+                ORDER BY cc.scrape_tier
+            """)
+            freshness_by_tier = [
+                {'tier': r[0], 'total': r[1], 'fresh_7d': r[2], 'fresh_30d': r[3], 'stale': r[4]}
+                for r in cur.fetchall()
+            ]
+
+            # Priority stale cards (staple/premium, >30 days old, still have value)
+            cur.execute("""
+                SELECT
+                    cc.player_name, cc.sport, cc.year, cc.set_name, cc.variant,
+                    mp.fair_value, mp.num_sales, mp.scraped_at, cc.scrape_tier
+                FROM market_prices mp
+                JOIN card_catalog cc ON cc.id = mp.card_catalog_id
+                WHERE (mp.scraped_at < NOW() - INTERVAL '30 days' OR mp.scraped_at IS NULL)
+                  AND cc.scrape_tier IN ('staple', 'premium')
+                  AND NOT COALESCE(mp.ignored, FALSE)
+                  AND mp.fair_value > 0
+                ORDER BY mp.scraped_at ASC NULLS FIRST
+                LIMIT 50
+            """)
+            cols = [d[0] for d in cur.description]
+            stale_cards = []
+            for row in cur.fetchall():
+                r = dict(zip(cols, row))
+                r['fair_value'] = float(r['fair_value']) if r['fair_value'] else 0
+                r['scraped_at'] = r['scraped_at'].isoformat() if r['scraped_at'] else None
+                stale_cards.append(r)
+
+            # Low-confidence cards (1 sale, value > $5 — most likely to be wrong)
+            cur.execute("""
+                SELECT
+                    cc.player_name, cc.sport, cc.year, cc.set_name, cc.variant,
+                    mp.fair_value, mp.num_sales, mp.scraped_at, cc.scrape_tier
+                FROM market_prices mp
+                JOIN card_catalog cc ON cc.id = mp.card_catalog_id
+                WHERE mp.num_sales = 1
+                  AND mp.fair_value > 5
+                  AND NOT COALESCE(mp.ignored, FALSE)
+                ORDER BY mp.fair_value DESC
+                LIMIT 50
+            """)
+            cols = [d[0] for d in cur.description]
+            low_conf_cards = []
+            for row in cur.fetchall():
+                r = dict(zip(cols, row))
+                r['fair_value'] = float(r['fair_value']) if r['fair_value'] else 0
+                r['scraped_at'] = r['scraped_at'].isoformat() if r['scraped_at'] else None
+                low_conf_cards.append(r)
+
+    return {
+        'stats':              stats,
+        'freshness_by_tier':  freshness_by_tier,
+        'stale_cards':        stale_cards,
+        'low_confidence_cards': low_conf_cards,
+    }
+
+
 @router.get("/scrape-runs")
 def get_scrape_runs(
     limit: int = 50,

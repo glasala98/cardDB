@@ -12,3 +12,4 @@ export const getPipelineHealth = ()                  => client.get('/admin/pipel
 export const getWorkflowStatus = ()                  => client.get('/stats/workflow-status')
 export const getScrapeRuns        = (limit = 50, workflow = null) => client.get('/admin/scrape-runs', { params: { limit, ...(workflow && { workflow }) } })
 export const getScrapeRunsSummary = ()                            => client.get('/admin/scrape-runs/summary')
+export const getDataQuality       = ()                            => client.get('/admin/data-quality')

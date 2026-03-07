@@ -425,3 +425,48 @@
 /* wf_completed / wf_running status badges */
 .wf_completed { background: rgba(0,201,122,0.12); color: #00c97a; }
 .wf_running   { background: rgba(255,179,50,0.12); color: #ffb332; }
+
+/* ── Runs tab — date range pills + refresh ─────────────────────────────────── */
+.dateRangePills { display: flex; gap: 4px; }
+.dateRangePill {
+  background: none; border: 1px solid var(--border); border-radius: 20px;
+  padding: 5px 11px; font-size: 11px; font-weight: 600; font-family: var(--font);
+  color: var(--text-muted); cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.dateRangePill:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.dateRangePillActive {
+  background: rgba(0,212,170,0.12); border-color: rgba(0,212,170,0.4);
+  color: var(--accent);
+}
+.refreshBtn {
+  margin-left: auto; background: none; border: 1px solid var(--border); border-radius: 8px;
+  padding: 6px 12px; font-size: 12px; font-weight: 600; font-family: var(--font);
+  color: var(--text-secondary); cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.refreshBtn:hover:not(:disabled) { color: var(--accent); border-color: rgba(0,212,170,0.4); }
+.refreshBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Quality tab ───────────────────────────────────────────────────────────── */
+.qualityWrap { display: flex; flex-direction: column; gap: 0; }
+
+/* Freshness stacked bar */
+.freshnessBar {
+  display: flex; height: 7px; border-radius: 4px; overflow: hidden;
+  width: 140px; background: var(--bg-secondary); gap: 0;
+}
+.freshSeg    { height: 100%; transition: width 0.3s; min-width: 0; }
+.freshGreen  { background: var(--success); }
+.freshYellow { background: #ffb332; }
+.freshRed    { background: var(--danger); }
+
+/* View toggle pills */
+.qualityToggle { display: flex; gap: 6px; margin-bottom: 12px; margin-top: 20px; }
+.qualityPill {
+  background: none; border: 1px solid var(--border); border-radius: 20px;
+  padding: 6px 14px; font-size: 12px; font-weight: 600; font-family: var(--font);
+  color: var(--text-muted); cursor: pointer; transition: all 0.15s;
+}
+.qualityPill:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.qualityPillActive {
+  background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.4); color: var(--accent);
+}
