@@ -324,12 +324,12 @@
   /* Hide logo on mobile */
   .logo { display: none; }
 
-  /* User area: compact row above tabs */
+  /* User area: compact row below tabs */
   .userArea {
     margin-top: 0;
     padding: 0 12px;
-    border-top: none;
-    border-bottom: 1px solid var(--border);
+    border-top: 1px solid var(--border);
+    border-bottom: none;
     flex-direction: row;
     align-items: center;
     gap: 8px;
@@ -344,7 +344,8 @@
     flex-direction: row;
     padding: 6px 10px;
     gap: 8px;
-    border-bottom: 1px solid var(--border);
+    border-top: 1px solid var(--border);
+    border-bottom: none;
     order: 0;
   }
 
@@ -414,14 +415,16 @@
     gap: 6px;
     height: 44px;
     padding: 0 12px;
-    border-bottom: 1px solid var(--border);
+    border-top: 1px solid var(--border);
     background: var(--bg-secondary);
     order: 1;
   }
-  /* Tab bar moves below sub-nav */
-  .links { order: 2; }
-  /* User/auth area stays on top */
-  .userArea, .authArea { order: 0; }
+  /* Tab bar at top of bottom nav (closest to page content) */
+  .links { order: 0; }
+  /* Sub-nav in middle */
+  .subNav { order: 1; }
+  /* User/auth area at very bottom */
+  .userArea, .authArea { order: 2; }
 
   .subNavLink {
     padding: 5px 14px;
