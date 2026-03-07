@@ -222,6 +222,18 @@
   color: var(--text-secondary);
 }
 
+.variantInline {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(160, 120, 255, 0.1);
+  color: #a07ff0;
+  border: 1px solid rgba(160, 120, 255, 0.2);
+  white-space: nowrap;
+}
+
 /* ── Price cell ────────────────────────────────────────── */
 .priceCell {
   display: flex;

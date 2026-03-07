@@ -24,9 +24,9 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 20px 18px 18px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .logoImg {
@@ -79,6 +79,34 @@
   gap: 1px;
   padding: 8px 8px;
   flex: 1;
+}
+
+.navGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.subLinks {
+  list-style: none;
+  padding: 2px 0 4px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.subLink {
+  display: block;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  transition: color 0.12s, background 0.12s;
+}
+.subLink:hover { color: var(--text-primary); background: rgba(255,255,255,0.04); }
+.subActive {
+  color: var(--accent) !important;
+  font-weight: 600;
 }
 
 .link {

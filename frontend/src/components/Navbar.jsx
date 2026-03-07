@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { usePublicMode } from '../context/PublicModeContext'
 import HelpModal from './HelpModal'
@@ -67,14 +67,33 @@ const Icons = {
 }
 
 const NAV_ITEMS = [
-  { to: '/catalog',   label: 'Catalog',   Icon: Icons.Catalog,   public: true  },
-  { to: '/ledger',    label: 'Ledger',    Icon: Icons.Ledger,    public: false },
-  { to: '/portfolio', label: 'Portfolio', Icon: Icons.Portfolio,  public: false },
+  {
+    to: '/catalog', label: 'Catalog', Icon: Icons.Catalog, public: true,
+    sub: [
+      { to: '/catalog',    label: 'Browse'        },
+      { to: '/collection', label: 'My Collection', auth: true },
+    ],
+  },
+  {
+    to: '/ledger', label: 'Ledger', Icon: Icons.Ledger, public: false,
+    sub: [
+      { to: '/ledger',  label: 'Active'  },
+      { to: '/archive', label: 'Archive' },
+    ],
+  },
+  {
+    to: '/portfolio', label: 'Portfolio', Icon: Icons.Portfolio, public: false,
+    sub: [
+      { to: '/portfolio', label: 'Overview' },
+      { to: '/charts',    label: 'Charts'   },
+    ],
+  },
 ]
 
 export default function Navbar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const isPublic = usePublicMode()
   const [showHelp, setShowHelp] = useState(false)
 
@@ -98,17 +117,35 @@ export default function Navbar() {
       </div>
 
       <ul className={styles.links}>
-        {NAV_ITEMS.filter(item => user || item.public).map(({ to, label, Icon }) => (
-          <li key={to}>
-            <NavLink
-              to={to}
-              className={({ isActive }) => `${styles.link} ${isActive ? styles.active : ''}`}
-            >
-              <span className={styles.icon}><Icon /></span>
-              <span className={styles.label}>{label}</span>
-            </NavLink>
-          </li>
-        ))}
+        {NAV_ITEMS.filter(item => user || item.public).map(({ to, label, Icon, sub }) => {
+          const sectionActive = sub ? sub.some(s => pathname === s.to) : pathname === to
+          return (
+            <li key={to} className={styles.navGroup}>
+              <NavLink
+                to={to}
+                className={`${styles.link} ${sectionActive ? styles.active : ''}`}
+              >
+                <span className={styles.icon}><Icon /></span>
+                <span className={styles.label}>{label}</span>
+              </NavLink>
+              {sub && sectionActive && (
+                <ul className={styles.subLinks}>
+                  {sub.filter(s => !s.auth || user).map(s => (
+                    <li key={s.to}>
+                      <NavLink
+                        to={s.to}
+                        end
+                        className={({ isActive }) => `${styles.subLink} ${isActive ? styles.subActive : ''}`}
+                      >
+                        {s.label}
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          )
+        })}
         {/* Settings tab — visible only on mobile via CSS, only when logged in */}
         {user && (
           <li className={styles.mobileSettingsTab}>

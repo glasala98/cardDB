@@ -27,12 +27,12 @@ const SPORT_COLORS = {
 
 // Optional columns that the user can toggle
 const OPTIONAL_COLS = [
-  { key: 'variant',    label: 'Variant'    },
   { key: 'team',       label: 'Team'       },
   { key: 'confidence', label: 'Confidence' },
   { key: 'num_sales',  label: 'Sales'      },
+  { key: 'variant',    label: 'Variant'    },
 ]
-const DEFAULT_VISIBLE = { variant: true, team: false, confidence: false, num_sales: false }
+const DEFAULT_VISIBLE = { team: false, confidence: true, num_sales: true, variant: false }
 
 function loadColPrefs() {
   try {
@@ -384,15 +384,18 @@ export default function Catalog() {
                           {row.year}
                           {row.set_name ? ` · ${row.set_name}` : ''}
                           {row.card_number ? ` · #${row.card_number}` : ''}
+                          {row.variant && row.variant !== 'Base' && (
+                            <span className={styles.variantInline}>{row.variant}</span>
+                          )}
                         </div>
                       </div>
                     </td>
 
-                    {/* Optional: Variant */}
+                    {/* Optional: Variant (full column when toggled on) */}
                     {visibleCols.variant && (
                       <td className={styles.td}>
                         <span className={styles.variantLabel}>
-                          {row.variant && row.variant !== 'Base' ? row.variant : <span className={styles.muted}>—</span>}
+                          {row.variant && row.variant !== 'Base' ? row.variant : <span className={styles.muted}>Base</span>}
                         </span>
                       </td>
                     )}
