@@ -1,0 +1,43 @@
+/* Hidden on desktop — only appears on mobile */
+.strip {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .strip {
+    display: flex;
+    gap: 6px;
+    padding: 0 0 16px 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    flex-shrink: 0;
+  }
+  .strip::-webkit-scrollbar { display: none; }
+
+  .pill {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: var(--font);
+    color: var(--text-secondary);
+    white-space: nowrap;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    flex-shrink: 0;
+  }
+  .pill:hover {
+    color: var(--text-primary);
+    border-color: var(--border-strong, var(--border));
+  }
+
+  .pillActive {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #000;
+    font-weight: 600;
+  }
+}

@@ -5,6 +5,7 @@ import { PublicModeProvider } from './context/PublicModeContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import AdminRoute from './components/AdminRoute'
 import Navbar from './components/Navbar'
+import MobileSubNav from './components/MobileSubNav'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
 import CardLedger from './pages/CardLedger'
@@ -27,6 +28,7 @@ function AppShell() {
     <div className={styles.layout}>
       <Navbar />
       <main className={styles.main}>
+        <MobileSubNav />
         <Routes>
           <Route path="/" element={<Navigate to="/catalog" replace />} />
           <Route path="/catalog"         element={<Catalog />} />
