@@ -310,7 +310,33 @@ export default function Catalog() {
 
       {/* Table */}
       {loading && cards.length === 0 ? (
-        <div className={pageStyles.status}>Loading...</div>
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th className={styles.th} style={{ width: 44 }} />
+                <th className={styles.th}>Card</th>
+                <th className={`${styles.th} ${styles.thRight}`}>Price</th>
+                <th className={styles.th} style={{ width: 72 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: 12 }).map((_, i) => (
+                <tr key={i} className={styles.skeletonRow}>
+                  <td className={styles.tdThumb}><div className={styles.skeletonThumb} /></td>
+                  <td>
+                    <div className={styles.cardCell}>
+                      <div className={styles.skeletonBlock} style={{ width: `${120 + (i % 4) * 30}px`, height: 14 }} />
+                      <div className={styles.skeletonBlock} style={{ width: `${80 + (i % 3) * 20}px`, height: 11, marginTop: 4 }} />
+                    </div>
+                  </td>
+                  <td className={styles.tdRight}><div className={styles.skeletonBlock} style={{ width: 52, height: 14, marginLeft: 'auto' }} /></td>
+                  <td className={styles.tdAction}><div className={styles.skeletonBlock} style={{ width: 44, height: 24, marginLeft: 'auto' }} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : cards.length === 0 ? (
         <div className={pageStyles.status}>No cards found.</div>
       ) : (

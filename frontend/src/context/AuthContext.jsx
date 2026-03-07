@@ -59,3 +59,9 @@ export function useIsGuest() {
   const { user } = useContext(AuthContext)
   return user?.role === 'guest'
 }
+
+/** Returns true when the logged-in user has the 'admin' role. */
+export function useIsAdmin() {
+  const { user } = useContext(AuthContext)
+  return user?.role === 'admin'
+}

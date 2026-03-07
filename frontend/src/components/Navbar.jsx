@@ -70,7 +70,8 @@ const NAV_ITEMS = [
   {
     to: '/catalog', label: 'Catalog', Icon: Icons.Catalog, public: true,
     sub: [
-      { to: '/catalog',    label: 'Browse'        },
+      { to: '/catalog',    label: 'Browse'         },
+      { to: '/releases',   label: 'New Releases'   },
       { to: '/collection', label: 'My Collection', auth: true },
     ],
   },
@@ -118,7 +119,9 @@ export default function Navbar() {
 
       <ul className={styles.links}>
         {NAV_ITEMS.filter(item => user || item.public).map(({ to, label, Icon, sub }) => {
-          const sectionActive = sub ? sub.some(s => pathname === s.to) : pathname === to
+          const sectionActive = sub
+            ? sub.some(s => pathname === s.to || pathname.startsWith(s.to + '/'))
+            : pathname === to || pathname.startsWith(to + '/')
           return (
             <li key={to} className={styles.navGroup}>
               <NavLink

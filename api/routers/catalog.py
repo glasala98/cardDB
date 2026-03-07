@@ -206,6 +206,102 @@ def catalog_card_history(catalog_id: int):
     return {"card": card, "history": history}
 
 
+@router.get("/releases")
+def new_releases(
+    sport:   Optional[str] = Query(None),
+    days:    int           = Query(60, ge=1, le=365),
+    limit:   int           = Query(30, ge=1, le=100),
+):
+    """Return recently indexed sets grouped by (sport, year, set_name).
+
+    Ordered by the date the set first appeared in the catalog (MAX created_at DESC).
+    Joins market_prices to surface top_value (highest priced card) and avg_value.
+
+    Args:
+        sport: Filter to one sport.
+        days:  Look-back window in days (default 60).
+        limit: Max number of sets to return.
+
+    Returns:
+        Dict with key 'sets', each entry containing sport/year/set_name/brand,
+        card_count, priced_count, top_value, avg_value, indexed_at (ISO string),
+        and top_cards (list of up to 5 cards with name + fair_value + is_rookie).
+    """
+    where_parts = ["cc.created_at >= NOW() - INTERVAL '%s days'"]
+    params: list = [days]
+
+    if sport:
+        where_parts.append("cc.sport = %s")
+        params.append(sport.upper())
+
+    where_sql = "WHERE " + " AND ".join(where_parts)
+
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SET statement_timeout = '10s'")
+
+        # Aggregate per set
+        cur.execute(f"""
+            SELECT
+                cc.sport,
+                cc.year,
+                cc.set_name,
+                cc.brand,
+                COUNT(*)                        AS card_count,
+                COUNT(mp.id)                    AS priced_count,
+                MAX(mp.fair_value)              AS top_value,
+                AVG(mp.fair_value)              AS avg_value,
+                MAX(cc.created_at)              AS indexed_at
+            FROM card_catalog cc
+            LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
+            {where_sql}
+            GROUP BY cc.sport, cc.year, cc.set_name, cc.brand
+            ORDER BY indexed_at DESC
+            LIMIT %s
+        """, params + [limit])
+
+        set_cols = [d[0] for d in cur.description]
+        set_rows = [dict(zip(set_cols, r)) for r in cur.fetchall()]
+
+        # For each set, fetch top 5 cards by fair_value
+        result_sets = []
+        for s in set_rows:
+            cur.execute("""
+                SELECT cc.player_name, cc.is_rookie, cc.variant, mp.fair_value, cc.id
+                FROM card_catalog cc
+                JOIN market_prices mp ON mp.card_catalog_id = cc.id
+                WHERE cc.sport = %s AND cc.year = %s AND cc.set_name = %s
+                  AND mp.fair_value IS NOT NULL
+                ORDER BY mp.fair_value DESC
+                LIMIT 5
+            """, [s["sport"], s["year"], s["set_name"]])
+            top_cards = [
+                {
+                    "id":          r[4],
+                    "player_name": r[0],
+                    "is_rookie":   r[1],
+                    "variant":     r[2],
+                    "fair_value":  float(r[3]) if r[3] is not None else None,
+                }
+                for r in cur.fetchall()
+            ]
+
+            result_sets.append({
+                "sport":        s["sport"],
+                "year":         s["year"],
+                "set_name":     s["set_name"],
+                "brand":        s["brand"],
+                "card_count":   s["card_count"],
+                "priced_count": s["priced_count"],
+                "top_value":    float(s["top_value"]) if s["top_value"] is not None else None,
+                "avg_value":    float(s["avg_value"]) if s["avg_value"] is not None else None,
+                "indexed_at":   s["indexed_at"].isoformat() if s["indexed_at"] else None,
+                "top_cards":    top_cards,
+            })
+
+    return {"sets": result_sets}
+
+
 @router.get("/filters")
 def catalog_filters(
     sport: Optional[str] = Query(None),

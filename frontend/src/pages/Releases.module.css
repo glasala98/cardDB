@@ -1,0 +1,231 @@
+/* ── Sport tabs ────────────────────────────────────────── */
+.sportTabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.tab {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-family: var(--font);
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tab:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.tabActive {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #000;
+  font-weight: 600;
+}
+
+/* ── Days filter ───────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.dayBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-family: var(--font);
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.dayBtn:hover { color: var(--text-secondary); border-color: var(--border-strong); }
+.dayBtnActive {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+  background: rgba(0, 212, 170, 0.06);
+}
+
+/* ── Set card grid ─────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.setCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.setCard:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(0, 212, 170, 0.15);
+}
+
+/* ── Set card header ───────────────────────────────────── */
+.setHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sportBadge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.indexedAt {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* ── Set name ──────────────────────────────────────────── */
+.setName {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.setMeta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: -6px;
+}
+
+/* ── Stats row ─────────────────────────────────────────── */
+.statsRow {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border-radius: 7px;
+  border: 1px solid var(--border);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.statVal {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.statHighlight {
+  color: var(--accent);
+}
+
+.statLabel {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 500;
+}
+
+/* ── Top cards list ────────────────────────────────────── */
+.topCards {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.topCard {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+.topCards .topCard:last-child { border-bottom: none; }
+
+.topCardRank {
+  font-size: 10px;
+  color: var(--text-muted);
+  width: 18px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.topCardName {
+  flex: 1;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rcBadge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(0, 212, 170, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(0, 212, 170, 0.25);
+  flex-shrink: 0;
+}
+
+.topCardPrice {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ── View link ─────────────────────────────────────────── */
+.viewLink {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 600;
+  margin-top: 2px;
+  opacity: 0.75;
+  transition: opacity 0.12s;
+}
+.setCard:hover .viewLink { opacity: 1; }
+
+/* ── Skeleton ──────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+
+.skeletonCard { cursor: default; }
+.skeletonCard:hover { border-color: var(--border); box-shadow: none; }
+
+.skeletonBlock {
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--bg-card) 25%, var(--bg-secondary) 50%, var(--bg-card) 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.4s infinite linear;
+}

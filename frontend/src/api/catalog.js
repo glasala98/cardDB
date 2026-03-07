@@ -15,3 +15,7 @@ export const getCatalogFilters = (sport = null, year = null) => {
 /** Get price history for a single catalog card. */
 export const getCatalogCardHistory = (catalogId) =>
   client.get(`/catalog/${catalogId}/history`)
+
+/** Get recently indexed sets for the Releases page. */
+export const getNewReleases = (params = {}) =>
+  client.get('/catalog/releases', { params })

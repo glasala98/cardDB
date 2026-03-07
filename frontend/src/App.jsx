@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext'
 import { CurrencyProvider } from './context/CurrencyContext'
 import { PublicModeProvider } from './context/PublicModeContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import AdminRoute from './components/AdminRoute'
 import Navbar from './components/Navbar'
 import Login from './pages/Login'
 import Signup from './pages/Signup'
@@ -17,6 +18,7 @@ import Admin from './pages/Admin'
 import Catalog from './pages/Catalog'
 import Collection from './pages/Collection'
 import Settings from './pages/Settings'
+import Releases from './pages/Releases'
 import { PreferencesProvider } from './context/PreferencesContext'
 import styles from './App.module.css'
 
@@ -37,7 +39,8 @@ function AppShell() {
           <Route path="/nhl-stats"       element={<ProtectedRoute><NHLStats /></ProtectedRoute>} />
           <Route path="/archive"         element={<ProtectedRoute><Archive /></ProtectedRoute>} />
           <Route path="/charts"          element={<ProtectedRoute><Charts /></ProtectedRoute>} />
-          <Route path="/admin"           element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+          <Route path="/admin"           element={<AdminRoute><Admin /></AdminRoute>} />
+          <Route path="/releases"        element={<Releases />} />
         </Routes>
       </main>
     </div>

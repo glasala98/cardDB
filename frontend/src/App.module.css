@@ -15,6 +15,6 @@
   }
   .main {
     padding: 16px;
-    padding-bottom: 80px; /* clearance for bottom tab bar */
+    padding-bottom: 120px; /* clearance for bottom nav (user row 40px + tab bar 62px + border + buffer) */
   }
 }
