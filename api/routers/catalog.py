@@ -279,16 +279,22 @@ def new_releases(
         set_cols = [d[0] for d in cur.description]
         set_rows = [dict(zip(set_cols, r)) for r in cur.fetchall()]
 
-        # For each set, fetch top 5 cards by fair_value
+        # For each set, fetch top 5 UNIQUE players by best card fair_value
         result_sets = []
         for s in set_rows:
             cur.execute("""
-                SELECT cc.player_name, cc.is_rookie, cc.variant, mp.fair_value, cc.id
-                FROM card_catalog cc
-                JOIN market_prices mp ON mp.card_catalog_id = cc.id
-                WHERE cc.sport = %s AND cc.year = %s AND cc.set_name = %s
-                  AND mp.fair_value IS NOT NULL
-                ORDER BY mp.fair_value DESC
+                SELECT player_name, is_rookie, variant, fair_value, id
+                FROM (
+                    SELECT DISTINCT ON (cc.player_name)
+                        cc.player_name, cc.is_rookie, cc.variant, mp.fair_value, cc.id
+                    FROM card_catalog cc
+                    JOIN market_prices mp ON mp.card_catalog_id = cc.id
+                    WHERE cc.sport = %s AND cc.year = %s AND cc.set_name = %s
+                      AND mp.fair_value IS NOT NULL
+                      AND NOT COALESCE(mp.ignored, FALSE)
+                    ORDER BY cc.player_name, mp.fair_value DESC
+                ) deduped
+                ORDER BY fair_value DESC
                 LIMIT 5
             """, [s["sport"], s["year"], s["set_name"]])
             top_cards = [

@@ -6,6 +6,12 @@ import styles from './Releases.module.css'
 import pageStyles from './Page.module.css'
 
 const SPORTS = ['NHL', 'NBA', 'NFL', 'MLB']
+
+// Only show RC badge when the variant name confirms it's a rookie-type card.
+// Prevents veteran players with wrong is_rookie flags showing false RC badges.
+const RC_KEYWORDS = ['young gun', 'rookie', ' rc', 'young stars', 'debut', 'first']
+const isActualRC = (card) =>
+  card.is_rookie && RC_KEYWORDS.some(k => (card.variant || '').toLowerCase().includes(k))
 const SEASON_OPTIONS = [
   { label: 'Current Season', value: 1 },
   { label: 'Last 2 Seasons', value: 2 },
@@ -173,7 +179,7 @@ export default function Releases() {
                       <div key={ci} className={styles.topCard}>
                         <span className={styles.topCardRank}>#{ci + 1}</span>
                         <span className={styles.topCardName}>{c.player_name}</span>
-                        {c.is_rookie && <span className={styles.rcBadge}>RC</span>}
+                        {isActualRC(c) && <span className={styles.rcBadge}>RC</span>}
                         {c.fair_value != null && (
                           <span className={styles.topCardPrice}>{fmtPrice(c.fair_value)}</span>
                         )}
