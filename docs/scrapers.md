@@ -1,183 +1,241 @@
-# Scraper Scripts — Reference
+# CardDB — Scraper Reference
 
-Five Python scripts handle all data collection. Run via GitHub Actions (automated), local CLI, or triggered by the "Rescrape All" button in the frontend.
+All scraping is cloud-only. Scripts run on GitHub Actions runners — never locally. Chrome/Selenium is installed fresh on each runner via the workflow setup steps.
 
 ---
 
 ## scrape_card_prices.py — eBay Scraping Engine
 
-Shared scraping library. Not run directly — imported by `daily_scrape.py`, `scrape_master_db.py`, and the FastAPI `cards` router.
+Shared library. Not run directly — imported by `scrape_master_db.py`, `daily_scrape.py`, and the FastAPI `cards` router (for single-card scrapes).
 
 ### 4-Stage Search Strategy
 
-| Stage | Query | Confidence |
-|-------|-------|-----------|
-| 1 | Exact: player + card# + parallel + serial + year + brand | `high` |
-| 2 | Set: player + card# + year + set name (no parallel) | `medium` |
-| 3 | Broad: player + card# + serial + year only | `low` |
-| 4 | Serial comps: find nearby serials, adjust by multiplier | `estimated` |
+Each card goes through up to 4 search stages until sales are found:
 
-No sales at any stage → confidence `none`, value = `$5.00` default.
+| Stage | Query | Confidence |
+|---|---|---|
+| 1 | Player + card# + parallel + serial + year + set | `high` |
+| 2 | Player + card# + serial + set (no parallel name) | `medium` |
+| 3 | Player + card# + serial + year only | `low` |
+| 4 | Nearest serial comps × `serial_multiplier()` | `estimated` |
+
+No sales at any stage → `confidence: none`, value = `$5.00` default.
 
 ### Key Functions
 
 **`process_card(card_name) → (card_name, result_dict)`**
-Main entry point. Runs 4-stage search. Result keys: `estimated_value`, `confidence`, `stats`, `raw_sales`, `search_url`, `image_url`.
+Main entry point. Runs 4-stage search. Result keys:
+- `estimated_value` — fair value (CAD)
+- `confidence` — high / medium / low / estimated / none / not found
+- `stats` — `{median, min, max, num_sales, top3}`
+- `raw_sales` — list of individual sale dicts
+- `search_url` — eBay URL used
+- `image_url` / `image_url_back` — fetched listing images
 
 **`search_ebay_sold(driver, card_name, max_results=240) → list[dict]`**
-Selenium scrape of eBay sold listings. Each sale: `title`, `price_val`, `shipping`, `sold_date`, `listing_url`, `image_url`. Filters to exact grade for graded cards.
+Selenium scrape of eBay "sold listings". Each sale dict:
+```python
+{
+  "title": "2023-24 Upper Deck Young Guns Bedard #201",
+  "price_val": 45.00,
+  "shipping": 5.00,
+  "sold_date": "2026-02-15",
+  "listing_url": "https://ebay.com/...",
+  "image_url": "https://i.ebayimg.com/..."
+}
+```
 
 **`calculate_fair_price(sales, target_serial=None) → (float, dict)`**
-1. Remove outliers (>3× or <1/3 median)
+1. Remove outliers (price > 3× median or < ⅓ median)
 2. Sort by recency
-3. Median of top 3 recent sales
-4. Trend: `up`/`down`/`stable` (last 3 vs previous 3)
+3. Median of top 3 recent sales = fair value
+4. Trend: compare average of last 3 sales vs previous 3 (`up`/`down`/`stable`)
 
 **`serial_multiplier(from_serial, to_serial) → float`**
-Price adjustment between two print runs using `SERIAL_VALUE` table (maps /1, /5, /10, /25, /50, /99, /199 … to relative values).
+Adjusts price between print runs using the `SERIAL_VALUE` table. Values mapped for: /1, /5, /10, /25, /50, /99, /199, /249, /299, /399, /499, /999, unlimited. Used in Stage 4 (estimated confidence).
+
+**`build_set_query(card) / build_simplified_query(card)`**
+Construct stage-2 and stage-3 eBay search strings from a card name.
 
 **`create_driver() / get_driver()`**
-Headless Chrome with memory-saving flags. `get_driver()` returns a thread-local driver.
+Headless Chrome with memory flags: `--headless`, `--disable-gpu`, `--no-sandbox`, `--disable-dev-shm-usage`, `--disable-images`. `get_driver()` returns a thread-local driver — one Chrome instance per worker thread.
 
 ---
 
-## daily_scrape.py — Personal Ledger Scraper
+### Variant Filter — `_apply_variant_filter(card_name, sales)`
 
-Scrapes all cards in the user ledger (`cards` table) and writes updated prices to PostgreSQL.
+Strips sales that belong to a different parallel than the card being priced.
 
-### Usage
-```bash
-python daily_scrape.py                 # all users, 3 workers
-python daily_scrape.py --workers 5
-python daily_scrape.py --user admin    # one user only
+**How it works:**
+1. Extract the card's variant keyword from its name via `_extract_variant_keyword()`
+2. Keep only sales whose listing title contains that keyword
+3. Exclude sales whose title contains a "superset" — a longer variant name that contains the matched keyword as a substring (e.g. when matching "Rainbow", exclude "Rainbow Foil" and "Rainbow Color Wheel" sales)
+4. For aliases (Auto ↔ Autograph): accept both spellings as equivalent
+
+**`_VARIANT_KEYWORDS`** — ordered list of 130+ known parallel names. More specific multi-word variants appear before single-word ones so extraction matches the most specific parallel first.
+
+**`_VARIANT_ALIASES`** — synonym map:
+```python
+{'auto': {'autograph'}, 'autograph': {'auto'}}
 ```
+Sellers use "Autograph" and "Auto" interchangeably for the same type of card.
 
-### What it does
-1. Gets user list from `users.yaml`
-2. For each user: loads cards from `cards` table
-3. Scrapes all cards in parallel via `process_card()`
-4. Writes to `cards` table: `fair_value`, `trend`, `min_price`, `max_price`, `num_sales`
-5. Appends to `card_price_history`: one row per card per day
-6. Appends to `portfolio_history`: daily total value snapshot
+**`_WORD_BOUNDARY_VARIANTS`** — short variants that need regex `\b` word-boundary matching to avoid false positives:
+```python
+{'ice', 'sp', 'ssp', 'mini', 'silk', 'wave', 'laser', 'clear', 'error'}
+```
+Without boundaries, "ice" would match "price", "sp" would match "display".
+
+**`_kw_in_title(keyword, title) → bool`**
+Applies word-boundary regex for variants in `_WORD_BOUNDARY_VARIANTS`, plain substring check for all others.
+
+**Superset exclusion logic:**
+```python
+# For variant "Rainbow", supersets = ["rainbow foil", "rainbow color wheel",
+#                                       "speckled rainbow", "retro rainbow"]
+# A title matching any superset is a different card → excluded
+supersets = [
+    kw.lower() for kw in _VARIANT_KEYWORDS
+    if kw.lower() != v_lower
+    and v_lower in kw.lower()
+    and kw.lower() not in aliases  # don't exclude aliases
+]
+```
 
 ---
 
 ## scrape_master_db.py — Catalog Market Price Scraper
 
-Scrapes cards from `card_catalog` and writes prices to `market_prices` + `market_price_history` (SCD Type 2).
-
-### Usage
-```bash
-python scrape_master_db.py --sport NHL --limit 500
-python scrape_master_db.py --sport MLB --workers 5
-python scrape_master_db.py --force       # re-scrape recently scraped cards too
-python scrape_master_db.py --sport NBA --limit 50  # test run
-```
+Reads from `card_catalog`, writes to `market_prices` + `market_price_history`. Supports raw prices and graded PSA/BGS prices.
 
 ### CLI Arguments
 
 | Argument | Default | Description |
-|----------|---------|-------------|
-| `--sport` | ALL | Filter to one sport (NHL/NBA/NFL/MLB) |
-| `--workers` | 3 | Parallel Chrome instances |
-| `--limit` | 0 | Max cards to process (0 = all) |
-| `--force` | False | Re-scrape even if recently scraped |
+|---|---|---|
+| `--sport` | ALL | Filter: NHL / NBA / NFL / MLB |
+| `--workers` | 3 | Parallel Chrome instances (thread pool) |
+| `--limit` | 0 | Max cards (0 = all) |
+| `--force` | False | Re-scrape recently scraped cards |
+| `--stale-days` | 7 | Skip cards scraped within N days |
+| `--rookies` | False | Only `is_rookie=true` cards |
+| `--year` | None | Filter to one year |
+| `--catalog-tier` | None | Filter: staple / premium / stars |
+| `--graded` | False | Scrape PSA/BGS graded prices instead of raw |
+| `--min-raw-value` | 5.0 | Min fair_value to qualify for graded scrape |
 
-### SCD Type 2 delta capture
-```sql
--- Only inserts a history row when fair_value has changed from the previous row.
--- No consecutive duplicate prices — true SCD Type 2.
-INSERT INTO market_price_history (card_catalog_id, scraped_at, fair_value, ...)
-SELECT ... WHERE NOT EXISTS (
-    SELECT 1 FROM market_price_history h
-    WHERE h.card_catalog_id = i.card_catalog_id
-      AND h.fair_value = i.fair_value
-      AND h.scraped_at = (SELECT MAX(scraped_at) FROM market_price_history
-                          WHERE card_catalog_id = i.card_catalog_id)
-)
+### Raw Price Mode (default)
+
+1. Query `card_catalog` for eligible cards (filtered by sport, tier, stale-days)
+2. For each card in parallel: `process_card()` → fair_value
+3. UPSERT `market_prices`: latest value, prev_value, trend, confidence
+4. Insert `market_price_history` only if value changed (SCD Type 2)
+
+**Progress counters:** done / found / not_found / errors / deltas (price changed)
+
+### Graded Price Mode (`--graded`)
+
+1. Query `card_catalog` joined with `market_prices` where `fair_value >= min_raw_value`
+2. For each card: probe PSA 10, PSA 9, PSA 8, BGS 10, BGS 9.5, BGS 9 in order
+   - Skip lower grade if higher grade found no sales
+3. Accumulate results into `graded_batch: dict[catalog_id → {grade: {fair_value, num_sales, min, max}}]`
+4. Flush batch via JSONB merge upsert:
+   ```sql
+   INSERT INTO market_prices (card_catalog_id, graded_data)
+   VALUES (%s, %s::jsonb)
+   ON CONFLICT (card_catalog_id)
+   DO UPDATE SET graded_data = market_prices.graded_data || EXCLUDED.graded_data
+   ```
+
+Graded scraping uses the same Chrome thread pool and `process_card()` engine — just with grade tokens appended to the card name (e.g. `"... [PSA 10]"`).
+
+### Thread Safety
+
+- One Chrome driver per thread (`threading.local()`)
+- Shared `_progress` dict protected by `threading.Lock()`
+- `ThreadPoolExecutor(max_workers=N)` — N = `--workers` argument
+
+---
+
+## daily_scrape.py — Personal Ledger Scraper
+
+Scrapes all cards in the `cards` table (user ledger) and writes updated prices.
+
+### What it does
+1. Loads all users from `users` DB table
+2. For each user: `SELECT * FROM cards WHERE user_id = ?`
+3. Scrapes all cards via `process_card()` in parallel
+4. Writes to `cards` table: `fair_value`, `trend`, `min_price`, `max_price`, `num_sales`, `top3_prices`, `confidence`, `last_scraped`
+5. Appends to `card_price_history`: one row per card per day
+6. Appends to `portfolio_history`: daily total value snapshot
+
+### Usage
+```bash
+python daily_scrape.py --workers 3
+python daily_scrape.py --user admin    # one user only
 ```
-
-### Output tables
-| Table | What's written |
-|-------|---------------|
-| `market_prices` | UPSERT: latest fair_value, prev_value, trend, confidence, num_sales |
-| `market_price_history` | INSERT only when price changed (SCD Type 2) |
 
 ---
 
 ## scrape_beckett_catalog.py — Card Catalog Populator
 
-Populates `card_catalog` with all cards ever produced, sourced from TCDB, CLI, and CBC.
+Populates `card_catalog` with all cards ever produced, from 3 sources.
+
+### Sources
+
+| Source | URL | Method | Era |
+|---|---|---|---|
+| TCDB | tradingcarddatabase.com | `curl_cffi` with `impersonate="chrome124"` (Cloudflare bypass) | All eras |
+| CLI | checklistinsider.com | Standard requests | 2022+ |
+| CBC | cardboardconnection.com | requests + BeautifulSoup | 2008–2023 |
+
+### Checkpoint System
+
+`catalog_checkpoint.json` stores completed set keys as `"{source}|{sport}|{year}|{set_name}"`. On restart, already-completed sets are skipped. Safe to interrupt and resume at any time.
+
+### TCDB Rate Limiting
+
+- 1.5–3s between year-index requests
+- 0.5–1.2s between set-level requests
+- Exponential backoff on 429: 30 → 60 → 120 → 240s
+- ~3,500+ premium/autograph sets require TCDB login credentials — skipped without them
+
+### Output
+Upsert on `(sport, year, set_name, card_number, player_name, variant)`. Updates `team`, `is_rookie`, `is_parallel`, `updated_at` if row already exists.
 
 ### Usage
 ```bash
-# TCDB — all eras
-python scrape_beckett_catalog.py --source tcdb --sport NHL --year-from 1906
-python scrape_beckett_catalog.py --source tcdb --sport MLB --year-from 1869
-
-# CLI — modern sets (2022+)
+python scrape_beckett_catalog.py --source tcdb --sport NHL --year-from 1951
 python scrape_beckett_catalog.py --source cli --sport NHL --year-from 2022
-
-# CBC — mid-era (2008–2023)
-python scrape_beckett_catalog.py --source cbc --sport NFL --year-from 2008
-
-# Year range split for parallel runs
-python scrape_beckett_catalog.py --source tcdb --sport MLB --year-from 2000 --year-to 2010
+python scrape_beckett_catalog.py --source cbc --sport NFL --year-from 2008 --year-to 2023
 ```
-
-### Source Coverage
-
-| Source | Sports | Years |
-|--------|--------|-------|
-| TCDB (tradingcarddatabase.com) | All | All eras |
-| CLI (checklistinsider.com) | NHL, MLB | 2022–2026 |
-| CBC (cardboardconnection.com) | NFL, MLB | 2008–2023 |
-
-### TCDB specifics
-- Uses `curl_cffi` with `impersonate="chrome124"` to bypass Cloudflare — regular requests/Selenium fail
-- Rate limiting: 1.5–3s between year-index requests, 0.5–1.2s between sets
-- Exponential backoff on 429s: 30/60/120/240s
-- ~3,500+ sets per sport require TCDB login (premium/autograph sets) — skipped without credentials
-
-### Checkpoint
-`catalog_checkpoint.json` stores `{source}|{sport}|{year}|{set_name}` keys for completed sets.
-Restarts skip already-done sets automatically — safe to interrupt and resume.
-
-### Output table: `card_catalog`
-One row per unique `(sport, year, set_name, card_number, player_name, variant)`.
-Upsert on conflict: updates `team`, `is_rookie`, `is_parallel`, `updated_at`.
 
 ---
 
 ## scrape_nhl_stats.py — NHL Stats Fetcher
 
-Fetches current-season player stats and standings from the NHL API and writes to `player_stats` + `standings` tables.
-
-### Usage
-```bash
-python scrape_nhl_stats.py                      # all YG players
-python scrape_nhl_stats.py --season "2023-24"   # one season
-python scrape_nhl_stats.py --fetch-bios          # include nationality/draft info
-python scrape_nhl_stats.py --dry-run             # show matches, don't save
-```
+Fetches current-season player stats and standings from the NHL API.
 
 ### Player matching (3-stage)
-1. **Exact** — card name == API name
-2. **Normalized** — strip diacritics, lowercase
-3. **Fuzzy** — 85% similarity cutoff
+1. Exact name match
+2. Normalized (strip diacritics, lowercase)
+3. Fuzzy (85% similarity cutoff)
 
 ### Output
-- `player_stats` table: `{sport, player}` → JSONB with `current_season`, `history`, `bio`
-- `standings` table: `{sport, team}` → JSONB with wins, losses, points, division, etc.
+- `player_stats` table: `(sport, player)` → JSONB `{current_season, history, bio}`
+- `standings` table: `(sport, team)` → JSONB `{wins, losses, points, division, ...}`
 
 ---
 
-## GitHub Actions Workflows
+## assign_catalog_tiers.py
 
-| Workflow | File | Schedule | What it runs |
-|----------|------|----------|--------------|
-| Daily card scrape | `daily_scrape.yml` | Daily 8am UTC | `python daily_scrape.py --workers 3` |
-| Catalog quality report | `catalog_quality_report.yml` | Monday 10am UTC | pytest + gap analysis → Step Summary |
+One-time and periodic script that assigns `catalog_tier` to `card_catalog` rows.
 
-The **Rescrape All** button in the frontend dispatches `daily_scrape.yml` via GitHub API.
-Requires `GITHUB_TOKEN` in Railway env vars (classic PAT with `repo` + `workflow` scopes).
+**Tier logic:**
+| Tier | Criteria |
+|---|---|
+| `staple` | High-demand rookies / key players with consistent eBay volume |
+| `premium` | Notable players, sets, or parallels with elevated value |
+| `stars` | Notable players who are not quite staple level |
+| NULL | All other cards |
+
+Tier drives which GitHub Actions workflow scrapes the card and how frequently.

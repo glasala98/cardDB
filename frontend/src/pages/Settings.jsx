@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext'
 import { usePreferences } from '../context/PreferencesContext'
 import { useCurrency } from '../context/CurrencyContext'
 import { getUsers, createUser, deleteUser, changePassword } from '../api/admin'
+import { getWorkflowStatus } from '../api/stats'
 import pageStyles from './Page.module.css'
 import styles from './Settings.module.css'
 
@@ -56,6 +57,84 @@ function AppearanceSection() {
           </button>
         </div>
       </div>
+    </section>
+  )
+}
+
+/* ── Scrape health section (admin only) ─────────────────────── */
+function ScrapesSection() {
+  const [workflows, setWorkflows] = useState([])
+  const [loading,   setLoading]   = useState(true)
+  const [error,     setError]     = useState(null)
+
+  useEffect(() => {
+    getWorkflowStatus()
+      .then(d => setWorkflows(d.workflows || []))
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const fmtDate = iso => {
+    if (!iso) return '—'
+    const d = new Date(iso)
+    const diffMs = Date.now() - d.getTime()
+    const diffH  = diffMs / 3600000
+    if (diffH < 1)  return `${Math.round(diffH * 60)}m ago`
+    if (diffH < 24) return `${Math.round(diffH)}h ago`
+    return `${Math.round(diffH / 24)}d ago`
+  }
+
+  const statusDot = (status, conclusion) => {
+    if (status === 'no_runs')    return { dot: '⬜', label: 'Never run' }
+    if (status === 'in_progress') return { dot: '🟡', label: 'Running' }
+    if (status === 'queued')      return { dot: '🟡', label: 'Queued' }
+    if (conclusion === 'success') return { dot: '✅', label: 'Success' }
+    if (conclusion === 'failure') return { dot: '🔴', label: 'Failed' }
+    if (conclusion === 'cancelled') return { dot: '⬛', label: 'Cancelled' }
+    return { dot: '⬜', label: status || '—' }
+  }
+
+  return (
+    <section className={styles.section}>
+      <h2 className={styles.sectionTitle}>Scrape Health</h2>
+      {loading && <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Loading…</p>}
+      {error   && <p style={{ color: 'var(--danger)', fontSize: 13 }}>{error}</p>}
+      {!loading && !error && (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th className={styles.th}>Workflow</th>
+                <th className={styles.th}>Status</th>
+                <th className={styles.th}>Last Run</th>
+                <th className={styles.th}>Updated</th>
+                <th className={styles.th}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {workflows.map(wf => {
+                const { dot, label } = statusDot(wf.status, wf.conclusion)
+                return (
+                  <tr key={wf.file} className={styles.tr}>
+                    <td className={styles.td}><strong>{wf.name}</strong></td>
+                    <td className={styles.td}>{dot} {label}</td>
+                    <td className={styles.td}>{fmtDate(wf.started_at)}</td>
+                    <td className={styles.td}>{fmtDate(wf.updated_at)}</td>
+                    <td className={styles.td}>
+                      {wf.html_url && (
+                        <a href={wf.html_url} target="_blank" rel="noopener noreferrer"
+                          style={{ color: 'var(--accent)', fontSize: 12 }}>
+                          View ↗
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   )
 }
@@ -219,6 +298,7 @@ export default function Settings() {
       </div>
 
       <AppearanceSection />
+      {isAdmin && <ScrapesSection />}
       {isAdmin && <UserManagementSection me={user} />}
     </div>
   )

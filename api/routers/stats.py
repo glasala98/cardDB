@@ -5,6 +5,7 @@ import math
 import urllib.request
 import urllib.error
 import json as _json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from fastapi import APIRouter, HTTPException
 from dashboard_utils import get_market_alerts, load_data
@@ -15,6 +16,17 @@ GITHUB_OWNER    = "glasala98"
 GITHUB_REPO     = "cardDB"
 WORKFLOW_FILE   = "daily_scrape.yml"
 WORKERS         = 3   # must match --workers in the workflow
+
+# All tracked workflows shown in the admin scrape health panel
+_WORKFLOWS = [
+    ("Catalog Staple",   "catalog_tier_staple.yml"),
+    ("Catalog Premium",  "catalog_tier_premium.yml"),
+    ("Catalog Stars",    "catalog_tier_stars.yml"),
+    ("Catalog Graded",   "catalog_tier_graded.yml"),
+    ("Master DB Daily",  "master_db_daily.yml"),
+    ("Master DB Weekly", "master_db_weekly.yml"),
+    ("Ledger Scrape",    "daily_scrape.yml"),
+]
 
 
 @router.get("/alerts")
@@ -186,3 +198,67 @@ def scrape_status():
         "run_number":  run.get("run_number"),
         "steps":       steps,
     }
+
+
+@router.get("/workflow-status")
+def workflow_status():
+    """Return the latest run status for every tracked scrape workflow.
+
+    Fetches all workflows concurrently from the GitHub API and returns
+    a list ordered as defined in _WORKFLOWS. Requires GITHUB_TOKEN.
+
+    Returns:
+        Dict with key 'workflows' — a list of dicts with keys:
+        'name', 'file', 'status', 'conclusion', 'started_at',
+        'updated_at', 'html_url', 'run_number'. Status is 'no_runs'
+        when the workflow has never been triggered.
+
+    Raises:
+        HTTPException: 503 if GITHUB_TOKEN is not set.
+    """
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        raise HTTPException(status_code=503, detail="GITHUB_TOKEN not configured")
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+    def _fetch_one(name: str, wf_file: str) -> dict:
+        url = (
+            f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}"
+            f"/actions/workflows/{wf_file}/runs?per_page=1"
+        )
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = _json.loads(resp.read().decode())
+            runs = data.get("workflow_runs", [])
+            if not runs:
+                return {"name": name, "file": wf_file, "status": "no_runs"}
+            run = runs[0]
+            return {
+                "name":        name,
+                "file":        wf_file,
+                "status":      run.get("status"),
+                "conclusion":  run.get("conclusion"),
+                "started_at":  run.get("run_started_at"),
+                "updated_at":  run.get("updated_at"),
+                "html_url":    run.get("html_url"),
+                "run_number":  run.get("run_number"),
+            }
+        except Exception as exc:
+            return {"name": name, "file": wf_file, "status": "error", "error": str(exc)}
+
+    # Fetch all workflows concurrently
+    results: dict[str, dict] = {}
+    with ThreadPoolExecutor(max_workers=len(_WORKFLOWS)) as pool:
+        futures = {pool.submit(_fetch_one, name, wf): name for name, wf in _WORKFLOWS}
+        for future in as_completed(futures):
+            result = future.result()
+            results[result["name"]] = result
+
+    # Return in defined order
+    return {"workflows": [results[name] for name, _ in _WORKFLOWS if name in results]}

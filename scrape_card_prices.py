@@ -219,8 +219,26 @@ _VARIANT_KEYWORDS = [
     'Bat Down', 'Rookie Debut',
     # === Generic value parallels ===
     'Black', 'Gold', 'Silver', 'Sapphire',
-    'Printing Plate',
 ]
+
+
+# Variants that are treated as interchangeable in eBay listing titles.
+# When card variant = key, titles containing any value are also accepted.
+_VARIANT_ALIASES: dict[str, set[str]] = {
+    'auto':      {'autograph'},
+    'autograph': {'auto'},
+}
+
+# Short/common single-word variants that need word-boundary matching to avoid
+# false positives (e.g. "ice" in "price", "sp" in "display").
+_WORD_BOUNDARY_VARIANTS = {'ice', 'sp', 'ssp', 'mini', 'silk', 'wave', 'laser', 'clear', 'error'}
+
+
+def _kw_in_title(keyword: str, title: str) -> bool:
+    """Return True if keyword appears in title, using word boundaries for short variants."""
+    if keyword in _WORD_BOUNDARY_VARIANTS:
+        return bool(re.search(r'\b' + re.escape(keyword) + r'\b', title))
+    return keyword in title
 
 
 def _extract_variant_keyword(card_name):
@@ -279,15 +297,22 @@ def _apply_variant_filter(card_name, sales):
         return sales  # Base card — no variant filter needed
 
     v_lower = variant.lower()
+    aliases = _VARIANT_ALIASES.get(v_lower, set())
+
     # Keywords that are more specific supersets of this variant
     # e.g. for "Rainbow" → ["Rainbow Color Wheel", "Rainbow Foil", "Speckled Rainbow", "Retro Rainbow"]
     # Titles matching a superset belong to a *different* parallel and must be excluded.
-    supersets = [kw.lower() for kw in _VARIANT_KEYWORDS if kw.lower() != v_lower and v_lower in kw.lower()]
+    # Aliases are not supersets — don't exclude them.
+    supersets = [
+        kw.lower() for kw in _VARIANT_KEYWORDS
+        if kw.lower() != v_lower and v_lower in kw.lower() and kw.lower() not in aliases
+    ]
 
     filtered = []
     for s in sales:
         title = s.get('title', '').lower()
-        if v_lower not in title:
+        # Accept if title contains the variant or any recognised alias
+        if not _kw_in_title(v_lower, title) and not any(a in title for a in aliases):
             continue
         if supersets and any(sup in title for sup in supersets):
             continue

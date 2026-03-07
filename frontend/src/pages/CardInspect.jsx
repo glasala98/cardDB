@@ -354,7 +354,7 @@ export default function CardInspect() {
             {/* No graded data message */}
             {gradingResult.psa.gr9.price === 0 && gradingResult.psa.gr10.price === 0 &&
              gradingResult.bgs.gr95.price === 0 && gradingResult.bgs.gr10.price === 0 && (
-              <p className={styles.roiEmpty}>No PSA/BGS market data for this card in the Young Guns DB.</p>
+              <p className={styles.roiEmpty}>No PSA/BGS market data for this card yet.</p>
             )}
             {/* Verdict */}
             {(() => {

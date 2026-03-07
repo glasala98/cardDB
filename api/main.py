@@ -29,6 +29,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from api.routers import cards, master_db, stats, auth, scan, admin, catalog, collection
+from db import get_db
 
 app = FastAPI(title="Card Dashboard API", version="0.1.0")
 
@@ -58,7 +59,15 @@ app.include_router(collection.router,  prefix="/api/collection",  tags=["collect
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    db_ok = False
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+        db_ok = True
+    except Exception:
+        pass
+    return {"status": "ok" if db_ok else "degraded", "db": db_ok}
 
 
 # Serve React frontend for all non-API routes (SPA support)
