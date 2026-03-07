@@ -32,6 +32,8 @@ export function AuthProvider({ children }) {
     localStorage.setItem(TOKEN_KEY, token)
     client.defaults.headers.common['Authorization'] = `Bearer ${token}`
     setUser(userData)
+    // Fetch full profile (role, display_name) immediately after login
+    getMe().then(data => setUser(data)).catch(() => {})
   }, [])
 
   const logout = useCallback(async () => {
