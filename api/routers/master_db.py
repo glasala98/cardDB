@@ -256,11 +256,11 @@ def seasonal_trends():
 
 @router.get("/grading-lookup/{player_name}")
 def grading_lookup(player_name: str):
-    """Return PSA and BGS graded price data for a player's YG cards.
+    """Return PSA and BGS graded price data for a player's cards.
 
-    First attempts an exact (case-insensitive) match on PlayerName, then
-    falls back to a substring contains match. Computes PSA9/PSA10 multipliers
-    relative to the raw fair value for the Grading ROI Calculator.
+    Priority:
+    1. Master DB CSV (Young Guns + high-priority cards with explicit PSA/BGS values).
+    2. rookie_price_history.graded_data (scraped graded prices for all catalog cards).
 
     Args:
         player_name: Player name to look up (path parameter, URL-encoded).
@@ -273,34 +273,82 @@ def grading_lookup(player_name: str):
     df = load_master_db()
     matches = df[df["PlayerName"].str.lower() == player_name.lower().strip()]
     if matches.empty:
-        # Fuzzy — contains
         matches = df[df["PlayerName"].str.lower().str.contains(player_name.lower().strip(), na=False)]
-    if matches.empty:
-        return {"cards": []}
 
-    cards = []
-    for _, r in matches.fillna("").iterrows():
-        raw  = _num(r, "FairValue")
-        p10  = _num(r, "PSA10_Value")
-        p9   = _num(r, "PSA9_Value")
-        p8   = _num(r, "PSA8_Value")
-        b10  = _num(r, "BGS10_Value")
-        b95  = _num(r, "BGS9_5_Value")
-        b9   = _num(r, "BGS9_Value")
-        cards.append({
-            "card_name":   r.get("CardName", ""),
-            "season":      r.get("Season", ""),
-            "fair_value":  raw,
-            "psa10_price": p10,
-            "psa9_price":  p9,
-            "psa8_price":  p8,
-            "bgs10_price": b10,
-            "bgs95_price": b95,
-            "bgs9_price":  b9,
-            "psa10_mult":  round(p10 / raw, 2) if raw and p10 else None,
-            "psa9_mult":   round(p9  / raw, 2) if raw and p9  else None,
-        })
-    return {"cards": cards}
+    if not matches.empty:
+        cards = []
+        for _, r in matches.fillna("").iterrows():
+            raw  = _num(r, "FairValue")
+            p10  = _num(r, "PSA10_Value")
+            p9   = _num(r, "PSA9_Value")
+            p8   = _num(r, "PSA8_Value")
+            b10  = _num(r, "BGS10_Value")
+            b95  = _num(r, "BGS9_5_Value")
+            b9   = _num(r, "BGS9_Value")
+            cards.append({
+                "card_name":   r.get("CardName", ""),
+                "season":      r.get("Season", ""),
+                "fair_value":  raw,
+                "psa10_price": p10,
+                "psa9_price":  p9,
+                "psa8_price":  p8,
+                "bgs10_price": b10,
+                "bgs95_price": b95,
+                "bgs9_price":  b9,
+                "psa10_mult":  round(p10 / raw, 2) if raw and p10 else None,
+                "psa9_mult":   round(p9  / raw, 2) if raw and p9  else None,
+                "source":      "master_db",
+            })
+        return {"cards": cards}
+
+    # Fallback: query rookie_price_history.graded_data (covers all catalog cards)
+    try:
+        from psycopg2.extras import RealDictCursor
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT player, season, fair_value, graded_data
+                    FROM rookie_price_history
+                    WHERE player ILIKE %s AND graded_data != '{}'
+                    ORDER BY date DESC
+                    LIMIT 10
+                """, (f"%{player_name.strip()}%",))
+                rows = cur.fetchall()
+        if not rows:
+            return {"cards": []}
+        cards = []
+        seen = set()
+        for r in rows:
+            key = r["player"]
+            if key in seen:
+                continue
+            seen.add(key)
+            gd  = r.get("graded_data") or {}
+            raw = float(r["fair_value"] or 0)
+            def _gv(grade): return float(gd.get(grade, {}).get("fair_value") or 0)
+            p10 = _gv("PSA 10")
+            p9  = _gv("PSA 9")
+            p8  = _gv("PSA 8")
+            b10 = _gv("BGS 10")
+            b95 = _gv("BGS 9.5")
+            b9  = _gv("BGS 9")
+            cards.append({
+                "card_name":   r["player"],
+                "season":      r.get("season", ""),
+                "fair_value":  raw,
+                "psa10_price": p10,
+                "psa9_price":  p9,
+                "psa8_price":  p8,
+                "bgs10_price": b10,
+                "bgs95_price": b95,
+                "bgs9_price":  b9,
+                "psa10_mult":  round(p10 / raw, 2) if raw and p10 else None,
+                "psa9_mult":   round(p9  / raw, 2) if raw and p9  else None,
+                "source":      "price_history",
+            })
+        return {"cards": cards}
+    except Exception:
+        return {"cards": []}
 
 
 @router.get("/yg-price-history")
