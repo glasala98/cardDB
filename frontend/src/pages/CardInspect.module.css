@@ -14,14 +14,27 @@
 .back:hover { color: var(--text-primary); }
 
 /* ── Card header ─────────────────────────────────────────────── */
-.cardHeader  { margin-bottom: 20px; }
+.cardHeader {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
 
 .cardImageWrap {
   flex-shrink: 0;
-  width: 220px;
-  height: 308px;
-  margin-bottom: 14px;
+  width: 200px;
+  height: 280px;
   perspective: 900px;
+}
+
+/* Right column: title + badges + metrics stacked */
+.cardHeaderContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 /* ── Card flip ─────────────────────────────────────── */
@@ -82,9 +95,22 @@
   background: var(--bg-secondary);
 }
 
+.fetchImgBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-family: var(--font);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.fetchImgBtn:hover { border-color: var(--accent); color: var(--accent); }
+
 .cardImagePlaceholder {
-  width: 220px;
-  height: 308px;
+  width: 200px;
+  height: 280px;
   border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--bg-secondary);
@@ -402,6 +428,7 @@
   .dateCell  { min-width: 80px; font-size: 12px; }
   .priceCell { min-width: 70px; font-size: 12px; }
 
+  .cardHeader { flex-direction: column; gap: 14px; }
   .cardImageWrap { width: 160px; height: 224px; }
   .cardImagePlaceholder { width: 160px; height: 224px; }
 

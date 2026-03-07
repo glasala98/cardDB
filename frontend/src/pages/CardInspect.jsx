@@ -43,17 +43,6 @@ export default function CardInspect() {
         setImageUrl(d.image_url || null)
         setImageUrlBack(d.image_url_back || null)
         setFlipped(false)
-        // Auto-fetch images from eBay listing if not stored
-        if ((!d.image_url || !d.image_url_back) && d.raw_sales?.some(s => s.listing_url)) {
-          setFetchingImg(true)
-          fetchImage(name)
-            .then(r => {
-              setImageUrl(r.image_url || null)
-              setImageUrlBack(r.image_url_back || null)
-            })
-            .catch(() => {})
-            .finally(() => setFetchingImg(false))
-        }
         // Auto-fetch grading data and compute ROI with hardcoded costs
         const player = d?.card?.player
         if (player) {
@@ -165,7 +154,17 @@ export default function CardInspect() {
             </div>
           ) : (
             <div className={styles.cardImagePlaceholder}>
-              {fetchingImg ? 'Loading image…' : 'No image available'}
+              {fetchingImg ? 'Loading…' : (
+                data?.raw_sales?.some(s => s.listing_url)
+                  ? <button className={styles.fetchImgBtn} onClick={() => {
+                      setFetchingImg(true)
+                      fetchImage(name)
+                        .then(r => { setImageUrl(r.image_url || null); setImageUrlBack(r.image_url_back || null) })
+                        .catch(() => {})
+                        .finally(() => setFetchingImg(false))
+                    }}>Fetch image</button>
+                  : 'No image'
+              )}
             </div>
           )}
         </div>
@@ -194,69 +193,71 @@ export default function CardInspect() {
             </div>
           </div>
         )}
-        <div className={styles.titleRow}>
-          <h1 className={styles.cardTitle}>{name}</h1>
-          <div className={styles.headerActions}>
-            <ConfidenceBadge confidence={confidence} />
-            {priceTier && (
-              <span className={`${styles.tierBadge} ${priceTier.cls}`}>{priceTier.label}</span>
-            )}
-            <button
-              className={styles.scrapeBtn}
-              onClick={handleScrape}
-              disabled={scraping}
-            >
-              {scraping ? 'Queuing…' : '⟳ Rescrape'}
-            </button>
-            {search_url && (
-              <a
-                href={search_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.ebayLink}
+        <div className={styles.cardHeaderContent}>
+          <div className={styles.titleRow}>
+            <h1 className={styles.cardTitle}>{name}</h1>
+            <div className={styles.headerActions}>
+              <ConfidenceBadge confidence={confidence} />
+              {priceTier && (
+                <span className={`${styles.tierBadge} ${priceTier.cls}`}>{priceTier.label}</span>
+              )}
+              <button
+                className={styles.scrapeBtn}
+                onClick={handleScrape}
+                disabled={scraping}
               >
-                View on eBay ↗
-              </a>
+                {scraping ? 'Queuing…' : '⟳ Rescrape'}
+              </button>
+              {search_url && (
+                <a
+                  href={search_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.ebayLink}
+                >
+                  View on eBay ↗
+                </a>
+              )}
+            </div>
+          </div>
+          {card.last_scraped && (
+            <p className={styles.lastScraped}>Last scraped: {card.last_scraped}</p>
+          )}
+
+          {/* ── Metrics inline in header ── */}
+          <div className={styles.metrics}>
+            <MetricCard
+              label="Fair Value"
+              value={fmt(card.fair_value)}
+              large
+              estimated={is_estimated}
+              priceSource={price_source}
+            />
+            <MetricCard label="Cost Basis" value={fmt(card.cost_basis)} />
+            {hasCost && hasValue && (
+              <MetricCard
+                label="Gain / Loss"
+                value={`${gain >= 0 ? '+' : ''}${fmt(gain)}`}
+                color={gain >= 0 ? 'success' : 'danger'}
+              />
+            )}
+            <MetricCard label="Trend"  value={<TrendBadge trend={card.trend} />} />
+            <MetricCard label="Sales"  value={card.num_sales || '—'} />
+            <MetricCard label="Median" value={fmt(card.median_all)} />
+            <MetricCard label="Min"    value={fmt(card.min)} />
+            <MetricCard label="Max"    value={fmt(card.max)} />
+            {card.purchase_date && (
+              <MetricCard label="Purchased" value={card.purchase_date} />
             )}
           </div>
+
+          {card.top3 && (
+            <p className={styles.top3}>
+              <span className={styles.top3Label}>Top 3 recent:</span> {card.top3}
+            </p>
+          )}
         </div>
-        {card.last_scraped && (
-          <p className={styles.lastScraped}>Last scraped: {card.last_scraped}</p>
-        )}
       </div>
-
-      {/* ── Metrics ── */}
-      <div className={styles.metrics}>
-        <MetricCard
-          label="Fair Value"
-          value={fmt(card.fair_value)}
-          large
-          estimated={is_estimated}
-          priceSource={price_source}
-        />
-        <MetricCard label="Cost Basis" value={fmt(card.cost_basis)} />
-        {hasCost && hasValue && (
-          <MetricCard
-            label="Gain / Loss"
-            value={`${gain >= 0 ? '+' : ''}${fmt(gain)}`}
-            color={gain >= 0 ? 'success' : 'danger'}
-          />
-        )}
-        <MetricCard label="Trend"  value={<TrendBadge trend={card.trend} />} />
-        <MetricCard label="Sales"  value={card.num_sales || '—'} />
-        <MetricCard label="Median" value={fmt(card.median_all)} />
-        <MetricCard label="Min"    value={fmt(card.min)} />
-        <MetricCard label="Max"    value={fmt(card.max)} />
-        {card.purchase_date && (
-          <MetricCard label="Purchased" value={card.purchase_date} />
-        )}
-      </div>
-
-      {card.top3 && (
-        <p className={styles.top3}>
-          <span className={styles.top3Label}>Top 3 recent:</span> {card.top3}
-        </p>
-      )}
 
       {/* ── Price Override (not-found cards) ── */}
       {(confidence === 'not found' || confidence === 'notfound') && (
