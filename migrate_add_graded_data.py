@@ -1,8 +1,9 @@
 """Migration: add graded_data JSONB column to market_prices.
 
-Run once via GitHub Actions workflow.
+Runs automatically on every Railway deploy (idempotent — safe to re-run).
+Errors are caught and logged so a failure never prevents the server starting.
 """
-import os, sys
+import os
 import psycopg2
 
 DATABASE_URL = os.environ["DATABASE_URL"]
@@ -20,29 +21,31 @@ def main():
     """)
     print("market_prices.graded_data column added (or already existed)")
 
-    # Migrate any existing graded data from rookie_price_history into
-    # market_prices for cards that have a matching card_catalog entry.
-    # rookie_price_history uses player name as key; we match on player_name ILIKE.
+    # Migrate existing graded data from rookie_price_history into market_prices.
+    # In PostgreSQL UPDATE...FROM, the target table must NOT be aliased —
+    # reference it directly; JOIN condition uses market_prices.card_catalog_id.
     cur.execute("""
-        UPDATE market_prices mp
+        UPDATE market_prices
         SET graded_data = rph.graded_data
         FROM rookie_price_history rph
-        JOIN card_catalog cc ON cc.id = mp.card_catalog_id
+        JOIN card_catalog cc ON cc.id = market_prices.card_catalog_id
         WHERE rph.graded_data != '{}'
           AND rph.player ILIKE cc.player_name
-          AND mp.graded_data = '{}'
+          AND market_prices.graded_data = '{}'
           AND rph.date = (
-              SELECT MAX(date) FROM rookie_price_history r2
+              SELECT MAX(r2.date) FROM rookie_price_history r2
               WHERE r2.player = rph.player
           )
     """)
-    migrated = cur.rowcount
-    print(f"Migrated {migrated} graded_data rows from rookie_price_history → market_prices")
+    print(f"Migrated {cur.rowcount} graded_data rows from rookie_price_history → market_prices")
 
     cur.close()
     conn.close()
-    print("Done.")
+    print("Migration complete.")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"Migration error (non-fatal): {e}")
