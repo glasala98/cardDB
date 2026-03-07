@@ -301,50 +301,73 @@ def grading_lookup(player_name: str):
             })
         return {"cards": cards}
 
-    # Fallback: query rookie_price_history.graded_data (covers all catalog cards)
+    # Fallback 1: market_prices.graded_data (catalog-linked, populated by graded scraper)
     try:
         from psycopg2.extras import RealDictCursor
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT cc.player_name, cc.year, cc.set_name, cc.variant,
+                           mp.fair_value, mp.graded_data
+                    FROM card_catalog cc
+                    JOIN market_prices mp ON mp.card_catalog_id = cc.id
+                    WHERE cc.player_name ILIKE %s
+                      AND mp.graded_data != '{}'
+                    ORDER BY cc.year DESC, mp.fair_value DESC
+                    LIMIT 10
+                """, (f"%{player_name.strip()}%",))
+                rows = cur.fetchall()
+
+        if rows:
+            def _gv(gd, grade): return float((gd.get(grade) or {}).get("fair_value") or 0)
+            cards = []
+            for r in rows:
+                gd  = r.get("graded_data") or {}
+                raw = float(r["fair_value"] or 0)
+                p10 = _gv(gd, "PSA 10"); p9 = _gv(gd, "PSA 9"); p8 = _gv(gd, "PSA 8")
+                b10 = _gv(gd, "BGS 10"); b95 = _gv(gd, "BGS 9.5"); b9 = _gv(gd, "BGS 9")
+                variant = r.get("variant") or ""
+                suffix = f" {variant}" if variant and variant.lower() != "base" else ""
+                cards.append({
+                    "card_name":   f"{r['year']} {r['set_name']}{suffix}",
+                    "season":      str(r["year"] or ""),
+                    "fair_value":  raw,
+                    "psa10_price": p10, "psa9_price": p9, "psa8_price": p8,
+                    "bgs10_price": b10, "bgs95_price": b95, "bgs9_price": b9,
+                    "psa10_mult":  round(p10 / raw, 2) if raw and p10 else None,
+                    "psa9_mult":   round(p9  / raw, 2) if raw and p9  else None,
+                    "source":      "market_prices",
+                })
+            return {"cards": cards}
+
+        # Fallback 2: legacy rookie_price_history.graded_data
         with get_db() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
                     SELECT player, season, fair_value, graded_data
                     FROM rookie_price_history
                     WHERE player ILIKE %s AND graded_data != '{}'
-                    ORDER BY date DESC
-                    LIMIT 10
+                    ORDER BY date DESC LIMIT 10
                 """, (f"%{player_name.strip()}%",))
                 rows = cur.fetchall()
         if not rows:
             return {"cards": []}
-        cards = []
-        seen = set()
+        def _gv2(gd, grade): return float((gd.get(grade) or {}).get("fair_value") or 0)
+        cards = []; seen = set()
         for r in rows:
-            key = r["player"]
-            if key in seen:
-                continue
-            seen.add(key)
-            gd  = r.get("graded_data") or {}
-            raw = float(r["fair_value"] or 0)
-            def _gv(grade): return float(gd.get(grade, {}).get("fair_value") or 0)
-            p10 = _gv("PSA 10")
-            p9  = _gv("PSA 9")
-            p8  = _gv("PSA 8")
-            b10 = _gv("BGS 10")
-            b95 = _gv("BGS 9.5")
-            b9  = _gv("BGS 9")
+            if r["player"] in seen: continue
+            seen.add(r["player"])
+            gd = r.get("graded_data") or {}; raw = float(r["fair_value"] or 0)
+            p10 = _gv2(gd, "PSA 10"); p9 = _gv2(gd, "PSA 9"); p8 = _gv2(gd, "PSA 8")
+            b10 = _gv2(gd, "BGS 10"); b95 = _gv2(gd, "BGS 9.5"); b9 = _gv2(gd, "BGS 9")
             cards.append({
-                "card_name":   r["player"],
-                "season":      r.get("season", ""),
-                "fair_value":  raw,
-                "psa10_price": p10,
-                "psa9_price":  p9,
-                "psa8_price":  p8,
-                "bgs10_price": b10,
-                "bgs95_price": b95,
-                "bgs9_price":  b9,
-                "psa10_mult":  round(p10 / raw, 2) if raw and p10 else None,
-                "psa9_mult":   round(p9  / raw, 2) if raw and p9  else None,
-                "source":      "price_history",
+                "card_name": r["player"], "season": r.get("season", ""),
+                "fair_value": raw,
+                "psa10_price": p10, "psa9_price": p9, "psa8_price": p8,
+                "bgs10_price": b10, "bgs95_price": b95, "bgs9_price": b9,
+                "psa10_mult": round(p10/raw,2) if raw and p10 else None,
+                "psa9_mult":  round(p9/raw,2)  if raw and p9  else None,
+                "source": "price_history",
             })
         return {"cards": cards}
     except Exception:

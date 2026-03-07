@@ -1,0 +1,59 @@
+name: Catalog — Graded Prices (Staple Tier)
+
+# Scrapes PSA/BGS graded prices for all staple-tier catalog cards.
+# Writes results into market_prices.graded_data (JSONB) so the
+# Grading ROI Calculator has data for any card in the catalog.
+
+on:
+  schedule:
+    # Every Sunday at 6am UTC (after staple raw prices run at 8am UTC Sat)
+    - cron: '0 6 * * 0'
+  workflow_dispatch:
+    inputs:
+      sport:
+        description: 'Sport filter (NHL/NBA/NFL/MLB or blank for all)'
+        required: false
+        default: ''
+      min_raw_value:
+        description: 'Min raw fair value to qualify for graded scrape'
+        required: false
+        default: '5.0'
+
+jobs:
+  graded-staple:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+
+    strategy:
+      matrix:
+        sport: [NHL, NBA, NFL, MLB]
+      fail-fast: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+
+      - name: Install Chrome
+        run: |
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+          sudo apt-get update -q
+          sudo apt-get install -y google-chrome-stable
+
+      - name: Scrape graded prices — ${{ matrix.sport }} staple cards
+        run: |
+          python -u scrape_master_db.py \
+            --sport ${{ matrix.sport }} \
+            --catalog-tier staple \
+            --graded \
+            --min-raw-value ${{ github.event.inputs.min_raw_value || '5.0' }} \
+            --workers 3
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}

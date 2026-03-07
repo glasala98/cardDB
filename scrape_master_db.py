@@ -495,23 +495,45 @@ def main():
         print(f"Eligible for graded scrape (>= ${args.min_raw_value:.2f}): {total:,} cards\n")
 
         with ThreadPoolExecutor(max_workers=args.workers) as executor:
+            graded_batch = {}   # catalog_id -> {grade: {fair_value, num_sales}}
             futures = {executor.submit(scrape_one_graded, card, grades): card for card in cards}
             done_count = 0
             for future in as_completed(futures):
                 catalog_id, graded_results = future.result()
                 done_count += 1
 
-                # Write each grade as its own market_price entry
-                # using the card_catalog id of a variant entry (insert if needed)
+                # Accumulate graded prices for this card into graded_data JSONB
+                gd = {}
                 for grade, data in graded_results.items():
-                    if data['num_sales'] > 0:
-                        batch.append((catalog_id, {
-                            **data['stats'],
-                            'confidence': f'graded-{grade.lower().replace(" ", "")}',
-                        }))
+                    if data and data.get('num_sales', 0) > 0:
+                        stats = data.get('stats', {})
+                        gd[grade] = {
+                            'fair_value': round(stats.get('fair_price', 0), 2),
+                            'num_sales':  stats.get('num_sales', 0),
+                            'min':        round(stats.get('min', 0) or 0, 2),
+                            'max':        round(stats.get('max', 0) or 0, 2),
+                        }
+                if gd:
+                    graded_batch[catalog_id] = gd
+                    _progress['found'] += 1
 
                 if done_count % BATCH_SIZE == 0 or done_count == total:
-                    _flush_batch()
+                    # Flush graded_data updates into market_prices.graded_data
+                    if graded_batch:
+                        import json as _json
+                        with get_db() as conn:
+                            with conn.cursor() as cur:
+                                from psycopg2.extras import execute_values
+                                execute_values(cur, """
+                                    INSERT INTO market_prices (card_catalog_id, graded_data)
+                                    VALUES %s
+                                    ON CONFLICT (card_catalog_id) DO UPDATE SET
+                                        graded_data = market_prices.graded_data || EXCLUDED.graded_data,
+                                        updated_at  = NOW()
+                                """, [(cid, _json.dumps(gdata))
+                                      for cid, gdata in graded_batch.items()])
+                            conn.commit()
+                        graded_batch.clear()
                     elapsed = time.time() - start
                     rate = done_count / elapsed if elapsed > 0 else 0
                     remaining = (total - done_count) / rate / 60 if rate > 0 else 0
