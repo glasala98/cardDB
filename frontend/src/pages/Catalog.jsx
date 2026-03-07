@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import CardTable from '../components/CardTable'
 import { getCatalog, getCatalogFilters, getCatalogCardHistory } from '../api/catalog'
 import { getOwnedIds, addToCollection, getGrades } from '../api/collection'
 import { useCurrency } from '../context/CurrencyContext'
@@ -19,64 +18,48 @@ const SPORTS = ['NHL', 'NBA', 'NFL', 'MLB']
 
 const TIER_LABELS = { staple: 'Staple', premium: 'Premium', stars: 'Stars' }
 
-const COLUMNS = (fmtPrice, ownedIds, onAdd, isLoggedIn) => [
-  { key: 'sport',       label: 'Sport' },
-  { key: 'year',        label: 'Year',       render: v => v || '—' },
-  { key: 'set_name',    label: 'Set',        render: v => v || '—' },
-  { key: 'card_number', label: '#',          render: v => v || '—' },
-  { key: 'player_name', label: 'Player' },
-  { key: 'team',        label: 'Team',       render: v => v || '—' },
-  { key: 'variant',     label: 'Variant',    render: v => v || '—' },
-  {
-    key: 'is_rookie',
-    label: 'RC',
-    render: (v, row) => {
-      const tier = row.scrape_tier
-      const tierLabel = TIER_LABELS[tier]
-      return (
-        <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          {v ? <span className={styles.rcBadge}>RC</span> : null}
-          {tierLabel ? <span className={`${styles.tierBadge} ${styles['tier_' + tier]}`}>{tierLabel}</span> : null}
-        </span>
-      )
-    },
-  },
-  {
-    key: 'fair_value',
-    label: 'Price',
-    render: (v) => v != null
-      ? <span className={styles.price}>{fmtPrice(v)}</span>
-      : <span className={styles.noPrice}>—</span>,
-  },
-  {
-    key: 'trend',
-    label: 'Trend',
-    render: v => {
-      if (!v || v === 'no data') return <span className={styles.trendFlat}>—</span>
-      if (v === 'up')   return <span className={styles.trendUp}>▲ up</span>
-      if (v === 'down') return <span className={styles.trendDown}>▼ down</span>
-      return <span className={styles.trendFlat}>{v}</span>
-    },
-  },
-  {
-    key: 'confidence',
-    label: 'Conf.',
-    render: v => v
-      ? <span className={`${styles.conf} ${styles['conf_' + (v || 'none').replace(' ', '_')]}`}>{v}</span>
-      : null,
-  },
-  { key: 'num_sales', label: 'Sales', render: v => v ?? '—' },
-  {
-    key: 'id',
-    label: '',
-    render: (v, row) => {
-      if (!isLoggedIn) return <span className={styles.signInToAdd} title="Sign in to add to collection">+ Add</span>
-      return ownedIds.has(v)
-        ? <span className={styles.ownedBadge} title="In your collection">✓ Owned</span>
-        : <button className={styles.addBtn} onClick={e => { e.stopPropagation(); onAdd(row) }} title="Add to collection">+ Add</button>
-    },
-  },
+const SPORT_COLORS = {
+  NHL: { bg: '#0c2d54', text: '#4a9eff' },
+  NBA: { bg: '#4a1500', text: '#ff6b35' },
+  NFL: { bg: '#0a3318', text: '#3dba5e' },
+  MLB: { bg: '#3d0a0a', text: '#e05555' },
+}
+
+// Optional columns that the user can toggle
+const OPTIONAL_COLS = [
+  { key: 'variant',    label: 'Variant'    },
+  { key: 'team',       label: 'Team'       },
+  { key: 'confidence', label: 'Confidence' },
+  { key: 'num_sales',  label: 'Sales'      },
 ]
+const DEFAULT_VISIBLE = { variant: true, team: false, confidence: false, num_sales: false }
+
+function loadColPrefs() {
+  try {
+    const saved = localStorage.getItem('catalog_cols')
+    return saved ? { ...DEFAULT_VISIBLE, ...JSON.parse(saved) } : DEFAULT_VISIBLE
+  } catch { return DEFAULT_VISIBLE }
+}
+
+function CardThumb({ sport, playerName, imageUrl }) {
+  const colors = SPORT_COLORS[sport] || { bg: '#1e1e2e', text: '#888' }
+  const initials = playerName
+    ? playerName.split(' ').filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase()
+    : '?'
+  if (imageUrl) {
+    return (
+      <div className={styles.cardThumb}>
+        <img src={imageUrl} alt={playerName} className={styles.cardThumbImg} />
+      </div>
+    )
+  }
+  return (
+    <div className={styles.cardThumb} style={{ background: colors.bg, borderColor: colors.text + '22' }}>
+      <span className={styles.cardThumbInitials} style={{ color: colors.text }}>{initials}</span>
+      <span className={styles.cardThumbSport} style={{ color: colors.text + 'aa' }}>{sport}</span>
+    </div>
+  )
+}
 
 const PER_PAGE = 50
 
@@ -106,6 +89,9 @@ export default function Catalog() {
   const [years, setYears] = useState([])
   const [sets,  setSets]  = useState([])
 
+  // Column visibility
+  const [visibleCols, setVisibleCols] = useState(loadColPrefs)
+
   // Collection: owned card IDs + add-to-collection modal
   const [ownedIds,  setOwnedIds]  = useState(new Set())
   const [grades,    setGrades]    = useState([])
@@ -123,6 +109,14 @@ export default function Catalog() {
     getOwnedIds().then(d => setOwnedIds(new Set(d.owned_ids || []))).catch(() => {})
     getGrades().then(d => setGrades(d.grades || [])).catch(() => {})
   }, [isLoggedIn])
+
+  const toggleCol = (key) => {
+    setVisibleCols(prev => {
+      const next = { ...prev, [key]: !prev[key] }
+      localStorage.setItem('catalog_cols', JSON.stringify(next))
+      return next
+    })
+  }
 
   const handleRowClick = (row) => {
     setDetailCard(row)
@@ -164,10 +158,6 @@ export default function Catalog() {
   }
 
   const searchTimer = useRef(null)
-  const [showTip, setShowTip] = useState(false)
-  useLayoutEffect(() => {
-    setShowTip(localStorage.getItem('catalog_tip_dismissed') !== '1')
-  }, [])
 
   // Reload years when sport changes; reset dependent filters
   useEffect(() => {
@@ -202,7 +192,7 @@ export default function Catalog() {
       ...(sport    && { sport }),
       ...(year     && { year }),
       ...(setName  && { set_name: setName }),
-...overrides,
+      ...overrides,
     }
     getCatalog(params)
       .then(data => {
@@ -215,7 +205,6 @@ export default function Catalog() {
       .finally(() => setLoading(false))
   }, [search, sport, year, setName, sortKey, sortDir])
 
-  // Re-fetch on filter/sort change (debounce search)
   useEffect(() => {
     clearTimeout(searchTimer.current)
     searchTimer.current = setTimeout(() => {
@@ -241,7 +230,7 @@ export default function Catalog() {
     setSport('')
     setYear('')
     setSetName('')
-setSortKey('year')
+    setSortKey('year')
     setSortDir('desc')
   }
 
@@ -250,14 +239,10 @@ setSortKey('year')
   return (
     <div className={pageStyles.page}>
       <PageTabs tabs={CATALOG_TABS} />
-      {/* Header */}
+
       <div className={pageStyles.header}>
         <h1 className={pageStyles.title}>Card Catalog</h1>
-        <span className={pageStyles.count}>
-          {total.toLocaleString()} cards
-        </span>
-        <div style={{ marginLeft: 'auto' }}>
-        </div>
+        <span className={pageStyles.count}>{total.toLocaleString()} cards</span>
       </div>
 
       {/* Sport tabs */}
@@ -281,7 +266,6 @@ setSortKey('year')
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-
         <select
           className={pageStyles.filterSelect}
           value={year}
@@ -290,7 +274,6 @@ setSortKey('year')
           <option value="">All Years</option>
           {years.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
-
         <select
           className={pageStyles.filterSelect}
           value={setName}
@@ -304,67 +287,179 @@ setSortKey('year')
             </option>
           ))}
         </select>
-
         {hasFilters && (
-          <button className={pageStyles.clearBtn} onClick={clearFilters}>
-            Clear Filters
-          </button>
+          <button className={pageStyles.clearBtn} onClick={clearFilters}>Clear</button>
         )}
       </div>
 
-      {/* Tips */}
-      {showTip && (
-        <div className={styles.tipBar}>
-          <span className={styles.tipIcon}>💡</span>
-          <span className={styles.tipText}>
-            <strong>Navigating the catalog:</strong> Pick a sport tab, then narrow by Year and Set.
-            The Year and Set dropdowns update based on your sport selection.
-            Use the search box to find any player or set name across the entire catalog.
-            Click any column header to sort.
-          </span>
-          <button
-            className={styles.tipClose}
-            onClick={() => { localStorage.setItem('catalog_tip_dismissed', '1'); setShowTip(false) }}
-            title="Dismiss"
-          >✕</button>
-        </div>
-      )}
-
       {error && <div className={pageStyles.error}>{error}</div>}
+
+      {/* Column toggles */}
+      <div className={styles.colToggleRow}>
+        <span className={styles.colToggleLabel}>Columns:</span>
+        {OPTIONAL_COLS.map(col => (
+          <button
+            key={col.key}
+            className={`${styles.colToggleBtn} ${visibleCols[col.key] ? styles.colToggleBtnOn : ''}`}
+            onClick={() => toggleCol(col.key)}
+          >
+            {col.label}
+          </button>
+        ))}
+      </div>
 
       {/* Table */}
       {loading && cards.length === 0 ? (
         <div className={pageStyles.status}>Loading...</div>
+      ) : cards.length === 0 ? (
+        <div className={pageStyles.status}>No cards found.</div>
       ) : (
         <>
-          <CardTable
-            columns={COLUMNS(fmtPrice, ownedIds, handleAdd, isLoggedIn)}
-            rows={cards}
-            sortKey={sortKey}
-            sortDir={sortDir}
-            onSort={handleSort}
-            onRowClick={handleRowClick}
-          />
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th className={styles.th} style={{ width: 44 }} />
+                  <th
+                    className={`${styles.th} ${styles.sortable}`}
+                    onClick={() => handleSort('player_name')}
+                  >
+                    Card
+                    {sortKey === 'player_name' && <span className={styles.sortArrow}>{sortDir === 'asc' ? ' ↑' : ' ↓'}</span>}
+                  </th>
+                  {visibleCols.variant && (
+                    <th className={styles.th}>Variant</th>
+                  )}
+                  {visibleCols.team && (
+                    <th className={styles.th}>Team</th>
+                  )}
+                  <th
+                    className={`${styles.th} ${styles.sortable} ${styles.thRight}`}
+                    onClick={() => handleSort('fair_value')}
+                  >
+                    Price
+                    {sortKey === 'fair_value' && <span className={styles.sortArrow}>{sortDir === 'asc' ? ' ↑' : ' ↓'}</span>}
+                  </th>
+                  {visibleCols.confidence && (
+                    <th className={styles.th}>Conf.</th>
+                  )}
+                  {visibleCols.num_sales && (
+                    <th className={`${styles.th} ${styles.thRight}`}>Sales</th>
+                  )}
+                  <th className={styles.th} style={{ width: 72 }} />
+                </tr>
+              </thead>
+              <tbody>
+                {cards.map((row, i) => (
+                  <tr
+                    key={i}
+                    className={styles.tr}
+                    onClick={() => handleRowClick(row)}
+                  >
+                    {/* Thumbnail */}
+                    <td className={`${styles.td} ${styles.tdThumb}`}>
+                      <CardThumb
+                        sport={row.sport}
+                        playerName={row.player_name}
+                        imageUrl={row.image_url}
+                      />
+                    </td>
+
+                    {/* Card info */}
+                    <td className={styles.td}>
+                      <div className={styles.cardCell}>
+                        <div className={styles.cardPlayerRow}>
+                          <span className={styles.playerPrimary}>{row.player_name}</span>
+                          {row.is_rookie && <span className={styles.rcBadge}>RC</span>}
+                          {row.scrape_tier && TIER_LABELS[row.scrape_tier] && (
+                            <span className={`${styles.tierBadge} ${styles['tier_' + row.scrape_tier]}`}>
+                              {TIER_LABELS[row.scrape_tier]}
+                            </span>
+                          )}
+                        </div>
+                        <div className={styles.cardSub}>
+                          {!sport && row.sport && (
+                            <span className={`${styles.sportTag} ${styles['sport_' + row.sport]}`}>{row.sport}</span>
+                          )}
+                          {row.year}
+                          {row.set_name ? ` · ${row.set_name}` : ''}
+                          {row.card_number ? ` · #${row.card_number}` : ''}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Optional: Variant */}
+                    {visibleCols.variant && (
+                      <td className={styles.td}>
+                        <span className={styles.variantLabel}>
+                          {row.variant && row.variant !== 'Base' ? row.variant : <span className={styles.muted}>—</span>}
+                        </span>
+                      </td>
+                    )}
+
+                    {/* Optional: Team */}
+                    {visibleCols.team && (
+                      <td className={styles.td}>
+                        <span className={styles.muted}>{row.team || '—'}</span>
+                      </td>
+                    )}
+
+                    {/* Price + trend */}
+                    <td className={`${styles.td} ${styles.tdRight}`}>
+                      {row.fair_value != null ? (
+                        <div className={styles.priceCell}>
+                          <span className={styles.price}>{fmtPrice(row.fair_value)}</span>
+                          {row.trend === 'up'   && <span className={styles.trendUp}>▲</span>}
+                          {row.trend === 'down' && <span className={styles.trendDown}>▼</span>}
+                        </div>
+                      ) : (
+                        <span className={styles.muted}>—</span>
+                      )}
+                    </td>
+
+                    {/* Optional: Confidence */}
+                    {visibleCols.confidence && (
+                      <td className={styles.td}>
+                        {row.confidence
+                          ? <span className={`${styles.conf} ${styles['conf_' + row.confidence]}`}>{row.confidence}</span>
+                          : <span className={styles.muted}>—</span>
+                        }
+                      </td>
+                    )}
+
+                    {/* Optional: Sales */}
+                    {visibleCols.num_sales && (
+                      <td className={`${styles.td} ${styles.tdRight}`}>
+                        <span className={styles.muted}>{row.num_sales ?? '—'}</span>
+                      </td>
+                    )}
+
+                    {/* Add / Owned */}
+                    <td className={`${styles.td} ${styles.tdAction}`} onClick={e => e.stopPropagation()}>
+                      {!isLoggedIn
+                        ? <span className={styles.signInToAdd}>+ Add</span>
+                        : ownedIds.has(row.id)
+                          ? <span className={styles.ownedBadge}>✓ Owned</span>
+                          : <button className={styles.addBtn} onClick={() => handleAdd(row)}>+ Add</button>
+                      }
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
           {loading && <div className={styles.loadingBar} />}
 
           {/* Pagination */}
           {pages > 1 && (
             <div className={styles.pagination}>
-              <button
-                className={styles.pgBtn}
-                onClick={() => goTo(1)}
-                disabled={page === 1}
-              >«</button>
-              <button
-                className={styles.pgBtn}
-                onClick={() => goTo(page - 1)}
-                disabled={page === 1}
-              >‹</button>
+              <button className={styles.pgBtn} onClick={() => goTo(1)}       disabled={page === 1}>«</button>
+              <button className={styles.pgBtn} onClick={() => goTo(page - 1)} disabled={page === 1}>‹</button>
 
               {buildPageRange(page, pages).map((p, i) =>
                 p === '...'
-                  ? <span key={`ellipsis-${i}`} className={styles.pgEllipsis}>…</span>
+                  ? <span key={`e-${i}`} className={styles.pgEllipsis}>…</span>
                   : <button
                       key={p}
                       className={`${styles.pgBtn} ${p === page ? styles.pgActive : ''}`}
@@ -372,17 +467,8 @@ setSortKey('year')
                     >{p}</button>
               )}
 
-              <button
-                className={styles.pgBtn}
-                onClick={() => goTo(page + 1)}
-                disabled={page === pages}
-              >›</button>
-              <button
-                className={styles.pgBtn}
-                onClick={() => goTo(pages)}
-                disabled={page === pages}
-              >»</button>
-
+              <button className={styles.pgBtn} onClick={() => goTo(page + 1)} disabled={page === pages}>›</button>
+              <button className={styles.pgBtn} onClick={() => goTo(pages)}     disabled={page === pages}>»</button>
               <span className={styles.pgInfo}>
                 Page {page} of {pages.toLocaleString()} &nbsp;·&nbsp; {total.toLocaleString()} results
               </span>

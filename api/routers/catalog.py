@@ -113,7 +113,8 @@ def browse_catalog(
             mp.trend,
             mp.confidence,
             mp.num_sales,
-            mp.scraped_at
+            mp.scraped_at,
+            mp.image_url
         {base_query}
         ORDER BY {sort_col} {sort_dir} NULLS LAST,
                  cc.player_name ASC

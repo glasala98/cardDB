@@ -1,3 +1,4 @@
+/* ── Sport tabs ────────────────────────────────────────── */
 .sportTabs {
   display: flex;
   gap: 4px;
@@ -25,45 +26,221 @@
   font-weight: 600;
 }
 
-/* Badges */
-.tierBadge {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 1px 5px;
-  border-radius: 4px;
+/* ── Column toggles ────────────────────────────────────── */
+.colToggleRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.colToggleLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-right: 2px;
+}
+
+.colToggleBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.colToggleBtn:hover { color: var(--text-secondary); border-color: var(--border-strong); }
+.colToggleBtnOn {
+  background: rgba(0, 212, 170, 0.1);
+  border-color: rgba(0, 212, 170, 0.4);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ── Table ─────────────────────────────────────────────── */
+.tableWrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.th {
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-weight: 600;
+  text-align: left;
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  user-select: none;
+  font-size: 11px;
+  text-transform: uppercase;
   letter-spacing: 0.4px;
 }
-.tier_staple  { background: rgba(0, 212, 170, 0.15); color: var(--accent); border: 1px solid rgba(0, 212, 170, 0.3); }
-.tier_premium { background: rgba(255, 179, 50, 0.12); color: #ffb332; border: 1px solid rgba(255, 179, 50, 0.3); }
-.tier_stars   { background: rgba(160, 120, 255, 0.12); color: #a07ff0; border: 1px solid rgba(160, 120, 255, 0.3); }
+.thRight { text-align: right; }
+.sortable { cursor: pointer; }
+.sortable:hover { color: var(--text-primary); }
 
-.rcBadge {
-  font-size: 10px;
+.sortArrow { color: var(--accent); }
+
+.td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+.tdThumb {
+  padding: 8px 8px 8px 14px;
+  width: 44px;
+}
+.tdRight { text-align: right; }
+.tdAction { text-align: right; padding-right: 14px; }
+
+.tr:last-child .td { border-bottom: none; }
+.tr { cursor: pointer; transition: background 0.1s; }
+.tr:hover .td { background: var(--bg-secondary); }
+
+/* ── Card thumbnail ────────────────────────────────────── */
+.cardThumb {
+  width: 36px;
+  height: 50px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.cardThumbImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cardThumbInitials {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+
+.cardThumbSport {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* ── Card info cell ────────────────────────────────────── */
+.cardCell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cardPlayerRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.playerPrimary {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.cardSub {
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+/* ── Sport tag in "All Sports" view ────────────────────── */
+.sportTag {
+  font-size: 9px;
   font-weight: 700;
   padding: 1px 5px;
-  border-radius: 4px;
-  background: rgba(0, 212, 170, 0.15);
-  color: var(--accent);
-  border: 1px solid rgba(0, 212, 170, 0.3);
+  border-radius: 3px;
   letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.sport_NHL { background: rgba(74,158,255,0.12); color: #4a9eff; }
+.sport_NBA { background: rgba(255,107,53,0.12);  color: #ff6b35; }
+.sport_NFL { background: rgba(61,186,94,0.12);   color: #3dba5e; }
+.sport_MLB { background: rgba(224,85,85,0.12);   color: #e05555; }
+
+/* ── Badges ────────────────────────────────────────────── */
+.rcBadge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(0, 212, 170, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(0, 212, 170, 0.25);
+  letter-spacing: 0.5px;
+}
+
+.tierBadge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.4px;
+}
+.tier_staple  { background: rgba(0, 212, 170, 0.12); color: var(--accent);   border: 1px solid rgba(0, 212, 170, 0.25); }
+.tier_premium { background: rgba(255,179,50,0.12);   color: #ffb332;          border: 1px solid rgba(255,179,50,0.25); }
+.tier_stars   { background: rgba(160,120,255,0.12);  color: #a07ff0;          border: 1px solid rgba(160,120,255,0.25); }
+
+/* ── Variant ───────────────────────────────────────────── */
+.variantLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ── Price cell ────────────────────────────────────────── */
+.priceCell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
 }
 
 .price {
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 13px;
   color: var(--text-primary);
 }
 
-.noPrice {
-  color: var(--text-muted);
-}
+.trendUp   { color: var(--success); font-size: 10px; }
+.trendDown { color: var(--danger);  font-size: 10px; }
 
-/* Trend */
-.trendUp   { color: var(--success); font-size: 12px; }
-.trendDown { color: var(--danger);  font-size: 12px; }
-.trendFlat { color: var(--text-muted); font-size: 12px; }
-
-/* Confidence badges */
+/* ── Confidence badges ─────────────────────────────────── */
 .conf {
   font-size: 11px;
   font-weight: 600;
@@ -71,13 +248,50 @@
   border-radius: 4px;
   text-transform: capitalize;
 }
-.conf_high      { background: rgba(0, 201, 122, 0.15); color: #00c97a; }
-.conf_medium    { background: rgba(255, 179, 50, 0.15); color: #ffb332; }
-.conf_low       { background: rgba(240, 80, 80, 0.15);  color: #f05050; }
-.conf_estimated { background: rgba(120, 100, 200, 0.15); color: #9b80e0; }
+.conf_high      { background: rgba(0, 201, 122, 0.12); color: #00c97a; }
+.conf_medium    { background: rgba(255, 179, 50, 0.12); color: #ffb332; }
+.conf_low       { background: rgba(240, 80, 80, 0.12);  color: #f05050; }
+.conf_estimated { background: rgba(120,100,200, 0.12);  color: #9b80e0; }
 .conf_none      { background: var(--bg-card); color: var(--text-muted); }
 
-/* Pagination */
+/* ── Add / Owned ───────────────────────────────────────── */
+.addBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.addBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(0,212,170,0.07);
+}
+
+.ownedBadge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.signInToAdd {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.4;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.muted { color: var(--text-muted); }
+
+/* ── Pagination ────────────────────────────────────────── */
 .pagination {
   display: flex;
   align-items: center;
@@ -108,11 +322,7 @@
   font-weight: 700;
 }
 
-.pgEllipsis {
-  color: var(--text-muted);
-  padding: 0 4px;
-  font-size: 14px;
-}
+.pgEllipsis { color: var(--text-muted); padding: 0 4px; font-size: 14px; }
 
 .pgInfo {
   margin-left: 8px;
@@ -121,73 +331,21 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Tips bar */
-.tipBar {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  background: rgba(0, 212, 170, 0.07);
-  border: 1px solid rgba(0, 212, 170, 0.2);
-  border-radius: 8px;
-  padding: 10px 14px;
-  margin-bottom: 12px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.5;
+/* ── Loading bar ───────────────────────────────────────── */
+.loadingBar {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  background-size: 200% 100%;
+  animation: slide 1.2s linear infinite;
+  border-radius: 2px;
+  margin-top: 4px;
 }
-.tipIcon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
-.tipText { flex: 1; }
-.tipText strong { color: var(--text-primary); }
-.tipClose {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 13px;
-  padding: 0 2px;
-  flex-shrink: 0;
-  line-height: 1;
-  margin-top: 2px;
-}
-.tipClose:hover { color: var(--text-primary); }
-
-/* Add to Collection button + owned badge */
-.addBtn {
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  padding: 3px 8px;
-  font-size: 11px;
-  font-weight: 600;
-  font-family: var(--font);
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-.addBtn:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: rgba(0,212,170,0.07);
+@keyframes slide {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
-.ownedBadge {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--accent);
-  white-space: nowrap;
-}
-
-.signInToAdd {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  white-space: nowrap;
-  opacity: 0.5;
-  cursor: default;
-}
-
-/* Add to Collection modal */
+/* ── Add to Collection modal ───────────────────────────── */
 .modalOverlay {
   position: fixed;
   inset: 0;
@@ -307,17 +465,3 @@
 }
 .modalSave:hover { opacity: 0.85; }
 .modalSave:disabled { opacity: 0.5; cursor: default; }
-
-/* Loading bar (while paginating with existing data visible) */
-.loadingBar {
-  height: 2px;
-  background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  background-size: 200% 100%;
-  animation: slide 1.2s linear infinite;
-  border-radius: 2px;
-  margin-top: 4px;
-}
-@keyframes slide {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
