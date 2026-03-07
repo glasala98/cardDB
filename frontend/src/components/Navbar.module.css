@@ -30,8 +30,8 @@
 }
 
 .logoImg {
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   object-fit: contain;
   flex-shrink: 0;
 }
@@ -281,8 +281,8 @@
     right: 0;
     width: 100%;
     min-height: auto;
-    height: 62px;
-    flex-direction: row;
+    height: auto;
+    flex-direction: column;
     align-items: stretch;
     padding: 0;
     border-right: none;
@@ -291,17 +291,42 @@
   }
   .nav::before { display: none; }
 
-  /* Hide logo and user area on mobile */
-  .logo     { display: none; }
-  .userArea { display: none; }
+  /* Hide logo on mobile */
+  .logo { display: none; }
 
-  /* Links fill full width as evenly-spaced tabs */
+  /* User area: compact row above tabs */
+  .userArea {
+    margin-top: 0;
+    padding: 0 12px;
+    border-top: none;
+    border-bottom: 1px solid var(--border);
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    order: 0;
+  }
+  .userRow { padding: 0; flex: 1; }
+  .actionRow { flex-shrink: 0; }
+
+  /* Auth area on mobile */
+  .authArea {
+    flex-direction: row;
+    padding: 6px 10px;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    order: 0;
+  }
+
+  /* Tab bar */
   .links {
     flex-direction: row;
-    flex: 1;
+    flex: none;
     padding: 0;
     gap: 0;
     align-items: stretch;
+    height: 62px;
+    order: 1;
   }
   .links li {
     flex: 1;
