@@ -579,7 +579,7 @@ def load_data(username: str) -> pd.DataFrame:
     with get_db() as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                "SELECT card_name, scraped_at, confidence FROM card_results WHERE user_id = %s",
+                "SELECT card_name, scraped_at, confidence, image_url FROM card_results WHERE user_id = %s",
                 (username,)
             )
             res_rows = cur.fetchall()
@@ -589,6 +589,9 @@ def load_data(username: str) -> pd.DataFrame:
     )
     df['Confidence'] = df['Card Name'].map(
         lambda n: res_map.get(n, {}).get('confidence') or ''
+    )
+    df['Image URL'] = df['Card Name'].map(
+        lambda n: res_map.get(n, {}).get('image_url') or ''
     )
 
     # Parse card names into display columns

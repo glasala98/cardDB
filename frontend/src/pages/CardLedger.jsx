@@ -24,6 +24,31 @@ const LEDGER_TABS = [
 
 const TRENDS = ['up', 'stable', 'down', 'no data']
 
+const SPORT_COLORS = {
+  NHL: { bg: '#0c2d54', text: '#4a9eff' },
+  NBA: { bg: '#4a1500', text: '#ff6b35' },
+  NFL: { bg: '#0a3318', text: '#3dba5e' },
+  MLB: { bg: '#3d0a0a', text: '#e05555' },
+}
+
+function CardThumb({ playerName, imageUrl, sport }) {
+  const colors = SPORT_COLORS[sport] || { bg: '#1a1a2e', text: '#666' }
+  const initials = (playerName || '')
+    .split(' ').filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase() || '?'
+  if (imageUrl) {
+    return (
+      <div className={styles.cardThumb}>
+        <img src={imageUrl} alt={playerName} className={styles.cardThumbImg} />
+      </div>
+    )
+  }
+  return (
+    <div className={styles.cardThumb} style={{ background: colors.bg, borderColor: colors.text + '22' }}>
+      <span className={styles.cardThumbInitials} style={{ color: colors.text }}>{initials}</span>
+    </div>
+  )
+}
+
 function buildSubsetLine(card) {
   const parts = []
   if (card.subset) parts.push(card.subset)
@@ -117,7 +142,7 @@ export default function CardLedger() {
   // Hide optional columns when no card has that data populated
   const hasCostBasis = useMemo(() => cards.some(c => c.cost_basis != null && c.cost_basis !== '' && Number(c.cost_basis) > 0), [cards])
   const hasTags      = useMemo(() => cards.some(c => c.tags && c.tags.trim() !== ''), [cards])
-  const colCount     = 6 + (hasCostBasis ? 1 : 0) + (hasTags ? 1 : 0) + (!isPublic ? 1 : 0)
+  const colCount     = 7 + (hasCostBasis ? 1 : 0) + (hasTags ? 1 : 0) + (!isPublic ? 1 : 0)
 
   const filtered = useMemo(() => {
     const s = search.toLowerCase()
@@ -468,6 +493,7 @@ export default function CardLedger() {
               <table className={styles.table}>
                 <thead>
                   <tr>
+                    <th className={styles.th} style={{ width: 44 }} />
                     <SortTh col="player"       label="Card" />
                     <SortTh col="fair_value"   label="Fair Value" />
                     <SortTh col="trend"        label="Trend" />
@@ -485,6 +511,16 @@ export default function CardLedger() {
                   )}
                   {filtered.map(card => (
                     <tr key={card.card_name} className={styles.tr}>
+                      <td
+                        className={`${styles.td} ${styles.tdThumb}`}
+                        onClick={() => navigate(`/ledger/${encodeURIComponent(card.card_name)}`)}
+                      >
+                        <CardThumb
+                          playerName={card.player || card.card_name}
+                          imageUrl={card.image_url}
+                          sport={card.year ? '' : ''}
+                        />
+                      </td>
                       <td
                         className={`${styles.td} ${styles.nameCell}`}
                         onClick={() => navigate(`/ledger/${encodeURIComponent(card.card_name)}`)}

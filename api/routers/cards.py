@@ -48,6 +48,7 @@ def _normalise_row(r: dict) -> dict:
         "serial":       r.get("Serial", "") or "",
         "grade":        r.get("Grade", "") or "",
         "confidence":   r.get("Confidence", "") or "",
+        "image_url":    r.get("Image URL", "") or "",
     }
 
 
