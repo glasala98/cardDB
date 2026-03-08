@@ -367,6 +367,7 @@ def get_scrape_runs_summary(_admin: str = Depends(_require_admin)):
                         WHEN status = 'timed_out'  THEN 'timed_out'
                         WHEN status = 'completed' AND cards_total > 100
                              AND COALESCE(cards_processed, 0) < cards_total * 0.9
+                             AND EXTRACT(EPOCH FROM (COALESCE(finished_at, NOW()) - started_at)) > 120
                              THEN 'timed_out'
                         WHEN status = 'completed' AND cards_delta = 0 AND cards_total > 0
                              THEN 'zero_delta'
@@ -380,7 +381,8 @@ def get_scrape_runs_summary(_admin: str = Depends(_require_admin)):
                     status = 'error'
                     OR status = 'timed_out'
                     OR (status = 'completed' AND cards_total > 100
-                        AND COALESCE(cards_processed, 0) < cards_total * 0.9)
+                        AND COALESCE(cards_processed, 0) < cards_total * 0.9
+                        AND EXTRACT(EPOCH FROM (COALESCE(finished_at, NOW()) - started_at)) > 120)
                     OR (status = 'completed' AND cards_delta = 0 AND cards_total > 0)
                     OR (status = 'completed' AND cards_total > 0
                         AND cards_found::float / cards_total < 0.10)

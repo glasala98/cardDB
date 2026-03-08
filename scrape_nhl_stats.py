@@ -39,15 +39,15 @@ NHL_API_BASE = "https://api-web.nhle.com/v1"
 
 # ── NHL API helpers ───────────────────────────────────────────────────────────
 
-def fetch_json(url, retries=2):
+def fetch_json(url, retries=3):
     for attempt in range(retries + 1):
         try:
             req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urlopen(req, timeout=15) as resp:
+            with urlopen(req, timeout=20) as resp:
                 return json.loads(resp.read().decode())
-        except (URLError, HTTPError) as e:
+        except (URLError, HTTPError, OSError) as e:
             if attempt < retries:
-                time.sleep(1)
+                time.sleep(2 ** attempt)  # 1s, 2s, 4s backoff
                 continue
             print(f"  ERROR fetching {url}: {e}")
             return None
