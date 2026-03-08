@@ -200,6 +200,7 @@ def load_cards(args) -> list:
         SELECT cc.id, cc.sport, cc.year, cc.brand, cc.set_name,
                cc.card_number, cc.player_name, cc.team,
                cc.variant, cc.print_run, cc.is_rookie, cc.search_query,
+               cc.scrape_tier,
                {select_extra}
         FROM card_catalog cc
         {join_clause}
@@ -328,6 +329,34 @@ def save_prices_batch(results: list):
                 ON CONFLICT (card_catalog_id, scraped_at) DO NOTHING
             """, [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], 'ebay')
                   for r in hist_rows])
+        conn.commit()
+
+
+def save_no_market_batch(catalog_ids: list) -> None:
+    """Stamp base-tier cards with 0 eBay sales as 'no_market' — confirmed $0 market.
+
+    Unlike save_prices_batch, this does NOT write to market_price_history since there
+    is no price data to track. It simply marks the card as confirmed-no-market so it
+    is skipped by the stale-days gate until it's due for re-check.
+    """
+    if not catalog_ids:
+        return
+    now = datetime.utcnow()
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            from psycopg2.extras import execute_values
+            execute_values(cur, """
+                INSERT INTO market_prices
+                    (card_catalog_id, fair_value, trend, confidence, num_sales, scraped_at)
+                VALUES %s
+                ON CONFLICT (card_catalog_id) DO UPDATE SET
+                    prev_value = market_prices.fair_value,
+                    fair_value = 0,
+                    confidence = 'no_market',
+                    num_sales  = 0,
+                    scraped_at = EXCLUDED.scraped_at,
+                    updated_at = NOW()
+            """, [(cid, 0.0, 'no data', 'no_market', 0, now) for cid in catalog_ids])
         conn.commit()
 
 
@@ -600,18 +629,25 @@ def main():
 
     start = time.time()
     batch: list = []
+    no_market_batch: list = []
     BATCH_SIZE = 50
 
     def _flush_batch():
-        nonlocal batch
+        nonlocal batch, no_market_batch
         if batch:
             try:
                 save_prices_batch(batch)
                 if args.catalog_tier:
-                    bump_tiers_by_sales([cid for cid, _ in batch])
+                    bump_tiers_by_sales([cid for cid, *_ in batch])
             except Exception as e:
                 print(f"  WARNING: DB write error: {e}")
             batch = []
+        if no_market_batch:
+            try:
+                save_no_market_batch(no_market_batch)
+            except Exception as e:
+                print(f"  WARNING: DB write error (no_market): {e}")
+            no_market_batch = []
 
     if args.graded:
         # ── Graded mode: filter to cards worth >= min_raw_value ──
@@ -687,12 +723,17 @@ def main():
             futures = {executor.submit(scrape_one, card): card for card in cards}
             done_count = 0
             for future in as_completed(futures):
+                card = futures[future]
                 catalog_id, result = future.result()
                 done_count += 1
                 stats = result.get('stats', {})
 
                 if stats.get('num_sales', 0) > 0:
                     batch.append((catalog_id, stats, result.get('image_url') or ''))
+                elif card.get('scrape_tier') == 'base':
+                    # Base cards with 0 sales are confirmed no-market, not unknowns.
+                    # Stamp them so the stale-days gate skips them on the next run.
+                    no_market_batch.append(catalog_id)
 
                 if done_count % BATCH_SIZE == 0 or done_count == total:
                     _flush_batch()
