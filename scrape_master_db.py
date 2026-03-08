@@ -367,16 +367,16 @@ def create_scrape_run(workflow: str, sport: str | None, tier: str | None,
         return None
 
 
-def update_scrape_run_progress(run_id: int | None, done_count: int) -> None:
-    """Checkpoint cards_processed mid-run so the dashboard shows live progress."""
+def update_scrape_run_progress(run_id: int | None, done_count: int, found_count: int = 0) -> None:
+    """Checkpoint cards_processed and cards_found mid-run so the dashboard shows live progress."""
     if run_id is None:
         return
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "UPDATE scrape_runs SET cards_processed = %s WHERE id = %s",
-                    (done_count, run_id)
+                    "UPDATE scrape_runs SET cards_processed = %s, cards_found = %s WHERE id = %s",
+                    (done_count, found_count, run_id)
                 )
             conn.commit()
     except Exception as e:
@@ -645,7 +645,7 @@ def main():
                     _progress['found'] += 1
 
                 if done_count % BATCH_SIZE == 0 or done_count == total:
-                    update_scrape_run_progress(run_id, done_count)
+                    update_scrape_run_progress(run_id, done_count, _progress['found'])
                     # Flush graded_data updates into market_prices.graded_data
                     if graded_batch:
                         import json as _json
@@ -688,7 +688,7 @@ def main():
 
                 if done_count % BATCH_SIZE == 0 or done_count == total:
                     _flush_batch()
-                    update_scrape_run_progress(run_id, done_count)
+                    update_scrape_run_progress(run_id, done_count, _progress['found'])
                     elapsed = time.time() - start
                     rate = done_count / elapsed if elapsed > 0 else 0
                     remaining = (total - done_count) / rate / 60 if rate > 0 else 0

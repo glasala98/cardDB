@@ -27,6 +27,7 @@ _WORKFLOWS = [
     ("Master DB Daily",  "master_db_daily.yml"),
     ("Master DB Weekly", "master_db_weekly.yml"),
     ("Ledger Scrape",    "daily_scrape.yml"),
+    ("Set Info Scrape",  "scrape_set_info.yml"),
 ]
 
 
