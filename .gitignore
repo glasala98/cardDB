@@ -5,8 +5,8 @@ backups/
 data/*
 !data/master_db/
 
-# Personal data - keep off GitHub
-# users.yaml now tracked (repo is private)
+# Personal data - never commit to public repo
+users.yaml
 hockey_cards.csv
 card_prices_summary.csv
 card_prices_results.json
