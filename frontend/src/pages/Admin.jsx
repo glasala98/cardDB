@@ -21,11 +21,30 @@ const WF_COLORS = ['#00d4aa', '#4a9eff', '#ff6b35', '#ffb332', '#a07ff0', '#e055
 
 export default function Admin() {
   const [tab, setTab] = useState('Users')
+  const [activeCount, setActiveCount] = useState(0)
+
+  // Poll for running scrapes every 30s to keep the badge current
+  useEffect(() => {
+    const check = () => {
+      getScrapeRuns(50).then(d => {
+        setActiveCount((d.runs || []).filter(r => r.status === 'running').length)
+      }).catch(() => {})
+    }
+    check()
+    const id = setInterval(check, 30000)
+    return () => clearInterval(id)
+  }, [])
 
   return (
     <div className={pageStyles.page}>
       <div className={pageStyles.header}>
         <h1 className={pageStyles.title}>Admin</h1>
+        {activeCount > 0 && (
+          <span className={styles.liveGlobalBadge}>
+            <span className={styles.liveDotGlobal} />
+            {activeCount} scrape{activeCount > 1 ? 's' : ''} running
+          </span>
+        )}
       </div>
 
       <div className={styles.tabRow}>
@@ -36,6 +55,9 @@ export default function Admin() {
             onClick={() => setTab(t)}
           >
             {t}
+            {t === 'Runs' && activeCount > 0 && (
+              <span className={styles.liveBadge}>{activeCount}</span>
+            )}
           </button>
         ))}
       </div>
@@ -401,6 +423,14 @@ function PipelineTab() {
 
   useEffect(() => { load() }, [load])
 
+  // Auto-refresh while GH Actions workflows are in progress
+  useEffect(() => {
+    const hasActive = workflows.some(w => w.status === 'in_progress' || w.status === 'queued')
+    if (!hasActive) return
+    const id = setInterval(() => load(true), 30000)
+    return () => clearInterval(id)
+  }, [workflows, load])
+
   const handleTrigger = async (wf) => {
     if (!confirm(`Trigger "${wf.name}"?\nThis will start a new GitHub Actions run.`)) return
     setTriggering(wf.file)
@@ -553,6 +583,18 @@ function RunsTab() {
 
   useEffect(() => { load() }, [load])
 
+  // Auto-refresh every 30s while any scrape is running
+  const runningJobs = useMemo(() => runs.filter(r => r.status === 'running'), [runs])
+  const [lastRefresh, setLastRefresh] = useState(Date.now())
+  useEffect(() => {
+    if (runningJobs.length === 0) return
+    const id = setInterval(() => {
+      setLastRefresh(Date.now())
+      load(true)
+    }, 30000)
+    return () => clearInterval(id)
+  }, [runningJobs.length, load])
+
   const uniqueWorkflows = useMemo(() => [...new Set(runs.map(r => r.workflow))].sort(), [runs])
   const uniqueSports    = useMemo(() => [...new Set(runs.map(r => r.sport).filter(Boolean))].sort(), [runs])
 
@@ -607,6 +649,60 @@ function RunsTab() {
 
   return (
     <div className={styles.runsWrap}>
+
+      {/* Active jobs banner */}
+      {runningJobs.length > 0 && (
+        <div className={styles.activeJobsBanner}>
+          <div className={styles.liveHeader}>
+            <div className={styles.liveIndicator}>
+              <span className={styles.liveDot} />
+              <span className={styles.liveText}>
+                Live — {runningJobs.length} job{runningJobs.length > 1 ? 's' : ''} running · auto-refreshing every 30s
+              </span>
+            </div>
+            <span className={styles.muted} style={{ fontSize: 11 }}>
+              Last updated: {new Date(lastRefresh).toLocaleTimeString()}
+            </span>
+          </div>
+          <div className={styles.activeJobsGrid}>
+            {runningJobs.map(r => {
+              const elapsed = r.started_at
+                ? Math.round((Date.now() - new Date(r.started_at)) / 60000)
+                : null
+              const hitRate = r.cards_total > 0
+                ? Math.round(r.cards_found / r.cards_total * 100) : null
+              const progress = r.cards_total > 0
+                ? Math.round(r.cards_found / r.cards_total * 100) : 0
+              return (
+                <div key={r.id} className={styles.activeJobCard}>
+                  <div className={styles.activeJobHeader}>
+                    <span className={styles.running}>⬤</span>
+                    <span className={styles.activeJobWf}>{r.workflow}</span>
+                    {r.sport && <span className={styles.activeJobSport}>{r.sport}</span>}
+                    {r.tier  && <span className={`${styles.tierBadge} ${styles['tier_' + r.tier]}`}>{r.tier}</span>}
+                  </div>
+                  <div className={styles.activeJobStats}>
+                    <span><strong>{r.cards_total.toLocaleString()}</strong> scraped</span>
+                    <span><strong>{r.cards_found.toLocaleString()}</strong> found</span>
+                    {hitRate != null && (
+                      <span className={hitRate < 10 ? styles.textDanger : hitRate < 30 ? styles.textWarn : styles.textSuccess}>
+                        {hitRate}% hit
+                      </span>
+                    )}
+                    {r.errors > 0 && <span className={styles.textDanger}>{r.errors} err</span>}
+                    {elapsed != null && <span className={styles.muted}>{elapsed}m elapsed</span>}
+                  </div>
+                  {r.cards_total > 0 && (
+                    <div className={styles.progressBar}>
+                      <div className={styles.progressFill} style={{ width: `${Math.min(progress, 100)}%` }} />
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Filter bar */}
       <div className={styles.runsFilterBar}>
