@@ -47,7 +47,13 @@ ALL_GRADES = PSA_PROBE_ORDER + BGS_PROBE_ORDER
 # Thread-local Chrome drivers + shared progress counters
 _thread_local = threading.local()
 _lock = threading.Lock()
-_progress = {"done": 0, "found": 0, "not_found": 0, "errors": 0, "deltas": 0}
+_progress = {
+    "done": 0, "found": 0, "not_found": 0, "errors": 0, "deltas": 0,
+    "consec_errors": 0,   # consecutive failures — triggers rate-limit backoff
+    "error_log": [],      # list of (card_catalog_id, card_name, error_type, error_msg)
+}
+# Backoff thresholds: after N consecutive errors, sleep this many seconds
+_BACKOFF = [(5, 10), (10, 30), (20, 90)]
 
 
 # ── Chrome driver ─────────────────────────────────────────────────────────────
@@ -348,7 +354,7 @@ def create_scrape_run(workflow: str, sport: str | None, tier: str | None,
 
 
 def finish_scrape_run(run_id: int | None, progress: dict, status: str = 'completed') -> None:
-    """Update a scrape_runs row with final stats. No-op if run_id is None."""
+    """Update a scrape_runs row with final stats and flush per-card error log."""
     if run_id is None:
         return
     try:
@@ -364,7 +370,18 @@ def finish_scrape_run(run_id: int | None, progress: dict, status: str = 'complet
                        WHERE id = %s""",
                     (progress['found'], progress['deltas'], progress['errors'], status, run_id)
                 )
+                # Write per-card error log
+                error_log = progress.get('error_log', [])
+                if error_log:
+                    from psycopg2.extras import execute_values
+                    execute_values(cur, """
+                        INSERT INTO scrape_error_log
+                            (run_id, card_catalog_id, card_name, error_type, error_msg)
+                        VALUES %s
+                    """, [(run_id, cid, name, etype, emsg) for cid, name, etype, emsg in error_log])
             conn.commit()
+        if error_log:
+            print(f"  Logged {len(error_log)} card errors to scrape_error_log")
     except Exception as e:
         print(f"  WARNING: Could not update scrape_run row: {e}")
 
@@ -380,6 +397,7 @@ def scrape_one(card: dict) -> tuple:
     history row will be written.
     """
     card_name = build_card_name(card)
+    last_exc = None
     for attempt in range(2):
         try:
             _, result = process_card(card_name)
@@ -388,6 +406,7 @@ def scrape_one(card: dict) -> tuple:
             old_price = card.get('existing_price')
             with _lock:
                 _progress['done'] += 1
+                _progress['consec_errors'] = 0  # reset on success
                 if stats.get('num_sales', 0) > 0:
                     _progress['found'] += 1
                     if old_price is None or abs(float(old_price) - new_price) > 0.01:
@@ -395,16 +414,33 @@ def scrape_one(card: dict) -> tuple:
                 else:
                     _progress['not_found'] += 1
             return card['id'], result
-        except Exception:
+        except Exception as exc:
+            last_exc = exc
             if attempt == 0:
                 try:
                     if hasattr(_thread_local, 'driver'): _thread_local.driver.quit()
                 except Exception: pass
                 if hasattr(_thread_local, 'driver'): del _thread_local.driver
                 continue
+            # Both attempts failed — log and apply consecutive-failure backoff
+            err_type = type(last_exc).__name__
+            err_msg  = str(last_exc)[:400]
             with _lock:
                 _progress['done'] += 1
                 _progress['errors'] += 1
+                _progress['consec_errors'] += 1
+                _progress['error_log'].append(
+                    (card.get('id'), card_name, err_type, err_msg)
+                )
+                consec = _progress['consec_errors']
+            # Rate-limit backoff: sleep outside the lock
+            backoff_secs = 0
+            for threshold, secs in _BACKOFF:
+                if consec >= threshold:
+                    backoff_secs = secs
+            if backoff_secs:
+                print(f"  [BACKOFF] {consec} consecutive errors — sleeping {backoff_secs}s", flush=True)
+                time.sleep(backoff_secs)
             return card['id'], {'stats': {}, 'raw_sales': []}
 
 

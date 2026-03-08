@@ -522,6 +522,40 @@
 .snapshotDetailRow span { flex: 1; }
 .snapshotDetailRow span:first-child { color: var(--text-muted); flex: 1.5; }
 
+/* ── Runs tab error drill-down ──────────────────────────── */
+.errCountBtn {
+  background: transparent;
+  border: none;
+  color: var(--danger);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline dotted;
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums;
+}
+.errCountBtn:hover { opacity: 0.75; }
+
+.errorPanel {
+  margin-top: 16px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.errorPanelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: rgba(240,80,80,0.08);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+  border-bottom: 1px solid var(--danger);
+}
+
 /* ── Sealed Products tab ────────────────────────────────── */
 .searchInput {
   background: var(--bg-primary);

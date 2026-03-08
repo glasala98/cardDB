@@ -16,5 +16,7 @@ export const getDataQuality       = ()                            => client.get(
 export const getSnapshotAudit     = (tier = 'staple', sport = null, limit = 25) =>
   client.get('/admin/snapshot-audit', { params: { tier, ...(sport && { sport }), limit } })
 
+export const getScrapeRunErrors     = (runId, limit = 100) => client.get(`/admin/scrape-runs/${runId}/errors`, { params: { limit } })
+
 export const getSealedProductsAdmin = (params = {}) => client.get('/admin/sealed-products', { params })
 export const updateSealedProduct    = (id, data)    => client.patch(`/admin/sealed-products/${id}`, data)

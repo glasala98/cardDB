@@ -552,6 +552,29 @@ def get_snapshot_audit(
     return {"cards": cards}
 
 
+@router.get("/scrape-runs/{run_id}/errors")
+def get_scrape_run_errors(run_id: int, limit: int = 100, _admin: str = Depends(_require_admin)):
+    """Return per-card errors logged for a specific scrape run."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT sel.id, sel.card_catalog_id, sel.card_name,
+                       sel.error_type, sel.error_msg, sel.occurred_at
+                FROM scrape_error_log sel
+                WHERE sel.run_id = %s
+                ORDER BY sel.occurred_at DESC
+                LIMIT %s
+            """, [run_id, limit])
+            cols = [d[0] for d in cur.description]
+            rows = cur.fetchall()
+    errors = []
+    for row in rows:
+        r = dict(zip(cols, row))
+        r["occurred_at"] = r["occurred_at"].isoformat() if r["occurred_at"] else None
+        errors.append(r)
+    return {"errors": errors, "run_id": run_id}
+
+
 @router.get("/scrape-runs")
 def get_scrape_runs(
     limit: int = 50,

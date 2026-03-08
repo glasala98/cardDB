@@ -7,6 +7,7 @@ import {
   getUsers, createUser, deleteUser, changePassword, changeRole,
   getPipelineHealth, getWorkflowStatus, getOutliers, toggleIgnore,
   getScrapeRuns, getScrapeRunsSummary, getDataQuality, getSnapshotAudit,
+  getScrapeRunErrors,
   getSealedProductsAdmin, updateSealedProduct,
 } from '../api/admin'
 import { useAuth } from '../context/AuthContext'
@@ -496,6 +497,9 @@ function RunsTab() {
   const [wfFilter,    setWfFilter]    = useState('')
   const [sportFilter, setSportFilter] = useState('')
   const [dateRange,   setDateRange]   = useState('all')
+  const [errorRunId,  setErrorRunId]  = useState(null)
+  const [runErrors,   setRunErrors]   = useState([])
+  const [errLoading,  setErrLoading]  = useState(false)
 
   const load = useCallback((isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
@@ -785,7 +789,19 @@ function RunsTab() {
                         : r.cards_delta.toLocaleString()}
                     </td>
                     <td className={`${styles.td} ${styles.thRight}`}>
-                      {r.errors > 0 ? <span className={styles.textDanger}>{r.errors}</span> : r.errors}
+                      {r.errors > 0 ? (
+                        <button
+                          className={styles.errCountBtn}
+                          onClick={() => {
+                            if (errorRunId === r.id) { setErrorRunId(null); return }
+                            setErrorRunId(r.id); setRunErrors([]); setErrLoading(true)
+                            getScrapeRunErrors(r.id).then(d => setRunErrors(d.errors || [])).finally(() => setErrLoading(false))
+                          }}
+                          title="Click to see error details"
+                        >
+                          {r.errors}
+                        </button>
+                      ) : r.errors}
                     </td>
                     <td className={styles.td}>
                       <span className={`${styles.wfStatus} ${styles['wf_' + r.status]}`}>{r.status}</span>
@@ -795,6 +811,42 @@ function RunsTab() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Error drill-down panel */}
+      {errorRunId && (
+        <div className={styles.errorPanel}>
+          <div className={styles.errorPanelHeader}>
+            <span>Error log — run #{errorRunId}</span>
+            <button className={styles.cancelBtn} onClick={() => setErrorRunId(null)} style={{padding:'2px 8px',fontSize:11}}>✕</button>
+          </div>
+          {errLoading ? (
+            <div className={styles.muted} style={{padding:'10px 14px'}}>Loading…</div>
+          ) : runErrors.length === 0 ? (
+            <div className={styles.muted} style={{padding:'10px 14px'}}>No error details available (errors logged from next scrape onwards).</div>
+          ) : (
+            <table className={styles.table} style={{marginTop:0}}>
+              <thead>
+                <tr>
+                  <th className={styles.th}>Card</th>
+                  <th className={styles.th}>Error Type</th>
+                  <th className={styles.th}>Message</th>
+                  <th className={styles.th}>Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {runErrors.map(e => (
+                  <tr key={e.id} className={styles.tr}>
+                    <td className={styles.td} style={{maxWidth:220,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.card_name}</td>
+                    <td className={styles.td}><span className={styles.textDanger}>{e.error_type}</span></td>
+                    <td className={styles.td} style={{maxWidth:320,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:11,color:'var(--text-muted)'}}>{e.error_msg}</td>
+                    <td className={styles.td} style={{whiteSpace:'nowrap'}}>{e.occurred_at?.slice(0,19).replace('T',' ')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
     </div>

@@ -10,7 +10,7 @@
 - [x] **GH Actions Schedules:** daily staple, weekly full sweep, monthly premium/stars/graded, monthly set info
 - [x] **NHL Player Stats scrape failing** — fixed INSERT column mismatch (updated_at listed but not in values tuple)
 - [x] **Image Retrieval:** scrape card images from eBay listings during price scrape; store in market_prices.image_url
-- [ ] **Scraping Resiliency:** central error logging, retry logic, rate-limit backoff across all scrapers
+- [x] **Scraping Resiliency:** scrape_error_log table; per-card error capture + DB flush; consecutive-failure backoff (5→10s, 10→30s, 20→90s); admin Runs tab error drill-down
 - [ ] **[AI] Entity Resolution Agent:** LangGraph agent to map ambiguous eBay titles to card_catalog records
 
 ## Data / Backend
