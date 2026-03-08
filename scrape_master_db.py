@@ -343,7 +343,15 @@ def create_scrape_run(workflow: str, sport: str | None, tier: str | None,
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                # Mark stale 'running' rows from previous GitHub-killed jobs
+                # Mark stale 'running' rows from previous GitHub-killed jobs.
+                # Broad sweep: any running row older than 7h (GitHub hard limit).
+                cur.execute(
+                    """UPDATE scrape_runs
+                       SET status = 'timed_out', finished_at = NOW()
+                       WHERE status = 'running'
+                         AND started_at < NOW() - INTERVAL '7 hours'"""
+                )
+                # Narrow sweep: same workflow+sport older than 1h (fast-cycling jobs).
                 cur.execute(
                     """UPDATE scrape_runs
                        SET status = 'timed_out', finished_at = NOW()

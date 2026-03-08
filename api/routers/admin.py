@@ -754,7 +754,13 @@ def get_scrape_runs(
             cur.execute(f"""
                 SELECT id, workflow, sport, tier, mode,
                        started_at, finished_at,
-                       cards_total, cards_processed, cards_found, cards_delta, errors, status
+                       cards_total, cards_processed, cards_found, cards_delta, errors,
+                       CASE
+                           WHEN status = 'running'
+                                AND started_at < NOW() - INTERVAL '7 hours'
+                           THEN 'timed_out'
+                           ELSE status
+                       END AS status
                 FROM scrape_runs
                 {where_sql}
                 ORDER BY started_at DESC
