@@ -267,12 +267,10 @@ def new_releases(
             LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
             {where_sql}
             GROUP BY cc.sport, cc.year, cc.set_name, cc.brand
+            HAVING COUNT(mp.id) FILTER (WHERE mp.fair_value > 0
+                                          AND NOT COALESCE(mp.ignored, FALSE)) > 0
             ORDER BY
                 year_num DESC,
-                -- Populated sets (any priced cards) always before empty shells
-                CASE WHEN COUNT(mp.id) FILTER (WHERE mp.fair_value > 0
-                                                 AND NOT COALESCE(mp.ignored, FALSE)) > 0
-                     THEN 0 ELSE 1 END,
                 COUNT(*) FILTER (WHERE cc.scrape_tier IN ('staple','premium')) DESC,
                 COALESCE(SUM(mp.num_sales), 0) DESC,
                 MAX(mp.fair_value) DESC NULLS LAST,
