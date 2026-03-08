@@ -18,8 +18,10 @@ export const getSnapshotAudit     = (tier = 'staple', sport = null, limit = 25) 
 
 export const getScrapeRunErrors     = (runId, limit = 100) => client.get(`/admin/scrape-runs/${runId}/errors`, { params: { limit } })
 
-export const getSealedProductsAdmin = (params = {}) => client.get('/admin/sealed-products', { params })
-export const updateSealedProduct    = (id, data)    => client.patch(`/admin/sealed-products/${id}`, data)
+export const getSealedProductsAdmin  = (params = {}) => client.get('/admin/sealed-products', { params })
+export const updateSealedProduct     = (id, data)    => client.patch(`/admin/sealed-products/${id}`, data)
+export const getSealedQuality        = ()             => client.get('/admin/sealed-products/quality')
+export const deleteSealedMismatches  = ()             => client.delete('/admin/sealed-products/mismatches')
 
 export const triggerWorkflow    = (workflowFile, inputs = {}) => client.post('/admin/trigger-workflow', { workflow_file: workflowFile, inputs })
 export const bulkIgnoreOutliers = (ids)                       => client.post('/admin/outliers/bulk-ignore', { ids })

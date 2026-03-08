@@ -122,6 +122,25 @@ def cbc_expand_year(year: str) -> str:
     return f"{start}-{start[:2]}{end}"
 
 
+# Sport signals: words that clearly indicate a specific sport regardless of which
+# page the set was discovered from (catches cross-listed products on CBC)
+_SPORT_SIGNALS: dict[str, list[str]] = {
+    "NHL": [" hockey", "nhl "],
+    "NBA": [" basketball", "nba "],
+    "NFL": [" football", "nfl ", "gridiron"],
+    "MLB": [" baseball", "mlb ", " bowman"],  # Bowman is always MLB
+}
+
+
+def infer_sport_from_name(set_name: str) -> str | None:
+    """Return sport code if set_name contains clear sport-specific keywords."""
+    sl = " " + set_name.lower() + " "
+    for sport, signals in _SPORT_SIGNALS.items():
+        if any(sig in sl for sig in signals):
+            return sport
+    return None
+
+
 def infer_brand(set_name: str) -> str:
     sl = set_name.lower()
     if any(x in sl for x in ("upper deck", "o-pee-chee", "opc", "parkhurst",
@@ -147,10 +166,12 @@ def normalize_product_type(raw: str) -> str | None:
 
 
 def parse_price(text: str) -> float | None:
-    """Extract first dollar amount from text. Returns None if not found."""
-    m = re.search(r'\$\s*(\d{1,4}(?:\.\d{2})?)', text)
+    """Extract first dollar amount from text. Returns None if not found.
+    Handles comma-thousands like $1,499.99 and $1,000.
+    """
+    m = re.search(r'\$\s*([\d,]+(?:\.\d{2})?)', text)
     if m:
-        return float(m.group(1))
+        return float(m.group(1).replace(',', ''))
     return None
 
 
@@ -251,8 +272,19 @@ def cbc_get_set_urls(session: requests.Session, sport: str, year: str,
                 seen.add(href)
                 sets.append({"set_name": name, "url": href})
 
-    log.info(f"  CBC {sport} {year}: {len(sets)} sets found")
-    return sets
+    # Filter out cross-listed sets whose names clearly belong to a different sport
+    filtered = []
+    for s in sets:
+        inferred = infer_sport_from_name(s["set_name"])
+        if inferred and inferred != sport:
+            log.info(f"  Skipping cross-listed set (expected {sport}, inferred {inferred}): {s['set_name']}")
+            continue
+        filtered.append(s)
+    if len(filtered) != len(sets):
+        log.info(f"  CBC {sport} {year}: {len(filtered)} sets after removing {len(sets) - len(filtered)} cross-listed")
+    else:
+        log.info(f"  CBC {sport} {year}: {len(sets)} sets found")
+    return filtered
 
 
 # ── CBC set page parser ───────────────────────────────────────────────────────

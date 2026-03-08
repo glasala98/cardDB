@@ -636,6 +636,104 @@ def get_scrape_run_errors(run_id: int, limit: int = 100, _admin: str = Depends(_
     return {"errors": errors, "run_id": run_id}
 
 
+@router.get("/sealed-products/quality")
+def sealed_quality(_admin: str = Depends(_require_admin)):
+    """Data quality report for sealed_products: sport mismatches, bad MSRPs, duplicates."""
+    SPORT_SIGNALS = {
+        "NHL": ["%hockey%", "%nhl %"],
+        "NBA": ["%basketball%", "%nba %"],
+        "NFL": ["%football%", "%nfl %", "%gridiron%"],
+        "MLB": ["%baseball%", "%mlb %", "%bowman%"],
+    }
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = '10s'")
+
+            # Sport mismatches: set name signals a different sport than stored
+            mismatches = []
+            for correct_sport, patterns in SPORT_SIGNALS.items():
+                for pattern in patterns:
+                    cur.execute("""
+                        SELECT id, sport, year, set_name, product_type, msrp
+                        FROM sealed_products
+                        WHERE sport != %s AND set_name ILIKE %s
+                        ORDER BY sport, year DESC, set_name
+                        LIMIT 100
+                    """, [correct_sport, pattern])
+                    cols = [d[0] for d in cur.description]
+                    for row in cur.fetchall():
+                        r = dict(zip(cols, row))
+                        r["correct_sport"] = correct_sport
+                        r["msrp"] = float(r["msrp"]) if r["msrp"] else None
+                        mismatches.append(r)
+
+            # Bad MSRPs: suspiciously low (< $3) or zero
+            cur.execute("""
+                SELECT id, sport, year, set_name, product_type, msrp
+                FROM sealed_products
+                WHERE msrp IS NOT NULL AND msrp < 3
+                ORDER BY msrp ASC, sport, set_name
+                LIMIT 100
+            """)
+            cols = [d[0] for d in cur.description]
+            bad_msrp = []
+            for row in cur.fetchall():
+                r = dict(zip(cols, row))
+                r["msrp"] = float(r["msrp"]) if r["msrp"] else None
+                bad_msrp.append(r)
+
+            # Duplicates: same (year, set_name, product_type) under multiple sports
+            cur.execute("""
+                SELECT year, set_name, product_type, array_agg(sport ORDER BY sport) AS sports,
+                       COUNT(*) AS cnt
+                FROM sealed_products
+                GROUP BY year, set_name, product_type
+                HAVING COUNT(*) > 1
+                ORDER BY cnt DESC, set_name
+                LIMIT 100
+            """)
+            duplicates = [
+                {"year": r[0], "set_name": r[1], "product_type": r[2],
+                 "sports": r[3], "count": r[4]}
+                for r in cur.fetchall()
+            ]
+
+            # Summary counts
+            cur.execute("SELECT COUNT(*) FROM sealed_products")
+            total = cur.fetchone()[0]
+
+    return {
+        "total":       total,
+        "mismatches":  mismatches,
+        "bad_msrp":    bad_msrp,
+        "duplicates":  duplicates,
+        "issues":      len(mismatches) + len(bad_msrp) + len(duplicates),
+    }
+
+
+@router.delete("/sealed-products/mismatches")
+def delete_sport_mismatches(_admin: str = Depends(_require_admin)):
+    """Delete sealed_products rows where set name clearly indicates a different sport."""
+    RULES = [
+        ("NFL", "%football%"), ("NFL", "%gridiron%"),
+        ("MLB", "%baseball%"), ("MLB", "%bowman%"),
+        ("NBA", "%basketball%"),
+        ("NHL", "%hockey%"),
+    ]
+    total = 0
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            for correct_sport, pattern in RULES:
+                cur.execute(
+                    "DELETE FROM sealed_products WHERE sport != %s AND set_name ILIKE %s",
+                    [correct_sport, pattern],
+                )
+                total += cur.rowcount
+        conn.commit()
+    return {"deleted": total}
+
+
 @router.get("/scrape-runs")
 def get_scrape_runs(
     limit: int = 50,

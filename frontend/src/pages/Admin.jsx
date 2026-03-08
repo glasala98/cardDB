@@ -8,7 +8,7 @@ import {
   getPipelineHealth, getWorkflowStatus, getOutliers, toggleIgnore,
   getScrapeRuns, getScrapeRunsSummary, getDataQuality, getSnapshotAudit,
   getScrapeRunErrors,
-  getSealedProductsAdmin, updateSealedProduct,
+  getSealedProductsAdmin, updateSealedProduct, getSealedQuality, deleteSealedMismatches,
   triggerWorkflow, bulkIgnoreOutliers,
 } from '../api/admin'
 import { useAuth } from '../context/AuthContext'
@@ -76,17 +76,42 @@ export default function Admin() {
 const SEALED_SPORTS = ['', 'NHL', 'NBA', 'NFL', 'MLB']
 
 function SealedTab() {
-  const [products, setProducts] = useState([])
-  const [total,    setTotal]    = useState(0)
-  const [pages,    setPages]    = useState(1)
-  const [page,     setPage]     = useState(1)
-  const [loading,  setLoading]  = useState(false)
-  const [sport,    setSport]    = useState('')
-  const [yearQ,    setYearQ]    = useState('')
-  const [setQ,     setSetQ]     = useState('')
-  const [editId,   setEditId]   = useState(null)
-  const [editVals, setEditVals] = useState({})
-  const [saving,   setSaving]   = useState(false)
+  const [products,  setProducts]  = useState([])
+  const [total,     setTotal]     = useState(0)
+  const [pages,     setPages]     = useState(1)
+  const [page,      setPage]      = useState(1)
+  const [loading,   setLoading]   = useState(false)
+  const [sport,     setSport]     = useState('')
+  const [yearQ,     setYearQ]     = useState('')
+  const [setQ,      setSetQ]      = useState('')
+  const [editId,    setEditId]    = useState(null)
+  const [editVals,  setEditVals]  = useState({})
+  const [saving,    setSaving]    = useState(false)
+  const [quality,   setQuality]   = useState(null)
+  const [qLoading,  setQLoading]  = useState(false)
+  const [fixing,    setFixing]    = useState(false)
+  const [fixMsg,    setFixMsg]    = useState(null)
+
+  function runQualityCheck() {
+    setQLoading(true)
+    getSealedQuality()
+      .then(d => setQuality(d))
+      .finally(() => setQLoading(false))
+  }
+
+  function fixMismatches() {
+    if (!confirm('Delete all sealed product rows where the set name clearly indicates the wrong sport?')) return
+    setFixing(true)
+    setFixMsg(null)
+    deleteSealedMismatches()
+      .then(d => {
+        setFixMsg(`Deleted ${d.deleted} mismatched rows. Reload the page to see updated data.`)
+        setQuality(null)
+        load()
+      })
+      .catch(e => setFixMsg(`Error: ${e.message}`))
+      .finally(() => setFixing(false))
+  }
 
   const load = useCallback(() => {
     setLoading(true)
@@ -128,6 +153,77 @@ function SealedTab() {
 
   return (
     <>
+      {/* Data quality panel */}
+      <div className={styles.sealedQualityBar}>
+        <button className={styles.qualityPill} onClick={runQualityCheck} disabled={qLoading}>
+          {qLoading ? 'Checking…' : '⚑ Data Quality Check'}
+        </button>
+        {quality && (
+          <>
+            <span className={quality.issues > 0 ? styles.textDanger : styles.textSuccess}>
+              {quality.issues > 0
+                ? `${quality.issues} issues found: ${quality.mismatches.length} sport mismatches, ${quality.bad_msrp.length} bad MSRPs, ${quality.duplicates.length} duplicates`
+                : 'No issues found'}
+            </span>
+            {quality.mismatches.length > 0 && (
+              <button className={styles.delBtn} onClick={fixMismatches} disabled={fixing}>
+                {fixing ? 'Fixing…' : `Fix ${quality.mismatches.length} mismatches`}
+              </button>
+            )}
+            <button className={styles.cancelBtn} onClick={() => setQuality(null)} style={{ padding: '3px 8px' }}>✕</button>
+          </>
+        )}
+        {fixMsg && <span className={styles.muted} style={{ fontSize: 12 }}>{fixMsg}</span>}
+      </div>
+
+      {quality && quality.issues > 0 && (
+        <div className={styles.qualityDetails}>
+          {quality.mismatches.length > 0 && (
+            <div className={styles.qualitySection}>
+              <strong className={styles.textDanger}>Sport mismatches ({quality.mismatches.length})</strong>
+              <div className={styles.qualityList}>
+                {quality.mismatches.slice(0, 20).map((m, i) => (
+                  <div key={i} className={styles.qualityItem}>
+                    <span className={styles.sportChip}>{m.sport}</span>
+                    <span>→ should be</span>
+                    <span className={styles.sportChip}>{m.correct_sport}</span>
+                    <span>{m.year} {m.set_name} · {m.product_type}</span>
+                  </div>
+                ))}
+                {quality.mismatches.length > 20 && <span className={styles.muted}>…and {quality.mismatches.length - 20} more</span>}
+              </div>
+            </div>
+          )}
+          {quality.bad_msrp.length > 0 && (
+            <div className={styles.qualitySection}>
+              <strong className={styles.textWarn}>Bad MSRPs ({quality.bad_msrp.length})</strong>
+              <div className={styles.qualityList}>
+                {quality.bad_msrp.slice(0, 10).map((m, i) => (
+                  <div key={i} className={styles.qualityItem}>
+                    <span className={styles.sportChip}>{m.sport}</span>
+                    <span>{m.year} {m.set_name} · {m.product_type}</span>
+                    <span className={styles.textDanger}>${m.msrp?.toFixed(2) ?? '—'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {quality.duplicates.length > 0 && (
+            <div className={styles.qualitySection}>
+              <strong className={styles.textWarn}>Cross-sport duplicates ({quality.duplicates.length})</strong>
+              <div className={styles.qualityList}>
+                {quality.duplicates.slice(0, 10).map((d, i) => (
+                  <div key={i} className={styles.qualityItem}>
+                    <span>{d.year} {d.set_name} · {d.product_type}</span>
+                    <span className={styles.textDanger}>in: {d.sports.join(', ')}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
         {SEALED_SPORTS.map(s => (
           <button

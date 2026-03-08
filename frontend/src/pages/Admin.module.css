@@ -595,6 +595,29 @@
 }
 
 /* ── Sealed Products tab ────────────────────────────────── */
+.sealedQualityBar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 14px; padding: 10px 14px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+  font-size: 12px;
+}
+
+.qualityDetails {
+  margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px;
+}
+.qualitySection {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 14px; font-size: 12px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.qualityList { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.qualityItem {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 3px 0; border-bottom: 1px solid var(--border); font-size: 12px;
+  color: var(--text-secondary);
+}
+.qualityItem:last-child { border-bottom: none; }
+
 .searchInput {
   background: var(--bg-primary);
   border: 1px solid var(--border);
