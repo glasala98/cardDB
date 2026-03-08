@@ -283,6 +283,37 @@ def new_releases(
         set_cols = [d[0] for d in cur.description]
         set_rows = [dict(zip(set_cols, r)) for r in cur.fetchall()]
 
+        # Batch fetch 7-day price delta from market_price_history for all returned sets
+        volatility_lookup: dict = {}
+        if set_rows:
+            vol_sport_filter = "AND cc.sport = %s" if sport else ""
+            vol_params = [seasons] + ([sport.upper()] if sport else [])
+            cur.execute(f"""
+                SELECT cc.sport, cc.year, cc.set_name,
+                       AVG(mph.fair_value) FILTER (
+                           WHERE mph.scraped_at >= NOW() - INTERVAL '7 days'
+                       ) AS avg_7d,
+                       AVG(mph.fair_value) FILTER (
+                           WHERE mph.scraped_at >= NOW() - INTERVAL '14 days'
+                             AND mph.scraped_at <  NOW() - INTERVAL '7 days'
+                       ) AS avg_prev_7d
+                FROM market_price_history mph
+                JOIN card_catalog cc ON cc.id = mph.card_catalog_id
+                WHERE mph.fair_value > 0
+                  AND mph.scraped_at >= NOW() - INTERVAL '14 days'
+                  AND CAST(SUBSTRING(cc.year FROM '^\\d+') AS INTEGER)
+                      >= EXTRACT(YEAR FROM NOW())::INTEGER - %s
+                  {vol_sport_filter}
+                GROUP BY cc.sport, cc.year, cc.set_name
+            """, vol_params)
+            for row in cur.fetchall():
+                vsport, vyear, vset, avg_7d, avg_prev_7d = row
+                if avg_7d is not None and avg_prev_7d and avg_prev_7d > 0:
+                    delta = round((float(avg_7d) - float(avg_prev_7d)) / float(avg_prev_7d) * 100, 1)
+                else:
+                    delta = None
+                volatility_lookup[f"{vsport}|{vyear}|{vset}"] = delta
+
         # For each set, fetch top 5 UNIQUE players by best card fair_value
         result_sets = []
         for s in set_rows:
@@ -319,16 +350,18 @@ def new_releases(
             else:
                 momentum_pct = None
 
+            vkey = f"{s['sport']}|{s['year']}|{s['set_name']}"
             result_sets.append({
-                "sport":        s["sport"],
-                "year":         s["year"],
-                "set_name":     s["set_name"],
-                "brand":        s["brand"],
-                "card_count":   s["card_count"],
-                "priced_count": s["priced_count"],
-                "top_value":    float(s["top_value"]) if s["top_value"] is not None else None,
-                "avg_value":    avg_val,
-                "momentum_pct": momentum_pct,
+                "sport":          s["sport"],
+                "year":           s["year"],
+                "set_name":       s["set_name"],
+                "brand":          s["brand"],
+                "card_count":     s["card_count"],
+                "priced_count":   s["priced_count"],
+                "top_value":      float(s["top_value"]) if s["top_value"] is not None else None,
+                "avg_value":      avg_val,
+                "momentum_pct":   momentum_pct,
+                "delta_7d_pct":   volatility_lookup.get(vkey),
                 "total_sales":    int(s["total_sales"])    if s["total_sales"]    else 0,
                 "staple_count":   int(s["staple_count"])   if s["staple_count"]   else 0,
                 "flagship_count": int(s["flagship_count"]) if s["flagship_count"] else 0,

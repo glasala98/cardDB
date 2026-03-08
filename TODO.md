@@ -19,7 +19,7 @@
 - [x] **Performance indexes:** pg_trgm GIN on player_name/set_name, expression index on year cast, partial index on fair_value
 - [x] **sealed_products + sealed_product_odds tables:** MSRP / pack config / odds per set/product type
 - [x] **GET /catalog/sealed-products:** filterable API endpoint with nested odds
-- [ ] **Populate sealed_products:** trigger scrape_set_info GH Actions workflow for first data run (all sports, 2022+)
+- [x] **Populate sealed_products:** trigger scrape_set_info GH Actions workflow for first data run (all sports, 2022+)
 - [ ] **Lock ignore/delete to admin:** add admin dependency to PATCH /admin/market-prices/{id}/ignore
 - [ ] **Refine price queries:** tighten sales window / outlier exclusion to reduce price spread noise
 - [ ] **[AI] Outlier Quarantine:** auto-flag prices deviating >50% from player median
@@ -31,7 +31,7 @@
 - [x] **Users tab:** role management (admin/user/guest) inline
 - [x] **Runs tab:** KPI strip, delta + hit-rate charts, date range filter, refresh, anomaly feed
 - [x] **Quality tab:** stale/never-scraped/low-confidence KPIs, freshness by tier bar, priority stale + low-confidence card tables
-- [ ] **ETL Snapshot Audit:** show last 5 price snapshots per card (data already in market_price_history)
+- [x] **ETL Snapshot Audit:** show last 5 price snapshots per card (data already in market_price_history)
 - [ ] **Sealed Products Manager:** view/edit MSRP and pack config per set inline in admin
 - [ ] **Crowdsourced Price Gap Filler:** user-submitted prices for cards with no eBay data → admin review queue
 
@@ -41,10 +41,10 @@
 - [x] **Sort logic:** year desc → populated first → flagship count → total sales → top value
 - [x] **Flagship badge:** shown when set has staple/premium cards
 - [x] **Momentum %:** avg price vs prev_value delta
-- [ ] **MSRP + Box Price display:** show Hobby/Blaster MSRP on each set card (data now in sealed_products)
-- [ ] **EV vs MSRP:** compare top-N card values against hobby box MSRP to show expected value
-- [ ] **Hero Top Card:** highlight the single highest-value card across all current releases
-- [ ] **Volatility indicators:** 7/14-day price delta from market_price_history
+- [x] **MSRP + Box Price display:** show Hobby/Blaster MSRP on each set card (data now in sealed_products)
+- [x] **EV vs MSRP:** compare top-N card values against hobby box MSRP to show expected value
+- [x] **Hero Top Card:** highlight the single highest-value card across all current releases
+- [x] **Volatility indicators:** 7/14-day price delta from market_price_history (delta_7d_pct on set cards)
 - [ ] **Individual sales drill-down:** raw eBay sold listings per card (modal or slide-in)
 - [ ] **Rarity funnel:** visual print run breakdown (base → parallels → autos → 1/1s)
 

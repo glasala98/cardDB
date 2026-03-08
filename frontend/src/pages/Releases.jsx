@@ -185,11 +185,19 @@ export default function Releases() {
                         Flagship
                       </span>
                     )}
-                    {s.momentum_pct != null && (
-                      <span className={`${styles.momentumBadge} ${s.momentum_pct >= 0 ? styles.momentumUp : styles.momentumDown}`}>
-                        {s.momentum_pct >= 0 ? '+' : ''}{s.momentum_pct}%
-                      </span>
-                    )}
+                    {(() => {
+                      const pct = s.delta_7d_pct ?? s.momentum_pct
+                      if (pct == null) return null
+                      const label = s.delta_7d_pct != null ? `${pct >= 0 ? '+' : ''}${pct}% 7d` : `${pct >= 0 ? '+' : ''}${pct}%`
+                      return (
+                        <span
+                          className={`${styles.momentumBadge} ${pct >= 0 ? styles.momentumUp : styles.momentumDown}`}
+                          title={s.delta_7d_pct != null ? '7-day avg price change' : 'price vs prev scrape'}
+                        >
+                          {label}
+                        </span>
+                      )
+                    })()}
                   </div>
                 </div>
 
