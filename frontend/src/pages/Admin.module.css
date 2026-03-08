@@ -521,3 +521,49 @@
 
 .snapshotDetailRow span { flex: 1; }
 .snapshotDetailRow span:first-child { color: var(--text-muted); flex: 1.5; }
+
+/* ── Sealed Products tab ────────────────────────────────── */
+.searchInput {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font);
+}
+.searchInput:focus { outline: 1px solid var(--accent); }
+
+.sportChip {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  letter-spacing: 0.4px;
+}
+
+.inlineInput {
+  background: var(--bg-primary);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 3px 6px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums;
+}
+
+.editBtn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font);
+}
+.editBtn:hover { border-color: var(--accent); color: var(--accent); }

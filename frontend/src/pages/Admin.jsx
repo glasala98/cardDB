@@ -7,12 +7,13 @@ import {
   getUsers, createUser, deleteUser, changePassword, changeRole,
   getPipelineHealth, getWorkflowStatus, getOutliers, toggleIgnore,
   getScrapeRuns, getScrapeRunsSummary, getDataQuality, getSnapshotAudit,
+  getSealedProductsAdmin, updateSealedProduct,
 } from '../api/admin'
 import { useAuth } from '../context/AuthContext'
 import pageStyles from './Page.module.css'
 import styles from './Admin.module.css'
 
-const TABS = ['Users', 'Pipeline', 'Quality', 'Runs', 'Outliers']
+const TABS = ['Users', 'Pipeline', 'Quality', 'Runs', 'Outliers', 'Sealed']
 
 const WF_COLORS = ['#00d4aa', '#4a9eff', '#ff6b35', '#ffb332', '#a07ff0', '#e05555', '#3dba5e', '#ff9ff3']
 
@@ -42,7 +43,174 @@ export default function Admin() {
       {tab === 'Quality'  && <QualityTab />}
       {tab === 'Runs'     && <RunsTab />}
       {tab === 'Outliers' && <OutliersTab />}
+      {tab === 'Sealed'   && <SealedTab />}
     </div>
+  )
+}
+
+/* ── Sealed Products tab ────────────────────────────────────────────────────── */
+const SEALED_SPORTS = ['', 'NHL', 'NBA', 'NFL', 'MLB']
+
+function SealedTab() {
+  const [products, setProducts] = useState([])
+  const [total,    setTotal]    = useState(0)
+  const [pages,    setPages]    = useState(1)
+  const [page,     setPage]     = useState(1)
+  const [loading,  setLoading]  = useState(false)
+  const [sport,    setSport]    = useState('')
+  const [yearQ,    setYearQ]    = useState('')
+  const [setQ,     setSetQ]     = useState('')
+  const [editId,   setEditId]   = useState(null)
+  const [editVals, setEditVals] = useState({})
+  const [saving,   setSaving]   = useState(false)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    const params = { page, per_page: 50 }
+    if (sport) params.sport    = sport
+    if (yearQ) params.year     = yearQ
+    if (setQ)  params.set_name = setQ
+    getSealedProductsAdmin(params)
+      .then(d => { setProducts(d.products || []); setTotal(d.total || 0); setPages(d.pages || 1) })
+      .finally(() => setLoading(false))
+  }, [page, sport, yearQ, setQ])
+
+  useEffect(() => { load() }, [load])
+
+  function startEdit(p) {
+    setEditId(p.id)
+    setEditVals({
+      msrp:           p.msrp ?? '',
+      cards_per_pack: p.cards_per_pack ?? '',
+      packs_per_box:  p.packs_per_box  ?? '',
+      release_date:   p.release_date   ?? '',
+    })
+  }
+  function cancelEdit() { setEditId(null); setEditVals({}) }
+  function saveEdit(id) {
+    setSaving(true)
+    const body = {}
+    if (editVals.msrp !== '')           body.msrp           = parseFloat(editVals.msrp)
+    if (editVals.cards_per_pack !== '') body.cards_per_pack = parseInt(editVals.cards_per_pack)
+    if (editVals.packs_per_box  !== '') body.packs_per_box  = parseInt(editVals.packs_per_box)
+    if (editVals.release_date   !== '') body.release_date   = editVals.release_date
+    updateSealedProduct(id, body)
+      .then(updated => {
+        setProducts(ps => ps.map(p => p.id === id ? { ...p, ...updated } : p))
+        setEditId(null)
+      })
+      .finally(() => setSaving(false))
+  }
+
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+        {SEALED_SPORTS.map(s => (
+          <button
+            key={s || 'all'}
+            className={`${styles.qualityPill} ${sport === s ? styles.qualityPillActive : ''}`}
+            onClick={() => { setSport(s); setPage(1) }}
+          >
+            {s || 'All Sports'}
+          </button>
+        ))}
+        <input
+          className={styles.searchInput}
+          placeholder="Year (e.g. 2024-25)"
+          value={yearQ}
+          onChange={e => { setYearQ(e.target.value); setPage(1) }}
+          style={{ width: 140 }}
+        />
+        <input
+          className={styles.searchInput}
+          placeholder="Set name…"
+          value={setQ}
+          onChange={e => { setSetQ(e.target.value); setPage(1) }}
+          style={{ width: 200 }}
+        />
+        <span className={styles.muted} style={{ fontSize: 12 }}>{total.toLocaleString()} products</span>
+      </div>
+
+      {loading ? (
+        <div className={styles.muted}>Loading…</div>
+      ) : products.length === 0 ? (
+        <div className={styles.muted}>No sealed products found. Run the scrape_set_info workflow to populate.</div>
+      ) : (
+        <>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th className={styles.th}>Sport</th>
+                  <th className={styles.th}>Year</th>
+                  <th className={styles.th}>Set Name</th>
+                  <th className={styles.th}>Product</th>
+                  <th className={`${styles.th} ${styles.thRight}`}>MSRP</th>
+                  <th className={`${styles.th} ${styles.thRight}`}>Cards/Pack</th>
+                  <th className={`${styles.th} ${styles.thRight}`}>Packs/Box</th>
+                  <th className={styles.th}>Release</th>
+                  <th className={styles.th} />
+                </tr>
+              </thead>
+              <tbody>
+                {products.map(p => {
+                  const editing = editId === p.id
+                  return (
+                    <tr key={p.id} className={styles.tr}>
+                      <td className={styles.td}><span className={styles.sportChip}>{p.sport}</span></td>
+                      <td className={styles.td}>{p.year}</td>
+                      <td className={styles.td} style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.set_name}</td>
+                      <td className={styles.td}><span className={styles.muted}>{p.product_type}</span></td>
+                      {editing ? (
+                        <>
+                          <td className={`${styles.td} ${styles.thRight}`}>
+                            <input className={styles.inlineInput} value={editVals.msrp} onChange={e => setEditVals(v => ({...v, msrp: e.target.value}))} style={{width:64}} />
+                          </td>
+                          <td className={`${styles.td} ${styles.thRight}`}>
+                            <input className={styles.inlineInput} value={editVals.cards_per_pack} onChange={e => setEditVals(v => ({...v, cards_per_pack: e.target.value}))} style={{width:44}} />
+                          </td>
+                          <td className={`${styles.td} ${styles.thRight}`}>
+                            <input className={styles.inlineInput} value={editVals.packs_per_box} onChange={e => setEditVals(v => ({...v, packs_per_box: e.target.value}))} style={{width:44}} />
+                          </td>
+                          <td className={styles.td}>
+                            <input className={styles.inlineInput} value={editVals.release_date} onChange={e => setEditVals(v => ({...v, release_date: e.target.value}))} style={{width:100}} placeholder="YYYY-MM-DD" />
+                          </td>
+                          <td className={styles.td} style={{ whiteSpace: 'nowrap' }}>
+                            <button className={styles.saveBtn} onClick={() => saveEdit(p.id)} disabled={saving}>Save</button>
+                            <button className={styles.cancelBtn} onClick={cancelEdit} style={{marginLeft:4}}>✕</button>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className={`${styles.td} ${styles.thRight}`}>{p.msrp != null ? `$${p.msrp.toFixed(2)}` : <span className={styles.muted}>—</span>}</td>
+                          <td className={`${styles.td} ${styles.thRight}`}>{p.cards_per_pack ?? <span className={styles.muted}>—</span>}</td>
+                          <td className={`${styles.td} ${styles.thRight}`}>{p.packs_per_box ?? <span className={styles.muted}>—</span>}</td>
+                          <td className={styles.td}>{p.release_date ?? <span className={styles.muted}>—</span>}</td>
+                          <td className={styles.td}>
+                            <button className={styles.editBtn} onClick={() => startEdit(p)}>Edit</button>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          {pages > 1 && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 14, flexWrap: 'wrap' }}>
+              {Array.from({ length: pages }, (_, i) => i + 1).map(p => (
+                <button
+                  key={p}
+                  className={`${styles.qualityPill} ${page === p ? styles.qualityPillActive : ''}`}
+                  onClick={() => setPage(p)}
+                >{p}</button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </>
   )
 }
 

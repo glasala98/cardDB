@@ -586,3 +586,121 @@ def get_scrape_runs(
         r["finished_at"] = r["finished_at"].isoformat() if r["finished_at"] else None
         runs.append(r)
     return {"runs": runs}
+
+
+# ── Sealed Products Manager ────────────────────────────────────────────────────
+
+class SealedProductPatch(BaseModel):
+    msrp: float | None = None
+    cards_per_pack: int | None = None
+    packs_per_box: int | None = None
+    release_date: str | None = None  # ISO date string
+
+
+@router.get("/sealed-products")
+def list_sealed_products(
+    sport: str = None,
+    year: str = None,
+    set_name: str = None,
+    page: int = 1,
+    per_page: int = 50,
+    _admin: str = Depends(_require_admin),
+):
+    """Return paginated sealed_products rows with nested odds."""
+    where_parts, params = [], []
+    if sport:
+        where_parts.append("sp.sport = %s")
+        params.append(sport.upper())
+    if year:
+        where_parts.append("sp.year ILIKE %s")
+        params.append(f"%{year}%")
+    if set_name:
+        where_parts.append("sp.set_name ILIKE %s")
+        params.append(f"%{set_name}%")
+    where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+    offset = (page - 1) * per_page
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT COUNT(*) FROM sealed_products sp {where_sql}", params)
+            total = cur.fetchone()[0]
+
+            cur.execute(f"""
+                SELECT sp.id, sp.sport, sp.year, sp.set_name, sp.brand,
+                       sp.product_type, sp.msrp, sp.cards_per_pack, sp.packs_per_box,
+                       sp.release_date, sp.source_url, sp.updated_at
+                FROM sealed_products sp
+                {where_sql}
+                ORDER BY sp.year DESC, sp.sport, sp.set_name, sp.product_type
+                LIMIT %s OFFSET %s
+            """, params + [per_page, offset])
+            cols = [d[0] for d in cur.description]
+            rows = cur.fetchall()
+
+            # Fetch odds for returned products
+            ids = [r[0] for r in rows]
+            odds_by_id: dict = {}
+            if ids:
+                cur.execute("""
+                    SELECT sealed_product_id, card_type, odds_ratio
+                    FROM sealed_product_odds
+                    WHERE sealed_product_id = ANY(%s)
+                    ORDER BY sealed_product_id, card_type
+                """, [ids])
+                for pid, card_type, odds_ratio in cur.fetchall():
+                    odds_by_id.setdefault(pid, []).append({"card_type": card_type, "odds_ratio": odds_ratio})
+
+    products = []
+    for row in rows:
+        r = dict(zip(cols, row))
+        r["msrp"] = float(r["msrp"]) if r["msrp"] is not None else None
+        r["release_date"] = r["release_date"].isoformat() if r["release_date"] else None
+        r["updated_at"] = r["updated_at"].isoformat() if r["updated_at"] else None
+        r["odds"] = odds_by_id.get(r["id"], [])
+        products.append(r)
+
+    return {"products": products, "total": total, "pages": -(-total // per_page)}
+
+
+@router.patch("/sealed-products/{product_id}")
+def update_sealed_product(
+    product_id: int,
+    body: SealedProductPatch,
+    _admin: str = Depends(_require_admin),
+):
+    """Update MSRP, pack config, or release date for a sealed product."""
+    sets, params = [], []
+    if body.msrp is not None:
+        sets.append("msrp = %s"); params.append(body.msrp)
+    if body.cards_per_pack is not None:
+        sets.append("cards_per_pack = %s"); params.append(body.cards_per_pack)
+    if body.packs_per_box is not None:
+        sets.append("packs_per_box = %s"); params.append(body.packs_per_box)
+    if body.release_date is not None:
+        sets.append("release_date = %s"); params.append(body.release_date or None)
+    if not sets:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    sets.append("updated_at = NOW()")
+    params.append(product_id)
+
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"""
+                UPDATE sealed_products
+                SET {', '.join(sets)}
+                WHERE id = %s
+                RETURNING id, msrp, cards_per_pack, packs_per_box, release_date
+            """, params)
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Product not found")
+        conn.commit()
+
+    pid, msrp, cpp, ppb, rd = row
+    return {
+        "id": pid,
+        "msrp": float(msrp) if msrp is not None else None,
+        "cards_per_pack": cpp,
+        "packs_per_box": ppb,
+        "release_date": rd.isoformat() if rd else None,
+    }

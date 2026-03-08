@@ -9,7 +9,7 @@
 - [x] **Set Info Scraper:** scrape_set_info.py — cardboardconnection MSRP, pack config, release date, odds → sealed_products
 - [x] **GH Actions Schedules:** daily staple, weekly full sweep, monthly premium/stars/graded, monthly set info
 - [x] **NHL Player Stats scrape failing** — fixed INSERT column mismatch (updated_at listed but not in values tuple)
-- [ ] **Image Retrieval:** scrape card images from eBay listings during price scrape; store in market_prices.image_url
+- [x] **Image Retrieval:** scrape card images from eBay listings during price scrape; store in market_prices.image_url
 - [ ] **Scraping Resiliency:** central error logging, retry logic, rate-limit backoff across all scrapers
 - [ ] **[AI] Entity Resolution Agent:** LangGraph agent to map ambiguous eBay titles to card_catalog records
 
@@ -20,7 +20,7 @@
 - [x] **sealed_products + sealed_product_odds tables:** MSRP / pack config / odds per set/product type
 - [x] **GET /catalog/sealed-products:** filterable API endpoint with nested odds
 - [x] **Populate sealed_products:** trigger scrape_set_info GH Actions workflow for first data run (all sports, 2022+)
-- [ ] **Lock ignore/delete to admin:** add admin dependency to PATCH /admin/market-prices/{id}/ignore
+- [x] **Lock ignore/delete to admin:** PATCH /admin/market-prices/{id}/ignore already uses _require_admin
 - [ ] **Refine price queries:** tighten sales window / outlier exclusion to reduce price spread noise
 - [ ] **[AI] Outlier Quarantine:** auto-flag prices deviating >50% from player median
 - [ ] **[AI] Vector Search:** embed 2.6M records for sub-second fuzzy card matching (needs pgvector)
@@ -32,7 +32,7 @@
 - [x] **Runs tab:** KPI strip, delta + hit-rate charts, date range filter, refresh, anomaly feed
 - [x] **Quality tab:** stale/never-scraped/low-confidence KPIs, freshness by tier bar, priority stale + low-confidence card tables
 - [x] **ETL Snapshot Audit:** show last 5 price snapshots per card (data already in market_price_history)
-- [ ] **Sealed Products Manager:** view/edit MSRP and pack config per set inline in admin
+- [x] **Sealed Products Manager:** view/edit MSRP and pack config per set inline in admin (Sealed tab)
 - [ ] **Crowdsourced Price Gap Filler:** user-submitted prices for cards with no eBay data → admin review queue
 
 ## New Releases Page
@@ -52,8 +52,8 @@
 - [x] **Public browse:** no login required, paginated, sport/year/set/search/rookie/price filters
 - [x] **CatalogCardDetail panel:** slide-in with price summary, sparkline, add-to-collection
 - [x] **Tier badges:** Staple / Premium / Stars + RC badge
-- [ ] **Card image in rows:** image_url already in API response — show thumbnail in catalog table
-- [ ] **Price history graph:** sparkline or line chart embedded in catalog row / detail panel
+- [x] **Card image in rows:** CardThumb component in catalog rows — shows eBay image or sport-colored initials fallback
+- [x] **Price history graph:** sparkline + snapshot table in CatalogCardDetail slide-in panel
 - [ ] **Mobile layout:** card catalog needs responsive column collapse for small screens
 
 ## Card Ledger / Collection
