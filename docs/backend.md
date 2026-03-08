@@ -86,7 +86,7 @@ All endpoints use query params (`?name=...`) because card names contain characte
 
 ## Router: `catalog.py` — `/api/catalog`
 
-Read-only browsing of the 2.6M-card `card_catalog` table. Public — no auth required.
+Read-only browsing of the 1.26M-card `card_catalog` table. Public — no auth required.
 
 | Endpoint | Method | Auth | Description |
 |---|---|---|---|
@@ -206,7 +206,7 @@ Scrape orchestration and monitoring.
 }
 ```
 
-All 7 workflows are fetched concurrently via `ThreadPoolExecutor`. Requires `GITHUB_TOKEN` env var (classic PAT, `repo` + `workflow` scopes).
+All 9 tracked workflows are fetched concurrently via `ThreadPoolExecutor`. Requires `GITHUB_TOKEN` env var (classic PAT, `repo` + `workflow` scopes). The tracked list is defined in `_WORKFLOWS` at the top of `stats.py` — add new workflows there to include them in the health panel.
 
 ---
 
@@ -242,14 +242,43 @@ On parse failure: `{"parse_error": true, "raw": "..."}`.
 
 ## Router: `admin.py` — `/api/admin`
 
-User management. All endpoints require `role: admin`.
+Admin operations — scrape monitoring, data quality, sealed products, user management. All endpoints require `role: admin`.
 
-| Endpoint | Method | Auth | Description |
-|---|---|---|---|
-| `GET /api/admin/users` | GET | Admin | List all users |
-| `POST /api/admin/users` | POST | Admin | Create user (bcrypt hash, write to DB) |
-| `DELETE /api/admin/users/{username}` | DELETE | Admin | Delete user |
-| `PATCH /api/admin/users/{username}/password` | PATCH | Admin | Change password |
+**User management:**
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `GET /api/admin/users` | GET | List all users |
+| `POST /api/admin/users` | POST | Create user (bcrypt hash, write to DB) |
+| `DELETE /api/admin/users/{username}` | DELETE | Delete user |
+| `PATCH /api/admin/users/{username}/password` | PATCH | Change password |
+
+**Scrape monitoring:**
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `GET /api/admin/scrape-runs` | GET | Recent scrape run history + active runs |
+| `GET /api/admin/scrape-runs/summary` | GET | Per-workflow stats, consecutive errors, anomalies |
+| `GET /api/admin/scrape-run-errors/{run_id}` | GET | Per-card error log for a run |
+| `GET /api/admin/pipeline-health` | GET | Coverage stats: priced 7d/30d, newly_priced counts |
+| `GET /api/admin/data-quality` | GET | Snapshot audit: missing prices, stale data |
+| `GET /api/admin/snapshot-audit` | GET | Catalog coverage snapshot |
+
+**Sealed products:**
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `GET /api/admin/sealed-products` | GET | Paginated sealed product list |
+| `PATCH /api/admin/sealed-products/{id}` | PATCH | Edit a sealed product row |
+| `GET /api/admin/sealed-products/quality` | GET | Report: sport mismatches, bad MSRP ($1.00), duplicates |
+| `DELETE /api/admin/sealed-products/mismatches` | DELETE | Delete rows where set name indicates wrong sport |
+
+**Outlier management:**
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `GET /api/admin/outliers` | GET | Cards with statistically anomalous prices |
+| `POST /api/admin/outliers/ignore` | POST | Bulk-ignore selected outlier cards |
 
 ---
 

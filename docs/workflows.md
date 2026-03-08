@@ -8,15 +8,18 @@ All scraping and CI runs on GitHub Actions. No local compute — the local machi
 
 | Workflow | File | Schedule | Purpose |
 |---|---|---|---|
-| Catalog Staple | `catalog_tier_staple.yml` | Daily 1am EST | Raw prices for staple-tier cards |
-| Catalog Premium | `catalog_tier_premium.yml` | Sunday 2am UTC | Raw prices for premium-tier cards |
-| Catalog Stars | `catalog_tier_stars.yml` | Sunday 3am UTC | Raw prices for stars-tier cards |
-| Catalog Graded | `catalog_tier_graded.yml` | Sunday 6am UTC | PSA/BGS prices for all staple cards |
-| Master DB Daily | `master_db_daily.yml` | Daily 1am EST | 4 sports × 2K cards, stale-days 7 |
+| Catalog Staple | `catalog_tier_staple.yml` | Daily 6am UTC | Raw prices for staple-tier cards |
+| Catalog Premium | `catalog_tier_premium.yml` | Monday 10am UTC | Raw prices for premium-tier cards |
+| Catalog Stars | `catalog_tier_stars.yml` | 1st of month | Raw prices for stars-tier cards |
+| Catalog Base | `catalog_tier_base.yml` | Wednesday 6am UTC | Raw prices for base-tier 2010+ cards |
+| Catalog Graded | `catalog_tier_graded.yml` | Sunday 6am UTC | PSA/BGS prices for all staple cards (≥$5) |
+| Master DB Daily | `master_db_daily.yml` | Daily 1am EST | 4 sports × 1K cards, stale-days 7 |
 | Master DB Weekly | `master_db_weekly.yml` | Sunday 2am EST | Full rookie sweep, stale-days 30 |
 | Ledger Scrape | `daily_scrape.yml` | On demand | Personal ledger cards (trigger via UI) |
-| Catalog Update | `catalog_update.yml` | Periodic | Populate card_catalog from TCDB/CLI/CBC |
+| Set Info Scrape | `scrape_set_info.yml` | 1st of month 6am UTC | Sealed product MSRP + pack config |
+| Catalog Update | `catalog_update.yml` | Periodic / manual | Populate card_catalog from TCDB/CLI/CBC |
 | Catalog Quality | `catalog_quality_report.yml` | Monday 10am UTC | pytest + gap analysis → Step Summary |
+| Fix Sealed Sport | `fix_sealed_sport.yml` | Manual | One-time: delete sport-mismatched sealed rows |
 | Migrate Users | `migrate_users.yml` | Manual | One-time DB migrations |
 | Migrate Graded | `migrate_graded_data.yml` | Manual | Run migrate_add_graded_data.py |
 
@@ -249,13 +252,26 @@ curl -X POST \
 
 ## Monitoring
 
-The Settings page (admin) shows a **Scrape Health** panel with the last run status of all 7 workflows. Powered by `GET /api/stats/workflow-status` which queries GitHub API concurrently for each workflow.
+The **Admin → Pipeline** tab shows live scrape health for all tracked workflows. Powered by:
+- `GET /api/stats/workflow-status` — queries GitHub API concurrently for latest run status
+- `GET /admin/scrape-runs` — queries `scrape_runs` table for DB-level progress
 
-Status indicators:
-- ✅ Success — last run completed successfully
-- 🟡 Running / Queued — currently in progress
-- 🔴 Failed — last run failed (check GitHub Actions logs)
-- ⬛ Cancelled
-- ⬜ Never run
+**Active job cards** show:
+- Progress bar: `cards_processed / cards_total` (updated every 50 cards mid-run)
+- Hit rate: `cards_found / cards_processed` (updated mid-run)
+- Throughput: cards/hr + ETA
+- Elapsed time
 
-"View ↗" links go directly to the GitHub Actions run page.
+**Workflow health cards** show:
+- Last run status and timestamp
+- Consecutive failure count (red badge)
+- Overdue badge if last run is older than the expected cadence
+- ▶ Run button to trigger manually
+
+**Anomaly flags** on completed runs:
+- `timed_out` — run was killed before finishing (GitHub 6h limit or `--max-hours`)
+- `zero_delta` — ran but found no price changes
+- `low_hit_rate` — fewer than 10% of cards returned results
+- `high_errors` — more than 10 scrape errors
+
+Each scraper enforces `--max-hours 5.75` to exit gracefully before GitHub's 6h kill. Orphaned `running` rows (>1h old, same workflow+sport) are automatically marked `timed_out` when the next run starts.

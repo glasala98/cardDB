@@ -216,9 +216,68 @@ Pre-catalog ownership system. Keyed by `card_name` text rather than `card_catalo
 
 ---
 
+### `scrape_runs` — Scrape job tracking
+
+One row per scraper invocation. Used by Admin → Runs tab for live progress and history.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | SERIAL PK | |
+| `workflow` | TEXT | e.g. `catalog_tier_staple` |
+| `sport` | TEXT | NHL / NBA / NFL / MLB |
+| `tier` | TEXT | staple / premium / stars / base / NULL |
+| `mode` | TEXT | raw / graded |
+| `status` | TEXT | `running` / `completed` / `error` / `timed_out` |
+| `cards_total` | INTEGER | Set at run start |
+| `cards_processed` | INTEGER | Updated every 50 cards mid-run |
+| `cards_found` | INTEGER | Cards with eBay results (updated mid-run) |
+| `cards_delta` | INTEGER | Cards with price change (written at finish) |
+| `errors` | INTEGER | Scrape errors (written at finish) |
+| `started_at` | TIMESTAMP | |
+| `finished_at` | TIMESTAMP | NULL while running |
+
+Stale `running` rows (>1h old, same workflow+sport) are auto-marked `timed_out` when the next run starts.
+
+---
+
+### `scrape_run_errors` — Per-card error log
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | SERIAL PK | |
+| `run_id` | INT FK → scrape_runs.id | |
+| `card_name` | TEXT | |
+| `error_msg` | TEXT | |
+| `attempted_at` | TIMESTAMP | |
+
+---
+
+### `sealed_products` — Sealed product catalog
+
+Scraped monthly from cardboardconnection.com. One row per `(sport, year, set_name, product_type)`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | SERIAL PK | |
+| `sport` | TEXT | NHL / NBA / NFL / MLB |
+| `year` | TEXT | e.g. `2024-25` |
+| `set_name` | TEXT | |
+| `product_type` | TEXT | Hobby Box / Blaster / Jumbo / Rack / etc. |
+| `msrp` | NUMERIC(10,2) | |
+| `box_price` | NUMERIC(10,2) | Current secondary market price |
+| `cards_per_pack` | INTEGER | |
+| `packs_per_box` | INTEGER | |
+| `autos_per_box` | INTEGER | |
+| `source_url` | TEXT | |
+| `scraped_at` | TIMESTAMP | |
+
+**Unique constraint:** `(sport, year, set_name, product_type)`. Sport mismatch detection in `scrape_set_info.py` skips cross-listed products (e.g. a football set appearing on the hockey CBC page).
+
+---
+
 ### Legacy Analytics Tables
 
-These power the `/master-db` and `/nhl-stats` pages. Not actively migrated but still queried.
+These power the `/nhl-stats` page and grading lookup. Still queried at runtime.
 
 | Table | Purpose |
 |---|---|
@@ -290,5 +349,9 @@ Migrations are idempotent Python scripts using `IF NOT EXISTS` / `ON CONFLICT`. 
 | Script | Purpose |
 |---|---|
 | `migrate_add_graded_data.py` | Adds `graded_data JSONB` to `market_prices`; migrates data from `rookie_price_history` |
+| `migrate_add_perf_indexes.py` | Adds performance indexes on `card_catalog`, `market_prices`, `collection` |
+| `migrate_add_sealed_products.py` | Creates `sealed_products` table |
+| `migrate_add_scrape_error_log.py` | Creates `scrape_runs` and `scrape_run_errors` tables |
+| `migrate_add_cards_processed.py` | Adds `cards_processed INT DEFAULT 0` to `scrape_runs` |
 
-If a migration fails, the error is caught and logged — uvicorn still starts (no crash loop).
+All run in order on every Railway deploy (Dockerfile CMD). Each uses `IF NOT EXISTS` / `try/except` — safe to re-run. If a migration fails, the error is logged and uvicorn still starts (no crash loop).

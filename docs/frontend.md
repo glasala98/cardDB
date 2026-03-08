@@ -27,7 +27,7 @@ Default route: `/` → redirect to `/catalog`.
 
 ### `/catalog` — Card Catalog (`Catalog.jsx`)
 
-Browse all 2.6M+ cards in the reference database.
+Browse all 1.26M+ cards in the reference database.
 
 **Features:**
 - Search, sport filter (NHL/NBA/NFL/MLB), year, set name, rookie flag
@@ -132,11 +132,37 @@ Soft-deleted ledger cards. Restore button returns card to active ledger.
 
 ### `/settings` — Settings (`Settings.jsx`)
 
-**All users:** Currency toggle (CAD/USD), display density (comfortable/compact)
+**All users:** Currency toggle (CAD/USD), display density (comfortable/compact).
 
-**Admin only:**
-- **Scrape Health** — Table of all 7 workflows: status dot, last run time (relative), "View ↗" link to GitHub Actions run. Loaded from `GET /api/stats/workflow-status`.
-- **User Management** — Add/delete users, change passwords, assign roles.
+---
+
+### `/admin` — Admin Dashboard (`Admin.jsx`)
+
+Full scrape monitoring and data management. Admin role required. Five tabs:
+
+**Pipeline tab**
+- Coverage stats: total priced, priced in last 7d / 30d
+- Workflow health cards for all 9 tracked workflows — status dot, last run time, consecutive-failure badge (red `✕N`), overdue badge (amber) if older than expected cadence
+- ▶ Run trigger button per workflow (dispatches `workflow_dispatch` via GitHub API)
+
+**Runs tab**
+- Active jobs: live progress bars (`cards_processed / cards_total`), hit rate (`cards_found / cards_processed`), throughput (cards/hr), ETA
+- Completed run history: status, hit rate, delta count, anomaly flags (`timed_out`, `zero_delta`, `low_hit_rate`, `high_errors`)
+
+**Quality tab**
+- Snapshot audit: missing prices, stale data, catalog coverage gaps
+
+**Sealed tab**
+- Browse/edit all `sealed_products` rows (MSRP, box price, pack config)
+- Data quality panel: sport mismatches, bad MSRP ($1.00 parse errors), duplicate rows
+- One-click "Fix mismatches" button → `DELETE /api/admin/sealed-products/mismatches`
+
+**Outliers tab**
+- Review cards with statistically anomalous prices
+- Bulk-ignore selected outliers
+
+**Users tab**
+- Add/delete users, change passwords, assign roles
 
 ---
 
@@ -162,10 +188,6 @@ Legacy analytics page for the YG/Rookie market CSV database. Accessible by URL b
 NHL player stats cross-referenced with card values. Not in sidebar, accessible by URL.
 
 ---
-
-### `/admin` — Legacy Admin (`Admin.jsx`)
-
-Same as the User Management section in Settings. Kept for backward compatibility.
 
 ---
 
@@ -267,7 +289,7 @@ All files use `client.js` — an axios instance with base URL `/api` and a respo
 | `collection.js` | `getCollection()`, `getOwnedIds()`, `addToCollection()`, `updateCollection()`, `removeFromCollection()` |
 | `masterDb.js` | `getMasterDb()`, `getGradingLookup()`, `getPriceHistory()`, `getPortfolioHistory()`, `getRawSales()`, `scrapeYGCard()` |
 | `stats.js` | `triggerScrape()`, `getScrapeStatus()`, `getWorkflowStatus()` |
-| `admin.js` | `getUsers()`, `createUser()`, `deleteUser()`, `changePassword()` |
+| `admin.js` | `getUsers()`, `createUser()`, `deleteUser()`, `changePassword()`, `getScrapeRuns()`, `getScrapeRunsSummary()`, `getScrapeRunErrors()`, `getDataQuality()`, `getSnapshotAudit()`, `getPipelineHealth()`, `getSealedProductsAdmin()`, `updateSealedProduct()`, `getSealedQuality()`, `deleteSealedMismatches()`, `triggerWorkflow()`, `getOutliers()`, `bulkIgnoreOutliers()` |
 | `scan.js` | `analyzeCard(frontFile, backFile?)` |
 
 ---
