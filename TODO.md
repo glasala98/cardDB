@@ -45,7 +45,7 @@
 - [x] **EV vs MSRP:** compare top-N card values against hobby box MSRP to show expected value
 - [x] **Hero Top Card:** highlight the single highest-value card across all current releases
 - [x] **Volatility indicators:** 7/14-day price delta from market_price_history (delta_7d_pct on set cards)
-- [ ] **Individual sales drill-down:** raw eBay sold listings per card (modal or slide-in)
+- [x] **Individual sales drill-down:** last 5 price snapshots (date/fair value/range/sales) in CatalogCardDetail panel
 - [ ] **Rarity funnel:** visual print run breakdown (base → parallels → autos → 1/1s)
 
 ## Catalog Page

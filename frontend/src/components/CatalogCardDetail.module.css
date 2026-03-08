@@ -181,6 +181,42 @@
   margin-top: 5px;
 }
 
+.historyTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 11px;
+}
+
+.historyTable th {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  font-weight: 500;
+  padding: 3px 0;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.historyTable td {
+  padding: 4px 0;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-variant-numeric: tabular-nums;
+}
+
+.historyTable tr:last-child td { border-bottom: none; }
+
+.historyVal {
+  font-weight: 700;
+  color: var(--text-primary) !important;
+}
+
+.historyRange {
+  color: var(--text-muted) !important;
+  font-size: 10px;
+}
+
 .chartPlaceholder {
   padding: 24px 20px;
   font-size: 13px;

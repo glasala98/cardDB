@@ -100,6 +100,32 @@ export default function CatalogCardDetail({ card, history, loading, isLoggedIn, 
               <span>{history[0]?.scraped_at?.slice(0, 10)}</span>
               <span>{history[history.length - 1]?.scraped_at?.slice(0, 10)}</span>
             </div>
+
+            {/* Last 5 snapshots table */}
+            <table className={styles.historyTable}>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Fair Value</th>
+                  <th>Range</th>
+                  <th>Sales</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...history].reverse().slice(0, 5).map((h, i) => (
+                  <tr key={i}>
+                    <td>{h.scraped_at?.slice(0, 10)}</td>
+                    <td className={styles.historyVal}>{h.fair_value != null ? fmtPrice(h.fair_value) : '—'}</td>
+                    <td className={styles.historyRange}>
+                      {h.min_price != null && h.max_price != null
+                        ? `${fmtPrice(h.min_price)} – ${fmtPrice(h.max_price)}`
+                        : '—'}
+                    </td>
+                    <td>{h.num_sales ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
           <div className={styles.chartPlaceholder}>No price history yet</div>
