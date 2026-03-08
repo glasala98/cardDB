@@ -201,12 +201,37 @@
 .workflowGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-bottom: 24px; }
 .wfCard {
   background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: 8px; padding: 12px 14px; text-decoration: none;
+  border-radius: 8px; padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 4px;
   transition: border-color 0.15s;
 }
-.wfCard:hover { border-color: var(--accent); }
-.wfHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
-.wfName { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.wfCard:hover { border-color: var(--border-strong); }
+.wfHeader { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wfName { font-size: 12px; font-weight: 600; color: var(--text-primary); text-decoration: none; }
+.wfName:hover { color: var(--accent); }
+.triggerBtn {
+  margin-top: 6px; align-self: flex-start;
+  background: rgba(0,212,170,0.08); border: 1px solid rgba(0,212,170,0.3);
+  border-radius: 6px; padding: 4px 10px; font-size: 11px; font-weight: 600;
+  font-family: var(--font); color: var(--accent); cursor: pointer; transition: all 0.15s;
+}
+.triggerBtn:hover:not(:disabled) { background: rgba(0,212,170,0.18); border-color: var(--accent); }
+.triggerBtn:disabled { opacity: 0.4; cursor: default; }
+
+/* ── Section header row (title + refresh button) ─────── */
+.sectionHeaderRow {
+  display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px;
+}
+
+/* ── Ignore All button (Outliers) ────────────────────── */
+.ignoreAllBtn {
+  flex-shrink: 0; background: rgba(224,85,85,0.1); border: 1px solid rgba(224,85,85,0.35);
+  border-radius: 7px; padding: 6px 14px; font-size: 12px; font-weight: 600;
+  font-family: var(--font); color: var(--danger); cursor: pointer; transition: all 0.15s;
+  white-space: nowrap;
+}
+.ignoreAllBtn:hover:not(:disabled) { background: rgba(224,85,85,0.2); }
+.ignoreAllBtn:disabled { opacity: 0.5; cursor: default; }
 .wfTs   { font-size: 11px; color: var(--text-muted); }
 .wfStatus {
   font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px;
@@ -439,7 +464,7 @@
   color: var(--accent);
 }
 .refreshBtn {
-  margin-left: auto; background: none; border: 1px solid var(--border); border-radius: 8px;
+  flex-shrink: 0; background: none; border: 1px solid var(--border); border-radius: 8px;
   padding: 6px 12px; font-size: 12px; font-weight: 600; font-family: var(--font);
   color: var(--text-secondary); cursor: pointer; transition: all 0.15s; white-space: nowrap;
 }

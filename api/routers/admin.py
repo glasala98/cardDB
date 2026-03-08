@@ -1,11 +1,19 @@
 """Admin endpoints — user management (admin role required)."""
 
+import os
+import re
+import urllib.request
+import json as _json
 import bcrypt
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
+from typing import Optional
 
 from db import get_db
 from api.routers.auth import get_current_user
+
+GITHUB_OWNER = "glasala98"
+GITHUB_REPO  = "cardDB"
 
 router = APIRouter()
 
@@ -727,3 +735,78 @@ def update_sealed_product(
         "packs_per_box": ppb,
         "release_date": rd.isoformat() if rd else None,
     }
+
+
+class WorkflowTrigger(BaseModel):
+    workflow_file: str   # e.g. "catalog_tier_staple.yml"
+    inputs: dict = {}    # optional workflow_dispatch inputs
+
+
+@router.post("/trigger-workflow")
+def trigger_workflow(
+    body: WorkflowTrigger,
+    _admin: str = Depends(_require_admin),
+):
+    """Dispatch any GitHub Actions workflow via workflow_dispatch.
+
+    Only .yml files in the repo's .github/workflows/ directory are allowed.
+    Requires GITHUB_TOKEN env var with repo + workflow scopes.
+    """
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        raise HTTPException(status_code=503, detail="GITHUB_TOKEN not configured")
+
+    # Validate: only plain filenames ending in .yml, no path traversal
+    if not re.fullmatch(r"[\w\-]+\.yml", body.workflow_file):
+        raise HTTPException(status_code=400, detail="Invalid workflow filename")
+
+    url = (
+        f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}"
+        f"/actions/workflows/{body.workflow_file}/dispatches"
+    )
+    payload = _json.dumps({"ref": "main", "inputs": body.inputs}).encode()
+    req = urllib.request.Request(
+        url,
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "Content-Type": "application/json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            if resp.status not in (200, 204):
+                raise HTTPException(status_code=502, detail="GitHub API rejected the dispatch")
+    except urllib.error.HTTPError as e:
+        body_txt = e.read().decode(errors="replace")
+        raise HTTPException(status_code=502, detail=f"GitHub API error {e.code}: {body_txt}")
+    except urllib.error.URLError as e:
+        raise HTTPException(status_code=502, detail=f"Could not reach GitHub: {e.reason}")
+
+    return {"status": "dispatched", "workflow": body.workflow_file}
+
+
+class BulkIgnoreBody(BaseModel):
+    ids: list[int]
+
+
+@router.post("/outliers/bulk-ignore")
+def bulk_ignore_outliers(
+    body: BulkIgnoreBody,
+    _admin: str = Depends(_require_admin),
+):
+    """Ignore multiple market_prices records at once."""
+    if not body.ids:
+        return {"ignored": 0}
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE market_prices SET ignored = TRUE WHERE id = ANY(%s) AND NOT ignored",
+                (body.ids,)
+            )
+            count = cur.rowcount
+        conn.commit()
+    return {"ignored": count}

@@ -20,3 +20,6 @@ export const getScrapeRunErrors     = (runId, limit = 100) => client.get(`/admin
 
 export const getSealedProductsAdmin = (params = {}) => client.get('/admin/sealed-products', { params })
 export const updateSealedProduct    = (id, data)    => client.patch(`/admin/sealed-products/${id}`, data)
+
+export const triggerWorkflow    = (workflowFile, inputs = {}) => client.post('/admin/trigger-workflow', { workflow_file: workflowFile, inputs })
+export const bulkIgnoreOutliers = (ids)                       => client.post('/admin/outliers/bulk-ignore', { ids })

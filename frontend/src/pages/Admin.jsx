@@ -9,6 +9,7 @@ import {
   getScrapeRuns, getScrapeRunsSummary, getDataQuality, getSnapshotAudit,
   getScrapeRunErrors,
   getSealedProductsAdmin, updateSealedProduct,
+  triggerWorkflow, bulkIgnoreOutliers,
 } from '../api/admin'
 import { useAuth } from '../context/AuthContext'
 import pageStyles from './Page.module.css'
@@ -378,21 +379,41 @@ function UsersTab() {
 
 /* ── Pipeline tab ──────────────────────────────────────────────────────────── */
 function PipelineTab() {
-  const [health,    setHealth]    = useState(null)
-  const [workflows, setWorkflows] = useState([])
-  const [loading,   setLoading]   = useState(true)
-  const [error,     setError]     = useState(null)
+  const [health,      setHealth]      = useState(null)
+  const [workflows,   setWorkflows]   = useState([])
+  const [loading,     setLoading]     = useState(true)
+  const [refreshing,  setRefreshing]  = useState(false)
+  const [error,       setError]       = useState(null)
+  const [triggering,  setTriggering]  = useState(null)  // workflow file currently being triggered
+  const [triggerMsg,  setTriggerMsg]  = useState(null)  // success/error message
 
-  useEffect(() => {
-    setLoading(true)
+  const load = useCallback((isRefresh = false) => {
+    if (isRefresh) setRefreshing(true)
+    else setLoading(true)
     Promise.all([getPipelineHealth(), getWorkflowStatus()])
       .then(([h, w]) => {
         setHealth(h)
         setWorkflows(w.workflows || [])
       })
       .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
+      .finally(() => { setLoading(false); setRefreshing(false) })
   }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const handleTrigger = async (wf) => {
+    if (!confirm(`Trigger "${wf.name}"?\nThis will start a new GitHub Actions run.`)) return
+    setTriggering(wf.file)
+    setTriggerMsg(null)
+    try {
+      await triggerWorkflow(wf.file)
+      setTriggerMsg({ type: 'success', text: `"${wf.name}" dispatched — check GitHub Actions.` })
+    } catch (e) {
+      setTriggerMsg({ type: 'error', text: e.message })
+    } finally {
+      setTriggering(null)
+    }
+  }
 
   if (loading) return <p className={pageStyles.status}>Loading pipeline data…</p>
   if (error)   return <p className={pageStyles.error}>Error: {error}</p>
@@ -400,13 +421,23 @@ function PipelineTab() {
 
   return (
     <div className={styles.pipelineWrap}>
-      <div className={styles.statCards}>
-        <StatCard label="Catalog Size"   value={health.total_cards.toLocaleString()} />
-        <StatCard label="Priced Cards"   value={health.priced_cards.toLocaleString()} />
-        <StatCard label="Coverage"       value={`${health.coverage_pct}%`} accent={health.coverage_pct > 50} />
-        <StatCard label="Ignored Prices" value={health.ignored_count.toLocaleString()} warn={health.ignored_count > 0} />
-        <StatCard label="Outlier Flags"  value={health.outlier_count.toLocaleString()} warn={health.outlier_count > 0} />
+
+      <div className={styles.sectionHeaderRow}>
+        <div className={styles.statCards} style={{ flex: 1 }}>
+          <StatCard label="Catalog Size"   value={health.total_cards.toLocaleString()} />
+          <StatCard label="Priced Cards"   value={health.priced_cards.toLocaleString()} />
+          <StatCard label="Coverage"       value={`${health.coverage_pct}%`} accent={health.coverage_pct > 50} />
+          <StatCard label="Ignored Prices" value={health.ignored_count.toLocaleString()} warn={health.ignored_count > 0} />
+          <StatCard label="Outlier Flags"  value={health.outlier_count.toLocaleString()} warn={health.outlier_count > 0} />
+        </div>
+        <button className={styles.refreshBtn} onClick={() => load(true)} disabled={refreshing}>
+          {refreshing ? '↻' : '↻'} Refresh
+        </button>
       </div>
+
+      {triggerMsg && (
+        <div className={`${styles.toast} ${styles[triggerMsg.type]}`}>{triggerMsg.text}</div>
+      )}
 
       <h3 className={styles.sectionTitle}>Coverage by Tier</h3>
       <div className={styles.tableWrap}>
@@ -455,9 +486,11 @@ function PipelineTab() {
       <h3 className={styles.sectionTitle}>GitHub Actions Workflows</h3>
       <div className={styles.workflowGrid}>
         {workflows.map(wf => (
-          <a key={wf.file} href={wf.html_url || '#'} target="_blank" rel="noreferrer" className={styles.wfCard}>
+          <div key={wf.file} className={styles.wfCard}>
             <div className={styles.wfHeader}>
-              <span className={styles.wfName}>{wf.name}</span>
+              <a href={wf.html_url || '#'} target="_blank" rel="noreferrer" className={styles.wfName}>
+                {wf.name}
+              </a>
               <span className={`${styles.wfStatus} ${styles['wf_' + (wf.conclusion || wf.status || 'no_runs')]}`}>
                 {wf.conclusion || wf.status || 'no runs'}
               </span>
@@ -465,7 +498,15 @@ function PipelineTab() {
             {wf.started_at && (
               <span className={styles.wfTs}>{new Date(wf.started_at).toLocaleString()}</span>
             )}
-          </a>
+            <button
+              className={styles.triggerBtn}
+              onClick={() => handleTrigger(wf)}
+              disabled={triggering === wf.file}
+              title={`Trigger ${wf.name}`}
+            >
+              {triggering === wf.file ? '…' : '▶ Run'}
+            </button>
+          </div>
         ))}
       </div>
 
@@ -855,17 +896,22 @@ function RunsTab() {
 
 /* ── Quality tab ────────────────────────────────────────────────────────────── */
 function QualityTab() {
-  const [data,     setData]     = useState(null)
-  const [loading,  setLoading]  = useState(true)
-  const [error,    setError]    = useState(null)
-  const [view,     setView]     = useState('stale')   // 'stale' | 'lowconf'
+  const [data,       setData]       = useState(null)
+  const [loading,    setLoading]    = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [error,      setError]      = useState(null)
+  const [view,       setView]       = useState('stale')
 
-  useEffect(() => {
+  const load = useCallback((isRefresh = false) => {
+    if (isRefresh) setRefreshing(true)
+    else setLoading(true)
     getDataQuality()
       .then(d => setData(d))
       .catch(e => setError(e.message))
-      .finally(() => setLoading(false))
+      .finally(() => { setLoading(false); setRefreshing(false) })
   }, [])
+
+  useEffect(() => { load() }, [load])
 
   if (loading) return <p className={pageStyles.status}>Loading quality data…</p>
   if (error)   return <p className={pageStyles.error}>Error: {error}</p>
@@ -877,13 +923,18 @@ function QualityTab() {
     <div className={styles.qualityWrap}>
 
       {/* KPI strip */}
-      <div className={styles.kpiStrip}>
+      <div className={styles.sectionHeaderRow}>
+      <div className={styles.kpiStrip} style={{ flex: 1 }}>
         <KpiCard label="Stale >30d"      value={stats.stale_30.toLocaleString()}      warn={stats.stale_30 > 100} />
         <KpiCard label="Stale >90d"      value={stats.stale_90.toLocaleString()}      warn={stats.stale_90 > 50} />
         <KpiCard label="Never Scraped"   value={stats.never_scraped.toLocaleString()} warn={stats.never_scraped > 0} />
         <KpiCard label="Single Sale"     value={stats.single_sale.toLocaleString()}   warn={stats.single_sale > 50} />
         <KpiCard label="Low Confidence"  value={stats.low_confidence.toLocaleString()} warn={stats.low_confidence > 100} />
         <KpiCard label="Zero Price"      value={stats.zero_price.toLocaleString()}    warn={stats.zero_price > 0} />
+      </div>
+      <button className={styles.refreshBtn} onClick={() => load(true)} disabled={refreshing}>
+        {refreshing ? '↻' : '↻'} Refresh
+      </button>
       </div>
 
       {/* Freshness by tier */}
@@ -1166,10 +1217,11 @@ function StatCard({ label, value, accent, warn }) {
 
 /* ── Outliers tab ──────────────────────────────────────────────────────────── */
 function OutliersTab() {
-  const [outliers, setOutliers] = useState([])
-  const [loading,  setLoading]  = useState(true)
-  const [error,    setError]    = useState(null)
-  const [toast,    setToast]    = useState(null)
+  const [outliers,    setOutliers]    = useState([])
+  const [loading,     setLoading]     = useState(true)
+  const [error,       setError]       = useState(null)
+  const [toast,       setToast]       = useState(null)
+  const [bulkIgnoring, setBulkIgnoring] = useState(false)
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type })
@@ -1191,17 +1243,43 @@ function OutliersTab() {
     } catch (e) { showToast(e.message, 'error') }
   }
 
+  const handleIgnoreAll = async () => {
+    const activeIds = outliers.filter(o => !o.ignored).map(o => o.id)
+    if (!activeIds.length) return
+    if (!confirm(`Ignore all ${activeIds.length} active outlier prices? This hides them from the public catalog.`)) return
+    setBulkIgnoring(true)
+    try {
+      const result = await bulkIgnoreOutliers(activeIds)
+      setOutliers(prev => prev.map(o => activeIds.includes(o.id) ? { ...o, ignored: true } : o))
+      showToast(`${result.ignored} prices ignored`)
+    } catch (e) { showToast(e.message, 'error') }
+    finally { setBulkIgnoring(false) }
+  }
+
   if (loading) return <p className={pageStyles.status}>Detecting outliers…</p>
   if (error)   return <p className={pageStyles.error}>Error: {error}</p>
+
+  const activeCount = outliers.filter(o => !o.ignored).length
 
   return (
     <>
       {toast && <div className={`${styles.toast} ${styles[toast.type]}`}>{toast.msg}</div>}
 
-      <p className={styles.helpText}>
-        Prices where fair_value is &gt;5× the player's median across all their cards (minimum 3 cards).
-        Ignoring a price hides it from the public catalog and future calculations.
-      </p>
+      <div className={styles.sectionHeaderRow} style={{ marginBottom: 10 }}>
+        <p className={styles.helpText} style={{ margin: 0 }}>
+          Prices &gt;5× the player's median (min 3 cards). The nightly quarantine auto-ignores prices &gt;3×.
+          Manual review here catches borderline cases.
+        </p>
+        {activeCount > 0 && (
+          <button
+            className={styles.ignoreAllBtn}
+            onClick={handleIgnoreAll}
+            disabled={bulkIgnoring}
+          >
+            {bulkIgnoring ? 'Ignoring…' : `Ignore All (${activeCount})`}
+          </button>
+        )}
+      </div>
 
       {outliers.length === 0 ? (
         <p className={pageStyles.status}>No outliers detected.</p>
