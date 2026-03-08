@@ -3,10 +3,18 @@
 import json
 import math
 import os
+import threading
 from typing import Optional
 from fastapi import APIRouter, Query
+from cachetools import TTLCache
 
 from db import get_db
+
+# In-process TTL caches (thread-safe via locks)
+_releases_cache: TTLCache = TTLCache(maxsize=20,  ttl=300)   # 5 min
+_filters_cache:  TTLCache = TTLCache(maxsize=50,  ttl=600)   # 10 min
+_ai_cache:       TTLCache = TTLCache(maxsize=200, ttl=300)   # 5 min, keyed by query
+_cache_lock = threading.Lock()
 
 router = APIRouter()
 
@@ -216,7 +224,7 @@ def new_releases(
     sport:   Optional[str] = Query(None),
     seasons: int           = Query(2, ge=1, le=5),
     limit:   int           = Query(60, ge=1, le=200),
-):
+):  # noqa: C901
     """Return recent sets grouped by (sport, year, set_name), filtered by card release year.
 
     Uses the card's year field (e.g. '2024-25', '2024') to determine recency —
@@ -233,6 +241,11 @@ def new_releases(
         card_count, priced_count, top_value, avg_value, indexed_at (ISO string),
         and top_cards (list of up to 5 cards with name + fair_value + is_rookie).
     """
+    cache_key = f"releases|{sport}|{seasons}|{limit}"
+    with _cache_lock:
+        if cache_key in _releases_cache:
+            return _releases_cache[cache_key]
+
     where_parts = [
         "CAST(SUBSTRING(cc.year FROM '^\\d+') AS INTEGER) >= EXTRACT(YEAR FROM NOW())::INTEGER - %s"
     ]
@@ -314,41 +327,59 @@ def new_releases(
                     delta = None
                 volatility_lookup[f"{vsport}|{vyear}|{vset}"] = delta
 
-        # For each set, fetch top 5 UNIQUE players by best card fair_value
-        result_sets = []
-        for s in set_rows:
-            cur.execute("""
-                SELECT player_name, is_rookie, variant, fair_value, id
-                FROM (
-                    SELECT DISTINCT ON (cc.player_name)
-                        cc.player_name, cc.is_rookie, cc.variant, mp.fair_value, cc.id
+        # Batch-fetch top 5 unique players per set in ONE query (replaces N round-trips)
+        top_cards_by_set: dict = {}
+        if set_rows:
+            # Build VALUES list for all (sport, year, set_name) keys
+            values_sql = ",".join(["(%s,%s,%s)"] * len(set_rows))
+            set_params = []
+            for s in set_rows:
+                set_params.extend([s["sport"], s["year"], s["set_name"]])
+
+            cur.execute(f"""
+                WITH deduped AS (
+                    SELECT DISTINCT ON (cc.sport, cc.year, cc.set_name, cc.player_name)
+                        cc.sport, cc.year, cc.set_name,
+                        cc.player_name, cc.is_rookie, cc.variant, cc.id, mp.fair_value
                     FROM card_catalog cc
                     JOIN market_prices mp ON mp.card_catalog_id = cc.id
-                    WHERE cc.sport = %s AND cc.year = %s AND cc.set_name = %s
+                    WHERE (cc.sport, cc.year, cc.set_name) IN (VALUES {values_sql})
                       AND mp.fair_value IS NOT NULL
                       AND NOT COALESCE(mp.ignored, FALSE)
-                    ORDER BY cc.player_name, mp.fair_value DESC
-                ) deduped
-                ORDER BY fair_value DESC
-                LIMIT 5
-            """, [s["sport"], s["year"], s["set_name"]])
-            top_cards = [
-                {
-                    "id":          r[4],
-                    "player_name": r[0],
-                    "is_rookie":   r[1],
-                    "variant":     r[2],
-                    "fair_value":  float(r[3]) if r[3] is not None else None,
-                }
-                for r in cur.fetchall()
-            ]
+                    ORDER BY cc.sport, cc.year, cc.set_name, cc.player_name, mp.fair_value DESC
+                ),
+                ranked AS (
+                    SELECT *,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY sport, year, set_name
+                               ORDER BY fair_value DESC
+                           ) AS rn
+                    FROM deduped
+                )
+                SELECT sport, year, set_name, player_name, is_rookie, variant, id, fair_value
+                FROM ranked
+                WHERE rn <= 5
+                ORDER BY sport, year, set_name, fair_value DESC
+            """, set_params)
 
+            for row in cur.fetchall():
+                vsport, vyear, vset, player, is_rookie, variant, cid, fv = row
+                key = f"{vsport}|{vyear}|{vset}"
+                top_cards_by_set.setdefault(key, []).append({
+                    "id":          cid,
+                    "player_name": player,
+                    "is_rookie":   is_rookie,
+                    "variant":     variant,
+                    "fair_value":  float(fv) if fv is not None else None,
+                })
+
+        result_sets = []
+        for s in set_rows:
             avg_val  = float(s["avg_value"])      if s["avg_value"]      is not None else None
             avg_prev = float(s["avg_prev_value"]) if s["avg_prev_value"] is not None else None
-            if avg_val is not None and avg_prev and avg_prev > 0:
-                momentum_pct = round((avg_val - avg_prev) / avg_prev * 100, 1)
-            else:
-                momentum_pct = None
+            momentum_pct = round((avg_val - avg_prev) / avg_prev * 100, 1) if (
+                avg_val is not None and avg_prev and avg_prev > 0
+            ) else None
 
             vkey = f"{s['sport']}|{s['year']}|{s['set_name']}"
             result_sets.append({
@@ -365,10 +396,13 @@ def new_releases(
                 "total_sales":    int(s["total_sales"])    if s["total_sales"]    else 0,
                 "staple_count":   int(s["staple_count"])   if s["staple_count"]   else 0,
                 "flagship_count": int(s["flagship_count"]) if s["flagship_count"] else 0,
-                "top_cards":      top_cards,
+                "top_cards":      top_cards_by_set.get(vkey, []),
             })
 
-    return {"sets": result_sets}
+    result = {"sets": result_sets}
+    with _cache_lock:
+        _releases_cache[cache_key] = result
+    return result
 
 
 @router.get("/sealed-products")
@@ -459,6 +493,11 @@ def catalog_filters(
     Returns:
         Dict with keys: sports (list), years (list desc), sets (list).
     """
+    cache_key = f"{sport}|{year}"
+    with _cache_lock:
+        if cache_key in _filters_cache:
+            return _filters_cache[cache_key]
+
     with get_db() as conn:
         cur = conn.cursor()
         cur.execute("SET statement_timeout = '8s'")
@@ -492,7 +531,10 @@ def catalog_filters(
         )
         sets = [r[0] for r in cur.fetchall()]
 
-    return {"sports": sports, "years": years, "sets": sets}
+    result = {"sports": sports, "years": years, "sets": sets}
+    with _cache_lock:
+        _filters_cache[cache_key] = result
+    return result
 
 
 @router.get("/ai-search")
@@ -510,6 +552,10 @@ def ai_search(q: str = Query(..., min_length=2)):
     Returns:
         Dict with keys: query (original), filters (parsed), cards, total, page, pages, per_page.
     """
+    with _cache_lock:
+        if q in _ai_cache:
+            return _ai_cache[q]
+
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         from fastapi import HTTPException
@@ -628,7 +674,7 @@ def ai_search(q: str = Query(..., min_length=2)):
             r["scraped_at"] = r["scraped_at"].isoformat()
         cards.append(r)
 
-    return {
+    result = {
         "query":    q,
         "filters":  {**filters, **({"min_price": min_price} if min_price else {}), **({"max_price": max_price} if max_price else {})},
         "cards":    cards,
@@ -637,3 +683,6 @@ def ai_search(q: str = Query(..., min_length=2)):
         "pages":    math.ceil(total / 50) if total else 1,
         "per_page": 50,
     }
+    with _cache_lock:
+        _ai_cache[q] = result
+    return result

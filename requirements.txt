@@ -20,6 +20,7 @@ anthropic
 
 # Misc
 bcrypt
+cachetools
 
 # Database
 psycopg2-binary>=2.9
