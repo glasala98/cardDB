@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { usePreferences } from '../context/PreferencesContext'
 import { useCurrency } from '../context/CurrencyContext'
@@ -298,6 +299,20 @@ export default function Settings() {
       </div>
 
       <AppearanceSection />
+      {isAdmin && (
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Administration</h2>
+          <div className={styles.settingRow}>
+            <div className={styles.settingInfo}>
+              <span className={styles.settingLabel}>Admin Dashboard</span>
+              <span className={styles.settingDesc}>Monitor pipeline health, review data quality, manage outliers, and trigger scrape workflows.</span>
+            </div>
+            <Link to="/admin" className={styles.addBtn} style={{ textDecoration: 'none', display: 'inline-block' }}>
+              Open Dashboard
+            </Link>
+          </div>
+        </section>
+      )}
       {isAdmin && <ScrapesSection />}
       {isAdmin && <UserManagementSection me={user} />}
     </div>
