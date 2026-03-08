@@ -1,105 +1,71 @@
-# Card Analytics Project TODOs
-
-# Agent System Instruction: Pre-Flight Validation Gate
-
-## Protocol
-Before executing any task in the "Implementation Roadmap," you MUST perform a "Pre-Flight Check." Do not proceed if any condition is missing.
-
-## Checklist
-1. **Database:** Verify connection to the PostgreSQL instance and confirm `pgvector` extension is active.
-2. **Environment:** Confirm all required API keys (OpenAI/Anthropic/Railway) are present in the environment variables.
-3. **Connectivity:** Ensure the scraper has a valid path to the Railway internal URL.
-4. **Data State:** Check if the target table exists and is not currently locked by another process.
-
-## Cost-Control Logic
-- If a check fails, stop execution immediately and report the specific missing component.
-- DO NOT re-run expensive reasoning loops if the underlying data/connection is broken.
-- Report "Ready for Execution" only once all checks pass.
+# CardDB — Master TODO & Roadmap
 
 ---
 
-# Card Analytics Project: Master TODO & Roadmap
+## Scraping & Data Collection
+- [x] **Catalog Scraper:** checklistinsider / cardboardconnection / TCDB / Beckett sources — populates card_catalog (2.6M+ cards)
+- [x] **Price Scraper:** eBay sold listings → market_prices + market_price_history (raw + graded modes)
+- [x] **Scrape Tiers:** assign_catalog_tiers.py classifies staple / premium / stars / base
+- [x] **Set Info Scraper:** scrape_set_info.py — cardboardconnection MSRP, pack config, release date, odds → sealed_products
+- [x] **GH Actions Schedules:** daily staple, weekly full sweep, monthly premium/stars/graded, monthly set info
+- [ ] **NHL Player Stats scrape failing** — investigate why NHL stats job errors but NHL prices work fine
+- [ ] **Image Retrieval:** scrape card images from eBay listings during price scrape; store in market_prices.image_url
+- [ ] **Scraping Resiliency:** central error logging, retry logic, rate-limit backoff across all scrapers
+- [ ] **[AI] Entity Resolution Agent:** LangGraph agent to map ambiguous eBay titles to card_catalog records
 
-# 
-- The NHL Player stats scrape failed and why is that in the scrape but not nhl prices? 
+## Data / Backend
+- [x] **market_prices.ignored:** admin flag to hide bad prices from public catalog
+- [x] **market_prices.graded_data JSONB:** PSA/BGS prices per card keyed by grade
+- [x] **Performance indexes:** pg_trgm GIN on player_name/set_name, expression index on year cast, partial index on fair_value
+- [x] **sealed_products + sealed_product_odds tables:** MSRP / pack config / odds per set/product type
+- [x] **GET /catalog/sealed-products:** filterable API endpoint with nested odds
+- [ ] **Populate sealed_products:** trigger scrape_set_info GH Actions workflow for first data run (all sports, 2022+)
+- [ ] **Lock ignore/delete to admin:** add admin dependency to PATCH /admin/market-prices/{id}/ignore
+- [ ] **Refine price queries:** tighten sales window / outlier exclusion to reduce price spread noise
+- [ ] **[AI] Outlier Quarantine:** auto-flag prices deviating >50% from player median
+- [ ] **[AI] Vector Search:** embed 2.6M records for sub-second fuzzy card matching (needs pgvector)
 
-## Modular Scraping & Data Collection
-- [ ] **[Gate] Pre-Flight:** Verify Selenium environment, driver versions, and proxy rotation configs.
-- [ ] **Modular Engine Refactor:** Transition to a single, modular scraper engine.
-- [ ] **Config-Driven Scoping:** Templates for General Staples, New Set Releases, and Sport-Specific Selectors.
-- [ ] **Scraping Resiliency:** Central error logging, timeout handling, and proxy/rate-limiting.
-- [ ] **Image Retrieval:** Modular "Media Fetcher" for photo retrieval via Google vs. eBay.
-- [ ] **[AI] Entity Resolution Agent:** Build LangGraph-based agent to map raw titles to 2.6M Beckett records.
+## Admin Dashboard
+- [x] **Pipeline Health tab:** catalog coverage by tier, last scrape per sport, GH Actions status cards
+- [x] **Quarantine/Outliers tab:** outlier detection (>5× player median), ignore/restore toggle
+- [x] **Users tab:** role management (admin/user/guest) inline
+- [x] **Runs tab:** KPI strip, delta + hit-rate charts, date range filter, refresh, anomaly feed
+- [x] **Quality tab:** stale/never-scraped/low-confidence KPIs, freshness by tier bar, priority stale + low-confidence card tables
+- [ ] **ETL Snapshot Audit:** show last 5 price snapshots per card (data already in market_price_history)
+- [ ] **Sealed Products Manager:** view/edit MSRP and pack config per set inline in admin
+- [ ] **Crowdsourced Price Gap Filler:** user-submitted prices for cards with no eBay data → admin review queue
 
-## Data Processing & Logic (Backend)
-- [ ] **[Gate] Pre-Flight:** Verify `pgvector` extension is active and check DB connection stability.
-- [ ] **Raw Cards Focus:** Focus exclusively on building out raw card prices.
-- [ ] **Refine Queries:** Adjust sales history querying to tighten price spreads.
-- [ ] **Data Versioning (SDLC Type 2 ETL):** Call ETL integration for snapshot dates and versioning.
-- [ ] **Manual Delete Logic:** API route for manual delete/override (`ignored = true` flag).
-- [ ] **Caching Layer:** Implement Redis/Memcached for total capital and price history graphs.
-- [ ] **[AI] Vector Search Layer:** Embed 2.6M records for sub-second "fuzzy" matching.
-- [ ] **[AI] Outlier Quarantine:** Flag/quarantine prices deviating >50% from baseline.
+## New Releases Page
+- [x] **Set grid:** sport filter tabs, season range, card count / top value / avg / sales / % priced per set
+- [x] **Top 5 cards per set:** deduplicated by player, RC badge guarded by variant keyword
+- [x] **Sort logic:** year desc → populated first → flagship count → total sales → top value
+- [x] **Flagship badge:** shown when set has staple/premium cards
+- [x] **Momentum %:** avg price vs prev_value delta
+- [ ] **MSRP + Box Price display:** show Hobby/Blaster MSRP on each set card (data now in sealed_products)
+- [ ] **EV vs MSRP:** compare top-N card values against hobby box MSRP to show expected value
+- [ ] **Hero Top Card:** highlight the single highest-value card across all current releases
+- [ ] **Volatility indicators:** 7/14-day price delta from market_price_history
+- [ ] **Individual sales drill-down:** raw eBay sold listings per card (modal or slide-in)
+- [ ] **Rarity funnel:** visual print run breakdown (base → parallels → autos → 1/1s)
 
-## Admin & Health Dashboard (The Command Center)
-- [x] **Pipeline Health UI:** Catalog coverage by tier, last scrape per sport, GitHub Actions workflow status cards.
-- [x] **Quarantine Manager:** Outlier detection (>5× player median), ignore/restore toggle, hidden from public catalog.
-- [x] **Role Management:** Admin can change any user's role (user/admin/guest) inline in user table.
-- [x] **Manual Delete/Ignore:** `market_prices.ignored` column, `PATCH /admin/market-prices/{id}/ignore` endpoint.
-- [x] **Delta Ingestion Monitor:** Runs tab with KPI strip, workflow health cards, delta + hit-rate charts, anomaly feed, filtered run history table.
-- [ ] **AI Matcher Debugger:** Interface to inspect failed entity resolution attempts and manually map IDs.
-- [ ] **ETL Snapshot Audit:** View last 5 price snapshots per card for Type 2 integrity review.
-- [ ] **Crowdsourced Price Gap Filler:** Allow users to submit missing card prices for cards with no eBay data. Submissions go into a review queue; admin (or AI bot) validates legitimacy before accepting. Fills gaps for obscure/low-volume cards the scraper can't find.
+## Catalog Page
+- [x] **Public browse:** no login required, paginated, sport/year/set/search/rookie/price filters
+- [x] **CatalogCardDetail panel:** slide-in with price summary, sparkline, add-to-collection
+- [x] **Tier badges:** Staple / Premium / Stars + RC badge
+- [ ] **Card image in rows:** image_url already in API response — show thumbnail in catalog table
+- [ ] **Price history graph:** sparkline or line chart embedded in catalog row / detail panel
+- [ ] **Mobile layout:** card catalog needs responsive column collapse for small screens
 
-## UI/UX Design (Card Catalog Page)
-- [ ] **Layout Alignment:** Match Card Catalog format strictly to the Card Ledger layout.
-- [ ] **Image Placement:** Insert card photo between "Card" and "Fair Value" columns.
-- [ ] **Price History Graph:** Horizontal line graph between value headers and sidebar.
-- [ ] **Graph Defaults:** Default to total capital and price of all cards.
-- [ ] **Mobile Graph Responsiveness:** Define mobile-specific layout (sparkline or modal).
-- [ ] **Loading States:** Add UI loading skeletons for stability.
+## Card Ledger / Collection
+- [x] **CardInspect page:** side-by-side layout, lightbox image, grading ROI
+- [x] **Collection table:** tracks owned cards by grade, cost basis, purchase date
+- [ ] **Bulk import:** CSV upload to add multiple cards to collection at once
+- [ ] **Sell tracking:** record sale price + date; auto-calculate realized gain/loss vs cost basis
 
-## UI/UX Design (New Set Releases Page)
-- [x] **Page Architecture:** `/releases` — card grid grouped by set, sport filter, 30/60/90 day window.
-- [x] **Top 5 Cards per Set:** Cards ranked by fair value with RC badge shown inline.
-- [ ] **Hero Top Card:** Highlight the single highest-value card across all current releases.
-- [ ] **Box vs. Singles EV Tracker:** Calculator comparing sealed box price vs. aggregated singles value.
-- [ ] **Volatility & Hype Indicators:** Implement 7/14-day momentum using market_price_history delta.
-- [ ] **Rarity & Parallel Visualizer:** Visual print run funnel from base cards down to 1/1s.
-- [ ] **Individual Sales Drill-Down:** View raw eBay sold listing data per card (not just aggregated fair value).
-
-## Global Layout, Navigation & Security
-- [x] **Relocate Navigation (Mobile):** Fixed bottom tab bar with icon + label.
-- [x] **Relocate Account Controls:** Compact user row above tab bar on mobile.
-- [x] **Settings Placement:** Settings gear in sidebar desktop, tab on mobile.
-- [x] **Mobile Overlap Fix:** padding-bottom 120px to clear fixed nav bar.
-- [x] **Role-Based Access Control (RBAC):** admin.py uses DB role column; AdminRoute guards /admin; useIsAdmin() hook available.
-- [ ] **Lock Manual Delete to Admin:** API route for manual delete/ignore needs admin dependency.
-
----
-
-# Implementation Roadmap (AI-Optimized & Cost-Efficient)
-
-### Phase 1: Structural UI & Auth Logic (Highest Priority)
-1. **[Gate] Pre-Flight:** Agent verifies all DB credentials and Railway secrets.
-2. **Layout Overhaul:** Fix Navigation and Account Controls.
-3. **RBAC Setup:** Establish Admin tier and secure the future Dashboard route.
-
-### Phase 2: Modular Scraper & AI Foundation
-1. **[Gate] Pre-Flight:** Agent verifies config file syntax and DB schema integrity.
-2. **Engine Scaffolding:** Create the single scraper class.
-3. **AI Foundation:** Deploy FastAPI agent on Railway for price ingestion and `pgvector` initialization.
-
-### Phase 3: The Admin Dashboard & Delta Testing
-1. **[Gate] Pre-Flight:** Agent confirms connection to ETL metadata tables and Admin RBAC.
-2. **Dashboard Build:** Create the UI for monitoring delta ingestion and AI matching confidence.
-3. **Delta Validation:** Run tests to confirm ETL is only pulling incremental changes (SDLC Type 2).
-
-### Phase 4: Data Cleaning & Page Parity
-1. **[Gate] Pre-Flight:** Agent verifies vector index count (2.6M records) matches expectations.
-2. **Entity Resolution:** Run AI Agent to match new price scrapes to Beckett dataset.
-3. **UI Sync:** Align Catalog/Ledger layouts and embed images/graphs.
-
-### Phase 5: New Set Releases Page (The Analytics Engine)
-1. **[Gate] Pre-Flight:** Agent confirms Redis cache and ETL snapshots are ready.
-2. **Advanced Visuals:** Build EV Tracker, print run funnels, and momentum charts.
+## Global / Infrastructure
+- [x] **Mobile nav:** fixed bottom tab bar (Catalog / Ledger / Portfolio / Settings)
+- [x] **RBAC:** admin/user/guest roles, AdminRoute guard, useIsAdmin() hook
+- [x] **Railway deploy:** Dockerfile, auto-deploy from main, migrations run on startup
+- [x] **JWT auth:** 7-day expiry, bcrypt, PostgreSQL users table
+- [ ] **Caching layer:** Redis/Memcached for expensive aggregate queries (portfolio total, releases page)
+- [ ] **API rate limiting:** protect public endpoints from abuse
