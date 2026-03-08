@@ -451,6 +451,107 @@ def get_data_quality(_admin: str = Depends(_require_admin)):
     }
 
 
+@router.get("/snapshot-audit")
+def get_snapshot_audit(
+    tier:  str = "staple",
+    sport: str = None,
+    limit: int = 25,
+    _admin: str = Depends(_require_admin),
+):
+    """Return the last 5 price snapshots per card for ETL Type-2 integrity review.
+
+    Shows recently scraped cards with their full price history so admins can
+    verify prices are moving correctly and history is accumulating as expected.
+
+    Args:
+        tier:  scrape_tier filter (staple/premium/stars/base).
+        sport: Optional sport filter.
+        limit: Max cards to return (default 25).
+
+    Returns:
+        Dict with key 'cards', each entry containing card metadata plus a
+        'snapshots' list of the last 5 {scraped_at, fair_value, num_sales}.
+    """
+    from typing import Optional as Opt
+
+    where_parts = ["cc.scrape_tier = %s", "NOT COALESCE(mp.ignored, FALSE)", "mp.fair_value > 0"]
+    params: list = [tier]
+
+    if sport:
+        where_parts.append("cc.sport = %s")
+        params.append(sport.upper())
+
+    where_sql = " AND ".join(where_parts)
+
+    with get_db() as conn:
+        cur = conn.cursor()
+
+        # Fetch recently scraped cards for this tier
+        cur.execute(f"""
+            SELECT
+                cc.id, cc.player_name, cc.set_name, cc.year, cc.sport,
+                cc.scrape_tier, cc.variant,
+                mp.fair_value  AS current_value,
+                mp.prev_value,
+                mp.scraped_at  AS last_scraped
+            FROM card_catalog cc
+            JOIN market_prices mp ON mp.card_catalog_id = cc.id
+            WHERE {where_sql}
+            ORDER BY mp.scraped_at DESC NULLS LAST
+            LIMIT %s
+        """, params + [limit])
+        card_rows = cur.fetchall()
+
+        if not card_rows:
+            return {"cards": []}
+
+        card_ids = [r[0] for r in card_rows]
+
+        # Fetch last 5 snapshots for each card
+        cur.execute("""
+            SELECT card_catalog_id, scraped_at, fair_value, num_sales
+            FROM (
+                SELECT
+                    card_catalog_id, scraped_at, fair_value, num_sales,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY card_catalog_id ORDER BY scraped_at DESC
+                    ) AS rn
+                FROM market_price_history
+                WHERE card_catalog_id = ANY(%s)
+            ) sub
+            WHERE rn <= 5
+            ORDER BY card_catalog_id, scraped_at DESC
+        """, [card_ids])
+        snap_rows = cur.fetchall()
+
+    snaps_by_id: dict = {}
+    for cid, snap_at, fv, ns in snap_rows:
+        snaps_by_id.setdefault(cid, []).append({
+            "scraped_at": snap_at.isoformat() if snap_at else None,
+            "fair_value": float(fv) if fv is not None else None,
+            "num_sales":  ns,
+        })
+
+    cards = []
+    for row in card_rows:
+        cid, player, set_name, year, sport_v, tier_v, variant, curr, prev, last_scraped = row
+        cards.append({
+            "id":            cid,
+            "player_name":   player,
+            "set_name":      set_name,
+            "year":          year,
+            "sport":         sport_v,
+            "scrape_tier":   tier_v,
+            "variant":       variant,
+            "current_value": float(curr) if curr is not None else None,
+            "prev_value":    float(prev) if prev is not None else None,
+            "last_scraped":  last_scraped.isoformat() if last_scraped else None,
+            "snapshots":     snaps_by_id.get(cid, []),
+        })
+
+    return {"cards": cards}
+
+
 @router.get("/scrape-runs")
 def get_scrape_runs(
     limit: int = 50,

@@ -13,3 +13,5 @@ export const getWorkflowStatus = ()                  => client.get('/stats/workf
 export const getScrapeRuns        = (limit = 50, workflow = null) => client.get('/admin/scrape-runs', { params: { limit, ...(workflow && { workflow }) } })
 export const getScrapeRunsSummary = ()                            => client.get('/admin/scrape-runs/summary')
 export const getDataQuality       = ()                            => client.get('/admin/data-quality')
+export const getSnapshotAudit     = (tier = 'staple', sport = null, limit = 25) =>
+  client.get('/admin/snapshot-audit', { params: { tier, ...(sport && { sport }), limit } })

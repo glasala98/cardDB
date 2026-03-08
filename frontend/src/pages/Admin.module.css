@@ -470,3 +470,54 @@
 .qualityPillActive {
   background: rgba(0,212,170,0.1); border-color: rgba(0,212,170,0.4); color: var(--accent);
 }
+
+/* ── Snapshot audit ────────────────────────────────────────────────────── */
+.snapshotRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.snapshotChip {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.snapshotChip + .snapshotChip { margin-left: 4px; }
+
+.snapshotRow > span {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  cursor: default;
+  margin-right: 3px;
+}
+
+.snapshotDetail {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 11px;
+  width: 100%;
+}
+
+.snapshotDetailRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.snapshotDetailRow span { flex: 1; }
+.snapshotDetailRow span:first-child { color: var(--text-muted); flex: 1.5; }

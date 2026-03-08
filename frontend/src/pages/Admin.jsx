@@ -6,7 +6,7 @@ import {
 import {
   getUsers, createUser, deleteUser, changePassword, changeRole,
   getPipelineHealth, getWorkflowStatus, getOutliers, toggleIgnore,
-  getScrapeRuns, getScrapeRunsSummary, getDataQuality,
+  getScrapeRuns, getScrapeRunsSummary, getDataQuality, getSnapshotAudit,
 } from '../api/admin'
 import { useAuth } from '../context/AuthContext'
 import pageStyles from './Page.module.css'
@@ -714,11 +714,15 @@ function QualityTab() {
         <button
           className={`${styles.qualityPill} ${view === 'stale' ? styles.qualityPillActive : ''}`}
           onClick={() => setView('stale')}
-        >Priority Stale Cards ({stale_cards.length})</button>
+        >Priority Stale ({stale_cards.length})</button>
         <button
           className={`${styles.qualityPill} ${view === 'lowconf' ? styles.qualityPillActive : ''}`}
           onClick={() => setView('lowconf')}
         >Low Confidence ({low_confidence_cards.length})</button>
+        <button
+          className={`${styles.qualityPill} ${view === 'snapshot' ? styles.qualityPillActive : ''}`}
+          onClick={() => setView('snapshot')}
+        >Snapshot Audit</button>
       </div>
 
       {/* Stale cards table */}
@@ -739,6 +743,125 @@ function QualityTab() {
           </p>
           <QualityCardTable cards={low_confidence_cards} />
         </>
+      )}
+
+      {/* Snapshot audit */}
+      {view === 'snapshot' && <SnapshotAuditView />}
+    </div>
+  )
+}
+
+const AUDIT_TIERS   = ['staple', 'premium', 'stars', 'base']
+const AUDIT_SPORTS  = ['', 'NHL', 'NBA', 'NFL', 'MLB']
+
+function SnapshotAuditView() {
+  const [cards,   setCards]   = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error,   setError]   = useState(null)
+  const [tier,    setTier]    = useState('staple')
+  const [sport,   setSport]   = useState('')
+  const [expanded, setExpanded] = useState(null)
+
+  const load = useCallback((t, s) => {
+    setLoading(true)
+    setError(null)
+    getSnapshotAudit(t, s || null, 25)
+      .then(d => setCards(d.cards || []))
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => { load(tier, sport) }, [tier, sport, load])
+
+  return (
+    <div>
+      <p className={styles.helpText}>
+        Last 5 price snapshots per card. Verify ETL is accumulating history correctly and prices are moving as expected.
+      </p>
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div className={styles.qualityToggle} style={{ margin: 0 }}>
+          {AUDIT_TIERS.map(t => (
+            <button key={t}
+              className={`${styles.qualityPill} ${tier === t ? styles.qualityPillActive : ''}`}
+              onClick={() => setTier(t)}
+            >{t}</button>
+          ))}
+        </div>
+        <div className={styles.qualityToggle} style={{ margin: 0 }}>
+          {AUDIT_SPORTS.map(s => (
+            <button key={s || 'all'}
+              className={`${styles.qualityPill} ${sport === s ? styles.qualityPillActive : ''}`}
+              onClick={() => setSport(s)}
+            >{s || 'All'}</button>
+          ))}
+        </div>
+      </div>
+
+      {loading && <p className={pageStyles.status}>Loading…</p>}
+      {error   && <p className={pageStyles.error}>Error: {error}</p>}
+
+      {!loading && !error && (
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th className={styles.th}>Player</th>
+                <th className={styles.th}>Set · Year</th>
+                <th className={styles.th}>Variant</th>
+                <th className={`${styles.th} ${styles.thRight}`}>Current $</th>
+                <th className={styles.th}>Last 5 Snapshots</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cards.map(c => {
+                const isExp = expanded === c.id
+                return (
+                  <tr key={c.id} className={styles.tr}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setExpanded(isExp ? null : c.id)}
+                  >
+                    <td className={styles.td}><strong>{c.player_name}</strong></td>
+                    <td className={styles.td}>{c.set_name} · {c.year}</td>
+                    <td className={styles.td}>
+                      {c.variant !== 'Base' ? c.variant : <span className={styles.muted}>Base</span>}
+                    </td>
+                    <td className={`${styles.td} ${styles.thRight}`}>
+                      ${c.current_value != null ? c.current_value.toFixed(2) : '—'}
+                    </td>
+                    <td className={styles.td}>
+                      {c.snapshots.length === 0 ? (
+                        <span className={styles.textDanger}>No history</span>
+                      ) : (
+                        <div className={styles.snapshotRow}>
+                          {c.snapshots.map((sn, si) => (
+                            <span key={si} className={styles.snapshotChip}
+                              title={sn.scraped_at}
+                            >
+                              ${sn.fair_value?.toFixed(2) ?? '—'}
+                            </span>
+                          ))}
+                          {isExp && (
+                            <div className={styles.snapshotDetail}>
+                              {c.snapshots.map((sn, si) => (
+                                <div key={si} className={styles.snapshotDetailRow}>
+                                  <span className={styles.muted}>{sn.scraped_at}</span>
+                                  <span>${sn.fair_value?.toFixed(2) ?? '—'}</span>
+                                  <span className={styles.muted}>{sn.num_sales} sale{sn.num_sales !== 1 ? 's' : ''}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

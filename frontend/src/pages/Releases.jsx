@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getNewReleases } from '../api/catalog'
+import { getNewReleases, getSealedProducts } from '../api/catalog'
 import { useCurrency } from '../context/CurrencyContext'
 import styles from './Releases.module.css'
 import pageStyles from './Page.module.css'
@@ -30,19 +30,32 @@ export default function Releases() {
   const { fmtPrice } = useCurrency()
   const navigate = useNavigate()
 
-  const [sets,    setSets]    = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState(null)
-  const [sport,   setSport]   = useState('')
-  const [seasons, setSeasons] = useState(2)
+  const [sets,          setSets]          = useState([])
+  const [sealedLookup,  setSealedLookup]  = useState({})
+  const [loading,       setLoading]       = useState(false)
+  const [error,         setError]         = useState(null)
+  const [sport,         setSport]         = useState('')
+  const [seasons,       setSeasons]       = useState(2)
 
   useEffect(() => {
     setLoading(true)
     setError(null)
-    const params = { seasons }
-    if (sport) params.sport = sport
-    getNewReleases(params)
-      .then(data => setSets(data.sets || []))
+    const releasesParams = { seasons }
+    if (sport) releasesParams.sport = sport
+    const sealedParams = sport ? { sport } : {}
+
+    Promise.all([getNewReleases(releasesParams), getSealedProducts(sealedParams)])
+      .then(([relData, sealedData]) => {
+        setSets(relData.sets || [])
+        // Build lookup: "sport|year|set_name" -> [product, ...]
+        const lookup = {}
+        for (const p of sealedData.products || []) {
+          const key = `${p.sport}|${p.year}|${p.set_name}`
+          if (!lookup[key]) lookup[key] = []
+          lookup[key].push(p)
+        }
+        setSealedLookup(lookup)
+      })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [sport, seasons])
@@ -112,6 +125,22 @@ export default function Releases() {
               ? Math.round((s.priced_count / s.card_count) * 100)
               : 0
 
+            // Sealed product data for this set
+            const setKey = `${s.sport}|${s.year}|${s.set_name}`
+            const boxProducts = sealedLookup[setKey] || []
+            const hobbyBox  = boxProducts.find(p => p.product_type === 'Hobby Box' || p.product_type === 'Hobby Jumbo Box')
+            const blasterBox = boxProducts.find(p => p.product_type === 'Blaster Box')
+            // Crude EV: cards_per_box × avg card value in the set
+            const cardsPerBox = hobbyBox?.cards_per_pack && hobbyBox?.packs_per_box
+              ? hobbyBox.cards_per_pack * hobbyBox.packs_per_box
+              : null
+            const evHobby = cardsPerBox && s.avg_value
+              ? Math.round(cardsPerBox * s.avg_value * 100) / 100
+              : null
+            const evDiffPct = evHobby != null && hobbyBox?.msrp
+              ? ((evHobby - hobbyBox.msrp) / hobbyBox.msrp * 100).toFixed(1)
+              : null
+
             return (
               <div key={i} className={styles.setCard} onClick={(e) => goToCatalog(s, e)}>
                 {/* Header */}
@@ -171,6 +200,42 @@ export default function Releases() {
                     <span className={styles.statLabel}>priced</span>
                   </div>
                 </div>
+
+                {/* Box pricing + EV */}
+                {boxProducts.length > 0 && (
+                  <div className={styles.boxPricing}>
+                    <div className={styles.boxPricingRow}>
+                      {hobbyBox?.msrp != null && (
+                        <div className={styles.boxItem}>
+                          <span className={styles.boxLabel}>Hobby MSRP</span>
+                          <span className={styles.boxPrice}>{fmtPrice(hobbyBox.msrp)}</span>
+                        </div>
+                      )}
+                      {blasterBox?.msrp != null && (
+                        <div className={styles.boxItem}>
+                          <span className={styles.boxLabel}>Blaster MSRP</span>
+                          <span className={styles.boxPrice}>{fmtPrice(blasterBox.msrp)}</span>
+                        </div>
+                      )}
+                      {evHobby != null && (
+                        <div className={styles.boxItem}>
+                          <span className={styles.boxLabel}>EV est.</span>
+                          <span className={`${styles.boxPrice} ${evHobby >= (hobbyBox?.msrp ?? Infinity) ? styles.evPositive : styles.evNegative}`}>
+                            {fmtPrice(evHobby)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {evDiffPct != null && (
+                      <div className={styles.evNote}>
+                        <span className={Number(evDiffPct) >= 0 ? styles.evPositive : styles.evNegative}>
+                          {Number(evDiffPct) >= 0 ? '+' : ''}{evDiffPct}% vs MSRP
+                        </span>
+                        <span className={styles.evDisclaimer}> · avg card × cards/box</span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Top cards */}
                 {s.top_cards.length > 0 && (

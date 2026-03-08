@@ -19,3 +19,7 @@ export const getCatalogCardHistory = (catalogId) =>
 /** Get recently indexed sets for the Releases page. */
 export const getNewReleases = (params = {}) =>
   client.get('/catalog/releases', { params })
+
+/** Get sealed product info (MSRP, pack config, odds) for matching sets. */
+export const getSealedProducts = (params = {}) =>
+  client.get('/catalog/sealed-products', { params })
