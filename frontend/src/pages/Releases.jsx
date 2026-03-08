@@ -65,6 +65,16 @@ export default function Releases() {
     navigate(`/catalog?sport=${s.sport}&year=${encodeURIComponent(s.year)}&set_name=${encodeURIComponent(s.set_name)}`)
   }
 
+  // Find the single highest-value card across all sets
+  const heroCard = sets.reduce((best, s) => {
+    for (const c of s.top_cards) {
+      if (c.fair_value != null && (!best || c.fair_value > best.fair_value)) {
+        return { ...c, set_name: s.set_name, year: s.year, sport: s.sport }
+      }
+    }
+    return best
+  }, null)
+
   return (
     <div className={pageStyles.page}>
       <div className={pageStyles.header}>
@@ -99,6 +109,24 @@ export default function Releases() {
       </div>
 
       {error && <div className={pageStyles.error}>{error}</div>}
+
+      {/* Hero top card */}
+      {!loading && heroCard && (
+        <div
+          className={styles.heroCard}
+          onClick={() => navigate(`/catalog?sport=${heroCard.sport}&search=${encodeURIComponent(heroCard.player_name)}`)}
+        >
+          <div className={styles.heroLabel}>Top Card This Season</div>
+          <div className={styles.heroBody}>
+            <div className={styles.heroLeft}>
+              <span className={styles.heroPlayer}>{heroCard.player_name}</span>
+              {isActualRC(heroCard) && <span className={styles.rcBadge}>RC</span>}
+              <span className={styles.heroSet}>{heroCard.set_name} · {heroCard.year}</span>
+            </div>
+            <div className={styles.heroValue}>{fmtPrice(heroCard.fair_value)}</div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className={styles.grid}>
