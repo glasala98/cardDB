@@ -1,3 +1,244 @@
+/* ── Top bar ─────────────────────────────────────────────────── */
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.topBarLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.countBadge {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 2px 10px;
+  border-radius: 20px;
+}
+
+.filterToggleBtn {
+  display: none; /* shown only at mobile breakpoint */
+}
+
+/* ── Two-column layout ───────────────────────────────────────── */
+.layout {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+/* ── Filter sidebar ──────────────────────────────────────────── */
+.filterPanel {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  position: sticky;
+  top: 24px;
+}
+
+.filterSection {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.filterSection:last-child { border-bottom: none; }
+
+.filterLabel {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.sideSearch {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font);
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+.sideSearch::placeholder { color: var(--text-secondary); }
+.sideSearch:focus { border-color: var(--accent); }
+
+.sideSelect {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 28px 7px 10px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: var(--font);
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%238b949e' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  box-sizing: border-box;
+}
+.sideSelect:focus { border-color: var(--accent); }
+
+/* ── Sidebar pill buttons (sport / tier) ─────────────────────── */
+.sideBtnGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.sideBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 4px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.12s;
+  text-align: center;
+  white-space: nowrap;
+}
+.sideBtn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+.sideBtnActive {
+  background: var(--accent-muted);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.sideBtnFull {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* ── Clear button ────────────────────────────────────────────── */
+.clearBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  width: 100%;
+  text-align: center;
+}
+.clearBtn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+
+/* ── Main content area ───────────────────────────────────────── */
+.mainArea { min-width: 0; }
+
+/* ── Mobile drawer ───────────────────────────────────────────── */
+.drawerOverlay { display: none; }
+.drawerHeader  { display: none; }
+
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .filterPanel { display: none; }
+  .filterPanel.drawerOpen { display: block; }
+
+  .filterToggleBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 5px 12px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+    white-space: nowrap;
+  }
+  .filterToggleBtn:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+  .filterToggleActive { border-color: var(--accent); color: var(--accent); }
+
+  .drawerOverlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 199;
+  }
+
+  .filterPanel {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 210;
+    max-height: 82vh;
+    overflow-y: auto;
+    border-radius: 16px 16px 0 0;
+    border-bottom: none;
+    transform: translateY(100%);
+    transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    padding-bottom: 110px;
+  }
+  .filterPanel.drawerOpen { transform: translateY(0); }
+
+  .drawerHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .drawerTitle {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+  .drawerClose {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 6px;
+    line-height: 1;
+    transition: background 0.15s, color 0.15s;
+  }
+  .drawerClose:hover { background: var(--bg-card); color: var(--text-primary); }
+}
+
 /* ── AI Search ─────────────────────────────────────────── */
 .aiSearchBar {
   display: flex;

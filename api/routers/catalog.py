@@ -36,6 +36,7 @@ def browse_catalog(
     year:      Optional[str]  = Query(None),
     set_name:  Optional[str]  = Query(None),
     is_rookie: Optional[bool] = Query(None),
+    tier:      Optional[str]  = Query(None),
     has_price: Optional[bool] = Query(None),
     sort:      str            = Query("year"),
     dir:       str            = Query("desc"),
@@ -89,6 +90,10 @@ def browse_catalog(
         where_parts.append("cc.is_rookie = TRUE")
     elif is_rookie is False:
         where_parts.append("cc.is_rookie = FALSE")
+
+    if tier:
+        where_parts.append("cc.scrape_tier = %s")
+        params.append(tier.lower())
 
     if has_price is True:
         where_parts.append("mp.id IS NOT NULL")
