@@ -1,0 +1,74 @@
+name: Scrape Set Info (MSRP + Pack Config)
+
+on:
+  schedule:
+    - cron: '0 6 1 * *'  # 6am UTC 1st of each month
+  workflow_dispatch:
+    inputs:
+      sport:
+        description: 'Sport (NHL/NBA/NFL/MLB, blank=all)'
+        required: false
+        default: ''
+      year:
+        description: 'Single year e.g. 2024-25 (blank=last 3 years)'
+        required: false
+        default: ''
+      year_from:
+        description: 'Start year e.g. 2022 (blank=3 years ago)'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Dry run (true/false)'
+        required: false
+        default: 'false'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Run sealed products migration
+        run: python migrate_add_sealed_products.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  scrape:
+    needs: migrate
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Build scraper args
+        id: args
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.sport }}" ]; then
+            ARGS="$ARGS --sport ${{ github.event.inputs.sport }}"
+          else
+            ARGS="$ARGS --all-sports"
+          fi
+          if [ -n "${{ github.event.inputs.year }}" ]; then
+            ARGS="$ARGS --year ${{ github.event.inputs.year }}"
+          fi
+          if [ -n "${{ github.event.inputs.year_from }}" ]; then
+            ARGS="$ARGS --year-from ${{ github.event.inputs.year_from }}"
+          fi
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          echo "args=$ARGS" >> $GITHUB_OUTPUT
+      - name: Scrape set product info
+        run: python -u scrape_set_info.py ${{ steps.args.outputs.args }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

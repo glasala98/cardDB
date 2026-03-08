@@ -338,6 +338,77 @@ def new_releases(
     return {"sets": result_sets}
 
 
+@router.get("/sealed-products")
+def catalog_sealed_products(
+    sport:    Optional[str] = Query(None),
+    year:     Optional[str] = Query(None),
+    set_name: Optional[str] = Query(None),
+):
+    """Return sealed product info (MSRP, pack config, odds) for matching sets.
+
+    Args:
+        sport:    Filter to one sport (NHL/NBA/NFL/MLB).
+        year:     Filter to one year (e.g. '2024-25').
+        set_name: Partial set name match (case-insensitive).
+
+    Returns:
+        Dict with key 'products' — list of sealed product rows, each with
+        an 'odds' list of {card_type, odds_ratio} entries.
+    """
+    where_parts = []
+    params = []
+
+    if sport:
+        where_parts.append("sp.sport = %s")
+        params.append(sport.upper())
+    if year:
+        where_parts.append("sp.year = %s")
+        params.append(year)
+    if set_name:
+        where_parts.append("sp.set_name ILIKE %s")
+        params.append(f"%{set_name}%")
+
+    where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute(f"""
+            SELECT
+                sp.id, sp.sport, sp.year, sp.set_name, sp.brand,
+                sp.product_type, sp.msrp, sp.cards_per_pack, sp.packs_per_box,
+                sp.release_date, sp.source_url
+            FROM sealed_products sp
+            {where_sql}
+            ORDER BY sp.year DESC, sp.set_name, sp.product_type
+        """, params)
+        cols = [d[0] for d in cur.description]
+        rows = cur.fetchall()
+
+        product_ids = [r[0] for r in rows]
+        odds_by_id: dict = {}
+        if product_ids:
+            cur.execute("""
+                SELECT sealed_product_id, card_type, odds_ratio
+                FROM sealed_product_odds
+                WHERE sealed_product_id = ANY(%s)
+                ORDER BY sealed_product_id, card_type
+            """, [product_ids])
+            for pid, card_type, odds_ratio in cur.fetchall():
+                odds_by_id.setdefault(pid, []).append(
+                    {"card_type": card_type, "odds_ratio": odds_ratio}
+                )
+
+    products = []
+    for row in rows:
+        r = dict(zip(cols, row))
+        r["msrp"] = float(r["msrp"]) if r["msrp"] is not None else None
+        r["release_date"] = r["release_date"].isoformat() if r["release_date"] else None
+        r["odds"] = odds_by_id.get(r["id"], [])
+        products.append(r)
+
+    return {"products": products}
+
+
 @router.get("/filters")
 def catalog_filters(
     sport: Optional[str] = Query(None),
