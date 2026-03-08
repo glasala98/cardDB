@@ -454,11 +454,13 @@ function PipelineTab() {
 
       <div className={styles.sectionHeaderRow}>
         <div className={styles.statCards} style={{ flex: 1 }}>
-          <StatCard label="Catalog Size"   value={health.total_cards.toLocaleString()} />
-          <StatCard label="Priced Cards"   value={health.priced_cards.toLocaleString()} />
-          <StatCard label="Coverage"       value={`${health.coverage_pct}%`} accent={health.coverage_pct > 50} />
-          <StatCard label="Ignored Prices" value={health.ignored_count.toLocaleString()} warn={health.ignored_count > 0} />
-          <StatCard label="Outlier Flags"  value={health.outlier_count.toLocaleString()} warn={health.outlier_count > 0} />
+          <StatCard label="Catalog Size"    value={health.total_cards.toLocaleString()} />
+          <StatCard label="Priced Cards"    value={health.priced_cards.toLocaleString()} />
+          <StatCard label="Coverage"        value={`${health.coverage_pct}%`} accent={health.coverage_pct > 50} />
+          <StatCard label="Priced (7d)"     value={(health.newly_priced_7d ?? 0).toLocaleString()} accent={(health.newly_priced_7d ?? 0) > 0} />
+          <StatCard label="Priced (30d)"    value={(health.newly_priced_30d ?? 0).toLocaleString()} />
+          <StatCard label="Ignored Prices"  value={health.ignored_count.toLocaleString()} warn={health.ignored_count > 0} />
+          <StatCard label="Outlier Flags"   value={health.outlier_count.toLocaleString()} warn={health.outlier_count > 0} />
         </div>
         <button className={styles.refreshBtn} onClick={() => load(true)} disabled={refreshing}>
           {refreshing ? '↻' : '↻'} Refresh
@@ -547,6 +549,7 @@ function PipelineTab() {
 /* ── Runs tab ──────────────────────────────────────────────────────────────── */
 const ANOMALY_LABELS = {
   run_error:    'Run failed',
+  timed_out:    'Timed out / killed',
   zero_delta:   'Zero Δ — no new prices',
   low_hit_rate: 'Low hit rate (<10%)',
   high_errors:  'High error count',
@@ -669,10 +672,16 @@ function RunsTab() {
               const elapsed = r.started_at
                 ? Math.round((Date.now() - new Date(r.started_at)) / 60000)
                 : null
-              const hitRate = r.cards_total > 0
-                ? Math.round(r.cards_found / r.cards_total * 100) : null
-              const progress = r.cards_total > 0
-                ? Math.round(r.cards_found / r.cards_total * 100) : 0
+              const processed = r.cards_processed ?? 0
+              const total     = r.cards_total ?? 0
+              const found     = r.cards_found ?? 0
+              const progress  = total > 0 ? Math.round(processed / total * 100) : 0
+              const hitRate   = processed > 0 ? Math.round(found / processed * 100) : null
+              const rate      = (elapsed != null && elapsed > 0 && processed > 0)
+                ? Math.round(processed / elapsed * 60) : null
+              const eta = (elapsed != null && rate > 0 && processed < total)
+                ? Math.round((total - processed) / rate)
+                : null
               return (
                 <div key={r.id} className={styles.activeJobCard}>
                   <div className={styles.activeJobHeader}>
@@ -682,19 +691,22 @@ function RunsTab() {
                     {r.tier  && <span className={`${styles.tierBadge} ${styles['tier_' + r.tier]}`}>{r.tier}</span>}
                   </div>
                   <div className={styles.activeJobStats}>
-                    <span><strong>{r.cards_total.toLocaleString()}</strong> scraped</span>
-                    <span><strong>{r.cards_found.toLocaleString()}</strong> found</span>
+                    <span><strong>{processed.toLocaleString()}</strong> / {total.toLocaleString()} processed</span>
+                    <span><strong>{found.toLocaleString()}</strong> found</span>
                     {hitRate != null && (
                       <span className={hitRate < 10 ? styles.textDanger : hitRate < 30 ? styles.textWarn : styles.textSuccess}>
                         {hitRate}% hit
                       </span>
                     )}
                     {r.errors > 0 && <span className={styles.textDanger}>{r.errors} err</span>}
+                    {rate != null && <span className={styles.muted}>{rate.toLocaleString()}/hr</span>}
                     {elapsed != null && <span className={styles.muted}>{elapsed}m elapsed</span>}
+                    {eta != null && <span className={styles.muted}>~{eta}m left</span>}
                   </div>
-                  {r.cards_total > 0 && (
+                  {total > 0 && (
                     <div className={styles.progressBar}>
                       <div className={styles.progressFill} style={{ width: `${Math.min(progress, 100)}%` }} />
+                      <span className={styles.progressLabel}>{progress}%</span>
                     </div>
                   )}
                 </div>
@@ -754,12 +766,20 @@ function RunsTab() {
           <div className={styles.wfHealthGrid}>
             {summary.workflows.map(w => {
               const isSelected = wfFilter === w.workflow
-              const dotClass = w.last_run_status === 'error' ? 'error'
-                : (w.zero_delta_runs > 0 || w.success_rate < 75) ? 'warn'
-                : 'healthy'
               const daysSince = w.last_run_at
                 ? Math.floor((Date.now() - new Date(w.last_run_at)) / 86400000)
                 : null
+              // Infer expected cadence from workflow name
+              const cadenceDays = /daily/i.test(w.workflow) ? 1
+                : /monthly/i.test(w.workflow) ? 31
+                : /weekly|stars|graded|premium|base/i.test(w.workflow) ? 7
+                : null
+              const isOverdue = cadenceDays != null && daysSince != null
+                && daysSince > cadenceDays * 1.5
+              const consecFail = w.consecutive_errors ?? 0
+              const dotClass = consecFail >= 2 || w.last_run_status === 'error' ? 'error'
+                : (isOverdue || w.zero_delta_runs > 0 || w.success_rate < 75) ? 'warn'
+                : 'healthy'
               return (
                 <div
                   key={w.workflow}
@@ -769,6 +789,16 @@ function RunsTab() {
                   <div className={styles.wfHealthHeader}>
                     <span className={`${styles.statusDot} ${styles['dot_' + dotClass]}`} />
                     <span className={styles.wfHealthName}>{w.workflow}</span>
+                    {consecFail >= 2 && (
+                      <span className={styles.consecBadge} title={`${consecFail} consecutive failures`}>
+                        ✕{consecFail}
+                      </span>
+                    )}
+                    {isOverdue && consecFail < 2 && (
+                      <span className={styles.overdueBadge} title={`Expected every ${cadenceDays}d — last ran ${daysSince}d ago`}>
+                        overdue
+                      </span>
+                    )}
                   </div>
                   <div className={styles.wfHealthMeta}>
                     <span>{w.total_runs} runs</span>
@@ -786,6 +816,7 @@ function RunsTab() {
                     <span>
                       {daysSince === 0 ? 'Today' : daysSince === 1 ? 'Yesterday'
                         : daysSince != null ? `${daysSince}d ago` : 'Never'}
+                      {cadenceDays && <span className={styles.muted}> (/{cadenceDays}d)</span>}
                     </span>
                     {w.last_run_status && (
                       <span className={`${styles.wfStatus} ${styles['wf_' + w.last_run_status]}`}>

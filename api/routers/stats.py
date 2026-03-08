@@ -22,6 +22,7 @@ _WORKFLOWS = [
     ("Catalog Staple",   "catalog_tier_staple.yml"),
     ("Catalog Premium",  "catalog_tier_premium.yml"),
     ("Catalog Stars",    "catalog_tier_stars.yml"),
+    ("Catalog Base",     "catalog_tier_base.yml"),
     ("Catalog Graded",   "catalog_tier_graded.yml"),
     ("Master DB Daily",  "master_db_daily.yml"),
     ("Master DB Weekly", "master_db_weekly.yml"),

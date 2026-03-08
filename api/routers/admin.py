@@ -225,6 +225,18 @@ def pipeline_health(_admin: str = Depends(_require_admin)):
             cur.execute("SELECT COUNT(*) FROM market_prices WHERE fair_value > 0 AND NOT ignored")
             priced_cards = cur.fetchone()[0]
 
+            # Newly scraped this week / month (cards that got a price update)
+            cur.execute("""
+                SELECT
+                    COUNT(*) FILTER (WHERE scraped_at >= NOW() - INTERVAL '7 days')  AS priced_7d,
+                    COUNT(*) FILTER (WHERE scraped_at >= NOW() - INTERVAL '30 days') AS priced_30d
+                FROM market_prices
+                WHERE fair_value > 0 AND NOT ignored
+            """)
+            _fresh = cur.fetchone()
+            newly_priced_7d  = _fresh[0]
+            newly_priced_30d = _fresh[1]
+
             # Ignored prices
             cur.execute("SELECT COUNT(*) FROM market_prices WHERE ignored = TRUE")
             ignored_count = cur.fetchone()[0]
@@ -270,13 +282,15 @@ def pipeline_health(_admin: str = Depends(_require_admin)):
             last_scraped = {r[0]: r[1].isoformat() if r[1] else None for r in cur.fetchall()}
 
     return {
-        "total_cards":   total_cards,
-        "priced_cards":  priced_cards,
-        "ignored_count": ignored_count,
-        "outlier_count": outlier_count,
-        "coverage_pct":  round(priced_cards / total_cards * 100, 1) if total_cards else 0,
-        "tiers":         tiers,
-        "last_scraped":  last_scraped,
+        "total_cards":     total_cards,
+        "priced_cards":    priced_cards,
+        "ignored_count":   ignored_count,
+        "outlier_count":   outlier_count,
+        "coverage_pct":    round(priced_cards / total_cards * 100, 1) if total_cards else 0,
+        "newly_priced_7d":  newly_priced_7d,
+        "newly_priced_30d": newly_priced_30d,
+        "tiers":           tiers,
+        "last_scraped":    last_scraped,
     }
 
 
@@ -313,12 +327,46 @@ def get_scrape_runs_summary(_admin: str = Depends(_require_admin)):
             wf_cols = [d[0] for d in cur.description]
             wf_rows = cur.fetchall()
 
+            # Consecutive errors: last N runs per workflow to count unbroken error streak
+            cur.execute("""
+                SELECT workflow, status
+                FROM (
+                    SELECT workflow, status,
+                           ROW_NUMBER() OVER (PARTITION BY workflow ORDER BY started_at DESC) AS rn
+                    FROM scrape_runs
+                    WHERE status IN ('completed', 'error')
+                ) sub
+                WHERE rn <= 10
+                ORDER BY workflow, rn
+            """)
+            consec_map: dict[str, int] = {}
+            cur_wf = None
+            streak = 0
+            for wf_name, status in cur.fetchall():
+                if wf_name != cur_wf:
+                    if cur_wf is not None:
+                        consec_map[cur_wf] = streak
+                    cur_wf = wf_name
+                    streak = 0
+                if streak == -1:
+                    continue  # already broken
+                if status == 'error':
+                    streak += 1
+                else:
+                    consec_map[wf_name] = streak
+                    streak = -1  # mark broken so we stop counting
+            if cur_wf and cur_wf not in consec_map:
+                consec_map[cur_wf] = streak if streak != -1 else 0
+
             cur.execute("""
                 SELECT
                     id, workflow, sport, tier, mode,
                     started_at, cards_total, cards_found, cards_delta, errors, status,
                     CASE
                         WHEN status = 'error' THEN 'run_error'
+                        WHEN status = 'completed' AND cards_total > 100
+                             AND COALESCE(cards_processed, 0) < cards_total * 0.9
+                             THEN 'timed_out'
                         WHEN status = 'completed' AND cards_delta = 0 AND cards_total > 0
                              THEN 'zero_delta'
                         WHEN status = 'completed' AND cards_total > 0
@@ -329,6 +377,8 @@ def get_scrape_runs_summary(_admin: str = Depends(_require_admin)):
                 FROM scrape_runs
                 WHERE
                     status = 'error'
+                    OR (status = 'completed' AND cards_total > 100
+                        AND COALESCE(cards_processed, 0) < cards_total * 0.9)
                     OR (status = 'completed' AND cards_delta = 0 AND cards_total > 0)
                     OR (status = 'completed' AND cards_total > 0
                         AND cards_found::float / cards_total < 0.10)
@@ -342,12 +392,13 @@ def get_scrape_runs_summary(_admin: str = Depends(_require_admin)):
     workflows = []
     for row in wf_rows:
         r = dict(zip(wf_cols, row))
-        r['avg_hit_rate']  = float(r['avg_hit_rate'])  if r['avg_hit_rate']  is not None else None
-        r['avg_delta']     = int(r['avg_delta'])        if r['avg_delta']     is not None else 0
-        r['total_delta']   = int(r['total_delta'])      if r['total_delta']   is not None else 0
-        r['total_errors']  = int(r['total_errors'])     if r['total_errors']  is not None else 0
-        r['last_run_at']   = r['last_run_at'].isoformat() if r['last_run_at'] else None
-        r['success_rate']  = round(r['success_runs'] / r['total_runs'] * 100, 1) if r['total_runs'] else 0
+        r['avg_hit_rate']       = float(r['avg_hit_rate'])  if r['avg_hit_rate']  is not None else None
+        r['avg_delta']          = int(r['avg_delta'])        if r['avg_delta']     is not None else 0
+        r['total_delta']        = int(r['total_delta'])      if r['total_delta']   is not None else 0
+        r['total_errors']       = int(r['total_errors'])     if r['total_errors']  is not None else 0
+        r['last_run_at']        = r['last_run_at'].isoformat() if r['last_run_at'] else None
+        r['success_rate']       = round(r['success_runs'] / r['total_runs'] * 100, 1) if r['total_runs'] else 0
+        r['consecutive_errors'] = consec_map.get(r['workflow'], 0)
         workflows.append(r)
 
     anomalies = []
@@ -601,7 +652,7 @@ def get_scrape_runs(
             cur.execute(f"""
                 SELECT id, workflow, sport, tier, mode,
                        started_at, finished_at,
-                       cards_total, cards_found, cards_delta, errors, status
+                       cards_total, cards_processed, cards_found, cards_delta, errors, status
                 FROM scrape_runs
                 {where_sql}
                 ORDER BY started_at DESC

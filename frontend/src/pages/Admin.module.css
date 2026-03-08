@@ -408,6 +408,17 @@
 .wfHealthMeta       { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--text-muted); }
 .wfHealthFooter     { display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-muted); }
 
+.consecBadge {
+  flex-shrink: 0;
+  font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px;
+  background: rgba(240,80,80,0.15); color: var(--danger); border: 1px solid rgba(240,80,80,0.3);
+}
+.overdueBadge {
+  flex-shrink: 0;
+  font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px;
+  background: rgba(255,179,50,0.15); color: #ffb332; border: 1px solid rgba(255,179,50,0.3);
+}
+
 /* Status dots */
 .statusDot   { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .dot_healthy { background: var(--success); box-shadow: 0 0 6px rgba(0,201,122,0.5); }
@@ -427,12 +438,14 @@
   align-items: center; gap: 12px;
   padding: 10px 14px; border-radius: 8px; font-size: 12px; border: 1px solid transparent;
 }
-.anomaly_run_error    { background: rgba(240,80,80,0.06);  border-color: rgba(240,80,80,0.2);  }
-.anomaly_zero_delta   { background: rgba(255,179,50,0.06); border-color: rgba(255,179,50,0.2); }
-.anomaly_low_hit_rate { background: rgba(255,179,50,0.06); border-color: rgba(255,179,50,0.2); }
-.anomaly_high_errors  { background: rgba(240,80,80,0.06);  border-color: rgba(240,80,80,0.2);  }
+.anomaly_run_error    { background: rgba(240,80,80,0.06);   border-color: rgba(240,80,80,0.2);   }
+.anomaly_timed_out    { background: rgba(160,127,240,0.06); border-color: rgba(160,127,240,0.2); }
+.anomaly_zero_delta   { background: rgba(255,179,50,0.06);  border-color: rgba(255,179,50,0.2);  }
+.anomaly_low_hit_rate { background: rgba(255,179,50,0.06);  border-color: rgba(255,179,50,0.2);  }
+.anomaly_high_errors  { background: rgba(240,80,80,0.06);   border-color: rgba(240,80,80,0.2);   }
 .anomalyLabel  { font-size: 11px; font-weight: 700; white-space: nowrap; }
 .anomaly_run_error .anomalyLabel, .anomaly_high_errors .anomalyLabel { color: var(--danger); }
+.anomaly_timed_out .anomalyLabel { color: #a07ff0; }
 .anomaly_zero_delta .anomalyLabel, .anomaly_low_hit_rate .anomalyLabel { color: #ffb332; }
 .anomalyDetail { color: var(--text-primary); }
 .anomalyTs     { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
@@ -760,15 +773,28 @@
 
 /* Progress bar */
 .progressBar {
-  height: 4px;
+  position: relative;
+  height: 6px;
   background: var(--bg-secondary);
-  border-radius: 2px;
-  overflow: hidden;
+  border-radius: 3px;
+  overflow: visible;
 }
 
 .progressFill {
   height: 100%;
   background: var(--accent);
-  border-radius: 2px;
+  border-radius: 3px;
   transition: width 0.5s ease;
 }
+
+.progressLabel {
+  position: absolute;
+  right: 0;
+  top: -16px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.running { color: var(--accent); font-size: 8px; }
