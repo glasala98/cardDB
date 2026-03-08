@@ -335,10 +335,24 @@ def save_prices_batch(results: list):
 
 def create_scrape_run(workflow: str, sport: str | None, tier: str | None,
                       mode: str, total: int) -> int | None:
-    """Insert a scrape_runs row and return its ID. Returns None on failure."""
+    """Insert a scrape_runs row and return its ID. Returns None on failure.
+
+    Also cleans up any orphaned 'running' rows from the same workflow+sport
+    that were left behind by GitHub Actions killing the previous job.
+    """
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
+                # Mark stale 'running' rows from previous GitHub-killed jobs
+                cur.execute(
+                    """UPDATE scrape_runs
+                       SET status = 'timed_out', finished_at = NOW()
+                       WHERE status = 'running'
+                         AND workflow = %s
+                         AND COALESCE(sport, '') = COALESCE(%s, '')
+                         AND started_at < NOW() - INTERVAL '1 hour'""",
+                    (workflow, sport)
+                )
                 cur.execute(
                     """INSERT INTO scrape_runs
                        (workflow, sport, tier, mode, cards_total, status)
@@ -531,6 +545,9 @@ def main():
     parser.add_argument('--stale-days',    type=int,   default=7,    dest='stale_days',
                         help="Re-scrape cards not updated in this many days (default 7). "
                              "Use --force to ignore entirely.")
+    parser.add_argument('--max-hours',     type=float, default=5.75, dest='max_hours',
+                        help="Graceful exit after this many hours (default 5.75) to stay under "
+                             "GitHub Actions 6h limit. Progress is saved; next run skips done cards.")
     args = parser.parse_args()
 
     if args.graded:
@@ -561,7 +578,9 @@ def main():
     if not args.force:  print(f"  Stale days: {args.stale_days} (skip cards priced within {args.stale_days}d)")
     if args.graded:     print(f"  Grades:     {grades}")
     print(f"  Est. time:  ~{total * 5 / args.workers / 60:.0f} min")
+    print(f"  Time limit: {args.max_hours}h (graceful exit before GitHub's 6h kill)")
     print(f"{'='*60}\n")
+    max_seconds = args.max_hours * 3600
 
     # Record this run in scrape_runs for the delta ingestion monitor
     import os as _os
@@ -648,6 +667,11 @@ def main():
                     remaining = (total - done_count) / rate / 60 if rate > 0 else 0
                     print(f"  [{done_count}/{total}] Found: {_progress['found']} | "
                           f"Errors: {_progress['errors']} | ~{remaining:.1f}m remaining", flush=True)
+                    if elapsed >= max_seconds:
+                        print(f"\n  Time limit ({args.max_hours}h) reached — "
+                              f"saved {done_count:,}/{total:,} cards. "
+                              f"Next run will resume from card {done_count + 1}.", flush=True)
+                        break
 
     else:
         # ── Raw mode ──
@@ -673,6 +697,11 @@ def main():
                           f"Not found: {_progress['not_found']} | "
                           f"Errors: {_progress['errors']} | "
                           f"~{remaining:.1f}m remaining", flush=True)
+                    if elapsed >= max_seconds:
+                        print(f"\n  Time limit ({args.max_hours}h) reached — "
+                              f"saved {done_count:,}/{total:,} cards. "
+                              f"Next run will resume from card {done_count + 1}.", flush=True)
+                        break
 
     _flush_batch()
     elapsed = time.time() - start

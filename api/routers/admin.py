@@ -306,7 +306,7 @@ def get_scrape_runs_summary(_admin: str = Depends(_require_admin)):
                     workflow,
                     COUNT(*) AS total_runs,
                     COUNT(*) FILTER (WHERE status = 'completed') AS success_runs,
-                    COUNT(*) FILTER (WHERE status = 'error') AS error_runs,
+                    COUNT(*) FILTER (WHERE status IN ('error', 'timed_out')) AS error_runs,
                     COUNT(*) FILTER (
                         WHERE status = 'completed' AND cards_delta = 0 AND cards_total > 0
                     ) AS zero_delta_runs,
@@ -334,7 +334,7 @@ def get_scrape_runs_summary(_admin: str = Depends(_require_admin)):
                     SELECT workflow, status,
                            ROW_NUMBER() OVER (PARTITION BY workflow ORDER BY started_at DESC) AS rn
                     FROM scrape_runs
-                    WHERE status IN ('completed', 'error')
+                    WHERE status IN ('completed', 'error', 'timed_out')
                 ) sub
                 WHERE rn <= 10
                 ORDER BY workflow, rn
@@ -350,7 +350,7 @@ def get_scrape_runs_summary(_admin: str = Depends(_require_admin)):
                     streak = 0
                 if streak == -1:
                     continue  # already broken
-                if status == 'error':
+                if status in ('error', 'timed_out'):
                     streak += 1
                 else:
                     consec_map[wf_name] = streak
@@ -363,7 +363,8 @@ def get_scrape_runs_summary(_admin: str = Depends(_require_admin)):
                     id, workflow, sport, tier, mode,
                     started_at, cards_total, cards_found, cards_delta, errors, status,
                     CASE
-                        WHEN status = 'error' THEN 'run_error'
+                        WHEN status = 'error'      THEN 'run_error'
+                        WHEN status = 'timed_out'  THEN 'timed_out'
                         WHEN status = 'completed' AND cards_total > 100
                              AND COALESCE(cards_processed, 0) < cards_total * 0.9
                              THEN 'timed_out'
@@ -377,6 +378,7 @@ def get_scrape_runs_summary(_admin: str = Depends(_require_admin)):
                 FROM scrape_runs
                 WHERE
                     status = 'error'
+                    OR status = 'timed_out'
                     OR (status = 'completed' AND cards_total > 100
                         AND COALESCE(cards_processed, 0) < cards_total * 0.9)
                     OR (status = 'completed' AND cards_delta = 0 AND cards_total > 0)
