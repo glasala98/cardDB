@@ -8,7 +8,7 @@
 
 ## What It Is
 
-CardDB is a sports card market tracker and personal collection manager for NHL, NBA, NFL, and MLB cards. It scrapes eBay sold prices for 2.6M+ cards in a central catalog, lets users manage their personal collection, and calculates grading ROI (PSA/BGS).
+CardDB is a sports card market tracker and personal collection manager for NHL, NBA, NFL, and MLB cards. It scrapes eBay sold prices for 1.26M+ cards in a central catalog, lets users manage their personal collection, and calculates grading ROI (PSA/BGS).
 
 ---
 
@@ -34,7 +34,7 @@ CardDB is a sports card market tracker and personal collection manager for NHL, 
 │  Routers:                                                    │
 │  /api/auth        login · /me · logout · JWT 7-day           │
 │  /api/cards       Ledger CRUD · scrape trigger · bulk import │
-│  /api/catalog     2.6M card browse · paginated · filters     │
+│  /api/catalog     1.26M card browse · paginated · filters     │
 │  /api/collection  User ownership layer (FK → card_catalog)   │
 │  /api/master-db   Young Guns analytics · grading ROI lookup  │
 │  /api/stats       Market alerts · workflow status · trigger  │
@@ -50,7 +50,7 @@ CardDB is a sports card market tracker and personal collection manager for NHL, 
 │             RAILWAY PostgreSQL  (Pro — 10GB)                 │
 │                                                              │
 │  ── Card Reference ───────────────────────────────────────── │
-│  card_catalog        2.6M cards (TCDB / CLI / CBC)           │
+│  card_catalog        1.26M cards (TCDB / CLI / CBC)           │
 │  market_prices       Current price + graded_data JSONB       │
 │  market_price_history  Delta-only SCD Type 2 price history   │
 │                                                              │
@@ -99,7 +99,7 @@ cardDB/
 │   └── routers/                # One file per feature domain
 │       ├── auth.py             # Login / session / JWT
 │       ├── cards.py            # Card ledger CRUD + scrape trigger
-│       ├── catalog.py          # 2.6M card catalog browse
+│       ├── catalog.py          # 1.26M card catalog browse
 │       ├── collection.py       # User collection (FK to catalog)
 │       ├── master_db.py        # Young Guns DB + grading ROI
 │       ├── stats.py            # Workflow status + scrape trigger
@@ -164,7 +164,7 @@ GET /api/catalog?sport=NHL&year=2024-25&page=1
     LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
     WHERE cc.sport='NHL' AND cc.year='2024-25'
     ORDER BY year DESC LIMIT 50 OFFSET 0
-  Total count: pg_class estimate (avoids full-scan on 2.6M rows)
+  Total count: pg_class estimate (avoids full-scan on 1.26M rows)
 ```
 
 ### 5. Collection Management
@@ -237,7 +237,7 @@ GET /api/master-db/grading-lookup?player=Bedard
 | NBA | ~278K | TCDB | 1967–2026 |
 | NFL | ~643K | TCDB + CBC | 1948–2026 |
 | MLB | ~1.4M | TCDB + CBC + CLI | 1907–2026 |
-| **Total** | **~2.6M** | | |
+| **Total** | **~1.26M** | | |
 
 ---
 

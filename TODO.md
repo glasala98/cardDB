@@ -3,7 +3,7 @@
 ---
 
 ## Scraping & Data Collection
-- [x] **Catalog Scraper:** checklistinsider / cardboardconnection / TCDB / Beckett sources — populates card_catalog (2.6M+ cards)
+- [x] **Catalog Scraper:** checklistinsider / cardboardconnection / TCDB / Beckett sources — populates card_catalog (1.26M+ cards)
 - [x] **Price Scraper:** eBay sold listings → market_prices + market_price_history (raw + graded modes)
 - [x] **Scrape Tiers:** assign_catalog_tiers.py classifies staple / premium / stars / base
 - [x] **Set Info Scraper:** scrape_set_info.py — cardboardconnection MSRP, pack config, release date, odds → sealed_products
@@ -23,7 +23,7 @@
 - [x] **Lock ignore/delete to admin:** PATCH /admin/market-prices/{id}/ignore already uses _require_admin
 - [ ] **Refine price queries:** tighten sales window / outlier exclusion to reduce price spread noise
 - [x] **[AI] Outlier Quarantine:** auto-flag prices deviating >50% from player median
-- [ ] **[AI] Vector Search:** embed 2.6M records for sub-second fuzzy card matching (needs pgvector)
+- [ ] **[AI] Vector Search:** embed 1.26M records for sub-second fuzzy card matching (needs pgvector)
 
 ## Admin Dashboard
 - [x] **Pipeline Health tab:** catalog coverage by tier, last scrape per sport, GH Actions status cards
@@ -33,6 +33,11 @@
 - [x] **Quality tab:** stale/never-scraped/low-confidence KPIs, freshness by tier bar, priority stale + low-confidence card tables
 - [x] **ETL Snapshot Audit:** show last 5 price snapshots per card (data already in market_price_history)
 - [x] **Sealed Products Manager:** view/edit MSRP and pack config per set inline in admin (Sealed tab)
+- [x] **Live progress bars:** cards_processed + cards_found updated every 50 cards mid-run; shows hit rate + cards/hr + ETA
+- [x] **Consecutive failure badges + overdue detection:** red ✕N badge; amber overdue badge from cadence inference
+- [x] **Timed-out anomaly + orphan cleanup:** distinct status for killed runs; 7h broad sweep + narrow same-workflow cleanup
+- [x] **Sealed data quality panel:** sport mismatch detection, $1.00 parse error detection, one-click fix
+- [x] **NHS stats retry:** exponential backoff (1s/2s/4s) catches TimeoutError/OSError on NHL API calls
 - [ ] **Crowdsourced Price Gap Filler:** user-submitted prices for cards with no eBay data → admin review queue
 
 ## New Releases Page
@@ -67,5 +72,9 @@
 - [x] **RBAC:** admin/user/guest roles, AdminRoute guard, useIsAdmin() hook
 - [x] **Railway deploy:** Dockerfile, auto-deploy from main, migrations run on startup
 - [x] **JWT auth:** 7-day expiry, bcrypt, PostgreSQL users table
+- [ ] **Sealed products public browse page:** sport/year filter, set list with MSRP, box price, pack config
+- [ ] **Portfolio value over time chart:** line chart on Charts page using market_price_history
+- [ ] **Price alerts:** in-app or email notification when a tracked card moves >10% in 7 days
+- [ ] **Catalog full-text search bar:** search player name + set + year simultaneously
 - [ ] **Caching layer:** Redis/Memcached for expensive aggregate queries (portfolio total, releases page)
 - [ ] **API rate limiting:** protect public endpoints from abuse

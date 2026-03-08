@@ -58,7 +58,7 @@ There are two separate systems for tracking cards you own. They are not linked t
 
 ## Card Catalog (`card_catalog` table)
 
-The reference database of ~2.6M cards ever produced across NHL/NBA/NFL/MLB. Every card that was ever manufactured has (or should have) a row here.
+The reference database of ~1.26M cards ever produced across NHL/NBA/NFL/MLB. Every card that was ever manufactured has (or should have) a row here.
 
 **Sources:**
 - **TCDB** (tradingcarddatabase.com) — primary source, all eras
