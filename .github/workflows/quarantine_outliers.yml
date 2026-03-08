@@ -1,0 +1,40 @@
+name: Outlier Quarantine (Nightly)
+
+on:
+  schedule:
+    - cron: '0 10 * * *'  # 10am UTC daily (after all scrape jobs finish)
+  workflow_dispatch:
+    inputs:
+      ai:
+        description: 'Use Claude AI to validate borderline cases (3–6×)'
+        required: false
+        default: 'true'
+      dry_run:
+        description: 'Dry run — log only, no DB writes'
+        required: false
+        default: 'false'
+      threshold:
+        description: 'Lower outlier multiplier (default 3.0)'
+        required: false
+        default: '3.0'
+
+jobs:
+  quarantine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install psycopg2-binary anthropic
+      - name: Run outlier quarantine
+        run: |
+          ARGS="--threshold ${{ github.event.inputs.threshold || '3.0' }}"
+          if [ "${{ github.event.inputs.ai || 'true' }}" = "true" ]; then ARGS="$ARGS --ai"; fi
+          if [ "${{ github.event.inputs.dry_run || 'false' }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          python quarantine_outliers.py $ARGS
+        env:
+          DATABASE_URL:        ${{ secrets.DATABASE_URL }}
+          ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}

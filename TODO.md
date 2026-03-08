@@ -22,7 +22,7 @@
 - [x] **Populate sealed_products:** trigger scrape_set_info GH Actions workflow for first data run (all sports, 2022+)
 - [x] **Lock ignore/delete to admin:** PATCH /admin/market-prices/{id}/ignore already uses _require_admin
 - [ ] **Refine price queries:** tighten sales window / outlier exclusion to reduce price spread noise
-- [ ] **[AI] Outlier Quarantine:** auto-flag prices deviating >50% from player median
+- [x] **[AI] Outlier Quarantine:** auto-flag prices deviating >50% from player median
 - [ ] **[AI] Vector Search:** embed 2.6M records for sub-second fuzzy card matching (needs pgvector)
 
 ## Admin Dashboard

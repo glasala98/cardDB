@@ -23,3 +23,7 @@ export const getNewReleases = (params = {}) =>
 /** Get sealed product info (MSRP, pack config, odds) for matching sets. */
 export const getSealedProducts = (params = {}) =>
   client.get('/catalog/sealed-products', { params })
+
+/** Natural-language AI card search — Claude parses the query into filters. */
+export const aiSearchCatalog = (q) =>
+  client.get('/catalog/ai-search', { params: { q } })

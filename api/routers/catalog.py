@@ -1,6 +1,8 @@
 """Card Catalog browse endpoints — paginated search across 2M+ cards."""
 
+import json
 import math
+import os
 from typing import Optional
 from fastapi import APIRouter, Query
 
@@ -491,3 +493,147 @@ def catalog_filters(
         sets = [r[0] for r in cur.fetchall()]
 
     return {"sports": sports, "years": years, "sets": sets}
+
+
+@router.get("/ai-search")
+def ai_search(q: str = Query(..., min_length=2)):
+    """Parse a natural-language card query with Claude and return matching catalog results.
+
+    Example queries:
+        "Connor McDavid Young Guns under $200"
+        "LeBron James rookie cards"
+        "2023 Topps Chrome NFL quarterbacks"
+
+    Claude extracts structured filter params, then the normal browse_catalog
+    logic is called with those params.
+
+    Returns:
+        Dict with keys: query (original), filters (parsed), cards, total, page, pages, per_page.
+    """
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail="AI search not configured")
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+
+        system = (
+            "You are a sports card search assistant. Parse the user's query into JSON filter "
+            "params for a card catalog database. Return ONLY a JSON object with these optional keys:\n"
+            "  search (str): player name or set name keyword\n"
+            "  sport (str): one of NHL, NBA, NFL, MLB\n"
+            "  year (str): card year, e.g. '2024-25' or '2024'\n"
+            "  set_name (str): partial set name\n"
+            "  is_rookie (bool): true if user specifically wants rookies/RCs\n"
+            "  has_price (bool): true if user wants only priced cards\n"
+            "  max_price (float): maximum fair_value in USD\n"
+            "  min_price (float): minimum fair_value in USD\n"
+            "Only include keys you're confident about. Never include keys not in the list above."
+        )
+        msg = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=256,
+            system=system,
+            messages=[{"role": "user", "content": q}],
+        )
+        raw = msg.content[0].text.strip()
+        # Strip markdown code block if present
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        filters = json.loads(raw)
+    except Exception as e:
+        # Fall back to plain text search if Claude fails
+        filters = {"search": q}
+
+    # Extract price range — these aren't native browse_catalog params so handle separately
+    min_price = filters.pop("min_price", None)
+    max_price = filters.pop("max_price", None)
+
+    # Call browse_catalog logic inline with parsed filters
+    sort_col = SORT_COLS.get("fair_value", "mp.fair_value")
+    sort_dir = "DESC"
+
+    where_parts = []
+    params = []
+
+    sport    = filters.get("sport")
+    year     = filters.get("year")
+    set_name = filters.get("set_name")
+    search   = filters.get("search")
+    is_rookie = filters.get("is_rookie")
+    has_price = filters.get("has_price", True)  # AI searches default to priced only
+
+    if sport:
+        where_parts.append("cc.sport = %s")
+        params.append(sport.upper())
+    if year:
+        where_parts.append("cc.year = %s")
+        params.append(year)
+    if set_name:
+        where_parts.append("cc.set_name ILIKE %s")
+        params.append(f"%{set_name}%")
+    if search:
+        where_parts.append("(cc.player_name ILIKE %s OR cc.set_name ILIKE %s)")
+        params.extend([f"%{search}%", f"%{search}%"])
+    if is_rookie is True:
+        where_parts.append("cc.is_rookie = TRUE")
+    if has_price:
+        where_parts.append("mp.id IS NOT NULL")
+    if min_price is not None:
+        where_parts.append("mp.fair_value >= %s")
+        params.append(float(min_price))
+    if max_price is not None:
+        where_parts.append("mp.fair_value <= %s")
+        params.append(float(max_price))
+    where_parts.append("(mp.ignored IS NULL OR mp.ignored = FALSE)")
+
+    where_sql = "WHERE " + " AND ".join(where_parts)
+    base_query = f"""
+        FROM card_catalog cc
+        LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
+        {where_sql}
+    """
+    data_sql = f"""
+        SELECT
+            cc.id, cc.sport, cc.year, cc.brand, cc.set_name, cc.card_number,
+            cc.player_name, cc.team, cc.variant, cc.print_run,
+            cc.is_rookie, cc.is_parallel, cc.scrape_tier,
+            mp.fair_value, mp.prev_value, mp.trend, mp.confidence, mp.num_sales,
+            mp.scraped_at, COALESCE(mp.image_url, '') AS image_url
+        {base_query}
+        ORDER BY {sort_col} {sort_dir} NULLS LAST, cc.player_name ASC
+        LIMIT 50
+    """
+
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SET statement_timeout = '8s'")
+        cur.execute(f"SELECT COUNT(*) {base_query}", params)
+        total = cur.fetchone()[0]
+        cur.execute(data_sql, params)
+        rows = cur.fetchall()
+        cols = [d[0] for d in cur.description]
+
+    cards = []
+    for row in rows:
+        r = dict(zip(cols, row))
+        for k in ("fair_value", "prev_value"):
+            if r[k] is not None:
+                r[k] = float(r[k])
+        if r.get("scraped_at"):
+            r["scraped_at"] = r["scraped_at"].isoformat()
+        cards.append(r)
+
+    return {
+        "query":    q,
+        "filters":  {**filters, **({"min_price": min_price} if min_price else {}), **({"max_price": max_price} if max_price else {})},
+        "cards":    cards,
+        "total":    total,
+        "page":     1,
+        "pages":    math.ceil(total / 50) if total else 1,
+        "per_page": 50,
+    }

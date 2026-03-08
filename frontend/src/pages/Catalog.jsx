@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getCatalog, getCatalogFilters, getCatalogCardHistory } from '../api/catalog'
+import { getCatalog, getCatalogFilters, getCatalogCardHistory, aiSearchCatalog } from '../api/catalog'
 import { getOwnedIds, addToCollection, getGrades } from '../api/collection'
 import { useCurrency } from '../context/CurrencyContext'
 import { useAuth } from '../context/AuthContext'
@@ -98,6 +98,12 @@ export default function Catalog() {
   const [addTarget, setAddTarget] = useState(null)
   const [addForm,   setAddForm]   = useState({ grade: 'Raw', quantity: '1', cost_basis: '', purchase_date: '' })
   const [addSaving, setAddSaving] = useState(false)
+
+  // AI search
+  const [aiQuery,    setAiQuery]    = useState('')
+  const [aiLoading,  setAiLoading]  = useState(false)
+  const [aiFilters,  setAiFilters]  = useState(null)   // parsed filters shown as badges
+  const [aiMode,     setAiMode]     = useState(false)  // true = showing AI results
 
   // Card detail panel
   const [detailCard,    setDetailCard]    = useState(null)
@@ -234,6 +240,32 @@ export default function Catalog() {
     setSortDir('desc')
   }
 
+  const handleAiSearch = (e) => {
+    e.preventDefault()
+    if (!aiQuery.trim()) return
+    setAiLoading(true)
+    setAiMode(false)
+    setAiFilters(null)
+    aiSearchCatalog(aiQuery.trim())
+      .then(data => {
+        setCards(data.cards || [])
+        setTotal(data.total || 0)
+        setPages(data.pages || 1)
+        setPage(1)
+        setAiFilters(data.filters || {})
+        setAiMode(true)
+      })
+      .catch(e => setError(e.message))
+      .finally(() => setAiLoading(false))
+  }
+
+  const clearAiSearch = () => {
+    setAiQuery('')
+    setAiMode(false)
+    setAiFilters(null)
+    fetchPage(1)
+  }
+
   const hasFilters = search || sport || year || setName
 
   return (
@@ -244,6 +276,38 @@ export default function Catalog() {
         <h1 className={pageStyles.title}>Card Catalog</h1>
         <span className={pageStyles.count}>{total.toLocaleString()} cards</span>
       </div>
+
+      {/* AI search bar */}
+      <form className={styles.aiSearchBar} onSubmit={handleAiSearch}>
+        <span className={styles.aiIcon}>✦</span>
+        <input
+          className={styles.aiInput}
+          placeholder='Ask AI — e.g. "Connor McDavid Young Guns under $200"'
+          value={aiQuery}
+          onChange={e => setAiQuery(e.target.value)}
+          disabled={aiLoading}
+        />
+        <button type="submit" className={styles.aiBtn} disabled={aiLoading || !aiQuery.trim()}>
+          {aiLoading ? 'Searching…' : 'Search'}
+        </button>
+        {aiMode && (
+          <button type="button" className={styles.aiClearBtn} onClick={clearAiSearch}>
+            ✕ Clear AI
+          </button>
+        )}
+      </form>
+      {aiMode && aiFilters && (
+        <div className={styles.aiFilterBadges}>
+          <span className={styles.aiBadgeLabel}>AI understood:</span>
+          {Object.entries(aiFilters).map(([k, v]) =>
+            v != null && v !== '' && v !== false ? (
+              <span key={k} className={styles.aiBadge}>
+                {k.replace(/_/g, ' ')}: <strong>{String(v)}</strong>
+              </span>
+            ) : null
+          )}
+        </div>
+      )}
 
       {/* Sport tabs */}
       <div className={styles.sportTabs}>
