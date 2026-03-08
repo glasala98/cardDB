@@ -1,13 +1,14 @@
-name: Catalog Tier — Base (Weekly)
+name: Catalog Tier — Base (Daily during backfill)
 
 # Scrapes price data for base-tier cards (modern era only — 2010+).
 # Pre-2010 base cards typically have no eBay sold activity so are skipped.
-# Initial backfill: trigger manually with year_from=2010 and limit=0.
-# Ongoing: stale-days=30 means each card is re-scraped at most once per month.
+# Running daily during initial backfill. Once all base cards have been priced
+# once, stale-days=30 means each run is tiny (only repricing month-old cards).
+# Switch back to weekly (0 6 * * 3) after backfill is complete.
 
 on:
   schedule:
-    - cron: '0 6 * * 3'  # 6am UTC Wednesday — between premium (Mon) and staple (daily)
+    - cron: '0 6 * * *'  # 6am UTC daily during backfill
   workflow_dispatch:
     inputs:
       sport:
