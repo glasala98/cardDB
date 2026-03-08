@@ -1,0 +1,137 @@
+name: Catalog Tier — Base (Weekly)
+
+# Scrapes price data for base-tier cards (modern era only — 2010+).
+# Pre-2010 base cards typically have no eBay sold activity so are skipped.
+# Initial backfill: trigger manually with year_from=2010 and limit=0.
+# Ongoing: stale-days=30 means each card is re-scraped at most once per month.
+
+on:
+  schedule:
+    - cron: '0 6 * * 3'  # 6am UTC Wednesday — between premium (Mon) and staple (daily)
+  workflow_dispatch:
+    inputs:
+      sport:
+        description: 'Sport (NHL/NBA/NFL/MLB, blank=all)'
+        required: false
+        default: ''
+      year_from:
+        description: 'Start year (default: 2010)'
+        required: false
+        default: '2010'
+      limit:
+        description: 'Max cards per sport (0=all)'
+        required: false
+        default: '0'
+      stale_days:
+        description: 'Re-scrape if older than N days (default: 30)'
+        required: false
+        default: '30'
+
+jobs:
+  scrape-base-nhl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NHL' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Scrape NHL base prices
+        run: |
+          python -u scrape_master_db.py \
+            --catalog-tier base \
+            --sport NHL \
+            --workers 5 \
+            --year-from ${{ github.event.inputs.year_from || '2010' }} \
+            --stale-days ${{ github.event.inputs.stale_days || '30' }} \
+            --limit ${{ github.event.inputs.limit || '0' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  scrape-base-nba:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NBA' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Scrape NBA base prices
+        run: |
+          python -u scrape_master_db.py \
+            --catalog-tier base \
+            --sport NBA \
+            --workers 5 \
+            --year-from ${{ github.event.inputs.year_from || '2010' }} \
+            --stale-days ${{ github.event.inputs.stale_days || '30' }} \
+            --limit ${{ github.event.inputs.limit || '0' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  scrape-base-nfl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NFL' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Scrape NFL base prices
+        run: |
+          python -u scrape_master_db.py \
+            --catalog-tier base \
+            --sport NFL \
+            --workers 5 \
+            --year-from ${{ github.event.inputs.year_from || '2010' }} \
+            --stale-days ${{ github.event.inputs.stale_days || '30' }} \
+            --limit ${{ github.event.inputs.limit || '0' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  scrape-base-mlb:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'MLB' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Scrape MLB base prices
+        run: |
+          python -u scrape_master_db.py \
+            --catalog-tier base \
+            --sport MLB \
+            --workers 5 \
+            --year-from ${{ github.event.inputs.year_from || '2010' }} \
+            --stale-days ${{ github.event.inputs.stale_days || '30' }} \
+            --limit ${{ github.event.inputs.limit || '0' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
