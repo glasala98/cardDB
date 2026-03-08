@@ -286,7 +286,7 @@ def save_to_db(matched: dict, standings: dict, args):
             # Upsert player stats
             if matched:
                 execute_values(cur, """
-                    INSERT INTO player_stats (sport, player, data, updated_at)
+                    INSERT INTO player_stats (sport, player, data)
                     VALUES %s
                     ON CONFLICT (sport, player) DO UPDATE SET
                         data       = EXCLUDED.data,
@@ -296,7 +296,7 @@ def save_to_db(matched: dict, standings: dict, args):
             # Upsert standings
             if standings:
                 execute_values(cur, """
-                    INSERT INTO standings (sport, team, data, updated_at)
+                    INSERT INTO standings (sport, team, data)
                     VALUES %s
                     ON CONFLICT (sport, team) DO UPDATE SET
                         data       = EXCLUDED.data,

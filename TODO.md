@@ -8,7 +8,7 @@
 - [x] **Scrape Tiers:** assign_catalog_tiers.py classifies staple / premium / stars / base
 - [x] **Set Info Scraper:** scrape_set_info.py — cardboardconnection MSRP, pack config, release date, odds → sealed_products
 - [x] **GH Actions Schedules:** daily staple, weekly full sweep, monthly premium/stars/graded, monthly set info
-- [ ] **NHL Player Stats scrape failing** — investigate why NHL stats job errors but NHL prices work fine
+- [x] **NHL Player Stats scrape failing** — fixed INSERT column mismatch (updated_at listed but not in values tuple)
 - [ ] **Image Retrieval:** scrape card images from eBay listings during price scrape; store in market_prices.image_url
 - [ ] **Scraping Resiliency:** central error logging, retry logic, rate-limit backoff across all scrapers
 - [ ] **[AI] Entity Resolution Agent:** LangGraph agent to map ambiguous eBay titles to card_catalog records
