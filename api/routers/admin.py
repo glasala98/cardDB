@@ -948,6 +948,70 @@ def trigger_workflow(
     return {"status": "dispatched", "workflow": body.workflow_file}
 
 
+@router.get("/pricing-progress")
+def pricing_progress(_admin: str = Depends(_require_admin)):
+    """Return daily priced-card counts for the last 30 days, broken down by tier."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SET statement_timeout = '15s'")
+
+            # Daily counts of cards that received a price (scraped_at) in last 30 days, by tier
+            cur.execute("""
+                SELECT
+                    DATE(mp.scraped_at AT TIME ZONE 'UTC') AS day,
+                    cc.scrape_tier,
+                    COUNT(*) AS count
+                FROM market_prices mp
+                JOIN card_catalog cc ON cc.id = mp.card_catalog_id
+                WHERE mp.scraped_at >= NOW() - INTERVAL '30 days'
+                  AND mp.fair_value >= 0
+                  AND NOT COALESCE(mp.ignored, FALSE)
+                GROUP BY day, cc.scrape_tier
+                ORDER BY day
+            """)
+            rows = cur.fetchall()
+
+            # Cumulative total priced over time (all-time, sampled daily for last 30d)
+            cur.execute("""
+                SELECT
+                    DATE(mp.scraped_at AT TIME ZONE 'UTC') AS day,
+                    COUNT(*) AS daily_total
+                FROM market_prices mp
+                WHERE mp.scraped_at >= NOW() - INTERVAL '30 days'
+                  AND mp.fair_value >= 0
+                  AND NOT COALESCE(mp.ignored, FALSE)
+                GROUP BY day
+                ORDER BY day
+            """)
+            daily_totals = [{"day": str(r[0]), "count": r[1]} for r in cur.fetchall()]
+
+            # Total priced per tier (for donut/summary)
+            cur.execute("""
+                SELECT cc.scrape_tier, COUNT(mp.id) AS priced, COUNT(cc.id) AS total
+                FROM card_catalog cc
+                LEFT JOIN market_prices mp
+                    ON mp.card_catalog_id = cc.id
+                    AND mp.fair_value >= 0
+                    AND NOT COALESCE(mp.ignored, FALSE)
+                GROUP BY cc.scrape_tier
+                ORDER BY cc.scrape_tier
+            """)
+            tier_totals = [{"tier": r[0], "priced": r[1], "total": r[2]} for r in cur.fetchall()]
+
+    # Pivot daily rows into {day, staple, premium, stars, base}
+    from collections import defaultdict
+    by_day = defaultdict(dict)
+    for day, tier, count in rows:
+        by_day[str(day)][tier] = count
+    daily_by_tier = [{"day": d, **counts} for d, counts in sorted(by_day.items())]
+
+    return {
+        "daily_by_tier": daily_by_tier,
+        "daily_totals":  daily_totals,
+        "tier_totals":   tier_totals,
+    }
+
+
 class BulkIgnoreBody(BaseModel):
     ids: list[int]
 

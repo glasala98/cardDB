@@ -9,7 +9,7 @@ import {
   getScrapeRuns, getScrapeRunsSummary, getDataQuality, getSnapshotAudit,
   getScrapeRunErrors,
   getSealedProductsAdmin, updateSealedProduct, getSealedQuality, deleteSealedMismatches,
-  triggerWorkflow, bulkIgnoreOutliers,
+  triggerWorkflow, bulkIgnoreOutliers, getPricingProgress,
 } from '../api/admin'
 import { useAuth } from '../context/AuthContext'
 import pageStyles from './Page.module.css'
@@ -496,6 +496,79 @@ function UsersTab() {
 }
 
 /* ── Pipeline tab ──────────────────────────────────────────────────────────── */
+const TIER_COLORS = { staple: '#00d4aa', premium: '#ffb332', stars: '#a07ff0', base: '#4a9eff' }
+
+function PricingProgressChart() {
+  const [data, setData] = useState(null)
+
+  useEffect(() => {
+    getPricingProgress().then(setData).catch(() => {})
+  }, [])
+
+  if (!data) return <p className={pageStyles.status}>Loading progress data…</p>
+
+  const { daily_by_tier, tier_totals } = data
+  const tiers = ['staple', 'premium', 'stars', 'base']
+
+  // Format day labels as "Mar 9"
+  const chartData = daily_by_tier.map(d => ({
+    ...d,
+    label: new Date(d.day + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+  }))
+
+  return (
+    <div>
+      {/* Tier coverage progress bars */}
+      <h3 className={styles.sectionTitle}>Coverage by Tier</h3>
+      <div className={styles.tierProgressGrid}>
+        {tier_totals.map(t => {
+          const pct = t.total > 0 ? Math.round(t.priced / t.total * 100) : 0
+          const color = TIER_COLORS[t.tier] || '#4a9eff'
+          return (
+            <div key={t.tier} className={styles.tierProgressCard}>
+              <div className={styles.tierProgressHeader}>
+                <span className={`${styles.tierBadge} ${styles['tier_' + t.tier]}`}>{t.tier}</span>
+                <span className={styles.tierProgressPct} style={{ color }}>{pct}%</span>
+              </div>
+              <div className={styles.tierProgressBarBg}>
+                <div className={styles.tierProgressBarFill} style={{ width: `${pct}%`, background: color }} />
+              </div>
+              <div className={styles.tierProgressMeta}>
+                <span>{t.priced.toLocaleString()} priced</span>
+                <span>{t.total.toLocaleString()} total</span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Daily cards priced per tier (last 30d) */}
+      {chartData.length > 0 && (
+        <>
+          <h3 className={styles.sectionTitle}>Cards Priced Per Day — Last 30 Days</h3>
+          <div style={{ height: 220 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e2d3d" />
+                <XAxis dataKey="label" tick={{ fill: '#8899aa', fontSize: 11 }} interval="preserveStartEnd" />
+                <YAxis tick={{ fill: '#8899aa', fontSize: 11 }} width={45} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+                <Tooltip
+                  contentStyle={{ background: '#0a141e', border: '1px solid #1e2d3d', borderRadius: 6 }}
+                  labelStyle={{ color: '#fff', fontWeight: 600 }}
+                  itemStyle={{ color: '#8899aa' }}
+                />
+                {tiers.map(tier => (
+                  <Bar key={tier} dataKey={tier} stackId="a" fill={TIER_COLORS[tier]} name={tier} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function PipelineTab() {
   const [health,      setHealth]      = useState(null)
   const [workflows,   setWorkflows]   = useState([])
@@ -567,39 +640,7 @@ function PipelineTab() {
         <div className={`${styles.toast} ${styles[triggerMsg.type]}`}>{triggerMsg.text}</div>
       )}
 
-      <h3 className={styles.sectionTitle}>Coverage by Tier</h3>
-      <div className={styles.tableWrap}>
-        <table className={styles.table}>
-          <thead>
-            <tr>
-              <th className={styles.th}>Tier</th>
-              <th className={styles.th}>Total</th>
-              <th className={styles.th}>Priced</th>
-              <th className={styles.th}>Coverage</th>
-            </tr>
-          </thead>
-          <tbody>
-            {health.tiers.map(t => {
-              const pct = t.total > 0 ? Math.round(t.priced / t.total * 100) : 0
-              return (
-                <tr key={t.tier} className={styles.tr}>
-                  <td className={styles.td}>
-                    <span className={`${styles.tierBadge} ${styles['tier_' + t.tier]}`}>{t.tier}</span>
-                  </td>
-                  <td className={styles.td}>{t.total.toLocaleString()}</td>
-                  <td className={styles.td}>{t.priced.toLocaleString()}</td>
-                  <td className={styles.td}>
-                    <div className={styles.barWrap}>
-                      <div className={styles.barFill} style={{ width: `${pct}%` }} />
-                      <span className={styles.barLabel}>{pct}%</span>
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+      <PricingProgressChart />
 
       <h3 className={styles.sectionTitle}>Last Scrape by Sport</h3>
       <div className={styles.sportGrid}>
