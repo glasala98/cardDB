@@ -507,14 +507,29 @@ function PricingProgressChart() {
 
   if (!data) return <p className={pageStyles.status}>Loading progress data…</p>
 
-  const { daily_by_tier, tier_totals } = data
+  const { daily_by_tier, daily_totals, tier_totals } = data
   const tiers = ['staple', 'premium', 'stars', 'base']
 
+  const grandTotal  = tier_totals.reduce((s, t) => s + t.total,  0)
+  const totalPriced = tier_totals.reduce((s, t) => s + t.priced, 0)
+
   // Format day labels as "Mar 9"
-  const chartData = daily_by_tier.map(d => ({
-    ...d,
-    label: new Date(d.day + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-  }))
+  const fmtDay = iso => new Date(iso + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+  const barData = daily_by_tier.map(d => ({ ...d, label: fmtDay(d.day) }))
+
+  // Cumulative line: baseline = totalPriced - sum of all daily counts, then add each day
+  const dailySum = daily_totals.reduce((s, d) => s + d.count, 0)
+  const baseline = totalPriced - dailySum
+  let running = baseline
+  const lineData = daily_totals.map(d => {
+    running += d.count
+    return {
+      label: fmtDay(d.day),
+      priced: running,
+      pct: grandTotal > 0 ? parseFloat((running / grandTotal * 100).toFixed(2)) : 0,
+    }
+  })
 
   return (
     <div>
@@ -542,13 +557,55 @@ function PricingProgressChart() {
         })}
       </div>
 
-      {/* Daily cards priced per tier (last 30d) */}
-      {chartData.length > 0 && (
+      {/* Cumulative coverage % line chart */}
+      {lineData.length > 0 && (
         <>
-          <h3 className={styles.sectionTitle}>Cards Priced Per Day — Last 30 Days</h3>
+          <h3 className={styles.sectionTitle}>
+            Cumulative Coverage — Last 30 Days
+            <span className={styles.coveragePill}>
+              {grandTotal > 0 ? (totalPriced / grandTotal * 100).toFixed(1) : 0}% of {grandTotal.toLocaleString()} cards
+            </span>
+          </h3>
           <div style={{ height: 220 }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <LineChart data={lineData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e2d3d" />
+                <XAxis dataKey="label" tick={{ fill: '#8899aa', fontSize: 11 }} interval="preserveStartEnd" />
+                <YAxis
+                  yAxisId="pct"
+                  domain={[0, 100]}
+                  tick={{ fill: '#8899aa', fontSize: 11 }}
+                  width={40}
+                  tickFormatter={v => `${v}%`}
+                />
+                <YAxis
+                  yAxisId="count"
+                  orientation="right"
+                  tick={{ fill: '#8899aa', fontSize: 11 }}
+                  width={50}
+                  tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}
+                />
+                <Tooltip
+                  contentStyle={{ background: '#0a141e', border: '1px solid #1e2d3d', borderRadius: 6 }}
+                  labelStyle={{ color: '#fff', fontWeight: 600 }}
+                  formatter={(val, name) => name === 'pct' ? [`${val}%`, 'Coverage'] : [val.toLocaleString(), 'Cards priced']}
+                />
+                <ReferenceLine yAxisId="pct" y={100} stroke="#00d4aa22" strokeDasharray="4 4" label={{ value: '100%', fill: '#00d4aa88', fontSize: 10 }} />
+                <Line yAxisId="count" type="monotone" dataKey="priced" stroke="#4a9eff" strokeWidth={2} dot={false} name="priced" />
+                <Line yAxisId="pct"   type="monotone" dataKey="pct"    stroke="#00d4aa" strokeWidth={2} dot={false} name="pct" />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
+
+      {/* Daily cards priced per tier (last 30d) */}
+      {barData.length > 0 && (
+        <>
+          <h3 className={styles.sectionTitle}>Cards Priced Per Day — Last 30 Days</h3>
+          <div style={{ height: 200 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={barData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e2d3d" />
                 <XAxis dataKey="label" tick={{ fill: '#8899aa', fontSize: 11 }} interval="preserveStartEnd" />
                 <YAxis tick={{ fill: '#8899aa', fontSize: 11 }} width={45} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
