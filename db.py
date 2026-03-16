@@ -10,6 +10,7 @@ import psycopg2.pool
 import psycopg2.extras
 from contextlib import contextmanager
 from datetime import datetime
+import hashlib
 
 _pool = None
 
@@ -48,16 +49,30 @@ def get_db():
         pool.putconn(conn)
 
 
+def _sale_hash(card_catalog_id: int, sold_date, title: str, price_val: float) -> str:
+    """Deterministic hash that uniquely identifies one eBay sold listing.
+
+    Uses card_catalog_id + sold_date + title + price so two copies of the
+    same card selling on the same day at different prices are treated as
+    distinct sales.  NULL sold_date is replaced with the empty string so
+    the hash is always defined.
+    """
+    raw = f"{card_catalog_id}|{sold_date or ''}|{title.strip().lower()}|{round(price_val, 2)}"
+    return hashlib.md5(raw.encode()).hexdigest()
+
+
 def save_raw_sales(card_catalog_id: int, raw_sales: list, conn=None) -> int:
     """Insert individual eBay sold listings into market_raw_sales.
 
-    Deduplicates on (card_catalog_id, sold_date, title) so re-scraping the
-    same card never creates duplicate rows.  Returns the number of new rows
-    inserted.
+    Deduplicates on listing_hash — an md5 of (card_catalog_id, sold_date,
+    title, price_val) computed in Python before insert.  NULL-safe: undated
+    sales with the same title and price are treated as the same listing.
+    Returns the number of new rows inserted.
 
     Args:
         card_catalog_id: FK to card_catalog.id
-        raw_sales: list of dicts with keys price_val, sold_date, title
+        raw_sales: list of dicts with keys price_val, sold_date, title,
+                   and optionally shipping (raw shipping value as float)
         conn: optional existing psycopg2 connection (uses pool if not provided)
     """
     if not raw_sales:
@@ -66,20 +81,34 @@ def save_raw_sales(card_catalog_id: int, raw_sales: list, conn=None) -> int:
     rows = []
     now = datetime.utcnow()
     for sale in raw_sales:
-        price = sale.get('price_val') or sale.get('price')
-        if not price:
+        price_val = sale.get('price_val') or sale.get('price')
+        if not price_val:
             continue
-        sold_date = sale.get('sold_date')  # already 'YYYY-MM-DD' string or None
-        title = (sale.get('title') or '')[:500]  # cap at 500 chars
-        rows.append((card_catalog_id, sold_date, float(price), title, now))
+        price_val = float(price_val)
+        sold_date = sale.get('sold_date')       # 'YYYY-MM-DD' string or None
+        title = (sale.get('title') or '')[:500]
+
+        # Parse shipping — scraper stores it as "$3.50" string or 0.0 float
+        raw_ship = sale.get('shipping', 0)
+        if isinstance(raw_ship, str):
+            import re
+            m = re.search(r'[\d.]+', raw_ship)
+            shipping_val = float(m.group()) if m else 0.0
+        else:
+            shipping_val = float(raw_ship or 0)
+
+        listing_hash = _sale_hash(card_catalog_id, sold_date, title, price_val)
+        rows.append((card_catalog_id, sold_date, price_val, shipping_val, title,
+                     listing_hash, now))
 
     if not rows:
         return 0
 
     sql = """
-        INSERT INTO market_raw_sales (card_catalog_id, sold_date, price_val, title, scraped_at)
+        INSERT INTO market_raw_sales
+            (card_catalog_id, sold_date, price_val, shipping_val, title, listing_hash, scraped_at)
         VALUES %s
-        ON CONFLICT (card_catalog_id, sold_date, title) DO NOTHING
+        ON CONFLICT (listing_hash) DO NOTHING
     """
 
     def _run(c):
