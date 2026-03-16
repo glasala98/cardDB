@@ -94,11 +94,18 @@ def main():
     price_crossed   = price_milestone   > milestones.get('price',   0)
     history_crossed = history_milestone > milestones.get('history', 0)
 
-    if not price_crossed and not history_crossed:
+    force = os.environ.get("FORCE_NOTIFY", "false").lower() == "true"
+
+    if not price_crossed and not history_crossed and not force:
         print(f"No new milestone. Price: {price_pct:.1f}% (last notified: {milestones.get('price', 0)}%) "
               f"| History: {history_pct:.1f}% (last notified: {milestones.get('history', 0)}%)")
         set_output("should_notify", "false")
         return
+
+    if force and not price_crossed and not history_crossed:
+        # Test send — report current state without updating milestones
+        price_milestone   = milestones.get('price',   0)
+        history_milestone = milestones.get('history', 0)
 
     # ── Build email ────────────────────────────────────────────────────────
     crossed_parts = []
@@ -106,8 +113,10 @@ def main():
         crossed_parts.append(f"Price Coverage hit {price_milestone}%")
     if history_crossed:
         crossed_parts.append(f"History Coverage hit {history_milestone}%")
+    if not crossed_parts:
+        crossed_parts.append(f"Test — current state {price_pct:.1f}% price / {history_pct:.1f}% history")
 
-    subject = f"CardDB Milestone: {' & '.join(crossed_parts)}"
+    subject = f"CardDB {'[TEST] ' if force and not price_crossed and not history_crossed else ''}Milestone: {' & '.join(crossed_parts)}"
 
     tier_lines = []
     for tier, total, priced, has_history in tiers:
@@ -144,7 +153,14 @@ View dashboard: https://southwestsportscards.ca
     print(subject)
     print(body)
 
-    # ── Persist new milestones ─────────────────────────────────────────────
+    # ── Persist new milestones (skip on forced test sends) ────────────────
+    if force and not price_crossed and not history_crossed:
+        print("Test send — milestones not updated in DB.")
+        set_output("should_notify", "true")
+        set_output("subject", subject)
+        set_output("body", body)
+        return
+
     if price_crossed:
         cur.execute("""
             UPDATE coverage_notifications

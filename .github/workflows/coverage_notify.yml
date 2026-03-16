@@ -14,7 +14,12 @@ name: Coverage Milestone Notifications
 on:
   schedule:
     - cron: '0 12 * * *'  # noon UTC daily
-  workflow_dispatch:       # manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Send test email regardless of milestone (true/false)'
+        required: false
+        default: 'false'
 
 jobs:
   check-and-notify:
@@ -36,6 +41,7 @@ jobs:
         run: python coverage_notify.py
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          FORCE_NOTIFY: ${{ github.event.inputs.force || 'false' }}
 
       - name: Send milestone email
         if: steps.check.outputs.should_notify == 'true'
