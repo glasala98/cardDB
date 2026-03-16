@@ -1,12 +1,29 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCurrency } from '../context/CurrencyContext'
+import { getCatalogRawSales } from '../api/catalog'
 import styles from './CatalogCardDetail.module.css'
 
 export default function CatalogCardDetail({ card, history, loading, isLoggedIn, isOwned, onAdd, onClose }) {
   const { fmtPrice } = useCurrency()
   const navigate = useNavigate()
   const panelRef = useRef(null)
+  const [rawSales, setRawSales] = useState(null)
+  const [rawLoading, setRawLoading] = useState(false)
+  const [rawOffset, setRawOffset] = useState(0)
+  const [rawTotal, setRawTotal] = useState(0)
+  const PAGE = 50
+
+  const loadRawSales = useCallback((offset = 0) => {
+    setRawLoading(true)
+    getCatalogRawSales(card.id, offset, PAGE)
+      .then(d => {
+        setRawSales(prev => offset === 0 ? d.sales : [...(prev || []), ...d.sales])
+        setRawTotal(d.total)
+        setRawOffset(offset)
+      })
+      .finally(() => setRawLoading(false))
+  }, [card.id])
 
   // Close on Escape
   useEffect(() => {
@@ -130,6 +147,56 @@ export default function CatalogCardDetail({ card, history, loading, isLoggedIn, 
         ) : (
           <div className={styles.chartPlaceholder}>No price history yet</div>
         )}
+
+        {/* Individual sale history */}
+        <div className={styles.salesSection}>
+          <div className={styles.salesHeader}>
+            <span className={styles.salesTitle}>Sale History</span>
+            {rawSales === null && (
+              <button className={styles.loadSalesBtn} onClick={() => loadRawSales(0)} disabled={rawLoading}>
+                {rawLoading ? 'Loading…' : 'Load'}
+              </button>
+            )}
+            {rawSales !== null && (
+              <span className={styles.salesTotalPill}>{rawTotal.toLocaleString()} sales stored</span>
+            )}
+          </div>
+
+          {rawSales !== null && rawSales.length === 0 && (
+            <div className={styles.salesEmpty}>No sales data yet — backfill pending</div>
+          )}
+
+          {rawSales !== null && rawSales.length > 0 && (
+            <>
+              <table className={styles.salesTable}>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th className={styles.saleRight}>Price</th>
+                    <th>Listing Title</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rawSales.map((s, i) => (
+                    <tr key={i} className={s.exclusive ? styles.saleExclusive : ''}>
+                      <td className={styles.saleDate}>
+                        {s.sold_date || '—'}
+                        {s.exclusive && <span className={styles.exclusiveDot} title="eBay no longer shows this sale" />}
+                      </td>
+                      <td className={`${styles.salePrice} ${styles.saleRight}`}>{fmtPrice(s.price_val)}</td>
+                      <td className={styles.saleTitle}>{s.title}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {rawSales.length < rawTotal && (
+                <button className={styles.loadMoreBtn} onClick={() => loadRawSales(rawOffset + PAGE)} disabled={rawLoading}>
+                  {rawLoading ? 'Loading…' : `Load more (${rawTotal - rawSales.length} remaining)`}
+                </button>
+              )}
+            </>
+          )}
+        </div>
 
         {/* Action */}
         <div className={styles.actions}>

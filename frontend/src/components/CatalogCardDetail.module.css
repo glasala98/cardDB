@@ -270,3 +270,127 @@
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* ── Sale History section ─────────────────────────────────────── */
+.salesSection {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.salesHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.salesTitle {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+}
+
+.loadSalesBtn {
+  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+.loadSalesBtn:hover { background: rgba(0,212,170,0.08); }
+
+.salesTotalPill {
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: rgba(255,255,255,0.05);
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+
+.salesEmpty {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.salesTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  table-layout: fixed;
+}
+
+.salesTable th {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  padding-bottom: 6px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.salesTable td {
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+  color: var(--text-secondary);
+  vertical-align: top;
+}
+.salesTable tr:last-child td { border-bottom: none; }
+
+.saleDate {
+  width: 90px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.saleRight { text-align: right; width: 60px; padding-right: 8px !important; }
+
+.salePrice {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.saleTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--text-secondary);
+  max-width: 200px;
+}
+
+.saleExclusive { opacity: 0.75; }
+
+.exclusiveDot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #4a9eff;
+  margin-left: 4px;
+  vertical-align: middle;
+  opacity: 0.8;
+}
+
+.loadMoreBtn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px;
+  font-size: 11px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.loadMoreBtn:hover { background: rgba(255,255,255,0.04); }

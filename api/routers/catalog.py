@@ -224,6 +224,41 @@ def catalog_card_history(catalog_id: int):
     return {"card": card, "history": history}
 
 
+@router.get("/{catalog_id}/raw-sales")
+def catalog_raw_sales(catalog_id: int, limit: int = 50, offset: int = 0):
+    """Return individual eBay sold listings stored in market_raw_sales for a catalog card."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT COUNT(*) FROM market_raw_sales WHERE card_catalog_id = %s
+        """, [catalog_id])
+        total = cur.fetchone()[0]
+
+        cur.execute("""
+            SELECT sold_date, price_val, title, scraped_at
+            FROM market_raw_sales
+            WHERE card_catalog_id = %s
+            ORDER BY sold_date DESC NULLS LAST
+            LIMIT %s OFFSET %s
+        """, [catalog_id, limit, offset])
+        cols = [d[0] for d in cur.description]
+        sales = []
+        for r in cur.fetchall():
+            s = dict(zip(cols, r))
+            s["price_val"]  = float(s["price_val"])
+            s["sold_date"]  = s["sold_date"].isoformat()  if s["sold_date"]  else None
+            s["scraped_at"] = s["scraped_at"].isoformat() if s["scraped_at"] else None
+            # Flag sales eBay no longer shows (>90 days old)
+            if s["sold_date"]:
+                from datetime import date, timedelta
+                s["exclusive"] = date.fromisoformat(s["sold_date"]) < date.today() - timedelta(days=90)
+            else:
+                s["exclusive"] = False
+            sales.append(s)
+
+    return {"sales": sales, "total": total}
+
+
 @router.get("/releases")
 def new_releases(
     sport:   Optional[str] = Query(None),
