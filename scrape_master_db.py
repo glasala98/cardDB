@@ -35,7 +35,7 @@ try:
 except ImportError:
     pass
 
-from db import get_db
+from db import get_db, save_raw_sales
 from scrape_card_prices import process_card
 import scrape_card_prices
 
@@ -262,10 +262,10 @@ def bump_tiers_by_sales(catalog_ids: list):
 
 
 def save_prices_batch(results: list):
-    """Write a batch of scrape results to market_prices + market_price_history.
+    """Write a batch of scrape results to market_prices + market_price_history + market_raw_sales.
 
     Args:
-        results: list of (catalog_id, stats_dict, image_url) tuples with num_sales > 0
+        results: list of (catalog_id, stats_dict, image_url[, raw_sales]) tuples with num_sales > 0
     """
     if not results:
         return
@@ -274,9 +274,11 @@ def save_prices_batch(results: list):
 
     mp_rows = []
     hist_rows = []
+    raw_sales_by_card = []  # list of (catalog_id, raw_sales)
     for entry in results:
         catalog_id, stats = entry[0], entry[1]
         image_url = entry[2] if len(entry) > 2 else ''
+        raw_sales_by_card.append((catalog_id, entry[3] if len(entry) > 3 else []))
         fair_value = round(stats.get('fair_price', 0), 2)
         num_sales  = stats.get('num_sales', 0)
         confidence = stats.get('confidence', 'none')
@@ -329,6 +331,11 @@ def save_prices_batch(results: list):
                 ON CONFLICT (card_catalog_id, scraped_at) DO NOTHING
             """, [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], 'ebay')
                   for r in hist_rows])
+
+            # Persist every individual eBay sale — deduped on (card_catalog_id, sold_date, title)
+            for catalog_id, raw_sales in raw_sales_by_card:
+                save_raw_sales(catalog_id, raw_sales, conn=conn)
+
         conn.commit()
 
 
@@ -631,6 +638,7 @@ def main():
     batch: list = []
     no_market_batch: list = []
     BATCH_SIZE = 50
+    timed_out = False
 
     def _flush_batch():
         nonlocal batch, no_market_batch
@@ -665,11 +673,11 @@ def main():
         total = len(cards)
         print(f"Eligible for graded scrape (>= ${args.min_raw_value:.2f}): {total:,} cards\n")
 
-        with ThreadPoolExecutor(max_workers=args.workers) as executor:
-            graded_batch = {}   # catalog_id -> {grade: {fair_value, num_sales}}
-            futures = {executor.submit(scrape_one_graded, card, grades): card for card in cards}
-            done_count = 0
-            for future in as_completed(futures):
+        executor = ThreadPoolExecutor(max_workers=args.workers)
+        graded_batch = {}   # catalog_id -> {grade: {fair_value, num_sales}}
+        futures = {executor.submit(scrape_one_graded, card, grades): card for card in cards}
+        done_count = 0
+        for future in as_completed(futures):
                 catalog_id, graded_results = future.result()
                 done_count += 1
 
@@ -715,21 +723,24 @@ def main():
                         print(f"\n  Time limit ({args.max_hours}h) reached — "
                               f"saved {done_count:,}/{total:,} cards. "
                               f"Next run will resume from card {done_count + 1}.", flush=True)
+                        timed_out = True
                         break
+        executor.shutdown(wait=False, cancel_futures=True)
 
     else:
         # ── Raw mode ──
-        with ThreadPoolExecutor(max_workers=args.workers) as executor:
-            futures = {executor.submit(scrape_one, card): card for card in cards}
-            done_count = 0
-            for future in as_completed(futures):
+        executor = ThreadPoolExecutor(max_workers=args.workers)
+        futures = {executor.submit(scrape_one, card): card for card in cards}
+        done_count = 0
+        for future in as_completed(futures):
                 card = futures[future]
                 catalog_id, result = future.result()
                 done_count += 1
                 stats = result.get('stats', {})
 
                 if stats.get('num_sales', 0) > 0:
-                    batch.append((catalog_id, stats, result.get('image_url') or ''))
+                    batch.append((catalog_id, stats, result.get('image_url') or '',
+                                  result.get('raw_sales') or []))
                 elif card.get('scrape_tier') == 'base':
                     # Base cards with 0 sales are confirmed no-market, not unknowns.
                     # Stamp them so the stale-days gate skips them on the next run.
@@ -750,11 +761,13 @@ def main():
                         print(f"\n  Time limit ({args.max_hours}h) reached — "
                               f"saved {done_count:,}/{total:,} cards. "
                               f"Next run will resume from card {done_count + 1}.", flush=True)
+                        timed_out = True
                         break
+        executor.shutdown(wait=False, cancel_futures=True)
 
     _flush_batch()
     elapsed = time.time() - start
-    finish_scrape_run(run_id, _progress)
+    finish_scrape_run(run_id, _progress, status='timed_out' if timed_out else 'completed')
 
     print(f"\n{'='*60}")
     print(f"DONE in {elapsed/60:.1f} minutes")

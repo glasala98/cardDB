@@ -37,7 +37,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("market_prices")
 
-from db import get_db
+from db import get_db, save_raw_sales
 from scrape_card_prices import process_card
 
 # Priority order for confidence — lower = needs re-scraping sooner
@@ -122,8 +122,8 @@ def get_cards_to_scrape(sport=None, year=None, force=False,
 
 def save_price_result(card: dict, result: dict):
     """
-    Write one scrape result to market_price_history (INSERT) and
-    market_prices (UPSERT with trend).
+    Write one scrape result to market_price_history (INSERT),
+    market_prices (UPSERT with trend), and market_raw_sales (individual sales).
     """
     stats = result.get("stats", {})
     fair  = float(stats.get("fair_price") or result.get("estimated_value") or 0)
@@ -167,6 +167,9 @@ def save_price_result(card: dict, result: dict):
                 scraped_at  = EXCLUDED.scraped_at,
                 updated_at  = NOW()
         """, (card["id"], fair, card["prev_value"], trend, conf, sales))
+
+        # Persist every individual eBay sale — deduped on (card_catalog_id, sold_date, title)
+        save_raw_sales(card["id"], result.get("raw_sales") or [], conn=conn)
 
         conn.commit()
 
