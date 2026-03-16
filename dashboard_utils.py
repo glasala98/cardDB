@@ -298,7 +298,7 @@ def scrape_single_card(card_name, username):
     """
     driver = create_driver()
     try:
-        sales = search_ebay_sold(driver, card_name, max_results=50)
+        sales = search_ebay_sold(driver, card_name)
         # Filter to comps that match the card's specific variant/parallel
         sales = _filter_sales_by_variant(card_name, sales)
 
