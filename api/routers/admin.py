@@ -299,6 +299,19 @@ def pipeline_health(_admin: str = Depends(_require_admin)):
             """)
             raw_tiers = [{"tier": r[0], "total": r[1], "has_history": r[2]} for r in cur.fetchall()]
 
+            # Exclusive data — sales older than 90 days that eBay no longer shows
+            cur.execute("""
+                SELECT
+                    COUNT(*) FILTER (WHERE sold_date < NOW() - INTERVAL '90 days') AS exclusive_sales,
+                    COUNT(DISTINCT card_catalog_id) FILTER (WHERE sold_date < NOW() - INTERVAL '90 days') AS exclusive_cards,
+                    MIN(sold_date) AS oldest_sale
+                FROM market_raw_sales
+            """)
+            _ex = cur.fetchone()
+            exclusive_sales = _ex[0] or 0
+            exclusive_cards = _ex[1] or 0
+            oldest_sale = _ex[2].isoformat() if _ex[2] else None
+
     return {
         "total_cards":     total_cards,
         "priced_cards":    priced_cards,
@@ -313,6 +326,10 @@ def pipeline_health(_admin: str = Depends(_require_admin)):
         "raw_sales_total": raw_sales_total,
         "raw_sales_coverage_pct": round(raw_sales_cards / total_cards * 100, 1) if total_cards else 0,
         "raw_tiers":       raw_tiers,
+        "exclusive_sales": exclusive_sales,
+        "exclusive_cards": exclusive_cards,
+        "exclusive_pct":   round(exclusive_sales / raw_sales_total * 100, 1) if raw_sales_total else 0,
+        "oldest_sale":     oldest_sale,
     }
 
 

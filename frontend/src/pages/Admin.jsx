@@ -686,6 +686,7 @@ function PipelineTab() {
           <StatCard label="Priced (7d)"     value={(health.newly_priced_7d ?? 0).toLocaleString()} accent={(health.newly_priced_7d ?? 0) > 0} />
           <StatCard label="Sales Stored"    value={(health.raw_sales_total ?? 0).toLocaleString()} accent={(health.raw_sales_total ?? 0) > 0} />
           <StatCard label="History Coverage" value={`${health.raw_sales_coverage_pct ?? 0}%`} accent={(health.raw_sales_coverage_pct ?? 0) > 50} />
+          <StatCard label="Exclusive Sales" value={(health.exclusive_sales ?? 0).toLocaleString()} accent={(health.exclusive_sales ?? 0) > 0} title="Sales >90 days old — data eBay no longer shows" />
           <StatCard label="Ignored Prices"  value={health.ignored_count.toLocaleString()} warn={health.ignored_count > 0} />
           <StatCard label="Outlier Flags"   value={health.outlier_count.toLocaleString()} warn={health.outlier_count > 0} />
         </div>
@@ -731,6 +732,26 @@ function PipelineTab() {
             })}
           </div>
         </>
+      )}
+
+      {/* Exclusive history — data eBay no longer shows (>90 days old) */}
+      {(health.exclusive_sales ?? 0) > 0 && (
+        <div className={styles.exclusiveBox}>
+          <div className={styles.exclusiveTitle}>Exclusive History (SCD Type 2)</div>
+          <div className={styles.exclusiveBody}>
+            <span>
+              <strong>{(health.exclusive_sales ?? 0).toLocaleString()}</strong> sales older than 90 days —
+              eBay no longer shows this data.
+              {health.oldest_sale && (
+                <> Oldest captured: <strong>{new Date(health.oldest_sale).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</strong>.</>
+              )}
+            </span>
+            <span className={styles.muted}>
+              {health.exclusive_pct ?? 0}% of all stored sales are now exclusive to this database
+              ({(health.exclusive_cards ?? 0).toLocaleString()} cards with pre-90d history).
+            </span>
+          </div>
+        </div>
       )}
 
       <h3 className={styles.sectionTitle}>Last Scrape by Sport</h3>

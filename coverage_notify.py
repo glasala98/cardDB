@@ -73,6 +73,20 @@ def main():
     cur.execute("SELECT COUNT(*) FROM market_raw_sales")
     total_sales = cur.fetchone()[0]
 
+    # Exclusive data — sales eBay no longer shows (>90 days old)
+    cur.execute("""
+        SELECT
+            COUNT(*) FILTER (WHERE sold_date < NOW() - INTERVAL '90 days') AS exclusive_sales,
+            COUNT(DISTINCT card_catalog_id) FILTER (WHERE sold_date < NOW() - INTERVAL '90 days') AS exclusive_cards,
+            MIN(sold_date) AS oldest_sale
+        FROM market_raw_sales
+    """)
+    _ex = cur.fetchone()
+    exclusive_sales = _ex[0] or 0
+    exclusive_cards = _ex[1] or 0
+    oldest_sale = _ex[2]
+    exclusive_pct = round(exclusive_sales / total_sales * 100, 1) if total_sales else 0
+
     price_pct   = priced_cards  / total_cards * 100
     history_pct = history_cards / total_cards * 100
 
@@ -270,6 +284,19 @@ RECENT SCRAPE RUNS  (last 8)
   Workflow            Sport  Tier        Status       Found    Total    Started
   {'─' * 80}
 {chr(10).join(run_lines) if run_lines else "  No runs recorded yet"}
+
+{'=' * 65}
+EXCLUSIVE HISTORY  (SCD Type 2 — data eBay no longer shows)
+{'=' * 65}
+
+  eBay only exposes the last 90 days of sold listings. Every sale we have
+  older than 90 days is data that no longer exists anywhere else.
+
+  Exclusive Sales (>90d old) : {exclusive_sales:>12,}   ({exclusive_pct:.1f}% of all stored sales)
+  Cards with exclusive data  : {exclusive_cards:>12,}
+  Oldest sale captured       : {oldest_sale.strftime('%B %d, %Y') if oldest_sale else 'none yet':>12}
+
+  This grows every day as sales age out of eBay's window but remain in our DB.
 
 {'=' * 65}
 NEXT MILESTONES
