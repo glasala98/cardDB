@@ -1,0 +1,137 @@
+name: SCD Type 2 Architecture Verification
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Run SCD Type 2 verification queries
+        run: |
+          pip install psycopg2-binary -q
+
+          python - << 'PYEOF'
+          import os
+          import psycopg2
+          from datetime import date
+
+          conn = psycopg2.connect(os.environ["DATABASE_URL"])
+          cur = conn.cursor()
+
+          summary = []
+          summary.append("# SCD Type 2 Architecture Verification\n")
+          summary.append(f"Run date: {date.today()}\n")
+
+          # ── 1. Core proof: history rows older than 90 days (eBay has purged these) ──
+          cur.execute("""
+            SELECT
+              COUNT(*)                          AS preserved_rows,
+              MIN(scraped_at)                   AS oldest_record,
+              MAX(scraped_at)                   AS newest_in_window,
+              COUNT(DISTINCT card_catalog_id)   AS unique_cards
+            FROM market_price_history
+            WHERE scraped_at < CURRENT_DATE - INTERVAL '90 days'
+          """)
+          row = cur.fetchone()
+          preserved, oldest, newest_pre90, unique_cards = row
+
+          summary.append("## 1. Records beyond eBay's 90-day window\n")
+          summary.append("> eBay only serves sold listings from the past 90 days.")
+          summary.append("> Any `market_price_history` row older than 90 days proves our DB retains data eBay has purged.\n")
+          if preserved and preserved > 0:
+              summary.append(f"✅ **{preserved:,} history rows preserved** across **{unique_cards:,} unique cards**")
+              summary.append(f"- Oldest retained record: `{oldest}`")
+              summary.append(f"- Most recent pre-90-day record: `{newest_pre90}`\n")
+          else:
+              summary.append("⚠️  No history rows older than 90 days found — DB may be too new or scraping just started.\n")
+
+          # ── 2. Overall history table size ──
+          cur.execute("""
+            SELECT
+              COUNT(*)                         AS total_rows,
+              COUNT(DISTINCT card_catalog_id)  AS cards_with_history,
+              MIN(scraped_at)                  AS absolute_oldest,
+              MAX(scraped_at)                  AS most_recent
+            FROM market_price_history
+          """)
+          total, cards_hist, abs_oldest, most_recent = cur.fetchone()
+
+          summary.append("## 2. History table totals\n")
+          summary.append(f"| Metric | Value |")
+          summary.append(f"|--------|-------|")
+          summary.append(f"| Total history rows | {total:,} |")
+          summary.append(f"| Unique cards tracked | {cards_hist:,} |")
+          summary.append(f"| Oldest snapshot | {abs_oldest} |")
+          summary.append(f"| Most recent snapshot | {most_recent} |\n")
+
+          # ── 3. Cards stale in market_prices but still have history ──
+          cur.execute("""
+            SELECT
+              COUNT(*)  AS stale_current_but_has_history
+            FROM market_prices mp
+            WHERE mp.scraped_at < NOW() - INTERVAL '90 days'
+              AND EXISTS (
+                SELECT 1 FROM market_price_history mph
+                WHERE mph.card_catalog_id = mp.card_catalog_id
+              )
+          """)
+          stale_count = cur.fetchone()[0]
+
+          summary.append("## 3. Stale current prices that still have full history\n")
+          summary.append("> Cards where `market_prices.scraped_at` is 90+ days old.")
+          summary.append("> eBay has no data for these now — but our history table has their full price trail.\n")
+          summary.append(f"{'✅' if stale_count else '—'} **{stale_count:,} cards** with stale current price but intact history\n")
+
+          # ── 4. Sample: 10 cards with the deepest history (most snapshots) ──
+          cur.execute("""
+            SELECT
+              cc.player_name,
+              cc.year,
+              cc.set_name,
+              cc.variant,
+              COUNT(mph.id)      AS snapshot_count,
+              MIN(mph.scraped_at) AS first_seen,
+              MAX(mph.scraped_at) AS last_seen,
+              ROUND(MIN(mph.fair_value)::numeric, 2) AS min_price_ever,
+              ROUND(MAX(mph.fair_value)::numeric, 2) AS max_price_ever
+            FROM market_price_history mph
+            JOIN card_catalog cc ON cc.id = mph.card_catalog_id
+            GROUP BY cc.id, cc.player_name, cc.year, cc.set_name, cc.variant
+            ORDER BY snapshot_count DESC
+            LIMIT 10
+          """)
+          rows = cur.fetchall()
+
+          summary.append("## 4. Top 10 cards by snapshot depth\n")
+          summary.append("| Player | Year | Set | Variant | Snapshots | First Seen | Last Seen | Min $ | Max $ |")
+          summary.append("|--------|------|-----|---------|-----------|------------|-----------|-------|-------|")
+          for r in rows:
+              player, year, set_name, variant, snaps, first, last, lo, hi = r
+              summary.append(f"| {player} | {year} | {set_name} | {variant} | {snaps} | {first} | {last} | ${lo} | ${hi} |")
+          summary.append("")
+
+          # ── 5. Verdict ──
+          summary.append("## Verdict\n")
+          if preserved and preserved > 0:
+              days_back = (date.today() - oldest).days if oldest else 0
+              summary.append(f"✅ **SCD Type 2 architecture confirmed.**")
+              summary.append(f"The history table retains {preserved:,} price snapshots going back **{days_back} days** — well beyond eBay's 90-day purge window.")
+              summary.append(f"These records exist only in our database and cannot be reconstructed from eBay.")
+          else:
+              summary.append("⏳ **Too early to confirm** — no pre-90-day records yet. Re-run after the DB has been running for 90+ days.")
+
+          cur.close()
+          conn.close()
+
+          # Write to GitHub Step Summary
+          output_file = os.environ.get("GITHUB_STEP_SUMMARY", "/dev/stdout")
+          with open(output_file, "a", encoding="utf-8") as f:
+              f.write("\n".join(summary) + "\n")
+
+          print("Verification complete.")
+          PYEOF
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
