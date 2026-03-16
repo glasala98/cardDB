@@ -49,15 +49,14 @@ def get_db():
         pool.putconn(conn)
 
 
-def _sale_hash(card_catalog_id: int, sold_date, title: str, price_val: float) -> str:
+def _sale_hash(card_catalog_id: int, sold_date, title: str) -> str:
     """Deterministic hash that uniquely identifies one eBay sold listing.
 
-    Uses card_catalog_id + sold_date + title + price so two copies of the
-    same card selling on the same day at different prices are treated as
-    distinct sales.  NULL sold_date is replaced with the empty string so
-    the hash is always defined.
+    Keyed on (card_catalog_id, sold_date, title) — no two real sales share
+    the same card, date, and listing title.  NULL sold_date is replaced with
+    empty string so the hash is always defined.
     """
-    raw = f"{card_catalog_id}|{sold_date or ''}|{title.strip().lower()}|{round(price_val, 2)}"
+    raw = f"{card_catalog_id}|{sold_date or ''}|{title.strip().lower()}"
     return hashlib.md5(raw.encode()).hexdigest()
 
 
@@ -97,7 +96,7 @@ def save_raw_sales(card_catalog_id: int, raw_sales: list, conn=None) -> int:
         else:
             shipping_val = float(raw_ship or 0)
 
-        listing_hash = _sale_hash(card_catalog_id, sold_date, title, price_val)
+        listing_hash = _sale_hash(card_catalog_id, sold_date, title)
         rows.append((card_catalog_id, sold_date, price_val, shipping_val, title,
                      listing_hash, now))
 
