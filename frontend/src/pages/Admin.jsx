@@ -682,9 +682,10 @@ function PipelineTab() {
         <div className={styles.statCards} style={{ flex: 1 }}>
           <StatCard label="Catalog Size"    value={health.total_cards.toLocaleString()} />
           <StatCard label="Priced Cards"    value={health.priced_cards.toLocaleString()} />
-          <StatCard label="Coverage"        value={`${health.coverage_pct}%`} accent={health.coverage_pct > 50} />
+          <StatCard label="Price Coverage"  value={`${health.coverage_pct}%`} accent={health.coverage_pct > 50} />
           <StatCard label="Priced (7d)"     value={(health.newly_priced_7d ?? 0).toLocaleString()} accent={(health.newly_priced_7d ?? 0) > 0} />
-          <StatCard label="Priced (30d)"    value={(health.newly_priced_30d ?? 0).toLocaleString()} />
+          <StatCard label="Sales Stored"    value={(health.raw_sales_total ?? 0).toLocaleString()} accent={(health.raw_sales_total ?? 0) > 0} />
+          <StatCard label="History Coverage" value={`${health.raw_sales_coverage_pct ?? 0}%`} accent={(health.raw_sales_coverage_pct ?? 0) > 50} />
           <StatCard label="Ignored Prices"  value={health.ignored_count.toLocaleString()} warn={health.ignored_count > 0} />
           <StatCard label="Outlier Flags"   value={health.outlier_count.toLocaleString()} warn={health.outlier_count > 0} />
         </div>
@@ -698,6 +699,39 @@ function PipelineTab() {
       )}
 
       <PricingProgressChart />
+
+      {/* Raw sales history coverage by tier */}
+      {health.raw_tiers && health.raw_tiers.length > 0 && (
+        <>
+          <h3 className={styles.sectionTitle}>
+            Sale History Coverage by Tier
+            <span className={styles.coveragePill}>
+              {health.raw_sales_total?.toLocaleString() ?? 0} individual sales stored
+            </span>
+          </h3>
+          <div className={styles.tierProgressGrid}>
+            {health.raw_tiers.map(t => {
+              const pct = t.total > 0 ? Math.round(t.has_history / t.total * 100) : 0
+              const color = TIER_COLORS[t.tier] || '#4a9eff'
+              return (
+                <div key={t.tier} className={styles.tierProgressCard}>
+                  <div className={styles.tierProgressHeader}>
+                    <span className={`${styles.tierBadge} ${styles['tier_' + t.tier]}`}>{t.tier}</span>
+                    <span className={styles.tierProgressPct} style={{ color }}>{pct}%</span>
+                  </div>
+                  <div className={styles.tierProgressBarBg}>
+                    <div className={styles.tierProgressBarFill} style={{ width: `${pct}%`, background: color }} />
+                  </div>
+                  <div className={styles.tierProgressMeta}>
+                    <span>{t.has_history.toLocaleString()} with history</span>
+                    <span>{t.total.toLocaleString()} total</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
 
       <h3 className={styles.sectionTitle}>Last Scrape by Sport</h3>
       <div className={styles.sportGrid}>

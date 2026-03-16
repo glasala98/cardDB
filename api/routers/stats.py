@@ -24,6 +24,7 @@ _WORKFLOWS = [
     ("Catalog Stars",    "catalog_tier_stars.yml"),
     ("Catalog Base",     "catalog_tier_base.yml"),
     ("Catalog Graded",   "catalog_tier_graded.yml"),
+    ("Backfill History", "backfill_raw_sales.yml"),
     ("Master DB Daily",  "master_db_daily.yml"),
     ("Master DB Weekly", "master_db_weekly.yml"),
     ("Ledger Scrape",    "daily_scrape.yml"),

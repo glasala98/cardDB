@@ -281,6 +281,24 @@ def pipeline_health(_admin: str = Depends(_require_admin)):
             """)
             last_scraped = {r[0]: r[1].isoformat() if r[1] else None for r in cur.fetchall()}
 
+            # market_raw_sales — individual sale history coverage
+            cur.execute("SELECT COUNT(DISTINCT card_catalog_id), COUNT(*) FROM market_raw_sales")
+            _rs = cur.fetchone()
+            raw_sales_cards = _rs[0]   # cards with at least 1 sale stored
+            raw_sales_total = _rs[1]   # total individual sales stored
+
+            # Per-tier raw history coverage
+            cur.execute("""
+                SELECT cc.scrape_tier,
+                       COUNT(cc.id)                              AS total,
+                       COUNT(DISTINCT mrs.card_catalog_id)       AS has_history
+                FROM card_catalog cc
+                LEFT JOIN market_raw_sales mrs ON mrs.card_catalog_id = cc.id
+                GROUP BY cc.scrape_tier
+                ORDER BY cc.scrape_tier
+            """)
+            raw_tiers = [{"tier": r[0], "total": r[1], "has_history": r[2]} for r in cur.fetchall()]
+
     return {
         "total_cards":     total_cards,
         "priced_cards":    priced_cards,
@@ -291,6 +309,10 @@ def pipeline_health(_admin: str = Depends(_require_admin)):
         "newly_priced_30d": newly_priced_30d,
         "tiers":           tiers,
         "last_scraped":    last_scraped,
+        "raw_sales_cards": raw_sales_cards,
+        "raw_sales_total": raw_sales_total,
+        "raw_sales_coverage_pct": round(raw_sales_cards / total_cards * 100, 1) if total_cards else 0,
+        "raw_tiers":       raw_tiers,
     }
 
 
