@@ -100,7 +100,7 @@ def search_ebay_sold_paginated(driver, card_name, since_date=None, max_pages=15,
 - If min date ≤ today - 90 days → stop (backfill mode)
 - Do NOT stop mid-page — always collect the full page, then decide.
 
-**Status:** ⬜ TODO
+**Status:** ✅ Done
 
 ---
 
@@ -123,7 +123,7 @@ WHERE ...
 
 Each card dict gets `card['last_sale_date']` — None if never stored.
 
-**Status:** ⬜ TODO
+**Status:** ✅ Done
 
 ---
 
@@ -145,7 +145,7 @@ def scrape_one(card):
     stats = calculate_fair_price(pricing_sales)
 ```
 
-**Status:** ⬜ TODO
+**Status:** ✅ Done
 
 ---
 
@@ -165,7 +165,7 @@ WHERE NOT EXISTS (
 )
 ```
 
-**Status:** ⬜ TODO
+**Status:** ✅ Done
 
 ---
 
@@ -190,7 +190,7 @@ on:
 
 Runs: `python -u scrape_master_db.py --backfill --catalog-tier {tier} --sport {sport} --workers {workers} --max-hours 5`
 
-**Status:** ⬜ TODO
+**Status:** ✅ Done
 
 ---
 
@@ -199,7 +199,7 @@ Runs: `python -u scrape_master_db.py --backfill --catalog-tier {tier} --sport {s
 **Why:** No GH Actions workflow calls it. Dead code. Confusing to maintain alongside `scrape_master_db.py`.
 **Confirm:** Verify no other file imports it before deleting.
 
-**Status:** ⬜ TODO
+**Status:** ✅ Done
 
 ---
 
@@ -259,9 +259,9 @@ market_raw_sales grows forever:
 | `scrape_master_db.py` | Wire save_raw_sales into write_batch | ✅ Done |
 | `scrape_market_prices.py` | Wire save_raw_sales into save_price_result | ✅ Done |
 | `dashboard_utils.py` | Remove max_results=50 cap on primary scrape | ✅ Done |
-| `scrape_card_prices.py` | Add `search_ebay_sold_paginated()` | ⬜ TODO — Step 1 |
-| `scrape_master_db.py` | Add last_sale_date to card batch query | ⬜ TODO — Step 2 |
-| `scrape_master_db.py` | Pass since_date through scrape_one() | ⬜ TODO — Step 3 |
-| `scrape_master_db.py` | Add --backfill flag | ⬜ TODO — Step 4 |
-| `.github/workflows/backfill_raw_sales.yml` | New backfill workflow | ⬜ TODO — Step 5 |
-| `scrape_market_prices.py` | Delete (dead code) | ⬜ TODO — Step 6 |
+| `scrape_card_prices.py` | Add `search_ebay_sold_paginated()` | ✅ Done — Step 1 |
+| `scrape_master_db.py` | Add last_sale_date to card batch query | ✅ Done — Step 2 |
+| `scrape_master_db.py` | Pass since_date through scrape_one() | ✅ Done — Step 3 |
+| `scrape_master_db.py` | Add --backfill flag | ✅ Done — Step 4 |
+| `.github/workflows/backfill_raw_sales.yml` | New backfill workflow | ✅ Done — Step 5 |
+| `scrape_market_prices.py` | Delete (dead code) | ✅ Done — Step 6 |

@@ -7,7 +7,7 @@ import urllib.parse
 import statistics
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 try:
     from selenium import webdriver
@@ -708,8 +708,8 @@ def build_set_query(card_name):
     return search_term.strip()
 
 
-def search_ebay_sold(driver, card_name, max_results=240, search_query=None):
-    """Scrape eBay completed/sold listings for a card and return structured sale records.
+def search_ebay_sold(driver, card_name, max_results=240, search_query=None, page=1):
+    """Scrape one page of eBay completed/sold listings for a card.
 
     Navigates to eBay's sold-listing search page sorted by most recent, waits
     for the card-based result layout to load, then iterates over each listing
@@ -725,6 +725,7 @@ def search_ebay_sold(driver, card_name, max_results=240, search_query=None):
             (one full eBay results page).
         search_query: Pre-built eBay query string. If None, one is generated via
             clean_card_name_for_search(card_name).
+        page: eBay results page number (1-based). Defaults to 1.
 
     Returns:
         A list of dicts, each containing:
@@ -744,8 +745,8 @@ def search_ebay_sold(driver, card_name, max_results=240, search_query=None):
     grade_str, grade_num = get_grade_info(card_name)
     encoded_query = urllib.parse.quote(search_query)
 
-    # eBay sold listings URL, sorted by most recent
-    url = f"https://www.ebay.com/sch/i.html?_nkw={encoded_query}&_sacat=0&LH_Complete=1&LH_Sold=1&_sop=13&_ipg=240"
+    # eBay sold listings URL, sorted by most recent; _pgn for pagination
+    url = f"https://www.ebay.com/sch/i.html?_nkw={encoded_query}&_sacat=0&LH_Complete=1&LH_Sold=1&_sop=13&_ipg=240&_pgn={page}"
 
     try:
         driver.get(url)
@@ -884,6 +885,61 @@ def search_ebay_sold(driver, card_name, max_results=240, search_query=None):
     except Exception as e:
         print(f"  Error fetching data: {e}")
         return []
+
+
+def search_ebay_sold_paginated(driver, card_name, since_date=None, max_pages=15, search_query=None):
+    """Paginate eBay sold listings, returning all sales across multiple pages.
+
+    On first run (since_date=None), collects every sale going back up to 90 days
+    or until pages run out.  On subsequent delta runs (since_date set), stops as
+    soon as a full page contains no sales newer than since_date — typically 1–2
+    pages for most cards.
+
+    Args:
+        driver: Selenium WebDriver instance.
+        card_name: Full card name string (used for grade filtering + query building).
+        since_date: 'YYYY-MM-DD' string or None.
+            None      → first run / backfill — collect until 90 days back.
+            date str  → delta run — stop when oldest dated sale on a page ≤ this date.
+        max_pages: Safety cap on pages fetched (default 15 = up to 3,600 results).
+        search_query: Pre-built eBay query string (passed through to search_ebay_sold).
+
+    Returns:
+        Combined list of sale dicts across all pages, same shape as search_ebay_sold().
+        Sorted newest-first (eBay's natural order is preserved across pages).
+    """
+    from datetime import date, timedelta
+    cutoff_90 = (date.today() - timedelta(days=90)).isoformat()
+    stop_date = since_date or cutoff_90   # delta cutoff or 90-day window
+
+    all_sales = []
+
+    for page_num in range(1, max_pages + 1):
+        page_sales = search_ebay_sold(
+            driver, card_name,
+            max_results=240,
+            search_query=search_query,
+            page=page_num,
+        )
+
+        if not page_sales:
+            # No results — end of eBay's data for this card
+            break
+
+        all_sales.extend(page_sales)
+
+        # Check stop condition: look at the oldest dated sale on this page.
+        # We collect the full page first (don't stop mid-page) to avoid
+        # missing same-day sales that straddle the cutoff.
+        dated = [s['sold_date'] for s in page_sales if s.get('sold_date')]
+        if dated:
+            oldest_on_page = min(dated)
+            if oldest_on_page <= stop_date:
+                # We've reached or passed the cutoff — no need to fetch more pages
+                break
+        # If entire page has no dated sales, keep paginating (unusual but safe)
+
+    return all_sales
 
 
 def extract_serial_run(text):
@@ -1341,7 +1397,7 @@ def build_player_card_query(card_name):
     return search_term.strip()
 
 
-def process_card(card):
+def process_card(card, since_date=None):
     """Search eBay and compute a fair market price for a single card.
 
     Executes a 4-stage search with decreasing specificity, stopping as soon
@@ -1349,6 +1405,10 @@ def process_card(card):
 
       Stage 1 — Exact (confidence: high):
           Full query: variant + subset + serial + set + year.
+          Uses search_ebay_sold_paginated to capture all pages since
+          since_date (delta mode) or up to 90 days back (first run).
+          ALL returned sales are stored historically; only the last 30 days
+          are used for fair_value calculation.
       Stage 2 — Set (confidence: medium):
           Drops parallel/subset name; keeps serial + set + year.
       Stage 3 — Broad (confidence: low):
@@ -1368,13 +1428,16 @@ def process_card(card):
     Args:
         card: Full card name string, e.g.
             "2023-24 Upper Deck - Young Guns #201 - Connor Bedard".
+        since_date: 'YYYY-MM-DD' string or None.  Passed to Stage 1
+            paginated search as the delta stop condition.  None = first run,
+            collects up to 90 days of history.
 
     Returns:
         A tuple (card_name, result_dict) where result_dict contains:
             - estimated_value (str): formatted price string, e.g. "$12.50".
             - confidence (str): one of 'high', 'medium', 'low', 'estimated', 'none'.
             - stats (dict): output of calculate_fair_price() plus 'confidence' key.
-            - raw_sales (list): direct comp sales (stages 1-3 only).
+            - raw_sales (list): all Stage-1 paginated sales (stored historically).
             - search_url (str or None): URL of the successful eBay search.
             - image_url (str or None): thumbnail URL from the first direct sale.
         When no sales are found at any stage, estimated_value defaults to
@@ -1386,11 +1449,19 @@ def process_card(card):
     target_serial = extract_serial_run(card)
     confidence = 'high'
     pricing_sales = []   # used for fair value calculation
-    direct_sales = []    # stored historically (direct comps only)
+    direct_sales = []    # stored historically (stage-1 paginated results only)
 
-    # Stage 1: full query — variant + subset + serial + set
-    pricing_sales = search_ebay_sold(driver, card)
-    pricing_sales = _apply_variant_filter(card, pricing_sales)
+    # Stage 1: paginated full query — captures all pages since last run
+    _stage1 = search_ebay_sold_paginated(driver, card, since_date=since_date)
+    _stage1 = _apply_variant_filter(card, _stage1)
+
+    if _stage1:
+        direct_sales = _stage1  # ALL paginated sales stored historically
+        # For pricing: only last 30 days to avoid old sales skewing fair_value
+        cutoff_30 = (date.today() - timedelta(days=30)).isoformat()
+        pricing_sales = [s for s in _stage1 if (s.get('sold_date') or '') >= cutoff_30]
+        if not pricing_sales:
+            pricing_sales = _stage1  # fallback: use all if none in last 30 days
 
     if not pricing_sales:
         # Stage 2: drop parallel/subset name, keep serial + set
@@ -1406,10 +1477,7 @@ def process_card(card):
         pricing_sales = search_ebay_sold(driver, card, search_query=build_simplified_query(card))
         pricing_sales = _apply_variant_filter(card, pricing_sales)
 
-    if pricing_sales:
-        # Stages 1-3: these are direct comps — store historically
-        direct_sales = list(pricing_sales)
-    elif target_serial:
+    if not pricing_sales and target_serial:
         # Stage 4: no direct results found — search nearby serial print runs as comps
         confidence = 'estimated'
         nearby = get_nearby_serials(target_serial)
@@ -1429,11 +1497,10 @@ def process_card(card):
     if not pricing_sales:
         # Stage 5: player + card# only — absolute last resort for any card type.
         # Catches unusual/descriptive card names and un-numbered cards with no comps.
+        # Pricing fallback only — NOT stored historically in raw_sales.
         time.sleep(random.uniform(0.5, 1.0))
         confidence = 'low'
         pricing_sales = search_ebay_sold(driver, card, search_query=build_player_card_query(card))
-        if pricing_sales:
-            direct_sales = list(pricing_sales)
 
     if pricing_sales:
         pricing_sales = _normalize_shipping(pricing_sales)

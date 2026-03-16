@@ -1,0 +1,62 @@
+name: Backfill Raw Sales History
+
+on:
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: 'Tier to backfill (staple / premium / stars / base)'
+        required: true
+        default: 'staple'
+        type: choice
+        options:
+          - staple
+          - premium
+          - stars
+          - base
+      sport:
+        description: 'Sport (NHL / NBA / NFL / MLB, blank=all)'
+        required: false
+        default: ''
+      workers:
+        description: 'Parallel Chrome workers'
+        required: false
+        default: '5'
+      limit:
+        description: 'Max cards per run (0=all)'
+        required: false
+        default: '0'
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330  # 5.5h — graceful exit at 5h, hard kill at 5.5h
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+
+      - name: Backfill raw sales — ${{ github.event.inputs.tier }} tier
+        run: |
+          SPORT_ARG=""
+          if [ -n "${{ github.event.inputs.sport }}" ]; then
+            SPORT_ARG="--sport ${{ github.event.inputs.sport }}"
+          fi
+          python -u scrape_master_db.py \
+            --backfill \
+            --catalog-tier ${{ github.event.inputs.tier }} \
+            $SPORT_ARG \
+            --workers ${{ github.event.inputs.workers || '5' }} \
+            --limit ${{ github.event.inputs.limit || '0' }} \
+            --max-hours 5
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

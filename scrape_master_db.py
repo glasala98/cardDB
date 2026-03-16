@@ -14,6 +14,7 @@ Usage:
     python -u scrape_master_db.py --limit 500           # Cap at N cards per run
     python -u scrape_master_db.py --graded              # Scrape PSA/BGS graded prices
     python -u scrape_master_db.py --min-raw-value 5.0   # Min raw value for graded scraping
+    python -u scrape_master_db.py --backfill            # Only cards with 0 raw_sales; stores history only, skips market_prices write
 """
 
 import sys
@@ -36,7 +37,7 @@ except ImportError:
     pass
 
 from db import get_db, save_raw_sales
-from scrape_card_prices import process_card
+from scrape_card_prices import process_card, search_ebay_sold_paginated
 import scrape_card_prices
 
 # Graded variants — probe highest first, skip lower if no sales
@@ -179,10 +180,21 @@ def load_cards(args) -> list:
     if getattr(args, 'rookies', False):
         conditions.append("cc.is_rookie = TRUE")
 
+    # --backfill: only cards with zero rows in market_raw_sales
+    if getattr(args, 'backfill', False):
+        conditions.append(
+            "NOT EXISTS (SELECT 1 FROM market_raw_sales WHERE card_catalog_id = cc.id)"
+        )
+
     where = " AND ".join(conditions)
     limit_clause = f"LIMIT {args.limit}" if args.limit > 0 else ""
 
-    if args.force:
+    if getattr(args, 'backfill', False):
+        # Backfill: no price data needed — just pick un-stored cards, rookies first
+        join_clause = ""
+        select_extra = "NULL::numeric AS existing_price, NULL::timestamptz AS last_scraped"
+        order_clause = "cc.is_rookie DESC, cc.year DESC, cc.player_name"
+    elif args.force:
         join_clause = ""
         select_extra = "NULL::numeric AS existing_price, NULL::timestamptz AS last_scraped"
         order_clause = "cc.is_rookie DESC, cc.year DESC, cc.player_name"
@@ -201,9 +213,15 @@ def load_cards(args) -> list:
                cc.card_number, cc.player_name, cc.team,
                cc.variant, cc.print_run, cc.is_rookie, cc.search_query,
                cc.scrape_tier,
-               {select_extra}
+               {select_extra},
+               mrs_max.last_sale_date
         FROM card_catalog cc
         {join_clause}
+        LEFT JOIN (
+            SELECT card_catalog_id, MAX(sold_date)::text AS last_sale_date
+            FROM market_raw_sales
+            GROUP BY card_catalog_id
+        ) mrs_max ON mrs_max.card_catalog_id = cc.id
         WHERE {where}
         ORDER BY {order_clause}
         {limit_clause}
@@ -474,7 +492,7 @@ def scrape_one(card: dict) -> tuple:
     last_exc = None
     for attempt in range(2):
         try:
-            _, result = process_card(card_name)
+            _, result = process_card(card_name, since_date=card.get('last_sale_date'))
             stats = result.get('stats', {})
             new_price = round(stats.get('fair_price', 0), 2)
             old_price = card.get('existing_price')
@@ -592,6 +610,11 @@ def main():
     parser.add_argument('--max-hours',     type=float, default=5.75, dest='max_hours',
                         help="Graceful exit after this many hours (default 5.75) to stay under "
                              "GitHub Actions 6h limit. Progress is saved; next run skips done cards.")
+    parser.add_argument('--backfill',      action='store_true',
+                        help="Backfill mode: only process cards with 0 rows in market_raw_sales. "
+                             "Paginates full 90 days of history. Does NOT write market_prices or "
+                             "market_price_history — price is already current. Run per-tier manually "
+                             "until market_raw_sales is fully populated.")
     args = parser.parse_args()
 
     if args.graded:
@@ -609,7 +632,7 @@ def main():
         return
 
     total = len(cards)
-    mode = "GRADED" if args.graded else "RAW"
+    mode = "GRADED" if args.graded else ("BACKFILL" if args.backfill else "RAW")
     print(f"\n{'='*60}")
     print(f"{mode} SCRAPE — {total:,} cards | {args.workers} workers")
     if args.sport:      print(f"  Sport:      {args.sport}")
@@ -640,8 +663,18 @@ def main():
     BATCH_SIZE = 50
     timed_out = False
 
+    raw_sales_backfill_batch: list = []  # forward-declare so _flush_batch can see it
+
     def _flush_batch():
-        nonlocal batch, no_market_batch
+        nonlocal batch, no_market_batch, raw_sales_backfill_batch
+        if raw_sales_backfill_batch:
+            try:
+                with get_db() as conn:
+                    for cid, rs in raw_sales_backfill_batch:
+                        save_raw_sales(cid, rs, conn=conn)
+            except Exception as e:
+                print(f"  WARNING: DB write error (backfill raw_sales): {e}")
+            raw_sales_backfill_batch = []
         if batch:
             try:
                 save_prices_batch(batch)
@@ -728,7 +761,7 @@ def main():
         executor.shutdown(wait=False, cancel_futures=True)
 
     else:
-        # ── Raw mode ──
+        # ── Raw / Backfill mode ──
         executor = ThreadPoolExecutor(max_workers=args.workers)
         futures = {executor.submit(scrape_one, card): card for card in cards}
         done_count = 0
@@ -738,7 +771,12 @@ def main():
                 done_count += 1
                 stats = result.get('stats', {})
 
-                if stats.get('num_sales', 0) > 0:
+                if args.backfill:
+                    # Backfill: store raw_sales only — price is already current
+                    raw_sales = result.get('raw_sales') or []
+                    if raw_sales:
+                        raw_sales_backfill_batch.append((catalog_id, raw_sales))
+                elif stats.get('num_sales', 0) > 0:
                     batch.append((catalog_id, stats, result.get('image_url') or '',
                                   result.get('raw_sales') or []))
                 elif card.get('scrape_tier') == 'base':
@@ -752,11 +790,16 @@ def main():
                     elapsed = time.time() - start
                     rate = done_count / elapsed if elapsed > 0 else 0
                     remaining = (total - done_count) / rate / 60 if rate > 0 else 0
-                    print(f"  [{done_count}/{total}] Found: {_progress['found']} | "
-                          f"Deltas: {_progress['deltas']} | "
-                          f"Not found: {_progress['not_found']} | "
-                          f"Errors: {_progress['errors']} | "
-                          f"~{remaining:.1f}m remaining", flush=True)
+                    if args.backfill:
+                        print(f"  [{done_count}/{total}] Stored: {_progress['found']} | "
+                              f"Errors: {_progress['errors']} | "
+                              f"~{remaining:.1f}m remaining", flush=True)
+                    else:
+                        print(f"  [{done_count}/{total}] Found: {_progress['found']} | "
+                              f"Deltas: {_progress['deltas']} | "
+                              f"Not found: {_progress['not_found']} | "
+                              f"Errors: {_progress['errors']} | "
+                              f"~{remaining:.1f}m remaining", flush=True)
                     if elapsed >= max_seconds:
                         print(f"\n  Time limit ({args.max_hours}h) reached — "
                               f"saved {done_count:,}/{total:,} cards. "
