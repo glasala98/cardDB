@@ -1,0 +1,52 @@
+name: Coverage Milestone Notifications
+
+# Runs daily at noon UTC. Sends an email when price coverage OR raw sales
+# history coverage crosses a new 10% milestone (10%, 20%, ... 100%).
+#
+# Required GitHub Secrets:
+#   DATABASE_URL           — Railway PostgreSQL connection string (already set)
+#   NOTIFY_EMAIL_TO        — recipient email address (e.g. you@gmail.com)
+#   NOTIFY_GMAIL_USER      — Gmail address used to send (e.g. bot@gmail.com)
+#   NOTIFY_GMAIL_APP_PASSWORD — Gmail App Password (not your regular password)
+#     Generate at: myaccount.google.com/apppasswords
+#     (requires 2FA enabled on the sending Gmail account)
+
+on:
+  schedule:
+    - cron: '0 12 * * *'  # noon UTC daily
+  workflow_dispatch:       # manual trigger for testing
+
+jobs:
+  check-and-notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install psycopg2-binary
+
+      - name: Check coverage milestones
+        id: check
+        run: python coverage_notify.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Send milestone email
+        if: steps.check.outputs.should_notify == 'true'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.NOTIFY_GMAIL_USER }}
+          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.NOTIFY_EMAIL_TO }}
+          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
+          subject: ${{ steps.check.outputs.subject }}
+          body: ${{ steps.check.outputs.body }}
