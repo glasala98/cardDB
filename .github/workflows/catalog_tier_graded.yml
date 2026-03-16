@@ -53,6 +53,7 @@ jobs:
             --catalog-tier staple \
             --graded \
             --min-raw-value ${{ github.event.inputs.min_raw_value || '5.0' }} \
+            --max-hours 4.5 \
             --workers 3
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

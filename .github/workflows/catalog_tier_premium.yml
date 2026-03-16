@@ -31,7 +31,7 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NHL premium prices
-        run: python -u scrape_master_db.py --catalog-tier premium --sport NHL --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scrape_master_db.py --catalog-tier premium --sport NHL --workers 5 --stale-days 7 --max-hours 4.5 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -51,7 +51,7 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NBA premium prices
-        run: python -u scrape_master_db.py --catalog-tier premium --sport NBA --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scrape_master_db.py --catalog-tier premium --sport NBA --workers 5 --stale-days 7 --max-hours 4.5 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -71,7 +71,7 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NFL premium prices
-        run: python -u scrape_master_db.py --catalog-tier premium --sport NFL --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scrape_master_db.py --catalog-tier premium --sport NFL --workers 5 --stale-days 7 --max-hours 4.5 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -91,6 +91,6 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape MLB premium prices
-        run: python -u scrape_master_db.py --catalog-tier premium --sport MLB --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scrape_master_db.py --catalog-tier premium --sport MLB --workers 5 --stale-days 7 --max-hours 4.5 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
