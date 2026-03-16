@@ -48,85 +48,97 @@ jobs:
           else:
               summary.append("⚠️  No history rows older than 90 days found — DB may be too new or scraping just started.\n")
 
-          # ── 2. Overall history table size ──
+          # ── 2. market_prices_status view: fresh vs stale breakdown ──
           cur.execute("""
             SELECT
-              COUNT(*)                         AS total_rows,
-              COUNT(DISTINCT card_catalog_id)  AS cards_with_history,
-              MIN(scraped_at)                  AS absolute_oldest,
-              MAX(scraped_at)                  AS most_recent
-            FROM market_price_history
+              COUNT(*)                                          AS total_cards,
+              COUNT(*) FILTER (WHERE is_fresh)                 AS fresh_cards,
+              COUNT(*) FILTER (WHERE is_stale AND scraped_at IS NOT NULL) AS stale_cards,
+              COUNT(*) FILTER (WHERE scraped_at IS NULL)       AS never_scraped,
+              ROUND(AVG(days_since_scraped) FILTER (WHERE days_since_scraped IS NOT NULL)) AS avg_days_since_scraped,
+              MAX(days_since_scraped)                          AS max_days_since_scraped
+            FROM market_prices_status
           """)
-          total, cards_hist, abs_oldest, most_recent = cur.fetchone()
+          total, fresh, stale, never, avg_days, max_days = cur.fetchone()
 
-          summary.append("## 2. History table totals\n")
-          summary.append(f"| Metric | Value |")
-          summary.append(f"|--------|-------|")
-          summary.append(f"| Total history rows | {total:,} |")
-          summary.append(f"| Unique cards tracked | {cards_hist:,} |")
-          summary.append(f"| Oldest snapshot | {abs_oldest} |")
-          summary.append(f"| Most recent snapshot | {most_recent} |\n")
+          summary.append("## 2. market_prices_status view breakdown\n")
+          summary.append(f"| Status | Count | % of total |")
+          summary.append(f"|--------|-------|------------|")
+          summary.append(f"| ✅ Fresh (scraped ≤90 days ago) | {fresh:,} | {fresh/total*100:.1f}% |")
+          summary.append(f"| ⏳ Stale (scraped >90 days ago) | {stale:,} | {stale/total*100:.1f}% |")
+          summary.append(f"| ❌ Never scraped | {never:,} | {never/total*100:.1f}% |")
+          summary.append(f"| **Total** | **{total:,}** | 100% |")
+          summary.append(f"\nAvg days since scraped: **{avg_days}** · Max: **{max_days}**\n")
 
-          # ── 3. Cards stale in market_prices but still have history ──
+          # ── 3. SCD Type 2 proof: stale current price but full history preserved ──
           cur.execute("""
             SELECT
-              COUNT(*)  AS stale_current_but_has_history
-            FROM market_prices mp
-            WHERE mp.scraped_at < NOW() - INTERVAL '90 days'
-              AND EXISTS (
-                SELECT 1 FROM market_price_history mph
-                WHERE mph.card_catalog_id = mp.card_catalog_id
-              )
+              COUNT(DISTINCT s.card_catalog_id)  AS stale_cards_with_history,
+              SUM(h.snap_count)                  AS total_history_rows_preserved
+            FROM market_prices_status s
+            JOIN (
+              SELECT card_catalog_id, COUNT(*) AS snap_count
+              FROM market_price_history
+              GROUP BY card_catalog_id
+            ) h ON h.card_catalog_id = s.card_catalog_id
+            WHERE s.is_stale = TRUE
           """)
-          stale_count = cur.fetchone()[0]
+          stale_with_hist, hist_rows = cur.fetchone()
 
-          summary.append("## 3. Stale current prices that still have full history\n")
-          summary.append("> Cards where `market_prices.scraped_at` is 90+ days old.")
-          summary.append("> eBay has no data for these now — but our history table has their full price trail.\n")
-          summary.append(f"{'✅' if stale_count else '—'} **{stale_count:,} cards** with stale current price but intact history\n")
+          summary.append("## 3. Stale current prices with full history preserved\n")
+          summary.append("> Cards where `is_stale = TRUE` in `market_prices_status` but history is intact in `market_price_history`.")
+          summary.append("> This is the core SCD Type 2 proof — data eBay has purged lives on in our DB.\n")
+          if stale_with_hist:
+              summary.append(f"✅ **{stale_with_hist:,} stale cards** still have **{hist_rows:,} history rows** preserved\n")
+          else:
+              summary.append("⏳ No stale cards with history yet — re-run after 90+ days of scraping.\n")
 
-          # ── 4. Sample: 10 cards with the deepest history (most snapshots) ──
+          # ── 4. Sample: 10 stale cards with deepest history ──
           cur.execute("""
             SELECT
               cc.player_name,
               cc.year,
               cc.set_name,
               cc.variant,
-              COUNT(mph.id)      AS snapshot_count,
-              MIN(mph.scraped_at) AS first_seen,
-              MAX(mph.scraped_at) AS last_seen,
-              ROUND(MIN(mph.fair_value)::numeric, 2) AS min_price_ever,
-              ROUND(MAX(mph.fair_value)::numeric, 2) AS max_price_ever
-            FROM market_price_history mph
-            JOIN card_catalog cc ON cc.id = mph.card_catalog_id
-            GROUP BY cc.id, cc.player_name, cc.year, cc.set_name, cc.variant
-            ORDER BY snapshot_count DESC
+              s.days_since_scraped,
+              COUNT(mph.id)                             AS snapshots,
+              ROUND(MIN(mph.fair_value)::numeric, 2)   AS min_price,
+              ROUND(MAX(mph.fair_value)::numeric, 2)   AS max_price
+            FROM market_prices_status s
+            JOIN card_catalog cc ON cc.id = s.card_catalog_id
+            JOIN market_price_history mph ON mph.card_catalog_id = s.card_catalog_id
+            WHERE s.is_stale = TRUE
+            GROUP BY cc.id, cc.player_name, cc.year, cc.set_name, cc.variant, s.days_since_scraped
+            ORDER BY snapshots DESC
             LIMIT 10
           """)
           rows = cur.fetchall()
 
-          summary.append("## 4. Top 10 cards by snapshot depth\n")
-          summary.append("| Player | Year | Set | Variant | Snapshots | First Seen | Last Seen | Min $ | Max $ |")
-          summary.append("|--------|------|-----|---------|-----------|------------|-----------|-------|-------|")
-          for r in rows:
-              player, year, set_name, variant, snaps, first, last, lo, hi = r
-              summary.append(f"| {player} | {year} | {set_name} | {variant} | {snaps} | {first} | {last} | ${lo} | ${hi} |")
-          summary.append("")
+          summary.append("## 4. Sample: stale cards with deepest history\n")
+          if rows:
+              summary.append("| Player | Year | Set | Variant | Days Stale | Snapshots | Min $ | Max $ |")
+              summary.append("|--------|------|-----|---------|------------|-----------|-------|-------|")
+              for r in rows:
+                  player, year, set_name, variant, days, snaps, lo, hi = r
+                  summary.append(f"| {player} | {year} | {set_name} | {variant} | {days} | {snaps} | ${lo} | ${hi} |")
+              summary.append("")
+          else:
+              summary.append("_No stale cards with history yet._\n")
 
           # ── 5. Verdict ──
           summary.append("## Verdict\n")
           if preserved and preserved > 0:
               days_back = (date.today() - oldest).days if oldest else 0
               summary.append(f"✅ **SCD Type 2 architecture confirmed.**")
-              summary.append(f"The history table retains {preserved:,} price snapshots going back **{days_back} days** — well beyond eBay's 90-day purge window.")
-              summary.append(f"These records exist only in our database and cannot be reconstructed from eBay.")
+              summary.append(f"- {preserved:,} history snapshots retained beyond eBay's 90-day purge window")
+              summary.append(f"- Data goes back **{days_back} days** — reconstructable from our DB alone")
+              summary.append(f"- `market_prices_status` view exposes `is_stale` / `is_fresh` / `days_since_scraped` for all queries")
           else:
-              summary.append("⏳ **Too early to confirm** — no pre-90-day records yet. Re-run after the DB has been running for 90+ days.")
+              summary.append("⏳ **Too early to confirm** — no pre-90-day records yet. Re-run after 90+ days of scraping.")
 
           cur.close()
           conn.close()
 
-          # Write to GitHub Step Summary
           output_file = os.environ.get("GITHUB_STEP_SUMMARY", "/dev/stdout")
           with open(output_file, "a", encoding="utf-8") as f:
               f.write("\n".join(summary) + "\n")
