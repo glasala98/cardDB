@@ -1,0 +1,113 @@
+name: Backfill Raw Sales — All Tiers (Sequential)
+
+on:
+  workflow_dispatch:
+    inputs:
+      workers:
+        description: 'Parallel Chrome workers'
+        required: false
+        default: '5'
+
+jobs:
+  staple:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Backfill staple tier
+        run: |
+          python -u scrape_master_db.py \
+            --backfill \
+            --catalog-tier staple \
+            --workers ${{ github.event.inputs.workers || '5' }} \
+            --limit 0 \
+            --max-hours 5
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  premium:
+    needs: staple
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Backfill premium tier
+        run: |
+          python -u scrape_master_db.py \
+            --backfill \
+            --catalog-tier premium \
+            --workers ${{ github.event.inputs.workers || '5' }} \
+            --limit 0 \
+            --max-hours 5
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  stars:
+    needs: premium
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Backfill stars tier
+        run: |
+          python -u scrape_master_db.py \
+            --backfill \
+            --catalog-tier stars \
+            --workers ${{ github.event.inputs.workers || '5' }} \
+            --limit 0 \
+            --max-hours 5
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  base:
+    needs: stars
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Backfill base tier
+        run: |
+          python -u scrape_master_db.py \
+            --backfill \
+            --catalog-tier base \
+            --workers ${{ github.event.inputs.workers || '5' }} \
+            --limit 0 \
+            --max-hours 5
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
