@@ -60,22 +60,38 @@ def _sale_hash(card_catalog_id: int, sold_date, title: str) -> str:
     return hashlib.md5(raw.encode()).hexdigest()
 
 
-def save_raw_sales(card_catalog_id: int, raw_sales: list, conn=None) -> int:
-    """Insert individual eBay sold listings into market_raw_sales.
+def save_raw_sales(card_catalog_id: int, raw_sales: list, conn=None,
+                   source: str = 'ebay') -> int:
+    """Insert sold listings into market_raw_sales (all sources).
 
     Deduplicates on listing_hash — an md5 of (card_catalog_id, sold_date,
-    title, price_val) computed in Python before insert.  NULL-safe: undated
-    sales with the same title and price are treated as the same listing.
+    title) computed in Python before insert.  NULL-safe: undated sales with
+    the same title are treated as the same listing.
     Returns the number of new rows inserted.
 
     Args:
         card_catalog_id: FK to card_catalog.id
-        raw_sales: list of dicts with keys price_val, sold_date, title,
-                   and optionally shipping (raw shipping value as float)
-        conn: optional existing psycopg2 connection (uses pool if not provided)
+        raw_sales: list of dicts with keys:
+            Required: price_val, title
+            Optional: sold_date, shipping (string or float),
+                      source, grade, grade_company, grade_numeric,
+                      serial_number, print_run, lot_url, lot_id,
+                      hammer_price, buyer_premium_pct, image_url,
+                      is_auction, raw_metadata (dict)
+        conn:   optional existing psycopg2 connection (uses pool if not given)
+        source: default source tag when not specified per-sale ('ebay')
     """
+    import re as _re
+    import json
+
     if not raw_sales:
         return 0
+
+    # Lazy-import parser to avoid circular imports in scraper scripts
+    try:
+        from auction_title_parser import parse_title as _parse_title
+    except ImportError:
+        _parse_title = None
 
     rows = []
     now = datetime.utcnow()
@@ -87,25 +103,55 @@ def save_raw_sales(card_catalog_id: int, raw_sales: list, conn=None) -> int:
         sold_date = sale.get('sold_date')       # 'YYYY-MM-DD' string or None
         title = (sale.get('title') or '')[:500]
 
-        # Parse shipping — scraper stores it as "$3.50" string or 0.0 float
+        # Shipping — "$3.50" string or numeric float
         raw_ship = sale.get('shipping', 0)
         if isinstance(raw_ship, str):
-            import re
-            m = re.search(r'[\d.]+', raw_ship)
+            m = _re.search(r'[\d.]+', raw_ship)
             shipping_val = float(m.group()) if m else 0.0
         else:
             shipping_val = float(raw_ship or 0)
 
+        # Normalized fields — use sale-level values or parse from title
+        parsed = _parse_title(title) if _parse_title else {}
+        row_source       = sale.get('source') or source
+        grade            = sale.get('grade')            or parsed.get('grade')
+        grade_company    = sale.get('grade_company')    or parsed.get('grade_company')
+        grade_numeric    = sale.get('grade_numeric')    or parsed.get('grade_numeric')
+        serial_number    = sale.get('serial_number')    or parsed.get('serial_number')
+        print_run        = sale.get('print_run')        or parsed.get('print_run')
+        lot_url          = (sale.get('lot_url')  or '')[:2000]
+        lot_id           = (sale.get('lot_id')   or '')[:200]
+        hammer_price     = sale.get('hammer_price')
+        buyer_prem       = sale.get('buyer_premium_pct')
+        image_url        = (sale.get('image_url') or '')[:2000]
+        is_auction       = bool(sale.get('is_auction', False))
+        raw_meta         = sale.get('raw_metadata') or {}
+        raw_meta_json    = json.dumps(raw_meta) if isinstance(raw_meta, dict) else (raw_meta or '{}')
+
         listing_hash = _sale_hash(card_catalog_id, sold_date, title)
-        rows.append((card_catalog_id, sold_date, price_val, shipping_val, title,
-                     listing_hash, now))
+        rows.append((
+            card_catalog_id, sold_date, price_val, shipping_val, title,
+            listing_hash, now, row_source,
+            grade, grade_company, grade_numeric,
+            serial_number, print_run,
+            lot_url, lot_id,
+            hammer_price, buyer_prem, image_url,
+            is_auction, raw_meta_json,
+        ))
 
     if not rows:
         return 0
 
     sql = """
-        INSERT INTO market_raw_sales
-            (card_catalog_id, sold_date, price_val, shipping_val, title, listing_hash, scraped_at)
+        INSERT INTO market_raw_sales (
+            card_catalog_id, sold_date, price_val, shipping_val, title,
+            listing_hash, scraped_at, source,
+            grade, grade_company, grade_numeric,
+            serial_number, print_run,
+            lot_url, lot_id,
+            hammer_price, buyer_premium_pct, image_url,
+            is_auction, raw_metadata
+        )
         VALUES %s
         ON CONFLICT (listing_hash) DO NOTHING
     """

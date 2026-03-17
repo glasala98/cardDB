@@ -39,6 +39,7 @@ except ImportError:
 from db import get_db, save_raw_sales
 from scrape_card_prices import process_card, search_ebay_sold_paginated
 import scrape_card_prices
+from auction_title_parser import parse_title as _parse_sale_title
 
 # Graded variants — probe highest first, skip lower if no sales
 PSA_PROBE_ORDER = ['PSA 10', 'PSA 9', 'PSA 8']
