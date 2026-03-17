@@ -1,186 +1,290 @@
-import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getCatalog } from '../api/catalog'
-import SourceBadge from '../components/SourceBadge'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { getCatalog, parseCardQuery } from '../api/catalog'
 import styles from './Search.module.css'
 
 const PAGE_SIZE = 30
-const DEBOUNCE_MS = 350
 
-const SPORTS = ['NHL','NBA','NFL','MLB']
+// ─── Client-side quick parse (instant, no API) ─────────────────────────────
+const YEAR_RE    = /\b(20\d{2}(?:-\d{2,4})?|19\d{2}(?:-\d{2})?)\b/
+const SPORT_RE   = /\b(NHL|NBA|NFL|MLB)\b/i
+const ROOKIE_RE  = /\b(rookie|RC)\b/i
 
-function fmt(val) {
-  if (val == null) return null
-  return '$' + Number(val).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+function quickParse(q) {
+  let text = q
+
+  const yearM  = text.match(YEAR_RE)
+  const year   = yearM ? yearM[1] : ''
+  if (yearM) text = text.replace(yearM[0], ' ')
+
+  const sportM = text.match(SPORT_RE)
+  const sport  = sportM ? sportM[1].toUpperCase() : ''
+  if (sportM) text = text.replace(sportM[0], ' ')
+
+  const isRookie = ROOKIE_RE.test(text)
+  text = text.replace(ROOKIE_RE, ' ').replace(/\s+/g, ' ').trim()
+
+  // Put everything else into player_name — AI parse will refine on submit
+  return { player_name: text, year, set_name: '', variant: '', sport, is_rookie: isRookie }
 }
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function fmt(val) {
+  if (val == null) return null
+  return '$' + Number(val).toLocaleString('en-US', { maximumFractionDigits: 0 })
+}
+
+const SPORTS = ['NHL', 'NBA', 'NFL', 'MLB']
+
 export default function Search() {
-  const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
 
-  const [player,   setPlayer]   = useState(searchParams.get('player') ?? '')
-  const [year,     setYear]     = useState(searchParams.get('year')   ?? '')
-  const [setName,  setSetName]  = useState(searchParams.get('set')    ?? '')
-  const [variant,  setVariant]  = useState(searchParams.get('variant') ?? '')
-  const [sport,    setSport]    = useState(searchParams.get('sport')  ?? '')
-  const [isRookie, setIsRookie] = useState(searchParams.get('rookie') === '1')
-  const [page,     setPage]     = useState(Number(searchParams.get('page') ?? 1))
+  // The raw bar text
+  const [query, setQuery] = useState('')
 
-  const [results, setResults] = useState(null)  // null = idle, [] = empty
-  const [total,   setTotal]   = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState(null)
+  // Structured fields (populated by quick parse + AI parse)
+  const [fields, setFields] = useState({
+    player_name: '', year: '', set_name: '', variant: '', sport: '', is_rookie: false,
+  })
 
-  const debounceRef = useRef(null)
-  const reqIdRef    = useRef(0)
+  // Advanced panel open state
+  const [advanced, setAdvanced] = useState(false)
 
-  const hasQuery = player.trim().length >= 2 || year || setName.trim().length >= 2 || variant.trim().length >= 2
+  // Results
+  const [results,  setResults]  = useState(null)
+  const [total,    setTotal]    = useState(null)
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState(null)
+  const [page,     setPage]     = useState(1)
 
-  useEffect(() => {
-    clearTimeout(debounceRef.current)
+  // Parsing state
+  const [parsing,  setParsing]  = useState(false)
 
-    if (!hasQuery) {
-      setResults(null); setTotal(null); setError(null); setLoading(false)
+  const debounceRef  = useRef(null)
+  const reqIdRef     = useRef(0)
+
+  // When the bar changes: quick parse → update fields → open advanced if useful
+  function handleQueryChange(e) {
+    const q = e.target.value
+    setQuery(q)
+    setPage(1)
+
+    if (!q.trim()) {
+      setFields({ player_name: '', year: '', set_name: '', variant: '', sport: '', is_rookie: false })
+      setResults(null); setTotal(null); setError(null)
       return
     }
 
-    debounceRef.current = setTimeout(() => {
-      runSearch(player, year, setName, variant, sport, isRookie, page)
-    }, DEBOUNCE_MS)
+    const parsed = quickParse(q)
+    setFields(f => ({
+      ...f,
+      player_name: parsed.player_name || f.player_name,
+      year:        parsed.year        || f.year,
+      sport:       parsed.sport       || f.sport,
+      is_rookie:   parsed.is_rookie   !== undefined ? parsed.is_rookie : f.is_rookie,
+    }))
+  }
 
-    return () => clearTimeout(debounceRef.current)
-  }, [player, year, setName, variant, sport, isRookie, page])  // eslint-disable-line
+  // On Enter or Search button: AI parse → update fields → search
+  async function handleSubmit(e) {
+    e?.preventDefault()
+    if (!query.trim() || query.trim().length < 2) return
 
-  async function runSearch(p, y, s, v, sp, rookie, pg) {
+    clearTimeout(debounceRef.current)
+
+    // Call AI parse
+    if (query.trim().length >= 4) {
+      setParsing(true)
+      try {
+        const parsed = await parseCardQuery(query.trim())
+        if (parsed && !parsed.error) {
+          setFields({
+            player_name: parsed.player_name ?? '',
+            year:        parsed.year        ?? '',
+            set_name:    parsed.set_name    ?? '',
+            variant:     parsed.variant     ?? '',
+            sport:       parsed.sport       ?? '',
+            is_rookie:   parsed.is_rookie   ?? false,
+          })
+          setAdvanced(true)
+          // Search with AI-parsed fields
+          await runSearch({
+            player_name: parsed.player_name ?? '',
+            year:        parsed.year        ?? '',
+            set_name:    parsed.set_name    ?? '',
+            variant:     parsed.variant     ?? '',
+            sport:       parsed.sport       ?? '',
+            is_rookie:   parsed.is_rookie   ?? false,
+          }, 1)
+          return
+        }
+      } catch {
+        // fall through to quick-parse search
+      } finally {
+        setParsing(false)
+      }
+    }
+
+    // Fallback: search with quick-parsed fields
+    await runSearch(fields, 1)
+  }
+
+  // Field edit in advanced panel → re-search immediately
+  const handleFieldEdit = useCallback((key, val) => {
+    setFields(f => {
+      const next = { ...f, [key]: val }
+      setPage(1)
+      clearTimeout(debounceRef.current)
+      debounceRef.current = setTimeout(() => runSearch(next, 1), 400)
+      return next
+    })
+  }, [])  // eslint-disable-line
+
+  async function runSearch(f, pg) {
     const myId = ++reqIdRef.current
+
+    const hasAny = f.player_name || f.year || f.set_name || f.variant || f.sport || f.is_rookie
+    if (!hasAny) { setResults(null); setTotal(null); return }
+
     setLoading(true); setError(null)
 
-    const params = {
-      page,
-      per_page: PAGE_SIZE,
-      sort: 'num_sales',
-      dir: 'desc',
-    }
-    if (p.trim())   params.search   = p.trim()
-    if (y)          params.year     = y
-    if (s.trim())   params.set_name = s.trim()
-    if (sp)         params.sport    = sp
-    if (rookie)     params.is_rookie = true
-
-    // sync URL
-    const sp2 = new URLSearchParams()
-    if (p.trim())   sp2.set('player',  p.trim())
-    if (y)          sp2.set('year',    y)
-    if (s.trim())   sp2.set('set',     s.trim())
-    if (v.trim())   sp2.set('variant', v.trim())
-    if (sp)         sp2.set('sport',   sp)
-    if (rookie)     sp2.set('rookie',  '1')
-    if (pg > 1)     sp2.set('page',    String(pg))
-    setSearchParams(sp2, { replace: true })
+    const params = { page: pg, per_page: PAGE_SIZE, sort: 'num_sales', dir: 'desc' }
+    if (f.player_name) params.player_name = f.player_name
+    if (f.year)        params.year        = f.year
+    if (f.set_name)    params.set_name    = f.set_name
+    if (f.variant)     params.variant     = f.variant
+    if (f.sport)       params.sport       = f.sport
+    if (f.is_rookie)   params.is_rookie   = true
 
     try {
       const data = await getCatalog(params)
       if (myId !== reqIdRef.current) return
-
-      // client-side variant filter (catalog API doesn't support variant param yet)
-      let cards = data.cards ?? []
-      if (v.trim()) {
-        const vl = v.trim().toLowerCase()
-        cards = cards.filter(c => c.variant?.toLowerCase().includes(vl))
-      }
-
-      setResults(cards)
+      setResults(data.cards ?? [])
       setTotal(data.total ?? 0)
+      setPage(pg)
     } catch (e) {
       if (myId !== reqIdRef.current) return
-      setError(e?.message || 'Search failed — please try again.')
+      setError(e?.message || 'Search failed')
       setResults([])
     } finally {
       if (myId === reqIdRef.current) setLoading(false)
     }
   }
 
-  function handleFieldChange(setter) {
-    return (e) => { setter(e.target.value); setPage(1) }
-  }
-
-  const totalPages = total != null ? Math.ceil(total / PAGE_SIZE) : 0
-  const hasSearched = results !== null
+  const totalPages   = total != null ? Math.ceil(total / PAGE_SIZE) : 0
+  const hasSearched  = results !== null
+  const hasResults   = results?.length > 0
 
   return (
     <div className={styles.page}>
       <div className={styles.hero}>
         <h1 className={styles.heading}>Card Sales Search</h1>
-        <p className={styles.sub}>Find a card to see its full sale history.</p>
+        <p className={styles.sub}>Find a card to view its complete sale history.</p>
 
-        <div className={styles.searchGrid}>
-          <div className={styles.fieldWrap}>
-            <label className={styles.fieldLabel}>Player</label>
+        {/* ── Single smart search bar ── */}
+        <form onSubmit={handleSubmit} className={styles.searchForm}>
+          <div className={styles.barWrap}>
             <input
-              className={styles.fieldInput}
-              placeholder="e.g. Connor McDavid"
-              value={player}
-              onChange={handleFieldChange(setPlayer)}
+              className={styles.bar}
+              value={query}
+              onChange={handleQueryChange}
+              placeholder="e.g. Connor McDavid Red Prizm O-Pee-Chee Platinum 2024"
               autoFocus
             />
+            <button type="submit" className={styles.searchBtn} disabled={loading || parsing}>
+              {parsing ? '…' : 'Search'}
+            </button>
           </div>
+          <p className={styles.barHint}>
+            Press <kbd>Enter</kbd> to search — we'll figure out the player, set, and variant for you
+          </p>
+        </form>
 
-          <div className={styles.fieldWrap}>
-            <label className={styles.fieldLabel}>Year</label>
-            <input
-              className={styles.fieldInput}
-              placeholder="e.g. 2015-16"
-              value={year}
-              onChange={handleFieldChange(setYear)}
-            />
-          </div>
+        {/* ── Advanced toggle ── */}
+        <button
+          className={styles.advancedToggle}
+          type="button"
+          onClick={() => setAdvanced(a => !a)}
+        >
+          Advanced {advanced ? '▴' : '▾'}
+        </button>
 
-          <div className={styles.fieldWrap}>
-            <label className={styles.fieldLabel}>Set</label>
-            <input
-              className={styles.fieldInput}
-              placeholder="e.g. Upper Deck"
-              value={setName}
-              onChange={handleFieldChange(setSetName)}
-            />
+        {advanced && (
+          <div className={styles.advancedPanel}>
+            <div className={styles.advRow}>
+              <div className={styles.advField}>
+                <label className={styles.advLabel}>Player</label>
+                <input
+                  className={styles.advInput}
+                  placeholder="e.g. Connor McDavid"
+                  value={fields.player_name}
+                  onChange={e => handleFieldEdit('player_name', e.target.value)}
+                />
+              </div>
+              <div className={styles.advField}>
+                <label className={styles.advLabel}>Year</label>
+                <input
+                  className={styles.advInput}
+                  placeholder="e.g. 2024-25"
+                  value={fields.year}
+                  onChange={e => handleFieldEdit('year', e.target.value)}
+                />
+              </div>
+            </div>
+            <div className={styles.advRow}>
+              <div className={styles.advField}>
+                <label className={styles.advLabel}>Set</label>
+                <input
+                  className={styles.advInput}
+                  placeholder="e.g. O-Pee-Chee Platinum"
+                  value={fields.set_name}
+                  onChange={e => handleFieldEdit('set_name', e.target.value)}
+                />
+              </div>
+              <div className={styles.advField}>
+                <label className={styles.advLabel}>Variant / Subset</label>
+                <input
+                  className={styles.advInput}
+                  placeholder="e.g. Red Prizm, Young Guns"
+                  value={fields.variant}
+                  onChange={e => handleFieldEdit('variant', e.target.value)}
+                />
+              </div>
+            </div>
+            <div className={styles.advRow}>
+              <div className={styles.advField}>
+                <label className={styles.advLabel}>Sport</label>
+                <div className={styles.sportTabs}>
+                  <button type="button"
+                    className={`${styles.sportTab} ${fields.sport === '' ? styles.sportActive : ''}`}
+                    onClick={() => handleFieldEdit('sport', '')}
+                  >All</button>
+                  {SPORTS.map(s => (
+                    <button type="button" key={s}
+                      className={`${styles.sportTab} ${fields.sport === s ? styles.sportActive : ''}`}
+                      onClick={() => handleFieldEdit('sport', s)}
+                    >{s}</button>
+                  ))}
+                </div>
+              </div>
+              <label className={styles.checkLabel}>
+                <input
+                  type="checkbox"
+                  checked={fields.is_rookie}
+                  onChange={e => handleFieldEdit('is_rookie', e.target.checked)}
+                />
+                Rookies only
+              </label>
+            </div>
           </div>
-
-          <div className={styles.fieldWrap}>
-            <label className={styles.fieldLabel}>Variant / Subset</label>
-            <input
-              className={styles.fieldInput}
-              placeholder="e.g. Young Guns, Prizm"
-              value={variant}
-              onChange={handleFieldChange(setVariant)}
-            />
-          </div>
-        </div>
-
-        <div className={styles.filterRow}>
-          <div className={styles.sportTabs}>
-            <button
-              className={`${styles.sportTab} ${sport === '' ? styles.sportActive : ''}`}
-              onClick={() => { setSport(''); setPage(1) }}
-            >All</button>
-            {SPORTS.map(s => (
-              <button
-                key={s}
-                className={`${styles.sportTab} ${sport === s ? styles.sportActive : ''}`}
-                onClick={() => { setSport(s); setPage(1) }}
-              >{s}</button>
-            ))}
-          </div>
-          <label className={styles.checkLabel}>
-            <input type="checkbox" checked={isRookie} onChange={e => { setIsRookie(e.target.checked); setPage(1) }} />
-            Rookies only
-          </label>
-        </div>
+        )}
       </div>
 
-      {loading && (
+      {/* ── Status ── */}
+      {(loading || parsing) && (
         <div className={styles.statusRow}>
           <span className={styles.spinner} />
-          <span>Searching…</span>
+          <span>{parsing ? 'Parsing query…' : 'Searching…'}</span>
         </div>
       )}
 
@@ -188,17 +292,19 @@ export default function Search() {
         <div className={styles.error}>{error}</div>
       )}
 
-      {!loading && hasSearched && (
+      {/* ── Results ── */}
+      {!loading && !parsing && hasSearched && (
         <div className={styles.body}>
-          {results.length === 0 ? (
+          {!hasResults ? (
             <div className={styles.empty}>
-              <p>No cards found. Try broadening your search.</p>
+              No cards found. Try adjusting your search or opening Advanced to refine.
             </div>
           ) : (
             <>
               <div className={styles.resultMeta}>
                 {total != null && <span>{total.toLocaleString()} card{total !== 1 ? 's' : ''} — click one to see its sales</span>}
               </div>
+
               <div className={styles.cardGrid}>
                 {results.map(card => (
                   <button
@@ -214,14 +320,13 @@ export default function Search() {
                       {card.year} · {card.set_name}
                       {card.variant ? <span className={styles.variant}> · {card.variant}</span> : null}
                     </div>
+                    {card.card_number && (
+                      <div className={styles.cardNum}>#{card.card_number}</div>
+                    )}
                     <div className={styles.cardBottom}>
                       <span className={styles.sportChip}>{card.sport}</span>
-                      {card.fair_value && (
-                        <span className={styles.price}>{fmt(card.fair_value)}</span>
-                      )}
-                      {card.num_sales && (
-                        <span className={styles.salesCount}>{card.num_sales.toLocaleString()} sales</span>
-                      )}
+                      {card.fair_value && <span className={styles.price}>{fmt(card.fair_value)}</span>}
+                      {card.num_sales  && <span className={styles.salesCount}>{card.num_sales.toLocaleString()} sales</span>}
                     </div>
                   </button>
                 ))}
@@ -229,9 +334,9 @@ export default function Search() {
 
               {totalPages > 1 && (
                 <div className={styles.pagination}>
-                  <button className={styles.pageBtn} disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
+                  <button className={styles.pageBtn} disabled={page <= 1} onClick={() => runSearch(fields, page - 1)}>← Prev</button>
                   <span className={styles.pageInfo}>Page {page} of {totalPages}</span>
-                  <button className={styles.pageBtn} disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
+                  <button className={styles.pageBtn} disabled={page >= totalPages} onClick={() => runSearch(fields, page + 1)}>Next →</button>
                 </div>
               )}
             </>
@@ -239,10 +344,12 @@ export default function Search() {
         </div>
       )}
 
-      {!hasSearched && !loading && (
+      {!hasSearched && !loading && !parsing && (
         <div className={styles.prompt}>
-          <p>Search by player name, year, set, or variant to find a card and view its complete sale history.</p>
-          <p className={styles.promptHint}>e.g. "McDavid" + "Young Guns" · "Wembanyama" + "Prizm" · "Jordan" + "1986"</p>
+          <p>Type a player, set, year, variant — or any combination — and hit Search.</p>
+          <p className={styles.promptHint}>
+            "McDavid Young Guns 2015" · "Wembanyama Prizm RC" · "Jordan 1986 Fleer"
+          </p>
         </div>
       )}
     </div>

@@ -35,3 +35,7 @@ export const getCatalogRawSales = (catalogId, params = {}) =>
 /** Natural-language AI card search — Claude parses the query into filters. */
 export const aiSearchCatalog = (q) =>
   client.get('/catalog/ai-search', { params: { q } })
+
+/** Parse a natural-language query into structured fields (player, year, set, variant). */
+export const parseCardQuery = (q) =>
+  client.get('/catalog/parse', { params: { q } })

@@ -32,17 +32,19 @@ SORT_COLS = {
 
 @router.get("")
 def browse_catalog(
-    search:    Optional[str]  = Query(None),
-    sport:     Optional[str]  = Query(None),
-    year:      Optional[str]  = Query(None),
-    set_name:  Optional[str]  = Query(None),
-    is_rookie: Optional[bool] = Query(None),
-    tier:      Optional[str]  = Query(None),
-    has_price: Optional[bool] = Query(None),
-    sort:      str            = Query("year"),
-    dir:       str            = Query("desc"),
-    page:      int            = Query(1, ge=1),
-    per_page:  int            = Query(50, ge=1, le=200),
+    search:      Optional[str]  = Query(None),
+    player_name: Optional[str]  = Query(None),
+    sport:       Optional[str]  = Query(None),
+    year:        Optional[str]  = Query(None),
+    set_name:    Optional[str]  = Query(None),
+    variant:     Optional[str]  = Query(None),
+    is_rookie:   Optional[bool] = Query(None),
+    tier:        Optional[str]  = Query(None),
+    has_price:   Optional[bool] = Query(None),
+    sort:        str            = Query("year"),
+    dir:         str            = Query("desc"),
+    page:        int            = Query(1, ge=1),
+    per_page:    int            = Query(50, ge=1, le=200),
 ):
     """Paginated browse of card_catalog with optional market_prices join.
 
@@ -83,9 +85,17 @@ def browse_catalog(
         where_parts.append("cc.set_name ILIKE %s")
         params.append(f"%{set_name}%")
 
+    if player_name:
+        where_parts.append("cc.player_name ILIKE %s")
+        params.append(f"%{player_name}%")
+
+    if variant:
+        where_parts.append("cc.variant ILIKE %s")
+        params.append(f"%{variant}%")
+
     if search:
-        where_parts.append("(cc.player_name ILIKE %s OR cc.set_name ILIKE %s)")
-        params.extend([f"%{search}%", f"%{search}%"])
+        where_parts.append("(cc.player_name ILIKE %s OR cc.set_name ILIKE %s OR cc.variant ILIKE %s)")
+        params.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
 
     if is_rookie is True:
         where_parts.append("cc.is_rookie = TRUE")
@@ -797,4 +807,63 @@ def ai_search(q: str = Query(..., min_length=2)):
     }
     with _cache_lock:
         _ai_cache[q] = result
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Natural-language parse endpoint (no DB — just Claude extraction)
+# ---------------------------------------------------------------------------
+
+_parse_cache: TTLCache = TTLCache(maxsize=500, ttl=300)  # 5 min
+
+@router.get("/parse")
+def parse_card_query(q: str = Query(..., min_length=2)):
+    """Parse a natural-language card description into structured filter fields.
+
+    Returns only the parsed filter dict — no DB call. Used to populate
+    the advanced search panel in real time.
+
+    Returns:
+        Dict with: player_name, year, set_name, variant, sport, is_rookie (all optional)
+    """
+    with _cache_lock:
+        cached = _parse_cache.get(q)
+    if cached:
+        return cached
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return {"error": "AI parse not configured", "fallback": True}
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        system = (
+            "You are a sports card identifier. Parse the user's text into JSON with these optional keys:\n"
+            "  player_name (str): the player's full name\n"
+            "  year (str): card year, e.g. '2024-25' or '2024'\n"
+            "  set_name (str): the set name, e.g. 'O-Pee-Chee Platinum', 'Topps Chrome'\n"
+            "  variant (str): subset or parallel name, e.g. 'Young Guns', 'Red Prizm', 'Refractor'\n"
+            "  sport (str): one of NHL, NBA, NFL, MLB\n"
+            "  is_rookie (bool): true if the user specifically wants a rookie card\n"
+            "Only include keys you are confident about. Return ONLY valid JSON, no explanation."
+        )
+        msg = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=200,
+            system=system,
+            messages=[{"role": "user", "content": q}],
+        )
+        raw = msg.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        result = json.loads(raw)
+    except Exception:
+        # Graceful degradation — return bare search keyword
+        result = {"search": q}
+
+    with _cache_lock:
+        _parse_cache[q] = result
     return result
