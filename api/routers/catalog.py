@@ -39,6 +39,7 @@ def browse_catalog(
     set_name:    Optional[str]  = Query(None),
     variant:     Optional[str]  = Query(None),
     is_rookie:   Optional[bool] = Query(None),
+    card_number: Optional[str]  = Query(None),
     tier:        Optional[str]  = Query(None),
     has_price:   Optional[bool] = Query(None),
     sort:        str            = Query("year"),
@@ -92,6 +93,10 @@ def browse_catalog(
     if variant:
         where_parts.append("cc.variant ILIKE %s")
         params.append(f"%{variant}%")
+
+    if card_number:
+        where_parts.append("cc.card_number = %s")
+        params.append(card_number)
 
     if search:
         where_parts.append("(cc.player_name ILIKE %s OR cc.set_name ILIKE %s OR cc.variant ILIKE %s)")
@@ -1012,6 +1017,7 @@ def parse_card_query(q: str = Query(..., min_length=2)):
             "  variant (str): the subset, parallel, or insert name — e.g. 'Young Guns', 'Precious Metal Gems', 'PMG', 'Red Prizm', 'Refractor', 'Gold', 'Rookie Patch Auto'\n"
             "  sport (str): one of NHL, NBA, NFL, MLB\n"
             "  is_rookie (bool): true if the user specifically wants a rookie card\n"
+            "  card_number (str): the card number in the set, e.g. '201', '42', 'SP-15'\n"
             "IMPORTANT subset/insert classification rules:\n"
             "  - 'Precious Metal Gems' and 'PMG' are VARIANTS (inserts), NOT set names — Metal Universe is the set\n"
             "  - 'Young Guns', 'Canvas', 'UD Exclusives' are VARIANTS within Upper Deck sets\n"

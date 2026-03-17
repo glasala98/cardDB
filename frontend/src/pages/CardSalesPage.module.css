@@ -59,6 +59,47 @@
   color: var(--text-muted, #888);
 }
 
+.setLink {
+  background: none;
+  border: none;
+  color: var(--accent, #9d96ff);
+  font-size: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline dotted;
+}
+.setLink:hover { color: var(--accent, #6c63ff); }
+
+.statsBar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.statLabel {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted, #888);
+}
+
+.stat strong { font-size: 0.95rem; color: var(--text, #e8e8f0); }
+.high { color: #2ecc71 !important; }
+.low  { color: #e74c3c !important; }
+
+.sparkline {
+  margin-left: auto;
+  border-radius: 4px;
+}
+
 .cardStats {
   display: flex;
   gap: 16px;

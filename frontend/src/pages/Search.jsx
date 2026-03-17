@@ -44,7 +44,7 @@ export default function Search() {
 
   // Structured fields (populated by quick parse + AI parse)
   const [fields, setFields] = useState({
-    player_name: '', year: '', set_name: '', variant: '', sport: '', is_rookie: false,
+    player_name: '', year: '', set_name: '', variant: '', sport: '', is_rookie: false, card_number: '',
   })
 
   // Advanced panel open state
@@ -71,7 +71,7 @@ export default function Search() {
     setPage(1)
 
     if (!q.trim()) {
-      setFields({ player_name: '', year: '', set_name: '', variant: '', sport: '', is_rookie: false })
+      setFields({ player_name: '', year: '', set_name: '', variant: '', sport: '', is_rookie: false, card_number: '' })
       setResults(null); setTotal(null); setError(null)
       return
     }
@@ -106,6 +106,7 @@ export default function Search() {
             variant:     parsed.variant     ?? '',
             sport:       parsed.sport       ?? '',
             is_rookie:   parsed.is_rookie   ?? false,
+            card_number: parsed.card_number ?? '',
           })
           setAdvanced(true)
           // Search with AI-parsed fields
@@ -116,6 +117,7 @@ export default function Search() {
             variant:     parsed.variant     ?? '',
             sport:       parsed.sport       ?? '',
             is_rookie:   parsed.is_rookie   ?? false,
+            card_number: parsed.card_number ?? '',
           }, 1)
           return
         }
@@ -144,7 +146,7 @@ export default function Search() {
   async function runSearch(f, pg) {
     const myId = ++reqIdRef.current
 
-    const hasAny = f.player_name || f.year || f.set_name || f.variant || f.sport || f.is_rookie
+    const hasAny = f.player_name || f.year || f.set_name || f.variant || f.sport || f.is_rookie || f.card_number
     if (!hasAny) { setResults(null); setTotal(null); setFallbackNote(null); return }
 
     setLoading(true); setError(null); setFallbackNote(null)
@@ -158,6 +160,7 @@ export default function Search() {
       if (subset.variant)     p.variant     = subset.variant
       if (subset.sport)       p.sport       = subset.sport
       if (subset.is_rookie)   p.is_rookie   = true
+      if (subset.card_number) p.card_number = subset.card_number
       return p
     }
 
@@ -256,6 +259,15 @@ export default function Search() {
                   placeholder="e.g. 2024-25"
                   value={fields.year}
                   onChange={e => handleFieldEdit('year', e.target.value)}
+                />
+              </div>
+              <div className={styles.advField}>
+                <label className={styles.advLabel}>Card #</label>
+                <input
+                  className={styles.advInput}
+                  placeholder="e.g. 201"
+                  value={fields.card_number}
+                  onChange={e => handleFieldEdit('card_number', e.target.value)}
                 />
               </div>
             </div>

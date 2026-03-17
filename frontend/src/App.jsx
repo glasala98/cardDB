@@ -21,6 +21,8 @@ import Settings from './pages/Settings'
 import Releases from './pages/Releases'
 import Search from './pages/Search'
 import CardSalesPage from './pages/CardSalesPage'
+import SetBrowser from './pages/SetBrowser'
+import SetDetail from './pages/SetDetail'
 import { PreferencesProvider } from './context/PreferencesContext'
 import styles from './App.module.css'
 
@@ -45,6 +47,8 @@ function AppShell() {
           <Route path="/admin"           element={<AdminRoute><Admin /></AdminRoute>} />
           <Route path="/releases"        element={<Releases />} />
           <Route path="/catalog/:id"    element={<CardSalesPage />} />
+          <Route path="/sets"           element={<SetBrowser />} />
+          <Route path="/sets/detail"    element={<SetDetail />} />
         </Routes>
       </main>
     </div>

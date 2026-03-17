@@ -81,6 +81,7 @@ const NAV_ITEMS = [
     sub: [
       { to: '/catalog',    label: 'Browse'         },
       { to: '/releases',   label: 'New Releases'   },
+      { to: '/sets',       label: 'Sets'           },
       { to: '/collection', label: 'My Collection', auth: true },
     ],
   },

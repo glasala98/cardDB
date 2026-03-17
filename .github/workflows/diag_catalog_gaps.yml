@@ -1,0 +1,40 @@
+name: Diagnose Catalog Data Gaps
+
+on:
+  workflow_dispatch:
+    inputs:
+      sport:
+        description: 'Sport filter (ALL / NHL / NBA / NFL / MLB)'
+        required: false
+        default: 'ALL'
+      min_sales:
+        description: 'Sparse coverage threshold (sales count)'
+        required: false
+        default: '10'
+      limit:
+        description: 'Max rows to show per section'
+        required: false
+        default: '100'
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install psycopg2-binary
+
+      - name: Run diagnostic
+        run: |
+          python diag_catalog_gaps.py \
+            --sport "${{ github.event.inputs.sport || 'ALL' }}" \
+            --min-sales "${{ github.event.inputs.min_sales || '10' }}" \
+            --limit "${{ github.event.inputs.limit || '100' }}"
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

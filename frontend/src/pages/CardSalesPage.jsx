@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { getCatalogCard, getCatalogRawSales } from '../api/catalog'
 import SourceBadge from '../components/SourceBadge'
 import GradeBadge from '../components/GradeBadge'
@@ -19,8 +19,44 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+// Draw price sparkline on canvas
+function drawSparkline(canvas, prices) {
+  if (!canvas || prices.length < 2) return
+  const ctx  = canvas.getContext('2d')
+  const w    = canvas.width
+  const h    = canvas.height
+  ctx.clearRect(0, 0, w, h)
+  const min  = Math.min(...prices)
+  const max  = Math.max(...prices)
+  const span = max - min || 1
+  const pts  = prices.map((p, i) => ({
+    x: (i / (prices.length - 1)) * w,
+    y: h - ((p - min) / span) * (h - 8) - 4,
+  }))
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, 0, 0, h)
+  grad.addColorStop(0, 'rgba(108,99,255,0.35)')
+  grad.addColorStop(1, 'rgba(108,99,255,0)')
+  ctx.beginPath()
+  ctx.moveTo(pts[0].x, pts[0].y)
+  pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y))
+  ctx.lineTo(pts[pts.length - 1].x, h)
+  ctx.lineTo(pts[0].x, h)
+  ctx.closePath()
+  ctx.fillStyle = grad
+  ctx.fill()
+  // Line
+  ctx.beginPath()
+  ctx.moveTo(pts[0].x, pts[0].y)
+  pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y))
+  ctx.strokeStyle = '#6c63ff'
+  ctx.lineWidth = 2
+  ctx.stroke()
+}
+
 export default function CardSalesPage() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const catalogId = Number(id)
 
   const [card,    setCard]    = useState(null)
@@ -29,6 +65,8 @@ export default function CardSalesPage() {
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(null)
   const [page,    setPage]    = useState(1)
+
+  const canvasRef = useRef(null)
 
   const [sources,     setSources]     = useState([])
   const [grade,       setGrade]       = useState('')
@@ -66,8 +104,12 @@ export default function CardSalesPage() {
 
     getCatalogRawSales(catalogId, params)
       .then(data => {
-        setSales(data.sales ?? [])
+        const s = data.sales ?? []
+        setSales(s)
         setTotal(data.total ?? 0)
+        // Draw sparkline from date-asc prices
+        const prices = [...s].reverse().map(r => r.price_val).filter(Boolean)
+        setTimeout(() => drawSparkline(canvasRef.current, prices), 0)
       })
       .catch(e => setError(e?.message || 'Failed to load sales'))
       .finally(() => setLoading(false))
@@ -86,6 +128,12 @@ export default function CardSalesPage() {
 
   const totalPages = total != null ? Math.ceil(total / PAGE_SIZE) : 0
 
+  // Compute stats from current page of sales
+  const prices    = sales.map(s => s.price_val).filter(Boolean)
+  const avgPrice  = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : null
+  const highPrice = prices.length ? Math.max(...prices) : null
+  const lowPrice  = prices.length ? Math.min(...prices) : null
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -99,12 +147,23 @@ export default function CardSalesPage() {
               {card.scrape_tier === 'premium' && <span className={`${styles.tierBadge} ${styles.premium}`}>Premium</span>}
             </div>
             <div className={styles.cardMeta}>
-              {card.year} · {card.set_name}{card.variant ? ` · ${card.variant}` : ''}{card.card_number ? ` #${card.card_number}` : ''}
+              {card.year} · {' '}
+              <button className={styles.setLink}
+                onClick={() => navigate(`/sets/detail?year=${encodeURIComponent(card.year)}&set_name=${encodeURIComponent(card.set_name)}`)}>
+                {card.set_name}
+              </button>
+              {card.variant ? ` · ${card.variant}` : ''}
+              {card.card_number ? ` #${card.card_number}` : ''}
             </div>
-            <div className={styles.cardStats}>
-              {card.fair_value && <span>Fair value: <strong>{fmt(card.fair_value)}</strong></span>}
-              {card.num_sales  && <span>{card.num_sales.toLocaleString()} sales</span>}
-            </div>
+            {prices.length > 0 && (
+              <div className={styles.statsBar}>
+                <div className={styles.stat}><span className={styles.statLabel}>Avg</span><strong>{fmt(avgPrice)}</strong></div>
+                <div className={styles.stat}><span className={styles.statLabel}>High</span><strong className={styles.high}>{fmt(highPrice)}</strong></div>
+                <div className={styles.stat}><span className={styles.statLabel}>Low</span><strong className={styles.low}>{fmt(lowPrice)}</strong></div>
+                <div className={styles.stat}><span className={styles.statLabel}>Sales</span><strong>{total?.toLocaleString()}</strong></div>
+                <canvas ref={canvasRef} className={styles.sparkline} width={160} height={40} />
+              </div>
+            )}
           </div>
         ) : (
           <div className={styles.cardInfo}><span className={styles.loadingText}>Loading…</span></div>

@@ -1,0 +1,201 @@
+.page {
+  min-height: 100vh;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px 16px 48px;
+}
+
+.back {
+  display: inline-block;
+  color: var(--text-muted, #888);
+  font-size: 0.85rem;
+  text-decoration: none;
+  margin-bottom: 16px;
+}
+.back:hover { color: var(--accent, #6c63ff); }
+
+.header { margin-bottom: 16px; }
+
+.setName {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text, #e8e8f0);
+  margin: 0 0 4px;
+}
+
+.setMeta {
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+}
+
+.searchRow { margin-bottom: 16px; }
+
+.playerSearch {
+  background: var(--bg, #12121f);
+  border: 1px solid var(--border, #333);
+  border-radius: 8px;
+  color: var(--text, #e8e8f0);
+  font-size: 0.9rem;
+  padding: 8px 12px;
+  width: 280px;
+  max-width: 100%;
+}
+.playerSearch:focus { outline: none; border-color: var(--accent, #6c63ff); }
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted, #888);
+  font-size: 0.9rem;
+  padding: 24px 0;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border, #333);
+  border-top-color: var(--accent, #6c63ff);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error {
+  padding: 16px;
+  border: 1px solid #c0392b;
+  border-radius: 8px;
+  color: #e74c3c;
+}
+
+/* Card list */
+.list {
+  background: var(--surface, #1e1e2e);
+  border: 1px solid var(--border, #2a2a3e);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.playerRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border, #1e1e2e);
+  flex-wrap: wrap;
+}
+.playerRow:last-child { border-bottom: none; }
+.playerRow:hover { background: var(--surface2, #16162a); }
+
+.cardNum {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted, #666);
+  min-width: 42px;
+  padding-top: 2px;
+  flex-shrink: 0;
+}
+
+.playerInfo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 180px;
+  flex-shrink: 0;
+}
+
+.playerName {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text, #e8e8f0);
+}
+
+.rcBadge {
+  background: #e67e22;
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.team {
+  font-size: 0.75rem;
+  color: var(--text-muted, #666);
+}
+
+/* Variant chips */
+.variantChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  flex: 1;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 5px;
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid transparent;
+}
+
+.chipBase {
+  background: var(--bg, #12121f);
+  border-color: var(--border, #333);
+  color: var(--text-muted, #aaa);
+}
+.chipBase:hover { border-color: var(--accent, #6c63ff); color: var(--accent, #6c63ff); }
+
+.chipParallel {
+  background: var(--accent-dim, #6c63ff15);
+  border-color: var(--accent, #6c63ff44);
+  color: var(--accent, #9d96ff);
+}
+.chipParallel:hover { border-color: var(--accent, #6c63ff); background: var(--accent-dim, #6c63ff25); }
+
+.chipName { font-weight: 600; }
+
+.chipPrint {
+  color: var(--text-muted, #777);
+  font-size: 0.68rem;
+}
+
+.chipPrice {
+  color: #2ecc71;
+  font-weight: 700;
+  font-size: 0.7rem;
+  margin-left: 2px;
+}
+
+.empty {
+  text-align: center;
+  padding: 48px;
+  color: var(--text-muted, #888);
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.pageBtn {
+  background: var(--surface, #1e1e2e);
+  border: 1px solid var(--border, #333);
+  border-radius: 6px;
+  color: var(--text, #e8e8f0);
+  font-size: 0.85rem;
+  padding: 7px 14px;
+  cursor: pointer;
+}
+.pageBtn:hover:not(:disabled) { border-color: var(--accent, #6c63ff); }
+.pageBtn:disabled { opacity: 0.35; cursor: default; }
+.pageInfo { font-size: 0.85rem; color: var(--text-muted, #888); }
