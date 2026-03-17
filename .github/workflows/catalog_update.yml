@@ -26,10 +26,15 @@ jobs:
           python-version: '3.11'
       - name: Install Python dependencies
         run: pip install -r requirements.txt
-      - name: Update NHL catalog (CLI — recent 3 seasons)
+      - name: Update NHL catalog (CLI — 2022+)
+        run: |
+          python -u scrape_beckett_catalog.py --source cli --sport NHL --year-from 2022
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Update NHL catalog (TCDB — full history from year_from)
         run: |
           YEAR_FROM=${{ github.event.inputs.year_from || '2000' }}
-          python -u scrape_beckett_catalog.py --source cli --sport NHL --year-from $YEAR_FROM
+          python -u scrape_beckett_catalog.py --source tcdb --sport NHL --year-from $YEAR_FROM
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -46,14 +51,18 @@ jobs:
         run: pip install -r requirements.txt
       - name: Update MLB catalog (CLI — 2023+)
         run: |
-          YEAR_FROM=${{ github.event.inputs.year_from || '2000' }}
-          python -u scrape_beckett_catalog.py --source cli --sport MLB --year-from $YEAR_FROM
+          python -u scrape_beckett_catalog.py --source cli --sport MLB --year-from 2023
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Update MLB catalog (CBC — 2022+)
         run: |
+          python -u scrape_beckett_catalog.py --source cbc --sport MLB --year-from 2022
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Update MLB catalog (TCDB — full history from year_from)
+        run: |
           YEAR_FROM=${{ github.event.inputs.year_from || '2000' }}
-          python -u scrape_beckett_catalog.py --source cbc --sport MLB --year-from $YEAR_FROM
+          python -u scrape_beckett_catalog.py --source tcdb --sport MLB --year-from $YEAR_FROM
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -70,8 +79,13 @@ jobs:
         run: pip install -r requirements.txt
       - name: Update NFL catalog (CBC — 2022+)
         run: |
+          python -u scrape_beckett_catalog.py --source cbc --sport NFL --year-from 2022
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Update NFL catalog (TCDB — full history from year_from)
+        run: |
           YEAR_FROM=${{ github.event.inputs.year_from || '2000' }}
-          python -u scrape_beckett_catalog.py --source cbc --sport NFL --year-from $YEAR_FROM
+          python -u scrape_beckett_catalog.py --source tcdb --sport NFL --year-from $YEAR_FROM
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -86,9 +100,14 @@ jobs:
           python-version: '3.11'
       - name: Install Python dependencies
         run: pip install -r requirements.txt
-      - name: Update NBA catalog (CLI — season format e.g. 2024-25)
+      - name: Update NBA catalog (CLI — 2022+)
+        run: |
+          python -u scrape_beckett_catalog.py --source cli --sport NBA --year-from 2022
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Update NBA catalog (TCDB — full history from year_from)
         run: |
           YEAR_FROM=${{ github.event.inputs.year_from || '2000' }}
-          python -u scrape_beckett_catalog.py --source cli --sport NBA --year-from $YEAR_FROM
+          python -u scrape_beckett_catalog.py --source tcdb --sport NBA --year-from $YEAR_FROM
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
