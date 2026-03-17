@@ -33,6 +33,7 @@ SORT_COLS = {
 @router.get("")
 def browse_catalog(
     search:      Optional[str]  = Query(None),
+    fts:         Optional[str]  = Query(None),
     player_name: Optional[str]  = Query(None),
     sport:       Optional[str]  = Query(None),
     year:        Optional[str]  = Query(None),
@@ -101,6 +102,17 @@ def browse_catalog(
     if search:
         where_parts.append("(cc.player_name ILIKE %s OR cc.set_name ILIKE %s OR cc.variant ILIKE %s)")
         params.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
+
+    if fts:
+        # Multi-term AND: every token must appear in at least one of the key fields.
+        # "Connor McDavid Young Guns" → each word matched independently so
+        # "Connor"/"McDavid" hits player_name and "Young"/"Guns" hits variant.
+        for token in fts.split():
+            if len(token) >= 2:  # skip single chars
+                where_parts.append(
+                    "(cc.player_name ILIKE %s OR cc.set_name ILIKE %s OR cc.variant ILIKE %s)"
+                )
+                params.extend([f"%{token}%", f"%{token}%", f"%{token}%"])
 
     if is_rookie is True:
         where_parts.append("cc.is_rookie = TRUE")

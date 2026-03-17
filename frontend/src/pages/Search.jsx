@@ -109,7 +109,7 @@ export default function Search() {
             card_number: parsed.card_number ?? '',
           })
           setAdvanced(true)
-          // Search with AI-parsed fields
+          // Search with AI-parsed fields; pass raw query as fts fallback
           await runSearch({
             player_name: parsed.player_name ?? '',
             year:        parsed.year        ?? '',
@@ -118,18 +118,18 @@ export default function Search() {
             sport:       parsed.sport       ?? '',
             is_rookie:   parsed.is_rookie   ?? false,
             card_number: parsed.card_number ?? '',
-          }, 1)
+          }, 1, query.trim())
           return
         }
       } catch {
-        // fall through to quick-parse search
+        // fall through to fts search
       } finally {
         setParsing(false)
       }
     }
 
-    // Fallback: search with quick-parsed fields
-    await runSearch(fields, 1)
+    // Fallback: use raw query as multi-term FTS (no player_name splitting needed)
+    await runSearch({ sport: fields.sport, year: fields.year }, 1, query.trim())
   }
 
   // Field edit in advanced panel → re-search immediately
@@ -138,15 +138,15 @@ export default function Search() {
       const next = { ...f, [key]: val }
       setPage(1)
       clearTimeout(debounceRef.current)
-      debounceRef.current = setTimeout(() => runSearch(next, 1), 400)
+      debounceRef.current = setTimeout(() => runSearch(next, 1, query), 400)
       return next
     })
-  }, [])  // eslint-disable-line
+  }, [query])  // eslint-disable-line
 
-  async function runSearch(f, pg) {
+  async function runSearch(f, pg, rawQuery) {
     const myId = ++reqIdRef.current
 
-    const hasAny = f.player_name || f.year || f.set_name || f.variant || f.sport || f.is_rookie || f.card_number
+    const hasAny = f.player_name || f.year || f.set_name || f.variant || f.sport || f.is_rookie || f.card_number || f.fts || rawQuery
     if (!hasAny) { setResults(null); setTotal(null); setFallbackNote(null); return }
 
     setLoading(true); setError(null); setFallbackNote(null)
@@ -154,6 +154,7 @@ export default function Search() {
     // Build a param object from a filter subset
     function toParams(subset, pageNum) {
       const p = { page: pageNum, per_page: PAGE_SIZE, sort: 'num_sales', dir: 'desc' }
+      if (subset.fts)         p.fts         = subset.fts
       if (subset.player_name) p.player_name = subset.player_name
       if (subset.year)        p.year        = subset.year
       if (subset.set_name)    p.set_name    = subset.set_name
@@ -164,7 +165,7 @@ export default function Search() {
       return p
     }
 
-    // Cascade: full → swap set↔variant → drop variant → drop set → player only
+    // Cascade: full → swap set↔variant → drop variant → drop set → player only → fts fallback
     const attempts = [
       { filter: f,                                                                           note: null },
       // If set_name returned nothing, try it as a variant (common misclassification e.g. PMG)
@@ -173,6 +174,8 @@ export default function Search() {
       { filter: { ...f, set_name: '', variant: '' },                                         note: f.set_name ? `No results for set "${f.set_name}" — showing all matching cards` : null },
       { filter: { ...f, set_name: '', variant: '', year: '' },                               note: f.year     ? `No exact match — showing all ${f.player_name || 'matching'} cards` : null },
       { filter: { player_name: f.player_name, sport: f.sport },                             note: f.player_name ? `Showing all ${f.player_name} cards` : null },
+      // Last resort: multi-term FTS across all text fields using the raw query
+      ...(rawQuery ? [{ filter: { fts: rawQuery, sport: f.sport, year: f.year },            note: `Showing best matches for "${rawQuery}"` }] : []),
     ]
 
     try {
@@ -377,9 +380,9 @@ export default function Search() {
 
               {totalPages > 1 && (
                 <div className={styles.pagination}>
-                  <button className={styles.pageBtn} disabled={page <= 1} onClick={() => runSearch(fields, page - 1)}>← Prev</button>
+                  <button className={styles.pageBtn} disabled={page <= 1} onClick={() => runSearch(fields, page - 1, query)}>← Prev</button>
                   <span className={styles.pageInfo}>Page {page} of {totalPages}</span>
-                  <button className={styles.pageBtn} disabled={page >= totalPages} onClick={() => runSearch(fields, page + 1)}>Next →</button>
+                  <button className={styles.pageBtn} disabled={page >= totalPages} onClick={() => runSearch(fields, page + 1, query)}>Next →</button>
                 </div>
               )}
             </>
