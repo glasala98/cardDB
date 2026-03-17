@@ -1,0 +1,191 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal {
+  background: var(--surface, #1e1e2e);
+  border: 1px solid var(--border, #2a2a3e);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 540px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 28px;
+  position: relative;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+}
+
+.close {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  background: none;
+  border: none;
+  color: var(--text-muted, #888);
+  font-size: 1.8rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+.close:hover { color: var(--text, #e8e8f0); }
+
+.header {
+  margin-bottom: 18px;
+}
+
+.badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.rcBadge {
+  background: #7b2d8b;
+  color: #e8b4f0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.player {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text, #e8e8f0);
+  margin-bottom: 4px;
+}
+
+.cardMeta {
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+}
+
+.priceRow {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 16px;
+  background: rgba(108,99,255,0.08);
+  border-radius: 10px;
+  border: 1px solid rgba(108,99,255,0.2);
+}
+
+.mainPrice, .premiumBlock, .serialBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.priceLabel {
+  font-size: 0.72rem;
+  color: var(--text-muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.priceVal {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text, #e8e8f0);
+}
+
+.premiumNote {
+  font-size: 0.7rem;
+  color: var(--text-muted, #888);
+}
+
+.serialVal {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent, #6c63ff);
+}
+
+.meta2 {
+  display: flex;
+  gap: 16px;
+  font-size: 0.8rem;
+  color: var(--text-muted, #888);
+  margin-bottom: 12px;
+}
+
+.titleFull {
+  font-size: 0.78rem;
+  color: var(--text-muted, #777);
+  font-style: italic;
+  margin-bottom: 10px;
+  word-break: break-word;
+}
+
+.viewLink {
+  display: inline-block;
+  font-size: 0.82rem;
+  color: var(--accent, #6c63ff);
+  text-decoration: none;
+  margin-bottom: 20px;
+}
+.viewLink:hover { text-decoration: underline; }
+
+.historySection {
+  border-top: 1px solid var(--border, #2a2a3e);
+  padding-top: 16px;
+}
+
+.historyHead {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted, #888);
+  font-weight: 600;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.loadingDot { color: var(--accent, #6c63ff); }
+
+.sparkCanvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.statsRow {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stat span {
+  font-size: 0.7rem;
+  color: var(--text-muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stat strong {
+  font-size: 0.95rem;
+  color: var(--text, #e8e8f0);
+}
+
+.noHistory {
+  font-size: 0.82rem;
+  color: var(--text-muted, #888);
+  padding: 12px 0;
+}

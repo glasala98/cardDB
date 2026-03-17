@@ -12,18 +12,17 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-export default function SearchResultRow({ sale }) {
+export default function SearchResultRow({ sale, onClick }) {
   const hasPremium = sale.hammer_price != null && sale.buyer_premium_pct != null
   const premium = hasPremium
     ? (sale.price_val - sale.hammer_price).toFixed(0)
     : null
 
   return (
-    <a
-      href={sale.lot_url || sale.url || '#'}
-      target="_blank"
-      rel="noopener noreferrer"
+    <div
       className={styles.row}
+      onClick={onClick}
+      style={onClick ? { cursor: 'pointer' } : undefined}
     >
       {sale.image_url && (
         <img src={sale.image_url} alt="" className={styles.thumb} loading="lazy" />

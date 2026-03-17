@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { searchSales } from '../api/search'
+import client from '../api/client'
 import SearchBar from '../components/SearchBar'
 import SearchFilters from '../components/SearchFilters'
 import SearchResultRow from '../components/SearchResultRow'
+import SaleDetailModal from '../components/SaleDetailModal'
 import styles from './Search.module.css'
 
 const PAGE_SIZE = 25
@@ -43,7 +45,13 @@ export default function Search() {
   const [total, setTotal] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [selectedSale, setSelectedSale] = useState(null)
+  const [trending, setTrending] = useState([])
   const abortRef = useRef(null)
+
+  useEffect(() => {
+    client.get('/search/trending').then(data => setTrending(data ?? [])).catch(() => {})
+  }, [])
 
   const doSearch = useCallback(async (q, f, pg) => {
     if (!q.trim()) { setResults(null); setTotal(null); return }
@@ -135,7 +143,7 @@ export default function Search() {
             <>
               <div className={styles.resultList}>
                 {results.map((sale, i) => (
-                  <SearchResultRow key={sale.id ?? i} sale={sale} />
+                  <SearchResultRow key={sale.id ?? i} sale={sale} onClick={() => setSelectedSale(sale)} />
                 ))}
               </div>
 
@@ -162,7 +170,25 @@ export default function Search() {
       {results === null && !loading && (
         <div className={styles.prompt}>
           <p>Search across eBay, Goldin, Heritage, PWCC, Fanatics, Pristine, and MySlabs.</p>
+          {trending.length > 0 && (
+            <div className={styles.trending}>
+              <span className={styles.trendLabel}>Trending:</span>
+              {trending.slice(0, 8).map((t, i) => (
+                <button
+                  key={i}
+                  className={styles.trendChip}
+                  onClick={() => { handleQueryChange(t.query); handleSubmit(t.query) }}
+                >
+                  {t.query}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+      )}
+
+      {selectedSale && (
+        <SaleDetailModal sale={selectedSale} onClose={() => setSelectedSale(null)} />
       )}
     </div>
   )
