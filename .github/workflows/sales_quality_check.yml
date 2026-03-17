@@ -1,0 +1,65 @@
+name: Sales Quality Check — Variant Mismatch Analysis
+
+on:
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: 'Tier to analyse (staple/premium/stars/base/all)'
+        required: false
+        default: 'staple'
+      sport:
+        description: 'Sport to analyse (NHL/NBA/NFL/MLB/ALL)'
+        required: false
+        default: 'ALL'
+      min_sales:
+        description: 'Min stored sales per card to include (default: 3)'
+        required: false
+        default: '3'
+      sample:
+        description: 'Random sample N cards (leave blank = all)'
+        required: false
+        default: ''
+
+jobs:
+  analyse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python dependencies
+        run: pip install psycopg2-binary
+
+      - name: Run quality analysis
+        run: |
+          ARGS="--min-sales ${{ github.event.inputs.min_sales || '3' }}"
+
+          TIER="${{ github.event.inputs.tier || 'staple' }}"
+          if [ "$TIER" != "all" ]; then
+            ARGS="$ARGS --tier $TIER"
+          fi
+
+          SPORT="${{ github.event.inputs.sport || 'ALL' }}"
+          if [ "$SPORT" != "ALL" ]; then
+            ARGS="$ARGS --sport $SPORT"
+          fi
+
+          SAMPLE="${{ github.event.inputs.sample }}"
+          if [ -n "$SAMPLE" ]; then
+            ARGS="$ARGS --sample $SAMPLE"
+          fi
+
+          python analyze_sales_quality.py $ARGS
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Upload reports as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sales-quality-${{ github.event.inputs.tier || 'staple' }}-${{ github.run_id }}
+          path: |
+            sales_quality_report.csv
+            sales_quality_summary.csv
+          retention-days: 30
