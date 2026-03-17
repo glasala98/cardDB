@@ -48,6 +48,6 @@ export default function SearchResultRow({ sale, onClick }) {
           </span>
         )}
       </div>
-    </a>
+    </div>
   )
 }

@@ -42,8 +42,10 @@ def _detect_grade(q: str) -> Optional[str]:
     m = _GRADE_RE.search(q)
     if m:
         return f"{m.group(1).upper()} {m.group(2)}"
-    if _GRADE_WORD_RE.search(q):
-        return "GEM MT 10"
+    m2 = _GRADE_WORD_RE.search(q)
+    if m2:
+        text = m2.group(1).lower()
+        return "GEM MINT" if re.search(r'mint\s*$', text) else "GEM MT 10"
     return None
 
 
