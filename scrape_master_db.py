@@ -180,10 +180,13 @@ def load_cards(args) -> list:
     if getattr(args, 'rookies', False):
         conditions.append("cc.is_rookie = TRUE")
 
-    # --backfill: only cards with zero rows in market_raw_sales
+    # --backfill: only cards with zero rows in market_raw_sales AND not already confirmed no_market
     if getattr(args, 'backfill', False):
         conditions.append(
             "NOT EXISTS (SELECT 1 FROM market_raw_sales WHERE card_catalog_id = cc.id)"
+        )
+        conditions.append(
+            "NOT EXISTS (SELECT 1 FROM market_prices WHERE card_catalog_id = cc.id AND confidence = 'no_market')"
         )
 
     where = " AND ".join(conditions)
