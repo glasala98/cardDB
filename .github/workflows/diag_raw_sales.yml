@@ -1,0 +1,16 @@
+name: Diagnose Raw Sales Table
+on:
+  workflow_dispatch:
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install psycopg2-binary
+      - run: python diag_raw_sales.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
