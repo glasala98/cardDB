@@ -1,0 +1,22 @@
+name: Backfill Normalized Fields (grade/serial/print_run)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 0'  # Sunday 3am UTC — runs weekly, no-ops once all rows done
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install psycopg2-binary
+      - name: Backfill normalized fields
+        run: python -u backfill_normalized_fields.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
