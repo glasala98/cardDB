@@ -4,8 +4,9 @@ import json
 import math
 import os
 import threading
-from typing import Optional
-from fastapi import APIRouter, Query
+from datetime import date, timedelta
+from typing import Optional, List
+from fastapi import APIRouter, HTTPException, Query
 from cachetools import TTLCache
 
 from db import get_db
@@ -177,6 +178,34 @@ def browse_catalog(
     }
 
 
+@router.get("/{catalog_id}")
+def get_catalog_card(catalog_id: int):
+    """Return a single catalog card with its current market price."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT cc.id, cc.sport, cc.year, cc.brand, cc.set_name, cc.card_number,
+                   cc.player_name, cc.team, cc.variant, cc.print_run, cc.is_rookie,
+                   cc.scrape_tier,
+                   mp.fair_value, mp.prev_value, mp.trend, mp.confidence,
+                   mp.num_sales, mp.scraped_at, mp.image_url
+            FROM card_catalog cc
+            LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
+            WHERE cc.id = %s
+        """, [catalog_id])
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Card not found")
+        cols = [d[0] for d in cur.description]
+        card = dict(zip(cols, row))
+        for k in ("fair_value", "prev_value"):
+            if card[k] is not None:
+                card[k] = float(card[k])
+        if card.get("scraped_at"):
+            card["scraped_at"] = card["scraped_at"].isoformat()
+    return card
+
+
 @router.get("/{catalog_id}/history")
 def catalog_card_history(catalog_id: int):
     """Return price history for a single catalog card."""
@@ -225,38 +254,81 @@ def catalog_card_history(catalog_id: int):
 
 
 @router.get("/{catalog_id}/raw-sales")
-def catalog_raw_sales(catalog_id: int, limit: int = 50, offset: int = 0):
-    """Return individual eBay sold listings stored in market_raw_sales for a catalog card."""
+def catalog_raw_sales(
+    catalog_id:  int,
+    source:      List[str]      = Query(default=[]),
+    grade:       Optional[str]  = Query(None),
+    serial_only: bool           = Query(False),
+    date_from:   Optional[date] = Query(None),
+    date_to:     Optional[date] = Query(None),
+    price_min:   Optional[float]= Query(None, ge=0),
+    price_max:   Optional[float]= Query(None),
+    sort:        str            = Query("date_desc"),
+    limit:       int            = Query(50, ge=1, le=200),
+    offset:      int            = Query(0, ge=0),
+):
+    """Return paginated sales from market_raw_sales for a catalog card, with filters."""
+    ORDER_MAP = {
+        "date_desc":  "sold_date DESC NULLS LAST",
+        "date_asc":   "sold_date ASC  NULLS LAST",
+        "price_desc": "price_val DESC",
+        "price_asc":  "price_val ASC",
+    }
+    order = ORDER_MAP.get(sort, "sold_date DESC NULLS LAST")
+
+    conditions = ["card_catalog_id = %s"]
+    params: list = [catalog_id]
+
+    if source:
+        conditions.append("source = ANY(%s)")
+        params.append([s.lower() for s in source])
+    if grade:
+        conditions.append("grade ILIKE %s")
+        params.append(f"%{grade}%")
+    if serial_only:
+        conditions.append("serial_number IS NOT NULL")
+    if date_from:
+        conditions.append("sold_date >= %s"); params.append(date_from)
+    if date_to:
+        conditions.append("sold_date <= %s"); params.append(date_to)
+    if price_min is not None:
+        conditions.append("price_val >= %s"); params.append(price_min)
+    if price_max is not None:
+        conditions.append("price_val <= %s"); params.append(price_max)
+
+    where = " AND ".join(conditions)
+
     with get_db() as conn:
         cur = conn.cursor()
-        cur.execute("""
-            SELECT COUNT(*) FROM market_raw_sales WHERE card_catalog_id = %s
-        """, [catalog_id])
+        cur.execute(f"SELECT COUNT(*) FROM market_raw_sales WHERE {where}", params)
         total = cur.fetchone()[0]
 
-        cur.execute("""
-            SELECT sold_date, price_val, title, scraped_at
+        cur.execute(f"""
+            SELECT id, sold_date, price_val, title, source,
+                   grade, grade_company, grade_numeric,
+                   serial_number, print_run,
+                   lot_url, image_url,
+                   hammer_price, buyer_premium_pct, is_auction,
+                   scraped_at
             FROM market_raw_sales
-            WHERE card_catalog_id = %s
-            ORDER BY sold_date DESC NULLS LAST
+            WHERE {where}
+            ORDER BY {order}
             LIMIT %s OFFSET %s
-        """, [catalog_id, limit, offset])
+        """, params + [limit, offset])
         cols = [d[0] for d in cur.description]
+        cutoff = date.today() - timedelta(days=90)
         sales = []
         for r in cur.fetchall():
             s = dict(zip(cols, r))
-            s["price_val"]  = float(s["price_val"])
-            s["sold_date"]  = s["sold_date"].isoformat()  if s["sold_date"]  else None
-            s["scraped_at"] = s["scraped_at"].isoformat() if s["scraped_at"] else None
-            # Flag sales eBay no longer shows (>90 days old)
-            if s["sold_date"]:
-                from datetime import date, timedelta
-                s["exclusive"] = date.fromisoformat(s["sold_date"]) < date.today() - timedelta(days=90)
-            else:
-                s["exclusive"] = False
+            s["price_val"]     = float(s["price_val"])     if s["price_val"]     is not None else None
+            s["grade_numeric"] = float(s["grade_numeric"]) if s["grade_numeric"] is not None else None
+            s["hammer_price"]  = float(s["hammer_price"])  if s["hammer_price"]  is not None else None
+            s["sold_date"]     = s["sold_date"].isoformat()  if s["sold_date"]  else None
+            s["scraped_at"]    = s["scraped_at"].isoformat() if s["scraped_at"] else None
+            s["exclusive"]     = (date.fromisoformat(s["sold_date"]) < cutoff) if s["sold_date"] else False
             sales.append(s)
 
-    return {"sales": sales, "total": total}
+    return {"sales": sales, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/releases")

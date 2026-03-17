@@ -5,41 +5,106 @@
 }
 
 .hero {
-  padding: 48px 24px 32px;
-  text-align: center;
+  padding: 36px 24px 20px;
   background: linear-gradient(180deg, var(--surface, #1a1a2e) 0%, transparent 100%);
 }
 
 .heading {
-  font-size: 2rem;
+  font-size: 1.8rem;
   font-weight: 800;
-  margin: 0 0 6px;
+  margin: 0 0 4px;
   color: var(--text, #e8e8f0);
+  text-align: center;
 }
 
 .sub {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   color: var(--text-muted, #888);
-  margin: 0 0 24px;
+  margin: 0 0 20px;
+  text-align: center;
 }
 
-.searchWrap {
-  max-width: 680px;
-  margin: 0 auto;
+/* Search fields grid */
+.searchGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 10px;
+  max-width: 900px;
+  margin: 0 auto 12px;
+}
+
+@media (max-width: 700px) {
+  .searchGrid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 420px) {
+  .searchGrid { grid-template-columns: 1fr; }
+}
+
+.fieldWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldLabel {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted, #888);
+  font-weight: 600;
+}
+
+.fieldInput {
+  background: var(--bg, #12121f);
+  border: 1px solid var(--border, #333);
+  border-radius: 8px;
+  color: var(--text, #e8e8f0);
+  font-size: 0.9rem;
+  padding: 8px 12px;
   width: 100%;
+  box-sizing: border-box;
 }
+.fieldInput:focus { outline: none; border-color: var(--accent, #6c63ff); }
+.fieldInput::placeholder { color: var(--text-muted, #555); }
 
-.body {
+/* Sport tabs + rookie */
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   max-width: 900px;
   margin: 0 auto;
-  width: 100%;
-  padding: 0 16px 48px;
+  flex-wrap: wrap;
 }
 
-.filtersWrap {
-  margin-bottom: 16px;
+.sportTabs {
+  display: flex;
+  gap: 4px;
 }
 
+.sportTab {
+  background: none;
+  border: 1px solid var(--border, #333);
+  border-radius: 6px;
+  color: var(--text-muted, #888);
+  font-size: 0.8rem;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.sportTab:hover    { border-color: var(--accent, #6c63ff); }
+.sportActive       { border-color: var(--accent, #6c63ff); color: var(--accent, #6c63ff); background: var(--accent-dim, #6c63ff22); }
+
+.checkLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+  cursor: pointer;
+}
+
+/* Status */
 .statusRow {
   display: flex;
   align-items: center;
@@ -58,15 +123,111 @@
   animation: spin 0.7s linear infinite;
   flex-shrink: 0;
 }
-
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .error {
-  padding: 16px;
+  margin: 0 24px;
+  padding: 14px 16px;
   border: 1px solid #c0392b;
   border-radius: 8px;
   color: #e74c3c;
   font-size: 0.9rem;
+}
+
+/* Results */
+.body {
+  max-width: 960px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 16px 16px 48px;
+}
+
+.resultMeta {
+  font-size: 0.8rem;
+  color: var(--text-muted, #888);
+  margin-bottom: 10px;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.cardCard {
+  background: var(--surface, #1e1e2e);
+  border: 1px solid var(--border, #2a2a3e);
+  border-radius: 10px;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cardCard:hover {
+  border-color: var(--accent, #6c63ff);
+  background: var(--surface2, #16162a);
+}
+
+.cardPlayer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text, #e8e8f0);
+}
+
+.rcBadge {
+  background: #e67e22;
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+}
+
+.cardDetails {
+  font-size: 0.82rem;
+  color: var(--text-muted, #888);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variant { color: var(--text-muted, #666); }
+
+.cardBottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.sportChip {
+  background: var(--bg, #12121f);
+  border: 1px solid var(--border, #333);
+  border-radius: 4px;
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  color: var(--text-muted, #888);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.price {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text, #e8e8f0);
+  margin-left: auto;
+}
+
+.salesCount {
+  font-size: 0.75rem;
+  color: var(--text-muted, #666);
 }
 
 .empty {
@@ -74,22 +235,14 @@
   padding: 48px 16px;
   color: var(--text-muted, #888);
 }
-.empty strong { color: var(--text, #e8e8f0); }
-.emptySub { font-size: 0.85rem; margin-top: 6px; }
 
-.resultList {
-  background: var(--surface, #1e1e2e);
-  border: 1px solid var(--border, #2a2a3e);
-  border-radius: 10px;
-  overflow: hidden;
-}
-
+/* Pagination */
 .pagination {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 16px;
-  margin-top: 20px;
+  margin-top: 24px;
 }
 
 .pageBtn {
@@ -100,16 +253,13 @@
   font-size: 0.85rem;
   padding: 7px 14px;
   cursor: pointer;
-  transition: border-color 0.15s;
 }
 .pageBtn:hover:not(:disabled) { border-color: var(--accent, #6c63ff); }
 .pageBtn:disabled { opacity: 0.35; cursor: default; }
 
-.pageInfo {
-  font-size: 0.85rem;
-  color: var(--text-muted, #888);
-}
+.pageInfo { font-size: 0.85rem; color: var(--text-muted, #888); }
 
+/* Idle prompt */
 .prompt {
   flex: 1;
   display: flex;
@@ -119,38 +269,12 @@
   color: var(--text-muted, #888);
   font-size: 0.9rem;
   text-align: center;
-  padding: 24px;
-  gap: 16px;
-}
-
-.trending {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  padding: 32px 24px;
   gap: 8px;
-  justify-content: center;
-  max-width: 600px;
 }
 
-.trendLabel {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted, #888);
-  font-weight: 600;
-}
-
-.trendChip {
-  background: var(--surface, #1e1e2e);
-  border: 1px solid var(--border, #333);
-  border-radius: 20px;
-  color: var(--text, #e8e8f0);
+.promptHint {
   font-size: 0.8rem;
-  padding: 5px 14px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.trendChip:hover {
-  border-color: var(--accent, #6c63ff);
-  color: var(--accent, #6c63ff);
+  color: var(--text-muted, #666);
+  font-style: italic;
 }

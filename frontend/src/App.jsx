@@ -20,6 +20,7 @@ import Collection from './pages/Collection'
 import Settings from './pages/Settings'
 import Releases from './pages/Releases'
 import Search from './pages/Search'
+import CardSalesPage from './pages/CardSalesPage'
 import { PreferencesProvider } from './context/PreferencesContext'
 import styles from './App.module.css'
 
@@ -43,6 +44,7 @@ function AppShell() {
           <Route path="/charts"          element={<ProtectedRoute><Charts /></ProtectedRoute>} />
           <Route path="/admin"           element={<AdminRoute><Admin /></AdminRoute>} />
           <Route path="/releases"        element={<Releases />} />
+          <Route path="/catalog/:id"    element={<CardSalesPage />} />
         </Routes>
       </main>
     </div>

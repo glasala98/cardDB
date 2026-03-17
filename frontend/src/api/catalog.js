@@ -24,9 +24,13 @@ export const getNewReleases = (params = {}) =>
 export const getSealedProducts = (params = {}) =>
   client.get('/catalog/sealed-products', { params })
 
-/** Get individual eBay sold listings from market_raw_sales for a catalog card. */
-export const getCatalogRawSales = (catalogId, offset = 0, limit = 50) =>
-  client.get(`/catalog/${catalogId}/raw-sales`, { params: { offset, limit } })
+/** Get a single catalog card's info and current market price. */
+export const getCatalogCard = (catalogId) =>
+  client.get(`/catalog/${catalogId}`)
+
+/** Get individual sold listings from market_raw_sales for a catalog card, with filters. */
+export const getCatalogRawSales = (catalogId, params = {}) =>
+  client.get(`/catalog/${catalogId}/raw-sales`, { params })
 
 /** Natural-language AI card search — Claude parses the query into filters. */
 export const aiSearchCatalog = (q) =>

@@ -1,125 +1,107 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { searchSales } from '../api/search'
-import client from '../api/client'
-import SearchBar from '../components/SearchBar'
-import SearchFilters from '../components/SearchFilters'
-import SearchResultRow from '../components/SearchResultRow'
-import SaleDetailModal from '../components/SaleDetailModal'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { getCatalog } from '../api/catalog'
+import SourceBadge from '../components/SourceBadge'
 import styles from './Search.module.css'
 
-const PAGE_SIZE = 25
+const PAGE_SIZE = 30
 const DEBOUNCE_MS = 350
 
-function paramsToFilters(sp) {
-  return {
-    sources:     sp.getAll('source'),
-    sort:        sp.get('sort') ?? 'date_desc',
-    price_min:   sp.get('price_min') ?? undefined,
-    price_max:   sp.get('price_max') ?? undefined,
-    date_from:   sp.get('date_from') ?? undefined,
-    date_to:     sp.get('date_to') ?? undefined,
-    graded_only: sp.get('graded_only') === '1' ? true : undefined,
-  }
-}
+const SPORTS = ['NHL','NBA','NFL','MLB']
 
-function filtersToParams(q, filters, page) {
-  const p = new URLSearchParams()
-  if (q) p.set('q', q)
-  if (filters.sort && filters.sort !== 'date_desc') p.set('sort', filters.sort)
-  ;(filters.sources ?? []).forEach(s => p.append('source', s))
-  if (filters.price_min) p.set('price_min', filters.price_min)
-  if (filters.price_max) p.set('price_max', filters.price_max)
-  if (filters.date_from) p.set('date_from', filters.date_from)
-  if (filters.date_to)   p.set('date_to',   filters.date_to)
-  if (filters.graded_only) p.set('graded_only', '1')
-  if (page > 1) p.set('page', String(page))
-  return p
+function fmt(val) {
+  if (val == null) return null
+  return '$' + Number(val).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [query,   setQuery]   = useState(searchParams.get('q') ?? '')
-  const [filters, setFilters] = useState(() => paramsToFilters(searchParams))
-  const [page,    setPage]    = useState(Number(searchParams.get('page') ?? 1))
+  const navigate = useNavigate()
 
-  // null = idle (never searched), [] = searched + empty, [...] = has results
-  const [results, setResults] = useState(null)
+  const [player,   setPlayer]   = useState(searchParams.get('player') ?? '')
+  const [year,     setYear]     = useState(searchParams.get('year')   ?? '')
+  const [setName,  setSetName]  = useState(searchParams.get('set')    ?? '')
+  const [variant,  setVariant]  = useState(searchParams.get('variant') ?? '')
+  const [sport,    setSport]    = useState(searchParams.get('sport')  ?? '')
+  const [isRookie, setIsRookie] = useState(searchParams.get('rookie') === '1')
+  const [page,     setPage]     = useState(Number(searchParams.get('page') ?? 1))
+
+  const [results, setResults] = useState(null)  // null = idle, [] = empty
   const [total,   setTotal]   = useState(null)
   const [loading, setLoading] = useState(false)
   const [error,   setError]   = useState(null)
 
-  const [selectedSale, setSelectedSale] = useState(null)
-  const [trending,     setTrending]     = useState([])
-
   const debounceRef = useRef(null)
-  const reqIdRef    = useRef(0)   // increments on each search; stale responses are ignored
+  const reqIdRef    = useRef(0)
 
-  useEffect(() => {
-    client.get('/search/trending').then(d => setTrending(d ?? [])).catch(() => {})
-  }, [])
+  const hasQuery = player.trim().length >= 2 || year || setName.trim().length >= 2 || variant.trim().length >= 2
 
-  // Debounced search — fires 350ms after query/filters/page settle
   useEffect(() => {
     clearTimeout(debounceRef.current)
 
-    if (!query.trim() || query.trim().length < 2) {
-      setResults(null)
-      setTotal(null)
-      setError(null)
-      setLoading(false)
+    if (!hasQuery) {
+      setResults(null); setTotal(null); setError(null); setLoading(false)
       return
     }
 
     debounceRef.current = setTimeout(() => {
-      runSearch(query, filters, page)
+      runSearch(player, year, setName, variant, sport, isRookie, page)
     }, DEBOUNCE_MS)
 
     return () => clearTimeout(debounceRef.current)
-  }, [query, filters, page])  // eslint-disable-line
+  }, [player, year, setName, variant, sport, isRookie, page])  // eslint-disable-line
 
-  async function runSearch(q, f, pg) {
+  async function runSearch(p, y, s, v, sp, rookie, pg) {
     const myId = ++reqIdRef.current
-    setLoading(true)
-    setError(null)
+    setLoading(true); setError(null)
 
-    const urlParams = new URLSearchParams()
-    urlParams.set('q',      q.trim())
-    urlParams.set('sort',   f.sort ?? 'date_desc')
-    urlParams.set('limit',  String(PAGE_SIZE))
-    urlParams.set('offset', String((pg - 1) * PAGE_SIZE))
-    ;(f.sources ?? []).forEach(s => urlParams.append('source', s))
-    if (f.price_min)   urlParams.set('price_min',   f.price_min)
-    if (f.price_max)   urlParams.set('price_max',   f.price_max)
-    if (f.date_from)   urlParams.set('date_from',   f.date_from)
-    if (f.date_to)     urlParams.set('date_to',     f.date_to)
-    if (f.graded_only) urlParams.set('graded_only', '1')
+    const params = {
+      page,
+      per_page: PAGE_SIZE,
+      sort: 'num_sales',
+      dir: 'desc',
+    }
+    if (p.trim())   params.search   = p.trim()
+    if (y)          params.year     = y
+    if (s.trim())   params.set_name = s.trim()
+    if (sp)         params.sport    = sp
+    if (rookie)     params.is_rookie = true
 
-    setSearchParams(filtersToParams(q, f, pg), { replace: true })
+    // sync URL
+    const sp2 = new URLSearchParams()
+    if (p.trim())   sp2.set('player',  p.trim())
+    if (y)          sp2.set('year',    y)
+    if (s.trim())   sp2.set('set',     s.trim())
+    if (v.trim())   sp2.set('variant', v.trim())
+    if (sp)         sp2.set('sport',   sp)
+    if (rookie)     sp2.set('rookie',  '1')
+    if (pg > 1)     sp2.set('page',    String(pg))
+    setSearchParams(sp2, { replace: true })
 
     try {
-      const data = await searchSales(Object.fromEntries(urlParams))
-      // Ignore stale responses from previous keystrokes
+      const data = await getCatalog(params)
       if (myId !== reqIdRef.current) return
-      setResults(data.results ?? [])
+
+      // client-side variant filter (catalog API doesn't support variant param yet)
+      let cards = data.cards ?? []
+      if (v.trim()) {
+        const vl = v.trim().toLowerCase()
+        cards = cards.filter(c => c.variant?.toLowerCase().includes(vl))
+      }
+
+      setResults(cards)
       setTotal(data.total ?? 0)
     } catch (e) {
       if (myId !== reqIdRef.current) return
-      const msg = e?.message || 'Search failed — please try again.'
-      setError(msg)
-      setResults([])  // show body section so error is visible
+      setError(e?.message || 'Search failed — please try again.')
+      setResults([])
     } finally {
       if (myId === reqIdRef.current) setLoading(false)
     }
   }
 
-  function handleQueryChange(q) { setQuery(q); setPage(1) }
-  function handleFiltersChange(f) { setFilters(f); setPage(1) }
-  function handleSubmit(q) {
-    clearTimeout(debounceRef.current)
-    setQuery(q)
-    setPage(1)
-    if (q.trim().length >= 2) runSearch(q, filters, 1)
+  function handleFieldChange(setter) {
+    return (e) => { setter(e.target.value); setPage(1) }
   }
 
   const totalPages = total != null ? Math.ceil(total / PAGE_SIZE) : 0
@@ -129,70 +111,127 @@ export default function Search() {
     <div className={styles.page}>
       <div className={styles.hero}>
         <h1 className={styles.heading}>Card Sales Search</h1>
-        <p className={styles.sub}>Every sale. Every source. No paywalls.</p>
-        <div className={styles.searchWrap}>
-          <SearchBar
-            value={query}
-            onChange={handleQueryChange}
-            onSubmit={handleSubmit}
-            placeholder="Search by player, set, year, grade…"
-          />
-        </div>
-      </div>
+        <p className={styles.sub}>Find a card to see its full sale history.</p>
 
-      {hasSearched && (
-        <div className={styles.body}>
-          <div className={styles.filtersWrap}>
-            <SearchFilters
-              filters={filters}
-              onChange={handleFiltersChange}
-              totalCount={total}
+        <div className={styles.searchGrid}>
+          <div className={styles.fieldWrap}>
+            <label className={styles.fieldLabel}>Player</label>
+            <input
+              className={styles.fieldInput}
+              placeholder="e.g. Connor McDavid"
+              value={player}
+              onChange={handleFieldChange(setPlayer)}
+              autoFocus
             />
           </div>
 
-          {loading && (
-            <div className={styles.statusRow}>
-              <span className={styles.spinner} />
-              <span>Searching…</span>
-            </div>
-          )}
+          <div className={styles.fieldWrap}>
+            <label className={styles.fieldLabel}>Year</label>
+            <input
+              className={styles.fieldInput}
+              placeholder="e.g. 2015-16"
+              value={year}
+              onChange={handleFieldChange(setYear)}
+            />
+          </div>
 
-          {error && !loading && (
-            <div className={styles.error}>{error}</div>
-          )}
+          <div className={styles.fieldWrap}>
+            <label className={styles.fieldLabel}>Set</label>
+            <input
+              className={styles.fieldInput}
+              placeholder="e.g. Upper Deck"
+              value={setName}
+              onChange={handleFieldChange(setSetName)}
+            />
+          </div>
 
-          {!loading && !error && results?.length === 0 && (
+          <div className={styles.fieldWrap}>
+            <label className={styles.fieldLabel}>Variant / Subset</label>
+            <input
+              className={styles.fieldInput}
+              placeholder="e.g. Young Guns, Prizm"
+              value={variant}
+              onChange={handleFieldChange(setVariant)}
+            />
+          </div>
+        </div>
+
+        <div className={styles.filterRow}>
+          <div className={styles.sportTabs}>
+            <button
+              className={`${styles.sportTab} ${sport === '' ? styles.sportActive : ''}`}
+              onClick={() => { setSport(''); setPage(1) }}
+            >All</button>
+            {SPORTS.map(s => (
+              <button
+                key={s}
+                className={`${styles.sportTab} ${sport === s ? styles.sportActive : ''}`}
+                onClick={() => { setSport(s); setPage(1) }}
+              >{s}</button>
+            ))}
+          </div>
+          <label className={styles.checkLabel}>
+            <input type="checkbox" checked={isRookie} onChange={e => { setIsRookie(e.target.checked); setPage(1) }} />
+            Rookies only
+          </label>
+        </div>
+      </div>
+
+      {loading && (
+        <div className={styles.statusRow}>
+          <span className={styles.spinner} />
+          <span>Searching…</span>
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className={styles.error}>{error}</div>
+      )}
+
+      {!loading && hasSearched && (
+        <div className={styles.body}>
+          {results.length === 0 ? (
             <div className={styles.empty}>
-              <p>No sales found for <strong>"{query}"</strong></p>
-              <p className={styles.emptySub}>Try a shorter query or broaden your filters.</p>
+              <p>No cards found. Try broadening your search.</p>
             </div>
-          )}
-
-          {!loading && results?.length > 0 && (
+          ) : (
             <>
-              <div className={styles.resultList}>
-                {results.map((sale, i) => (
-                  <SearchResultRow
-                    key={sale.id ?? i}
-                    sale={sale}
-                    onClick={() => setSelectedSale(sale)}
-                  />
+              <div className={styles.resultMeta}>
+                {total != null && <span>{total.toLocaleString()} card{total !== 1 ? 's' : ''} — click one to see its sales</span>}
+              </div>
+              <div className={styles.cardGrid}>
+                {results.map(card => (
+                  <button
+                    key={card.id}
+                    className={styles.cardCard}
+                    onClick={() => navigate(`/catalog/${card.id}`)}
+                  >
+                    <div className={styles.cardPlayer}>
+                      {card.player_name}
+                      {card.is_rookie && <span className={styles.rcBadge}>RC</span>}
+                    </div>
+                    <div className={styles.cardDetails}>
+                      {card.year} · {card.set_name}
+                      {card.variant ? <span className={styles.variant}> · {card.variant}</span> : null}
+                    </div>
+                    <div className={styles.cardBottom}>
+                      <span className={styles.sportChip}>{card.sport}</span>
+                      {card.fair_value && (
+                        <span className={styles.price}>{fmt(card.fair_value)}</span>
+                      )}
+                      {card.num_sales && (
+                        <span className={styles.salesCount}>{card.num_sales.toLocaleString()} sales</span>
+                      )}
+                    </div>
+                  </button>
                 ))}
               </div>
 
               {totalPages > 1 && (
                 <div className={styles.pagination}>
-                  <button
-                    className={styles.pageBtn}
-                    disabled={page <= 1}
-                    onClick={() => setPage(p => p - 1)}
-                  >← Prev</button>
+                  <button className={styles.pageBtn} disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
                   <span className={styles.pageInfo}>Page {page} of {totalPages}</span>
-                  <button
-                    className={styles.pageBtn}
-                    disabled={page >= totalPages}
-                    onClick={() => setPage(p => p + 1)}
-                  >Next →</button>
+                  <button className={styles.pageBtn} disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next →</button>
                 </div>
               )}
             </>
@@ -202,26 +241,9 @@ export default function Search() {
 
       {!hasSearched && !loading && (
         <div className={styles.prompt}>
-          <p>Search across eBay, Goldin, Heritage, PWCC, Fanatics, Pristine, and MySlabs.</p>
-          {trending.length > 0 && (
-            <div className={styles.trending}>
-              <span className={styles.trendLabel}>Trending:</span>
-              {trending.slice(0, 8).map((t, i) => (
-                <button
-                  key={i}
-                  className={styles.trendChip}
-                  onClick={() => handleSubmit(t.query)}
-                >
-                  {t.query}
-                </button>
-              ))}
-            </div>
-          )}
+          <p>Search by player name, year, set, or variant to find a card and view its complete sale history.</p>
+          <p className={styles.promptHint}>e.g. "McDavid" + "Young Guns" · "Wembanyama" + "Prizm" · "Jordan" + "1986"</p>
         </div>
-      )}
-
-      {selectedSale && (
-        <SaleDetailModal sale={selectedSale} onClose={() => setSelectedSale(null)} />
       )}
     </div>
   )
