@@ -98,7 +98,7 @@ def _title_has_conflict(card_name: str, title: str) -> list[str]:
 
 def fetch_cards(conn, args) -> list[dict]:
     cur = conn.cursor()
-    conditions = ["EXISTS (SELECT 1 FROM market_raw_sales WHERE card_catalog_id = cc.id)"]
+    conditions = ["1=1"]
     params = []
 
     if args.tier:
@@ -118,10 +118,13 @@ def fetch_cards(conn, args) -> list[dict]:
                cc.player_name,
                cc.variant,
                cc.scrape_tier,
-               (SELECT COUNT(*) FROM market_raw_sales WHERE card_catalog_id = cc.id) AS sale_count
+               COUNT(mrs.id) AS sale_count
         FROM card_catalog cc
+        JOIN market_raw_sales mrs ON mrs.card_catalog_id = cc.id
         WHERE {where}
-          AND (SELECT COUNT(*) FROM market_raw_sales WHERE card_catalog_id = cc.id) >= %s
+        GROUP BY cc.id, cc.sport, cc.year, cc.brand, cc.set_name,
+                 cc.player_name, cc.variant, cc.scrape_tier
+        HAVING COUNT(mrs.id) >= %s
         ORDER BY sale_count DESC
     """, params + [args.min_sales])
 
