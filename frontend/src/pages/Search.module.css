@@ -1,0 +1,122 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.hero {
+  padding: 48px 24px 32px;
+  text-align: center;
+  background: linear-gradient(180deg, var(--surface, #1a1a2e) 0%, transparent 100%);
+}
+
+.heading {
+  font-size: 2rem;
+  font-weight: 800;
+  margin: 0 0 6px;
+  color: var(--text, #e8e8f0);
+}
+
+.sub {
+  font-size: 0.95rem;
+  color: var(--text-muted, #888);
+  margin: 0 0 24px;
+}
+
+.searchWrap {
+  max-width: 680px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.body {
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 0 16px 48px;
+}
+
+.filtersWrap {
+  margin-bottom: 16px;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 24px;
+  color: var(--text-muted, #888);
+  font-size: 0.9rem;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border, #333);
+  border-top-color: var(--accent, #6c63ff);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error {
+  padding: 16px;
+  border: 1px solid #c0392b;
+  border-radius: 8px;
+  color: #e74c3c;
+  font-size: 0.9rem;
+}
+
+.empty {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--text-muted, #888);
+}
+.empty strong { color: var(--text, #e8e8f0); }
+.emptySub { font-size: 0.85rem; margin-top: 6px; }
+
+.resultList {
+  background: var(--surface, #1e1e2e);
+  border: 1px solid var(--border, #2a2a3e);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.pageBtn {
+  background: var(--surface, #1e1e2e);
+  border: 1px solid var(--border, #333);
+  border-radius: 6px;
+  color: var(--text, #e8e8f0);
+  font-size: 0.85rem;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.pageBtn:hover:not(:disabled) { border-color: var(--accent, #6c63ff); }
+.pageBtn:disabled { opacity: 0.35; cursor: default; }
+
+.pageInfo {
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+}
+
+.prompt {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted, #888);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 0 24px;
+}

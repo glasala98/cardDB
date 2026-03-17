@@ -19,6 +19,7 @@ import Catalog from './pages/Catalog'
 import Collection from './pages/Collection'
 import Settings from './pages/Settings'
 import Releases from './pages/Releases'
+import Search from './pages/Search'
 import { PreferencesProvider } from './context/PreferencesContext'
 import styles from './App.module.css'
 
@@ -28,7 +29,8 @@ function AppShell() {
       <Navbar />
       <main className={styles.main}>
         <Routes>
-          <Route path="/" element={<Navigate to="/catalog" replace />} />
+          <Route path="/" element={<Navigate to="/search" replace />} />
+          <Route path="/search"          element={<Search />} />
           <Route path="/catalog"         element={<Catalog />} />
           <Route path="/collection"      element={<ProtectedRoute><Collection /></ProtectedRoute>} />
           <Route path="/settings"        element={<ProtectedRoute><Settings /></ProtectedRoute>} />

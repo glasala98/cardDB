@@ -13,6 +13,12 @@ const Icons = {
       <rect x="6" y="1" width="11" height="14" rx="2" fill="currentColor" opacity="0.45"/>
     </svg>
   ),
+  Search: () => (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+      <circle cx="7.5" cy="7.5" r="5"/>
+      <line x1="11.5" y1="11.5" x2="16" y2="16"/>
+    </svg>
+  ),
   Catalog: () => (
     <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
       <rect x="2" y="2" width="6" height="6" rx="1"/>
@@ -67,6 +73,9 @@ const Icons = {
 }
 
 const NAV_ITEMS = [
+  {
+    to: '/search', label: 'Search', Icon: Icons.Search, public: true,
+  },
   {
     to: '/catalog', label: 'Catalog', Icon: Icons.Catalog, public: true,
     sub: [

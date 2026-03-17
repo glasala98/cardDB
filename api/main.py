@@ -54,7 +54,7 @@ class RateLimitMiddleware:
             return
 
         path = scope.get("path", "")
-        if not path.startswith("/api/catalog"):
+        if not (path.startswith("/api/catalog") or path.startswith("/api/search")):
             await self.app(scope, receive, send)
             return
 
@@ -79,7 +79,7 @@ class RateLimitMiddleware:
         bucket.append(now)
         await self.app(scope, receive, send)
 
-from api.routers import cards, master_db, stats, auth, scan, admin, catalog, collection
+from api.routers import cards, master_db, stats, auth, scan, admin, catalog, collection, search
 from db import get_db
 
 app = FastAPI(title="Card Dashboard API", version="0.1.0")
@@ -108,6 +108,7 @@ app.include_router(scan.router,      prefix="/api/scan",      tags=["scan"])
 app.include_router(admin.router,     prefix="/api/admin",     tags=["admin"])
 app.include_router(catalog.router,     prefix="/api/catalog",     tags=["catalog"])
 app.include_router(collection.router,  prefix="/api/collection",  tags=["collection"])
+app.include_router(search.router,      prefix="/api/search",      tags=["search"])
 
 
 @app.get("/api/health")
