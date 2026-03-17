@@ -1,32 +1,43 @@
-"""Migration: strip eBay boilerplate text from market_raw_sales titles.
+"""Migration: strip eBay boilerplate from existing market_raw_sales titles.
 
-Removes '\nOpens in a new window or tab' and similar suffixes that were
-scraped from eBay's HTML before the fix was applied.
-
-Idempotent — safe to re-run.
+Runs automatically on every Railway deploy (idempotent — safe to re-run).
+Removes 'Opens in a new window or tab' and other eBay UI artifacts that were
+scraped before the title-strip fix was deployed.
 """
-import os, psycopg2
+import os
+import psycopg2
 
 DATABASE_URL = os.environ["DATABASE_URL"]
+
+BOILERPLATE = [
+    "\nOpens in a new window or tab",
+    "Opens in a new window or tab",
+]
+
 
 def main():
     conn = psycopg2.connect(DATABASE_URL)
     conn.autocommit = True
     cur = conn.cursor()
 
-    cur.execute("""
-        UPDATE market_raw_sales
-        SET title = TRIM(SPLIT_PART(title, E'\\n', 1))
-        WHERE title LIKE E'%\\n%'
-    """)
-    print(f"Cleaned {cur.rowcount} titles with newline boilerplate")
+    try:
+        for phrase in BOILERPLATE:
+            cur.execute(
+                "UPDATE market_raw_sales SET title = TRIM(REPLACE(title, %s, '')) WHERE title LIKE %s",
+                (phrase, f"%{phrase}%")
+            )
+            rows = cur.rowcount
+            if rows:
+                print(f"  Cleaned {rows:,} rows — stripped: {phrase!r}")
+
+        print("  Title cleanup complete.")
+
+    except Exception as e:
+        print(f"  WARNING: Title cleanup failed (non-fatal): {e}")
 
     cur.close()
     conn.close()
 
+
 if __name__ == "__main__":
-    try:
-        main()
-        print("migrate_clean_raw_sales_titles: done")
-    except Exception as e:
-        print(f"migrate_clean_raw_sales_titles: ERROR — {e}")
+    main()
