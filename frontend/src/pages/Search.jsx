@@ -51,11 +51,12 @@ export default function Search() {
   const [advanced, setAdvanced] = useState(false)
 
   // Results
-  const [results,  setResults]  = useState(null)
-  const [total,    setTotal]    = useState(null)
-  const [loading,  setLoading]  = useState(false)
-  const [error,    setError]    = useState(null)
-  const [page,     setPage]     = useState(1)
+  const [results,     setResults]     = useState(null)
+  const [total,       setTotal]       = useState(null)
+  const [loading,     setLoading]     = useState(false)
+  const [error,       setError]       = useState(null)
+  const [page,        setPage]        = useState(1)
+  const [fallbackNote, setFallbackNote] = useState(null)  // what was dropped
 
   // Parsing state
   const [parsing,  setParsing]  = useState(false)
@@ -144,24 +145,48 @@ export default function Search() {
     const myId = ++reqIdRef.current
 
     const hasAny = f.player_name || f.year || f.set_name || f.variant || f.sport || f.is_rookie
-    if (!hasAny) { setResults(null); setTotal(null); return }
+    if (!hasAny) { setResults(null); setTotal(null); setFallbackNote(null); return }
 
-    setLoading(true); setError(null)
+    setLoading(true); setError(null); setFallbackNote(null)
 
-    const params = { page: pg, per_page: PAGE_SIZE, sort: 'num_sales', dir: 'desc' }
-    if (f.player_name) params.player_name = f.player_name
-    if (f.year)        params.year        = f.year
-    if (f.set_name)    params.set_name    = f.set_name
-    if (f.variant)     params.variant     = f.variant
-    if (f.sport)       params.sport       = f.sport
-    if (f.is_rookie)   params.is_rookie   = true
+    // Build a param object from a filter subset
+    function toParams(subset, pageNum) {
+      const p = { page: pageNum, per_page: PAGE_SIZE, sort: 'num_sales', dir: 'desc' }
+      if (subset.player_name) p.player_name = subset.player_name
+      if (subset.year)        p.year        = subset.year
+      if (subset.set_name)    p.set_name    = subset.set_name
+      if (subset.variant)     p.variant     = subset.variant
+      if (subset.sport)       p.sport       = subset.sport
+      if (subset.is_rookie)   p.is_rookie   = true
+      return p
+    }
+
+    // Cascade: full → drop variant → drop set → player+year → player only
+    const attempts = [
+      { filter: f,                                                     note: null },
+      { filter: { ...f, variant: '' },                                 note: f.variant  ? `No results for variant "${f.variant}" — dropped it` : null },
+      { filter: { ...f, set_name: '', variant: '' },                   note: f.set_name ? `No results for set "${f.set_name}" — showing all matching cards` : null },
+      { filter: { ...f, set_name: '', variant: '', year: '' },         note: f.year     ? `No exact match — showing all ${f.player_name || 'matching'} cards` : null },
+      { filter: { player_name: f.player_name, sport: f.sport },        note: f.player_name ? `Showing all ${f.player_name} cards` : null },
+    ].filter(a => a.note !== undefined)  // keep only attempts that differ
 
     try {
-      const data = await getCatalog(params)
-      if (myId !== reqIdRef.current) return
-      setResults(data.cards ?? [])
-      setTotal(data.total ?? 0)
-      setPage(pg)
+      for (const attempt of attempts) {
+        if (myId !== reqIdRef.current) return
+        const data = await getCatalog(toParams(attempt.filter, pg))
+        if (myId !== reqIdRef.current) return
+        const cards = data.cards ?? []
+        if (cards.length > 0 || attempt === attempts[attempts.length - 1]) {
+          setResults(cards)
+          setTotal(data.total ?? 0)
+          setPage(pg)
+          setFallbackNote(attempt.note)
+          return
+        }
+      }
+      // All attempts empty
+      setResults([])
+      setTotal(0)
     } catch (e) {
       if (myId !== reqIdRef.current) return
       setError(e?.message || 'Search failed')
@@ -302,6 +327,9 @@ export default function Search() {
           ) : (
             <>
               <div className={styles.resultMeta}>
+                {fallbackNote && (
+                  <div className={styles.fallbackNote}>⚠ {fallbackNote}</div>
+                )}
                 {total != null && <span>{total.toLocaleString()} card{total !== 1 ? 's' : ''} — click one to see its sales</span>}
               </div>
 
