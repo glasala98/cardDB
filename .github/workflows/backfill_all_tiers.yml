@@ -4,17 +4,22 @@ on:
   workflow_dispatch:
     inputs:
       workers:
-        description: 'Parallel Chrome workers'
+        description: 'Parallel Chrome workers per sport job'
         required: false
         default: '5'
   schedule:
     - cron: '0 12 * * *'  # noon UTC daily — picks up wherever the previous run left off
 
 jobs:
+  # ── STAPLE: 4 sports in parallel ──────────────────────────────────────────
   staple:
     runs-on: ubuntu-latest
     timeout-minutes: 330
     continue-on-error: true
+    strategy:
+      matrix:
+        sport: [NHL, NBA, NFL, MLB]
+      fail-fast: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -26,23 +31,29 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Backfill staple tier
+      - name: Backfill staple tier (${{ matrix.sport }})
         run: |
           python -u scrape_master_db.py \
             --backfill \
             --catalog-tier staple \
+            --sport ${{ matrix.sport }} \
             --workers ${{ github.event.inputs.workers || '5' }} \
             --limit 0 \
             --max-hours 5
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+  # ── PREMIUM: 4 sports in parallel ─────────────────────────────────────────
   premium:
     needs: staple
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 330
     continue-on-error: true
+    strategy:
+      matrix:
+        sport: [NHL, NBA, NFL, MLB]
+      fail-fast: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -54,23 +65,29 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Backfill premium tier
+      - name: Backfill premium tier (${{ matrix.sport }})
         run: |
           python -u scrape_master_db.py \
             --backfill \
             --catalog-tier premium \
+            --sport ${{ matrix.sport }} \
             --workers ${{ github.event.inputs.workers || '5' }} \
             --limit 0 \
             --max-hours 5
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+  # ── STARS: 4 sports in parallel ───────────────────────────────────────────
   stars:
     needs: premium
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 330
     continue-on-error: true
+    strategy:
+      matrix:
+        sport: [NHL, NBA, NFL, MLB]
+      fail-fast: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -82,23 +99,29 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Backfill stars tier
+      - name: Backfill stars tier (${{ matrix.sport }})
         run: |
           python -u scrape_master_db.py \
             --backfill \
             --catalog-tier stars \
+            --sport ${{ matrix.sport }} \
             --workers ${{ github.event.inputs.workers || '5' }} \
             --limit 0 \
             --max-hours 5
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+  # ── BASE: 4 sports in parallel ────────────────────────────────────────────
   base:
     needs: stars
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 330
     continue-on-error: true
+    strategy:
+      matrix:
+        sport: [NHL, NBA, NFL, MLB]
+      fail-fast: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -110,11 +133,12 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Backfill base tier
+      - name: Backfill base tier (${{ matrix.sport }})
         run: |
           python -u scrape_master_db.py \
             --backfill \
             --catalog-tier base \
+            --sport ${{ matrix.sport }} \
             --workers ${{ github.event.inputs.workers || '5' }} \
             --limit 0 \
             --max-hours 5
