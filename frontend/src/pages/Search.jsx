@@ -129,7 +129,7 @@ export default function Search() {
     }
 
     // Fallback: use raw query as multi-term FTS (no player_name splitting needed)
-    await runSearch({ sport: fields.sport, year: fields.year }, 1, query.trim())
+    await runSearch({ fts: query.trim(), sport: fields.sport, year: fields.year }, 1, query.trim())
   }
 
   // Field edit in advanced panel → re-search immediately
