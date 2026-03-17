@@ -762,7 +762,7 @@ def search_ebay_sold(driver, card_name, max_results=240, search_query=None, page
         for item in items:
             try:
                 title_elem = item.find_element(By.CSS_SELECTOR, '.s-card__title')
-                title = title_elem.text.strip()
+                title = title_elem.text.split('\n')[0].strip()
 
                 # Skip empty placeholders
                 if not title:
