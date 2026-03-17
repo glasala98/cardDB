@@ -161,22 +161,25 @@ export default function Search() {
       return p
     }
 
-    // Cascade: full → drop variant → drop set → player+year → player only
+    // Cascade: full → swap set↔variant → drop variant → drop set → player only
     const attempts = [
-      { filter: f,                                                     note: null },
-      { filter: { ...f, variant: '' },                                 note: f.variant  ? `No results for variant "${f.variant}" — dropped it` : null },
-      { filter: { ...f, set_name: '', variant: '' },                   note: f.set_name ? `No results for set "${f.set_name}" — showing all matching cards` : null },
-      { filter: { ...f, set_name: '', variant: '', year: '' },         note: f.year     ? `No exact match — showing all ${f.player_name || 'matching'} cards` : null },
-      { filter: { player_name: f.player_name, sport: f.sport },        note: f.player_name ? `Showing all ${f.player_name} cards` : null },
-    ].filter(a => a.note !== undefined)  // keep only attempts that differ
+      { filter: f,                                                                           note: null },
+      // If set_name returned nothing, try it as a variant (common misclassification e.g. PMG)
+      { filter: { ...f, set_name: '', variant: f.set_name || f.variant },                   note: null },
+      { filter: { ...f, variant: '' },                                                       note: f.variant  ? `No exact variant match for "${f.variant}" — dropped it` : null },
+      { filter: { ...f, set_name: '', variant: '' },                                         note: f.set_name ? `No results for set "${f.set_name}" — showing all matching cards` : null },
+      { filter: { ...f, set_name: '', variant: '', year: '' },                               note: f.year     ? `No exact match — showing all ${f.player_name || 'matching'} cards` : null },
+      { filter: { player_name: f.player_name, sport: f.sport },                             note: f.player_name ? `Showing all ${f.player_name} cards` : null },
+    ]
 
     try {
-      for (const attempt of attempts) {
+      for (let i = 0; i < attempts.length; i++) {
+        const attempt = attempts[i]
         if (myId !== reqIdRef.current) return
         const data = await getCatalog(toParams(attempt.filter, pg))
         if (myId !== reqIdRef.current) return
         const cards = data.cards ?? []
-        if (cards.length > 0 || attempt === attempts[attempts.length - 1]) {
+        if (cards.length > 0 || i === attempts.length - 1) {
           setResults(cards)
           setTotal(data.total ?? 0)
           setPage(pg)

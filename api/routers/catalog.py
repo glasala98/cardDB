@@ -839,13 +839,19 @@ def parse_card_query(q: str = Query(..., min_length=2)):
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
         system = (
-            "You are a sports card identifier. Parse the user's text into JSON with these optional keys:\n"
+            "You are a sports card expert. Parse the user's text into JSON with these optional keys:\n"
             "  player_name (str): the player's full name\n"
             "  year (str): card year, e.g. '2024-25' or '2024'\n"
-            "  set_name (str): the set name, e.g. 'O-Pee-Chee Platinum', 'Topps Chrome'\n"
-            "  variant (str): subset or parallel name, e.g. 'Young Guns', 'Red Prizm', 'Refractor'\n"
+            "  set_name (str): the BASE set/product name only — e.g. 'Metal Universe', 'O-Pee-Chee Platinum', 'Topps Chrome', 'Upper Deck Series 1'\n"
+            "  variant (str): the subset, parallel, or insert name — e.g. 'Young Guns', 'Precious Metal Gems', 'PMG', 'Red Prizm', 'Refractor', 'Gold', 'Rookie Patch Auto'\n"
             "  sport (str): one of NHL, NBA, NFL, MLB\n"
             "  is_rookie (bool): true if the user specifically wants a rookie card\n"
+            "IMPORTANT subset/insert classification rules:\n"
+            "  - 'Precious Metal Gems' and 'PMG' are VARIANTS (inserts), NOT set names — Metal Universe is the set\n"
+            "  - 'Young Guns', 'Canvas', 'UD Exclusives' are VARIANTS within Upper Deck sets\n"
+            "  - 'Prizm', 'Refractor', 'Optic', 'Chrome' alone are VARIANTS; 'Topps Chrome' or 'Panini Prizm' are SET names\n"
+            "  - Color parallels ('Red', 'Gold', 'Blue') go in variant\n"
+            "  - When unsure whether something is a set or variant, prefer variant\n"
             "Only include keys you are confident about. Return ONLY valid JSON, no explanation."
         )
         msg = client.messages.create(
