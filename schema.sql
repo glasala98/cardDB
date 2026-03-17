@@ -306,3 +306,5 @@ CREATE INDEX idx_market_price_history_card  ON market_price_history (card_catalo
 CREATE INDEX idx_market_price_history_date  ON market_price_history (scraped_at);
 CREATE INDEX idx_collection_user            ON collection (user_id);
 CREATE INDEX idx_collection_catalog        ON collection (user_id, card_catalog_id);
+CREATE INDEX IF NOT EXISTS idx_market_raw_sales_catalog   ON market_raw_sales (card_catalog_id);
+CREATE INDEX IF NOT EXISTS idx_market_raw_sales_sold_date ON market_raw_sales (sold_date);
