@@ -598,6 +598,172 @@ def catalog_sealed_products(
     return {"products": products}
 
 
+# ---------------------------------------------------------------------------
+# Set browser — distinct sets with card counts
+# ---------------------------------------------------------------------------
+
+@router.get("/sets")
+def browse_sets(
+    sport:    Optional[str] = Query(None),
+    year:     Optional[str] = Query(None),
+    search:   Optional[str] = Query(None),
+    page:     int           = Query(1, ge=1),
+    per_page: int           = Query(50, ge=1, le=200),
+):
+    """Return distinct (year, set_name) combinations with card and variant counts."""
+    conditions = []
+    params: list = []
+
+    if sport:
+        conditions.append("sport = %s")
+        params.append(sport.upper())
+    if year:
+        conditions.append("year = %s")
+        params.append(year)
+    if search:
+        conditions.append("set_name ILIKE %s")
+        params.append(f"%{search}%")
+
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    offset = (page - 1) * per_page
+
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SET statement_timeout = '8s'")
+
+        cur.execute(f"""
+            SELECT COUNT(DISTINCT (year, set_name)) FROM card_catalog {where}
+        """, params)
+        total = cur.fetchone()[0]
+
+        cur.execute(f"""
+            SELECT
+                year,
+                set_name,
+                sport,
+                COUNT(*) AS total_entries,
+                COUNT(DISTINCT player_name) AS total_players,
+                COUNT(DISTINCT card_number) AS total_cards,
+                COUNT(DISTINCT variant) AS total_variants,
+                MIN(brand) AS brand
+            FROM card_catalog
+            {where}
+            GROUP BY year, set_name, sport
+            ORDER BY year DESC NULLS LAST, set_name ASC
+            LIMIT %s OFFSET %s
+        """, params + [per_page, offset])
+
+        rows = cur.fetchall()
+        cols = [d[0] for d in cur.description]
+
+    sets = [dict(zip(cols, r)) for r in rows]
+    return {
+        "sets": sets,
+        "total": total,
+        "page": page,
+        "pages": math.ceil(total / per_page) if per_page else 1,
+        "per_page": per_page,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Set detail — all cards in a set grouped by player/card_number with variants
+# ---------------------------------------------------------------------------
+
+@router.get("/set-detail")
+def catalog_set_detail(
+    year:     str           = Query(...),
+    set_name: str           = Query(...),
+    sport:    Optional[str] = Query(None),
+    search:   Optional[str] = Query(None),   # filter by player name within the set
+    page:     int           = Query(1, ge=1),
+    per_page: int           = Query(100, ge=1, le=500),
+):
+    """Return cards in a specific set grouped by card_number/player_name, with all variants."""
+    conditions = ["cc.year = %s", "cc.set_name = %s"]
+    params: list = [year, set_name]
+
+    if sport:
+        conditions.append("cc.sport = %s")
+        params.append(sport.upper())
+    if search:
+        conditions.append("cc.player_name ILIKE %s")
+        params.append(f"%{search}%")
+
+    where = "WHERE " + " AND ".join(conditions)
+    offset = (page - 1) * per_page
+
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SET statement_timeout = '10s'")
+
+        # Total unique player+card_number combos
+        cur.execute(f"""
+            SELECT COUNT(*) FROM (
+                SELECT DISTINCT cc.card_number, cc.player_name
+                FROM card_catalog cc {where}
+            ) sub
+        """, params)
+        total = cur.fetchone()[0]
+
+        # Grouped cards with aggregated variants
+        cur.execute(f"""
+            SELECT
+                cc.card_number,
+                cc.player_name,
+                cc.team,
+                cc.is_rookie,
+                cc.sport,
+                json_agg(
+                    json_build_object(
+                        'id',         cc.id,
+                        'variant',    COALESCE(cc.variant, 'Base'),
+                        'print_run',  cc.print_run,
+                        'is_parallel',cc.is_parallel,
+                        'fair_value', mp.fair_value,
+                        'num_sales',  mp.num_sales
+                    )
+                    ORDER BY
+                        CASE WHEN COALESCE(cc.variant, 'Base') = 'Base' THEN 0 ELSE 1 END,
+                        cc.print_run DESC NULLS LAST,
+                        cc.variant
+                ) AS variants
+            FROM card_catalog cc
+            LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
+                AND (mp.ignored IS NULL OR mp.ignored = FALSE)
+            {where}
+            GROUP BY cc.card_number, cc.player_name, cc.team, cc.is_rookie, cc.sport
+            ORDER BY
+                CASE WHEN cc.card_number ~ '^[0-9]+$'
+                     THEN cc.card_number::int ELSE 99999 END,
+                cc.player_name
+            LIMIT %s OFFSET %s
+        """, params + [per_page, offset])
+
+        rows = cur.fetchall()
+        cols = [d[0] for d in cur.description]
+
+    cards = []
+    for r in rows:
+        row = dict(zip(cols, r))
+        variants = row["variants"] or []
+        for v in variants:
+            if v.get("fair_value") is not None:
+                v["fair_value"] = float(v["fair_value"])
+        row["variants"] = variants
+        cards.append(row)
+
+    return {
+        "year":     year,
+        "set_name": set_name,
+        "total":    total,
+        "page":     page,
+        "pages":    math.ceil(total / per_page) if per_page else 1,
+        "per_page": per_page,
+        "cards":    cards,
+    }
+
+
 @router.get("/filters")
 def catalog_filters(
     sport: Optional[str] = Query(None),

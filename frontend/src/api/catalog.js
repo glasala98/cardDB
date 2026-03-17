@@ -39,3 +39,11 @@ export const aiSearchCatalog = (q) =>
 /** Parse a natural-language query into structured fields (player, year, set, variant). */
 export const parseCardQuery = (q) =>
   client.get('/catalog/parse', { params: { q } })
+
+/** Browse distinct sets with card/variant counts. */
+export const browseSets = (params = {}) =>
+  client.get('/catalog/sets', { params })
+
+/** Get all cards in a specific set grouped by player/card_number with all variants. */
+export const getSetDetail = (year, setName, params = {}) =>
+  client.get('/catalog/set-detail', { params: { year, set_name: setName, ...params } })
