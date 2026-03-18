@@ -232,6 +232,9 @@ def load_cards(args) -> list:
     """
     with get_db() as conn:
         with conn.cursor() as cur:
+            # Disable parallel query to avoid DSM shared memory exhaustion
+            # on Railway when result sets are large (NHL/MLB base tier).
+            cur.execute("SET max_parallel_workers_per_gather = 0")
             cur.execute(sql, params)
             cols = [d[0] for d in cur.description]
             rows = [dict(zip(cols, row)) for row in cur.fetchall()]
