@@ -141,6 +141,18 @@ def section_to_variant(section_header: str) -> str:
     return h.title() if h else "Base"
 
 
+def clean_set_name(name: str) -> str:
+    """Strip trailing scraper artifacts from set names (CLI/CBC page titles).
+
+    e.g. '2024-25 Upper Deck Series 1 Hockey Checklist Guide' → '2024-25 Upper Deck Series 1 Hockey'
+         '2021-22 O-Pee-Chee Hockey Cards'                    → '2021-22 O-Pee-Chee Hockey'
+    """
+    name = re.sub(r'\s+checklist\s+guide\s*$', '', name, flags=re.IGNORECASE).strip()
+    name = re.sub(r'\s+guide\s*$',             '', name, flags=re.IGNORECASE).strip()
+    name = re.sub(r'\s+cards?\s*$',            '', name, flags=re.IGNORECASE).strip()
+    return name
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # SOURCE 1 — checklistinsider.com  (no login, requests + BeautifulSoup)
 # ════════════════════════════════════════════════════════════════════════════
@@ -176,7 +188,7 @@ def cli_get_set_urls(session: requests.Session, sport: str, year: str, debug: bo
         href = a["href"]
         if not href.startswith("http"):
             href = CLI_BASE + href
-        name = a.get_text(strip=True)
+        name = clean_set_name(a.get_text(strip=True))
         if pattern.search(href) and name and href not in seen:
             # Skip category/year index pages, only want set-level
             path_parts = href.replace(CLI_BASE, "").strip("/").split("/")
@@ -331,7 +343,7 @@ def cbc_get_set_urls(session: requests.Session, sport: str, year: str, debug: bo
         href = a["href"]
         if not href.startswith("http"):
             href = CBC_BASE + href
-        name = a.get_text(strip=True)
+        name = clean_set_name(a.get_text(strip=True))
         if pattern.search(href) and name and href not in seen:
             path_parts = href.replace(CBC_BASE, "").strip("/").split("/")
             if len(path_parts) == 1:
