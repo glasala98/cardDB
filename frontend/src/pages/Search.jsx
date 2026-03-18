@@ -375,8 +375,11 @@ export default function Search() {
                     )}
                     <div className={styles.cardBottom}>
                       <span className={styles.sportChip}>{card.sport}</span>
-                      {card.fair_value && <span className={styles.price}>{fmt(card.fair_value)}</span>}
-                      {card.num_sales  && <span className={styles.salesCount}>{card.num_sales.toLocaleString()} sales</span>}
+                      {card.fair_value
+                        ? <><span className={styles.price}>{fmt(card.fair_value)}</span>
+                            {card.num_sales && <span className={styles.salesCount}>{card.num_sales.toLocaleString()} sales</span>}</>
+                        : <span className={styles.noPrice}>no price data</span>
+                      }
                     </div>
                   </button>
                 ))}

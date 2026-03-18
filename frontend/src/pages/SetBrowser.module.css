@@ -178,3 +178,20 @@
 .pageBtn:hover:not(:disabled) { border-color: var(--accent, #6c63ff); }
 .pageBtn:disabled { opacity: 0.35; cursor: default; }
 .pageInfo { font-size: 0.85rem; color: var(--text-muted, #888); }
+
+.error {
+  padding: 14px 16px;
+  border: 1px solid #c0392b;
+  border-radius: 8px;
+  color: #e74c3c;
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 640px) {
+  .page { padding: 16px 12px 48px; }
+  .title { font-size: 1.2rem; }
+  .grid { grid-template-columns: 1fr; }
+  .stats { flex-wrap: wrap; gap: 8px; }
+  .searchInput { min-width: 0; }
+}

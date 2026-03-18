@@ -152,6 +152,9 @@ export default function CatalogCardDetail({ card, history, loading, isLoggedIn, 
         <div className={styles.salesSection}>
           <div className={styles.salesHeader}>
             <span className={styles.salesTitle}>Sale History</span>
+            <button className={styles.fullPageBtn} onClick={() => navigate(`/catalog/${card.id}`)}>
+              Full page →
+            </button>
             {rawSales === null && (
               <button className={styles.loadSalesBtn} onClick={() => loadRawSales(0)} disabled={rawLoading}>
                 {rawLoading ? 'Loading…' : 'Load'}

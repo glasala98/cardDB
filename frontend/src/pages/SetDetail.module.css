@@ -199,3 +199,12 @@
 .pageBtn:hover:not(:disabled) { border-color: var(--accent, #6c63ff); }
 .pageBtn:disabled { opacity: 0.35; cursor: default; }
 .pageInfo { font-size: 0.85rem; color: var(--text-muted, #888); }
+
+@media (max-width: 640px) {
+  .page { padding: 14px 12px 48px; }
+  .setName { font-size: 1.15rem; }
+  .playerInfo { min-width: 140px; }
+  .playerRow { gap: 8px; padding: 8px 10px; }
+  .cardNum { min-width: 32px; }
+  .chip { font-size: 0.7rem; padding: 3px 6px; }
+}

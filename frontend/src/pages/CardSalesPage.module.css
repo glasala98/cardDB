@@ -305,6 +305,18 @@
 .pageInfo { font-size: 0.85rem; color: var(--text-muted, #888); }
 
 @media (max-width: 640px) {
+  .header { padding: 14px 14px 12px; }
+  .player { font-size: 1.1rem; }
+  .cardMeta { font-size: 0.8rem; }
+  .statsBar { gap: 12px; }
+  .stat { gap: 2px; }
+  .sparkline { width: 100px; }
+  .filters { padding: 10px 12px; gap: 8px; }
+  .filterRow { gap: 6px; flex-wrap: wrap; }
+  .filterLabel { min-width: 48px; }
+  .sortSelect { width: 100%; }
+  .body { padding: 0 0 48px; }
+
   .tableHead,
   .tableRow {
     grid-template-columns: 80px 70px 1fr 80px;
