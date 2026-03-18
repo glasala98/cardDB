@@ -15,7 +15,22 @@ on:
         default: 'ALL'
 
 jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install psycopg2-binary
+      - name: Check DB disk usage (fail if >90% of 50GB volume)
+        run: python preflight_db_check.py --volume-gb 50
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
   update-nhl:
+    needs: preflight
     runs-on: ubuntu-latest
     timeout-minutes: 360
     if: ${{ github.event.inputs.sport == 'NHL' || github.event.inputs.sport == 'ALL' || github.event.inputs.sport == '' }}
@@ -45,6 +60,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   update-mlb:
+    needs: preflight
     runs-on: ubuntu-latest
     timeout-minutes: 360
     if: ${{ github.event.inputs.sport == 'MLB' || github.event.inputs.sport == 'ALL' || github.event.inputs.sport == '' }}
@@ -74,6 +90,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   update-nfl:
+    needs: preflight
     runs-on: ubuntu-latest
     timeout-minutes: 360
     if: ${{ github.event.inputs.sport == 'NFL' || github.event.inputs.sport == 'ALL' || github.event.inputs.sport == '' }}
@@ -98,6 +115,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   update-nba:
+    needs: preflight
     runs-on: ubuntu-latest
     timeout-minutes: 360
     if: ${{ github.event.inputs.sport == 'NBA' || github.event.inputs.sport == 'ALL' || github.event.inputs.sport == '' }}
