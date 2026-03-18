@@ -303,10 +303,93 @@ def cli_get_cards(session: requests.Session, set_info: dict, sport: str, year: s
             if card:
                 cards.append(card)
 
+    # ── Table fallback (CBC older pages use <table> format) ──────────────────
+    # If the div+br parser found very few cards, try extracting from HTML tables.
+    # Older cardboardconnection.com pages (pre-~2015) use rows like:
+    #   <tr><td>234</td><td>Connor McDavid</td><td>Edmonton Oilers</td></tr>
+    if len(cards) < 30:
+        table_cards = _parse_table_cards(
+            content, soup, set_name, brand, sport, year, source
+        )
+        if len(table_cards) > len(cards):
+            log.debug(f"    {set_name}: table parser found {len(table_cards)} (div found {len(cards)})")
+            cards = table_cards
+
     if cards:
         log.info(f"    {set_name}: {len(cards)} cards")
     else:
         log.warning(f"    {set_name}: 0 cards found — check --debug HTML")
+
+    return cards
+
+
+def _parse_table_cards(content, soup, set_name: str, brand: str,
+                       sport: str, year: str, source: str) -> list[dict]:
+    """Parse checklists from HTML <table> elements (CBC older page format).
+
+    Columns are detected dynamically — we look for a row that contains
+    a short numeric-looking value (card number), a player name, and a team.
+    """
+    card_num_pat = re.compile(r'^[A-Za-z]{0,5}[-/]?\d+[A-Za-z]?$')
+    cards = []
+
+    for table in (content or soup).find_all("table"):
+        rows = table.find_all("tr")
+        if len(rows) < 3:
+            continue
+
+        # Detect column positions from the first non-header data row
+        num_col = name_col = team_col = None
+        for row in rows[1:4]:
+            cells = [td.get_text(strip=True) for td in row.find_all(["td", "th"])]
+            if len(cells) < 2:
+                continue
+            for i, c in enumerate(cells):
+                if card_num_pat.match(c) and num_col is None:
+                    num_col = i
+                elif num_col is not None and name_col is None and len(c) > 3:
+                    name_col = i
+                elif name_col is not None and team_col is None and len(c) > 3:
+                    team_col = i
+            if num_col is not None and name_col is not None:
+                break
+
+        if num_col is None or name_col is None:
+            continue
+
+        current_section = "Base"
+        for row in rows:
+            # Check for section header rows (th colspan, or single-cell rows)
+            cells = row.find_all(["td", "th"])
+            if len(cells) == 1:
+                hdr = cells[0].get_text(strip=True)
+                if re.search(r'(checklist|insert|autograph|parallel|subset|rookie)', hdr, re.I):
+                    current_section = section_to_variant(hdr)
+                continue
+
+            cell_texts = [c.get_text(strip=True) for c in cells]
+            if len(cell_texts) <= max(num_col, name_col):
+                continue
+
+            card_number = cell_texts[num_col]
+            player_name = cell_texts[name_col]
+            team        = cell_texts[team_col] if team_col is not None and team_col < len(cell_texts) else ""
+
+            if not card_num_pat.match(card_number):
+                continue
+            if len(player_name) < 3 or re.search(r'\d{4}', player_name):
+                continue
+            if re.search(r'\b(hobby|odds|packs?|box|case)\b', player_name, re.I):
+                continue
+
+            is_r, is_p, pr = infer_flags(current_section, card_number)
+            cards.append({
+                "sport": sport, "year": year, "brand": brand, "set_name": set_name,
+                "card_number": card_number, "player_name": player_name,
+                "team": team, "variant": current_section,
+                "print_run": pr, "is_rookie": is_r, "is_parallel": is_p,
+                "source": source,
+            })
 
     return cards
 
