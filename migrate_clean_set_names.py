@@ -15,9 +15,15 @@ import psycopg2
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 
-# Single regex that strips all known scraper suffixes in one pass
+# Only strip sport-qualified "Cards" suffixes to avoid clobbering legitimate
+# product names like "Wild Card", "Q Card", "Power Card".
 _SUFFIX_RE = re.compile(
-    r'\s+(?:checklist\s+guide|guide|cards?)\s*$',
+    r'\s+(?:'
+    r'checklist\s+guide'
+    r'|guide'
+    r'|(?:hockey|baseball|basketball|football|soccer|nhl|nba|nfl|mlb'
+    r'|chl|ahl|ohl|qmjhl|whl|lacrosse|pwhl)\s+cards?'
+    r')\s*$',
     flags=re.IGNORECASE,
 )
 
@@ -31,10 +37,15 @@ def main():
     cur  = conn.cursor()
 
     try:
-        cur.execute("""
-            SELECT COUNT(*) FROM card_catalog
-            WHERE set_name ~* '\\s+(checklist\\s+guide|guide|cards?)\\s*$'
-        """)
+        _PATTERN = (
+            r'\s+('
+            r'checklist\s+guide'
+            r'|guide'
+            r'|(?:hockey|baseball|basketball|football|soccer|nhl|nba|nfl|mlb'
+            r'|chl|ahl|ohl|qmjhl|whl|lacrosse|pwhl)\s+cards?'
+            r')\s*$'
+        )
+        cur.execute("SELECT COUNT(*) FROM card_catalog WHERE set_name ~* %s", (_PATTERN,))
         count = cur.fetchone()[0]
         print(f"Rows matching dirty pattern: {count:,}")
 
@@ -43,11 +54,10 @@ def main():
             return
 
         # Step 1 — fetch distinct dirty names (small set, all in memory)
-        cur.execute("""
-            SELECT DISTINCT set_name FROM card_catalog
-            WHERE set_name ~* '\\s+(checklist\\s+guide|guide|cards?)\\s*$'
-            ORDER BY set_name
-        """)
+        cur.execute(
+            "SELECT DISTINCT set_name FROM card_catalog WHERE set_name ~* %s ORDER BY set_name",
+            (_PATTERN,),
+        )
         dirty_names = [row[0] for row in cur.fetchall()]
         print(f"  {len(dirty_names)} distinct dirty set names")
 

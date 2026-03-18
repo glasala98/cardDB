@@ -142,7 +142,12 @@ def section_to_variant(section_header: str) -> str:
 
 
 _SET_NAME_SUFFIX_RE = re.compile(
-    r'\s+(?:checklist\s+guide|guide|cards?)\s*$',
+    r'\s+(?:'
+    r'checklist\s+guide'                                                    # "… Checklist Guide"
+    r'|guide'                                                               # "… Guide"
+    r'|(?:hockey|baseball|basketball|football|soccer|nhl|nba|nfl|mlb'
+    r'|chl|ahl|ohl|qmjhl|whl|lacrosse|pwhl)\s+cards?'                      # "… Hockey Cards"
+    r')\s*$',
     flags=re.IGNORECASE,
 )
 
@@ -152,6 +157,7 @@ def clean_set_name(name: str) -> str:
 
     e.g. '2024-25 Upper Deck Series 1 Hockey Checklist Guide' → '2024-25 Upper Deck Series 1 Hockey'
          '2021-22 O-Pee-Chee Hockey Cards'                    → '2021-22 O-Pee-Chee Hockey'
+    Legitimate product names like 'Wild Card', 'Q Card' are preserved.
     """
     return _SET_NAME_SUFFIX_RE.sub('', name).strip()
 
