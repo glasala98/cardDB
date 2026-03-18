@@ -96,8 +96,8 @@ def browse_catalog(
         params.append(f"%{variant}%")
 
     if card_number:
-        where_parts.append("cc.card_number = %s")
-        params.append(card_number)
+        where_parts.append("cc.card_number ILIKE %s")
+        params.append(f"%{card_number}%")
 
     if search:
         where_parts.append("(cc.player_name ILIKE %s OR cc.set_name ILIKE %s OR cc.variant ILIKE %s)")
@@ -327,8 +327,15 @@ def catalog_raw_sales(
 
     with get_db() as conn:
         cur = conn.cursor()
-        cur.execute(f"SELECT COUNT(*) FROM market_raw_sales WHERE {where}", params)
-        total = cur.fetchone()[0]
+        cur.execute(f"""
+            SELECT COUNT(*), AVG(price_val), MAX(price_val), MIN(price_val)
+            FROM market_raw_sales WHERE {where} AND price_val > 0
+        """, params)
+        agg = cur.fetchone()
+        total    = agg[0]
+        avg_val  = float(agg[1]) if agg[1] is not None else None
+        high_val = float(agg[2]) if agg[2] is not None else None
+        low_val  = float(agg[3]) if agg[3] is not None else None
 
         cur.execute(f"""
             SELECT id, sold_date, price_val, title, source,
@@ -355,7 +362,13 @@ def catalog_raw_sales(
             s["exclusive"]     = (date.fromisoformat(s["sold_date"]) < cutoff) if s["sold_date"] else False
             sales.append(s)
 
-    return {"sales": sales, "total": total, "limit": limit, "offset": offset}
+    return {
+        "sales":  sales,
+        "total":  total,
+        "limit":  limit,
+        "offset": offset,
+        "stats":  {"avg": avg_val, "high": high_val, "low": low_val},
+    }
 
 
 @router.get("/releases")

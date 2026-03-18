@@ -65,6 +65,7 @@ export default function CardSalesPage() {
   const [loading, setLoading] = useState(true)
   const [error,   setError]   = useState(null)
   const [page,    setPage]    = useState(1)
+  const [stats,   setStats]   = useState(null)
 
   const canvasRef = useRef(null)
 
@@ -88,12 +89,12 @@ export default function CardSalesPage() {
   useEffect(() => {
     setLoading(true)
     setError(null)
+    setStats(null)
     const params = {
       limit:  PAGE_SIZE,
       offset: (page - 1) * PAGE_SIZE,
       sort,
     }
-    sources.forEach(s => { /* appended below */ })
     if (sources.length)  params.source     = sources
     if (grade)           params.grade      = grade
     if (serialOnly)      params.serial_only = true
@@ -107,6 +108,7 @@ export default function CardSalesPage() {
         const s = data.sales ?? []
         setSales(s)
         setTotal(data.total ?? 0)
+        if (data.stats) setStats(data.stats)
         // Draw sparkline from date-asc prices
         const prices = [...s].reverse().map(r => r.price_val).filter(Boolean)
         setTimeout(() => drawSparkline(canvasRef.current, prices), 0)
@@ -128,11 +130,11 @@ export default function CardSalesPage() {
 
   const totalPages = total != null ? Math.ceil(total / PAGE_SIZE) : 0
 
-  // Compute stats from current page of sales
-  const prices    = sales.map(s => s.price_val).filter(Boolean)
-  const avgPrice  = prices.length ? prices.reduce((a, b) => a + b, 0) / prices.length : null
-  const highPrice = prices.length ? Math.max(...prices) : null
-  const lowPrice  = prices.length ? Math.min(...prices) : null
+  // Stats from API aggregate over full filtered dataset
+  const avgPrice  = stats?.avg  ?? null
+  const highPrice = stats?.high ?? null
+  const lowPrice  = stats?.low  ?? null
+  const prices    = sales.map(s => s.price_val).filter(v => v != null && v > 0)
 
   return (
     <div className={styles.page}>
@@ -155,7 +157,7 @@ export default function CardSalesPage() {
               {card.variant ? ` · ${card.variant}` : ''}
               {card.card_number ? ` #${card.card_number}` : ''}
             </div>
-            {prices.length > 0 && (
+            {(stats || total > 0) && (
               <div className={styles.statsBar}>
                 <div className={styles.stat}><span className={styles.statLabel}>Avg</span><strong>{fmt(avgPrice)}</strong></div>
                 <div className={styles.stat}><span className={styles.statLabel}>High</span><strong className={styles.high}>{fmt(highPrice)}</strong></div>

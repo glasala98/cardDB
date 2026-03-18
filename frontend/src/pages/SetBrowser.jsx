@@ -18,6 +18,7 @@ export default function SetBrowser() {
   const [sets,    setSets]    = useState([])
   const [total,   setTotal]   = useState(null)
   const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState(null)
   const [years,   setYears]   = useState([])
 
   const debounceRef = useRef(null)
@@ -42,12 +43,15 @@ export default function SetBrowser() {
     if (year)   params.year   = year
     if (search) params.search = search
     try {
+      setError(null)
       const data = await browseSets(params)
       setSets(data.sets ?? [])
       setTotal(data.total ?? 0)
       setPage(pg)
-    } catch { setSets([]) }
-    finally { setLoading(false) }
+    } catch (e) {
+      setError(e?.message || 'Failed to load sets')
+      setSets([])
+    } finally { setLoading(false) }
   }
 
   function goToSet(s) {
@@ -91,7 +95,9 @@ export default function SetBrowser() {
 
       {loading && <div className={styles.status}><span className={styles.spinner} /> Loading…</div>}
 
-      {!loading && (
+      {error && <div className={styles.error}>{error}</div>}
+
+      {!loading && !error && (
         <>
           <div className={styles.grid}>
             {sets.map((s, i) => (
