@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { getCatalogCard, getCatalogRawSales } from '../api/catalog'
+import { getCatalogCard, getCatalogRawSales, getCatalog } from '../api/catalog'
 import SourceBadge from '../components/SourceBadge'
 import GradeBadge from '../components/GradeBadge'
+import { pushRecentlyViewed } from '../utils/recentlyViewed'
 import styles from './CardSalesPage.module.css'
 
 const PAGE_SIZE = 50
@@ -66,6 +67,7 @@ export default function CardSalesPage() {
   const [error,   setError]   = useState(null)
   const [page,    setPage]    = useState(1)
   const [stats,   setStats]   = useState(null)
+  const [similar, setSimilar] = useState([])
 
   const canvasRef = useRef(null)
 
@@ -78,10 +80,17 @@ export default function CardSalesPage() {
   const [priceMax,    setPriceMax]    = useState('')
   const [sort,        setSort]        = useState('date_desc')
 
-  // load card info once
+  // load card info once + save to recently viewed + fetch similar
   useEffect(() => {
     getCatalogCard(catalogId)
-      .then(setCard)
+      .then(c => {
+        setCard(c)
+        pushRecentlyViewed(c)
+        // Similar cards: same player, exclude self
+        getCatalog({ player_name: c.player_name, sport: c.sport, per_page: 7, sort: 'num_sales', dir: 'desc' })
+          .then(d => setSimilar((d.cards ?? []).filter(x => x.id !== catalogId).slice(0, 6)))
+          .catch(() => {})
+      })
       .catch(() => setError('Card not found'))
   }, [catalogId])
 
@@ -288,6 +297,23 @@ export default function CardSalesPage() {
               </div>
             )}
           </>
+        )}
+
+        {similar.length > 0 && (
+          <div className={styles.similar}>
+            <div className={styles.similarTitle}>More from {card?.player_name}</div>
+            <div className={styles.similarGrid}>
+              {similar.map(s => (
+                <button key={s.id} className={styles.similarCard} onClick={() => navigate(`/catalog/${s.id}`)}>
+                  <div className={styles.similarSet}>{s.year} · {s.set_name}</div>
+                  {s.variant && <div className={styles.similarVariant}>{s.variant}</div>}
+                  {s.fair_value
+                    ? <div className={styles.similarPrice}>{fmt(s.fair_value)}</div>
+                    : <div className={styles.similarNoPrice}>no price</div>}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>

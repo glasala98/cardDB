@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getCatalog, parseCardQuery, suggestPlayers } from '../api/catalog'
+import { getRecentlyViewed } from '../utils/recentlyViewed'
 import styles from './Search.module.css'
 
 const PAGE_SIZE = 30
@@ -35,6 +36,25 @@ function fmt(val) {
 }
 
 const SPORTS = ['NHL', 'NBA', 'NFL', 'MLB']
+
+function RecentlyViewed({ navigate }) {
+  const items = getRecentlyViewed()
+  if (!items.length) return null
+  return (
+    <div className={styles.recentSection}>
+      <div className={styles.recentLabel}>Recently viewed</div>
+      <div className={styles.recentList}>
+        {items.map(c => (
+          <button key={c.id} className={styles.recentChip} onClick={() => navigate(`/catalog/${c.id}`)}>
+            <span className={styles.recentPlayer}>{c.player_name}</span>
+            <span className={styles.recentMeta}>{c.year} · {c.set_name}{c.variant ? ` · ${c.variant}` : ''}</span>
+            {c.fair_value && <span className={styles.recentPrice}>{fmt(c.fair_value)}</span>}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function Search() {
   const navigate = useNavigate()
@@ -471,6 +491,7 @@ export default function Search() {
           <p className={styles.promptHint}>
             "McDavid Young Guns 2015" · "Wembanyama Prizm RC" · "Jordan 1986 Fleer"
           </p>
+          <RecentlyViewed navigate={navigate} />
         </div>
       )}
     </div>
