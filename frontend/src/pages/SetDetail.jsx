@@ -84,8 +84,8 @@ export default function SetDetail() {
       {!loading && (
         <>
           <div className={styles.list}>
-            {cards.map((card, i) => (
-              <div key={i} className={styles.playerRow}>
+            {cards.map((card) => (
+              <div key={`${card.card_number}|${card.player_name}`} className={styles.playerRow}>
                 <div className={styles.cardNum}>
                   {card.card_number ? `#${card.card_number}` : '—'}
                 </div>
@@ -95,9 +95,9 @@ export default function SetDetail() {
                   {card.team && <span className={styles.team}>{card.team}</span>}
                 </div>
                 <div className={styles.variantChips}>
-                  {(card.variants ?? []).map((v, j) => (
+                  {(card.variants ?? []).map((v) => (
                     <button
-                      key={j}
+                      key={v.id}
                       className={`${styles.chip} ${v.variant === 'Base' ? styles.chipBase : styles.chipParallel}`}
                       onClick={() => navigate(`/catalog/${v.id}`)}
                       title={v.print_run ? `/${v.print_run}` : undefined}

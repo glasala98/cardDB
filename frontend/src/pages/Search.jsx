@@ -59,7 +59,8 @@ export default function Search() {
   const [fallbackNote, setFallbackNote] = useState(null)  // what was dropped
 
   // Parsing state
-  const [parsing,  setParsing]  = useState(false)
+  const [parsing,   setParsing]   = useState(false)
+  const [parseNote, setParseNote] = useState(null)
 
   const debounceRef  = useRef(null)
   const reqIdRef     = useRef(0)
@@ -92,6 +93,7 @@ export default function Search() {
     if (!query.trim() || query.trim().length < 2) return
 
     clearTimeout(debounceRef.current)
+    setParseNote(null)
 
     // Call AI parse
     if (query.trim().length >= 4) {
@@ -122,13 +124,14 @@ export default function Search() {
           return
         }
       } catch {
-        // fall through to fts search
+        setParseNote('AI parse unavailable — using keyword search')
       } finally {
         setParsing(false)
       }
     }
 
     // Fallback: use raw query as multi-term FTS (no player_name splitting needed)
+    setParseNote(n => n || null)  // keep existing note if set
     await runSearch({ fts: query.trim(), sport: fields.sport, year: fields.year }, 1, query.trim())
   }
 
@@ -232,6 +235,7 @@ export default function Search() {
           <p className={styles.barHint}>
             Press <kbd>Enter</kbd> to search — we'll figure out the player, set, and variant for you
           </p>
+          {parseNote && <p className={styles.parseNote}>{parseNote}</p>}
         </form>
 
         {/* ── Advanced toggle ── */}
