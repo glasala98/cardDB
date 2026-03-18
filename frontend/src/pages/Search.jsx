@@ -236,6 +236,14 @@ export default function Search() {
       return p
     }
 
+    // For fts-only mode (AI parse failed), extract likely player name from query
+    // so we can cascade to a structured search if fts is too restrictive.
+    const ftsParts = (f.fts && !f.player_name)
+      ? f.fts.trim().split(/\s+/).filter(w => w.length >= 2)
+      : []
+    const playerFromFts2 = ftsParts.length >= 2 ? ftsParts.slice(0, 2).join(' ') : null
+    const playerFromFts3 = ftsParts.length >= 3 ? ftsParts.slice(0, 3).join(' ') : null
+
     // Cascade: full → swap set↔variant → drop variant → drop set → player only → fts fallback
     const attempts = [
       { filter: f,                                                                           note: null },
@@ -247,7 +255,15 @@ export default function Search() {
       { filter: { player_name: f.player_name, sport: f.sport },                             note: f.player_name ? `Showing all ${f.player_name} cards` : null },
       // Last resort: multi-term FTS across all text fields using the raw query
       ...(rawQuery ? [{ filter: { fts: rawQuery, sport: f.sport, year: f.year },            note: `Showing best matches for "${rawQuery}"` }] : []),
+      // fts-only fallbacks: try first 2 or 3 tokens as player_name (handles "McDavid Young Guns" → "Connor McDavid")
+      ...(playerFromFts3 ? [{ filter: { player_name: playerFromFts3, sport: f.sport, year: f.year }, note: `Showing results for "${playerFromFts3}"` }] : []),
+      ...(playerFromFts2 ? [{ filter: { player_name: playerFromFts2, sport: f.sport, year: f.year }, note: `Showing results for "${playerFromFts2}"` }] : []),
     ]
+
+    // For fts-only mode (no AI parse), require at least 3 results before accepting;
+    // 1–2 FTS hits likely means the variant term is too specific (e.g. "Young Guns" not
+    // stored in that field) and a player-name search will surface more relevant cards.
+    const minAccept = (f.fts && !f.player_name) ? 3 : 1
 
     try {
       for (let i = 0; i < attempts.length; i++) {
@@ -256,7 +272,7 @@ export default function Search() {
         const data = await getCatalog(toParams(attempt.filter, pg))
         if (myId !== reqIdRef.current) return
         const cards = data.cards ?? []
-        if (cards.length > 0 || i === attempts.length - 1) {
+        if (cards.length >= minAccept || i === attempts.length - 1) {
           setResults(cards)
           setTotal(data.total ?? 0)
           setPage(pg)
