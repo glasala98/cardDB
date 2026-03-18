@@ -47,3 +47,6 @@ export const browseSets = (params = {}) =>
 /** Get all cards in a specific set grouped by player/card_number with all variants. */
 export const getSetDetail = (year, setName, params = {}) =>
   client.get('/catalog/set-detail', { params: { year, set_name: setName, ...params } })
+
+export const suggestPlayers = (q, sport = null) =>
+  client.get('/catalog/suggest', { params: { q, ...(sport ? { sport } : {}) } })

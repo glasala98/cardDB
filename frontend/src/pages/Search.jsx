@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getCatalog, parseCardQuery } from '../api/catalog'
+import { getCatalog, parseCardQuery, suggestPlayers } from '../api/catalog'
 import styles from './Search.module.css'
 
 const PAGE_SIZE = 30
@@ -62,8 +62,14 @@ export default function Search() {
   const [parsing,   setParsing]   = useState(false)
   const [parseNote, setParseNote] = useState(null)
 
-  const debounceRef  = useRef(null)
-  const reqIdRef     = useRef(0)
+  const [suggestions,    setSuggestions]    = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [suggHighlight,   setSuggHighlight]   = useState(-1)
+
+  const debounceRef    = useRef(null)
+  const suggestRef     = useRef(null)
+  const reqIdRef       = useRef(0)
+  const barRef         = useRef(null)
 
   // When the bar changes: quick parse → update fields → open advanced if useful
   function handleQueryChange(e) {
@@ -85,6 +91,46 @@ export default function Search() {
       sport:       parsed.sport       || f.sport,
       is_rookie:   parsed.is_rookie   !== undefined ? parsed.is_rookie : f.is_rookie,
     }))
+
+    // Typeahead: debounce 200ms, only if looks like a name (no year/sport)
+    clearTimeout(suggestRef.current)
+    if (q.trim().length >= 2 && !parsed.year && !parsed.sport) {
+      suggestRef.current = setTimeout(async () => {
+        try {
+          const data = await suggestPlayers(q.trim())
+          setSuggestions(data ?? [])
+          setShowSuggestions((data ?? []).length > 0)
+          setSuggHighlight(-1)
+        } catch { /* ignore */ }
+      }, 200)
+    } else {
+      setSuggestions([])
+      setShowSuggestions(false)
+    }
+  }
+
+  function handleSuggestionPick(player_name) {
+    setQuery(player_name)
+    setSuggestions([])
+    setShowSuggestions(false)
+    setFields(f => ({ ...f, player_name }))
+    runSearch({ ...fields, player_name }, 1)
+  }
+
+  function handleKeyDown(e) {
+    if (!showSuggestions || suggestions.length === 0) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setSuggHighlight(h => Math.min(h + 1, suggestions.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setSuggHighlight(h => Math.max(h - 1, -1))
+    } else if (e.key === 'Enter' && suggHighlight >= 0) {
+      e.preventDefault()
+      handleSuggestionPick(suggestions[suggHighlight].player_name)
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false)
+    }
   }
 
   // On Enter or Search button: AI parse → update fields → search
@@ -92,6 +138,8 @@ export default function Search() {
     e?.preventDefault()
     if (!query.trim() || query.trim().length < 2) return
 
+    setShowSuggestions(false)
+    setSuggestions([])
     clearTimeout(debounceRef.current)
     setParseNote(null)
 
@@ -220,18 +268,38 @@ export default function Search() {
 
         {/* ── Single smart search bar ── */}
         <form onSubmit={handleSubmit} className={styles.searchForm}>
-          <div className={styles.barWrap}>
+          <div className={styles.barWrap} style={{ position: 'relative' }}>
             <input
+              ref={barRef}
               className={styles.bar}
               value={query}
               onChange={handleQueryChange}
+              onKeyDown={handleKeyDown}
+              onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
               placeholder="e.g. Connor McDavid Red Prizm O-Pee-Chee Platinum 2024"
               autoFocus
+              autoComplete="off"
             />
+            {showSuggestions && suggestions.length > 0 && (
+              <div className={styles.suggDropdown}>
+                {suggestions.map((s, i) => (
+                  <button
+                    key={s.player_name}
+                    type="button"
+                    className={`${styles.suggItem} ${i === suggHighlight ? styles.suggActive : ''}`}
+                    onMouseDown={() => handleSuggestionPick(s.player_name)}
+                  >
+                    <span className={styles.suggName}>{s.player_name}</span>
+                    <span className={styles.suggMeta}>{s.sport} · {s.count.toLocaleString()} cards</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <button type="submit" className={styles.searchBtn} disabled={loading || parsing}>
               {parsing ? '…' : 'Search'}
             </button>
-          </div>
+          </div> {/* barWrap */}
           <p className={styles.barHint}>
             Press <kbd>Enter</kbd> to search — we'll figure out the player, set, and variant for you
           </p>

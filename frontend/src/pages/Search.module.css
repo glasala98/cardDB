@@ -80,6 +80,50 @@
   color: #f39c12;
   margin: 4px 0 0;
 }
+
+/* ── Typeahead dropdown ── */
+.suggDropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 80px; /* leave room for search button */
+  background: var(--surface, #1e1e2e);
+  border: 1px solid var(--border, #333);
+  border-radius: 10px;
+  overflow: hidden;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+
+.suggItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 9px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  border-bottom: 1px solid var(--border, #2a2a3e);
+  gap: 8px;
+}
+.suggItem:last-child { border-bottom: none; }
+.suggItem:hover, .suggActive {
+  background: var(--accent-dim, #6c63ff18);
+}
+
+.suggName {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text, #e8e8f0);
+}
+
+.suggMeta {
+  font-size: 0.72rem;
+  color: var(--text-muted, #666);
+  white-space: nowrap;
+}
 .barHint kbd {
   background: var(--surface, #1e1e2e);
   border: 1px solid var(--border, #333);

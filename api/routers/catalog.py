@@ -1070,3 +1070,53 @@ def parse_card_query(q: str = Query(..., min_length=2)):
     with _cache_lock:
         _parse_cache[q] = result
     return result
+
+
+_suggest_cache: TTLCache = TTLCache(maxsize=500, ttl=120)  # 2 min
+
+@router.get("/suggest")
+def suggest(
+    q:     str          = Query(..., min_length=2),
+    sport: Optional[str]= Query(None),
+    limit: int          = Query(8, ge=1, le=20),
+):
+    """Fast player-name typeahead — returns up to `limit` distinct names matching prefix."""
+    cache_key = f"{q}|{sport}|{limit}"
+    with _cache_lock:
+        if cache_key in _suggest_cache:
+            return _suggest_cache[cache_key]
+
+    conditions = ["player_name ILIKE %s"]
+    params: list = [f"%{q}%"]
+    if sport:
+        conditions.append("sport = %s")
+        params.append(sport.upper())
+
+    where = " AND ".join(conditions)
+
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SET statement_timeout = '2s'")
+        cur.execute(f"""
+            SELECT player_name, sport, COUNT(*) AS cnt
+            FROM card_catalog
+            WHERE {where}
+            GROUP BY player_name, sport
+            ORDER BY cnt DESC
+            LIMIT %s
+        """, params + [limit])
+        rows = cur.fetchall()
+
+    result = [{"player_name": r[0], "sport": r[1], "count": r[2]} for r in rows]
+
+    # Deduplicate by player_name keeping highest count
+    seen: dict = {}
+    for r in result:
+        if r["player_name"] not in seen:
+            seen[r["player_name"]] = r
+
+    deduped = sorted(seen.values(), key=lambda x: -x["count"])[:limit]
+
+    with _cache_lock:
+        _suggest_cache[cache_key] = deduped
+    return deduped
