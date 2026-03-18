@@ -57,11 +57,25 @@ ANCHOR_SETS = {
              "%black diamond%", "%spectrum%", "%superstar spotlight%"],
             1990, 2026,
         ),
+        # OPC was discontinued 1996–2008 and 2011–2012; only check active years
+        # Active: 1990-95, 2009-10, 2013+
         (
-            "O-Pee-Chee (base)",
+            "O-Pee-Chee (base) 1990-95",
             "%o-pee-chee%",
             ["%platinum%", "%retro%", "%premier%"],
-            1990, 2026,
+            1990, 1995,
+        ),
+        (
+            "O-Pee-Chee (base) 2009-10",
+            "%o-pee-chee%",
+            ["%platinum%", "%retro%", "%premier%"],
+            2009, 2010,
+        ),
+        (
+            "O-Pee-Chee (base) 2013+",
+            "%o-pee-chee%",
+            ["%platinum%", "%retro%", "%premier%"],
+            2013, 2026,
         ),
     ],
     "NBA": [
