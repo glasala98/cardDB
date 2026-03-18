@@ -218,7 +218,17 @@ def cli_get_cards(session: requests.Session, set_info: dict, sport: str, year: s
     Section headers are <h2>/<h3>/<h4> tags immediately before their card divs.
     We scope parsing to the article content div to avoid picking up navigation items.
     """
-    resp = session.get(set_info["url"], timeout=15)
+    for attempt in range(3):
+        try:
+            resp = session.get(set_info["url"], timeout=30)
+            break
+        except requests.exceptions.Timeout:
+            if attempt < 2:
+                log.warning(f"    Timeout on {set_info['url']} — retry {attempt+1}/3")
+                time.sleep(10)
+            else:
+                log.warning(f"    Timeout on {set_info['url']} — giving up")
+                return []
     if resp.status_code != 200:
         log.warning(f"    HTTP {resp.status_code} — {set_info['url']}")
         return []
@@ -415,7 +425,17 @@ def cbc_get_set_urls(session: requests.Session, sport: str, year: str, debug: bo
     suffix     = SPORT_SUFFIX_CBC.get(sport, "hockey-cards")
     full_year  = cbc_expand_year(year)
     url        = f"{CBC_BASE}/sports-cards-sets/{slug}/{full_year}-{suffix}"
-    resp       = session.get(url, timeout=15)
+    for attempt in range(3):
+        try:
+            resp = session.get(url, timeout=30)
+            break
+        except requests.exceptions.Timeout:
+            if attempt < 2:
+                log.warning(f"  CBC index timeout {sport} {year} — retry {attempt+1}/3")
+                time.sleep(10)
+            else:
+                log.warning(f"  CBC index timeout {sport} {year} — giving up")
+                return []
 
     if resp.status_code != 200:
         log.warning(f"  cardboardconnection {sport} {year}: HTTP {resp.status_code} — {url}")
