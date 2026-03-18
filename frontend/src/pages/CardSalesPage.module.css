@@ -304,6 +304,53 @@
 
 .pageInfo { font-size: 0.85rem; color: var(--text-muted, #888); }
 
+/* ── Grade breakdown ── */
+.gradeBreakdown { margin-top: 28px; }
+
+.gradeTitle {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted, #666);
+  margin-bottom: 10px;
+}
+
+.gradeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.gradeCard {
+  background: var(--surface, #1e1e2e);
+  border: 1px solid var(--border, #2a2a3e);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.gradeName {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted, #aaa);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.gradePrice {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text, #e8e8f0);
+}
+
+.gradeSales {
+  font-size: 0.68rem;
+  color: var(--text-muted, #666);
+}
+
 /* ── Similar cards ── */
 .similar { margin-top: 32px; }
 

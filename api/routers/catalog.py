@@ -215,7 +215,7 @@ def get_catalog_card(catalog_id: int):
                    cc.player_name, cc.team, cc.variant, cc.print_run, cc.is_rookie,
                    cc.scrape_tier,
                    mp.fair_value, mp.prev_value, mp.trend, mp.confidence,
-                   mp.num_sales, mp.scraped_at, mp.image_url
+                   mp.num_sales, mp.scraped_at, mp.image_url, mp.graded_data
             FROM card_catalog cc
             LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
             WHERE cc.id = %s
@@ -228,6 +228,12 @@ def get_catalog_card(catalog_id: int):
         for k in ("fair_value", "prev_value"):
             if card[k] is not None:
                 card[k] = float(card[k])
+        if card.get("graded_data") and isinstance(card["graded_data"], dict):
+            # Normalize graded_data values to float
+            card["graded_data"] = {
+                grade: {**v, "fair_value": float(v["fair_value"])} if v.get("fair_value") else v
+                for grade, v in card["graded_data"].items()
+            }
         if card.get("scraped_at"):
             card["scraped_at"] = card["scraped_at"].isoformat()
     return card

@@ -303,6 +303,24 @@ export default function CardSalesPage() {
           </>
         )}
 
+        {card?.graded_data && Object.keys(card.graded_data).length > 0 && (
+          <div className={styles.gradeBreakdown}>
+            <div className={styles.gradeTitle}>Price by Grade</div>
+            <div className={styles.gradeGrid}>
+              {Object.entries(card.graded_data)
+                .filter(([, v]) => v.fair_value)
+                .sort((a, b) => (b[1].fair_value ?? 0) - (a[1].fair_value ?? 0))
+                .map(([grade, v]) => (
+                  <div key={grade} className={styles.gradeCard}>
+                    <div className={styles.gradeName}>{grade}</div>
+                    <div className={styles.gradePrice}>{fmt(v.fair_value)}</div>
+                    {v.num_sales != null && <div className={styles.gradeSales}>{v.num_sales} sale{v.num_sales !== 1 ? 's' : ''}</div>}
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
         {similar.length > 0 && (
           <div className={styles.similar}>
             <div className={styles.similarTitle}>More from {card?.player_name}</div>
