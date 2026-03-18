@@ -6,7 +6,7 @@ cur = conn.cursor()
 
 print("=== McDavid cards with 'young' or 'gun' in any field ===")
 cur.execute("""
-    SELECT id, year, set_name, variant, card_number, scrape_tier,
+    SELECT cc.id, cc.year, cc.set_name, cc.variant, cc.card_number, cc.scrape_tier,
            mp.fair_value, mp.num_sales
     FROM card_catalog cc
     LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
@@ -23,7 +23,7 @@ for r in rows:
 print()
 print("=== All McDavid cards in 2015-16 Upper Deck sets ===")
 cur.execute("""
-    SELECT id, set_name, variant, card_number, scrape_tier, mp.fair_value
+    SELECT cc.id, cc.set_name, cc.variant, cc.card_number, cc.scrape_tier, mp.fair_value
     FROM card_catalog cc
     LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
     WHERE cc.player_name ILIKE '%mcdavid%'
