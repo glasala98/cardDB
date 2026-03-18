@@ -17,6 +17,8 @@ import os
 import sys
 import re
 import argparse
+from collections import defaultdict
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 import psycopg2
 from psycopg2.extras import RealDictCursor
@@ -170,7 +172,6 @@ target_sports = SPORTS if args.sport == "ALL" else [args.sport.upper()]
 # ── 1. Summary ────────────────────────────────────────────────────────────────
 h(2, "Catalog Summary")
 if md:
-    from datetime import datetime, timezone
     print(f"_Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}_\n")
     print("| Sport | Cards | Years | Sets | Players |")
     print("|-------|------:|------:|-----:|--------:|")
@@ -305,7 +306,6 @@ for sport in target_sports:
     all_sets = cur.fetchall()
 
     # Build lookup: year_prefix (int) → list of lower-cased set names
-    from collections import defaultdict
     sets_by_year = defaultdict(list)
     for row in all_sets:
         yr_prefix = int(row["year"].split("-")[0])

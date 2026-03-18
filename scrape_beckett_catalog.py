@@ -141,16 +141,19 @@ def section_to_variant(section_header: str) -> str:
     return h.title() if h else "Base"
 
 
+_SET_NAME_SUFFIX_RE = re.compile(
+    r'\s+(?:checklist\s+guide|guide|cards?)\s*$',
+    flags=re.IGNORECASE,
+)
+
+
 def clean_set_name(name: str) -> str:
     """Strip trailing scraper artifacts from set names (CLI/CBC page titles).
 
     e.g. '2024-25 Upper Deck Series 1 Hockey Checklist Guide' → '2024-25 Upper Deck Series 1 Hockey'
          '2021-22 O-Pee-Chee Hockey Cards'                    → '2021-22 O-Pee-Chee Hockey'
     """
-    name = re.sub(r'\s+checklist\s+guide\s*$', '', name, flags=re.IGNORECASE).strip()
-    name = re.sub(r'\s+guide\s*$',             '', name, flags=re.IGNORECASE).strip()
-    name = re.sub(r'\s+cards?\s*$',            '', name, flags=re.IGNORECASE).strip()
-    return name
+    return _SET_NAME_SUFFIX_RE.sub('', name).strip()
 
 
 # ════════════════════════════════════════════════════════════════════════════
