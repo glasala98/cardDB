@@ -1,18 +1,13 @@
 name: DB Health Check (Daily)
 
 # Runs every morning before the scrape workflows.
-# Fails loudly if disk usage is above 80%, blocking nothing but creating a
-# visible red X on the Actions tab before the expensive jobs even start.
+# Fails loudly if DB exceeds the fail threshold, creating a visible red X
+# on the Actions tab before the expensive jobs even start.
 
 on:
   schedule:
     - cron: '0 5 * * *'  # 5am UTC — 1hr before scrapes at 6am
   workflow_dispatch:
-    inputs:
-      volume_gb:
-        description: 'Railway volume size in GB'
-        required: false
-        default: '50'
 
 jobs:
   check:
@@ -25,6 +20,6 @@ jobs:
           python-version: '3.11'
       - run: pip install psycopg2-binary
       - name: Check DB disk usage
-        run: python preflight_db_check.py --volume-gb ${{ github.event.inputs.volume_gb || '50' }}
+        run: python preflight_db_check.py
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
