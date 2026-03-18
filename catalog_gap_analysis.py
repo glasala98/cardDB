@@ -8,12 +8,14 @@ Checks:
   1. Summary: cards / sets / years per sport
   2. Years with zero cards (gaps in coverage)
   3. Sets with suspiciously low card counts (< 5 cards) — likely scrape failures
-  4. Duplicate set names within the same year (possible double-scrape)
-  5. Cards with missing player names or card numbers
+  4. Cards with missing player names or card numbers
+  5. NEW: Missing major set families (the critical check — detects entirely absent sets)
+  6. Possibly truncated major sets (brand median comparison)
 """
 
 import os
 import sys
+import re
 import argparse
 from dotenv import load_dotenv
 import psycopg2
@@ -25,16 +27,110 @@ SPORTS = ["NHL", "NBA", "NFL", "MLB"]
 
 # Expected year ranges per sport (for gap detection)
 SPORT_YEAR_RANGES = {
-    "NHL": (1910, 2026),
-    "NBA": (1948, 2026),
-    "NFL": (1935, 2026),
-    "MLB": (1869, 2026),
+    "NHL": (1990, 2026),
+    "NBA": (1990, 2026),
+    "NFL": (1990, 2026),
+    "MLB": (1990, 2026),
 }
 
+# -------------------------------------------------------------------
+# ANCHOR SET FAMILIES
+# For each sport, define major set families that should appear every
+# year within their active range.  Each entry:
+#   (label, sql_ilike_pattern, exclude_ilike_patterns, year_from, year_to)
+#
+# The check asks: for each year in [year_from, year_to], does the
+# catalog contain at least one set whose name ILIKE the pattern AND
+# does NOT ILIKE any of the exclude patterns?
+# -------------------------------------------------------------------
+ANCHOR_SETS = {
+    "NHL": [
+        # Base Upper Deck set — Series 1 or Series 2.  Exclude sub-products
+        # (Artifacts, The Cup, Ice, Trilogy, etc.)
+        (
+            "Upper Deck (base / Series 1 or 2)",
+            "%upper deck%",
+            ["%artifacts%", "%the cup%", "%ice%", "%trilogy%", "%overtime%",
+             "%premier%", "%collection%", "%credentials%", "%star rookies%",
+             "%full force%", "%spx%", "%mvp%", "%bee hive%", "%exclusives%",
+             "%portraits%", "%update%", "%clear cut%", "%retro%", "%milestone%",
+             "%black diamond%", "%spectrum%", "%superstar spotlight%"],
+            1990, 2026,
+        ),
+        (
+            "O-Pee-Chee (base)",
+            "%o-pee-chee%",
+            ["%platinum%", "%retro%", "%premier%"],
+            1990, 2026,
+        ),
+    ],
+    "NBA": [
+        (
+            "Topps / Bowman (base)",
+            "%topps%",
+            ["%chrome%", "%finest%", "%stadium club%", "%gold label%",
+             "%heritage%", "%archives%", "%bowman%"],
+            1990, 2010,
+        ),
+        (
+            "Panini Prizm",
+            "%panini prizm%",
+            [],
+            2012, 2026,
+        ),
+        (
+            "Hoops / NBA Hoops",
+            "%hoops%",
+            [],
+            1990, 2026,
+        ),
+    ],
+    "NFL": [
+        (
+            "Topps (base)",
+            "%topps%",
+            ["%chrome%", "%finest%", "%stadium club%", "%gold label%",
+             "%heritage%", "%archives%", "%bowman%", "%platinum%"],
+            1990, 2022,
+        ),
+        (
+            "Panini Prizm",
+            "%panini prizm%",
+            [],
+            2012, 2026,
+        ),
+        (
+            "Donruss / Panini Donruss",
+            "%donruss%",
+            [],
+            1990, 2026,
+        ),
+    ],
+    "MLB": [
+        (
+            "Topps (base / Series 1 or 2)",
+            "%topps%",
+            ["%chrome%", "%finest%", "%stadium club%", "%gold label%",
+             "%heritage%", "%archives%", "%bowman%", "%platinum%",
+             "%update%", "%now%", "%gallery%"],
+            1990, 2026,
+        ),
+        (
+            "Bowman (base)",
+            "%bowman%",
+            ["%chrome%", "%draft%", "%platinum%", "%best%"],
+            1990, 2026,
+        ),
+    ],
+}
+
+
 parser = argparse.ArgumentParser()
-parser.add_argument("--sport", default="ALL", help="Sport to analyze (or ALL)")
+parser.add_argument("--sport",    default="ALL", help="Sport to analyze (or ALL)")
 parser.add_argument("--markdown", action="store_true", help="Output GitHub-flavoured Markdown")
-parser.add_argument("--output", default=None, help="Write output to file instead of stdout")
+parser.add_argument("--output",   default=None, help="Write output to file instead of stdout")
+parser.add_argument("--year-from", type=int, default=None, dest="year_from",
+                    help="Only check from this year onwards (default: sport minimum)")
 args = parser.parse_args()
 
 import sys as _sys
@@ -48,13 +144,9 @@ def h(level, text):
     if md:
         print(f"\n{'#' * level} {text}")
     else:
-        print(f"\n{'=' * 60}")
-        print(text)
-        print("=" * 60)
-
-def row_sep():
-    if not md:
-        print("-" * 60)
+        print(f"\n{'=' * 70}")
+        print(f"  {text}")
+        print("=" * 70)
 
 conn = psycopg2.connect(os.environ["DATABASE_URL"])
 cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -62,10 +154,9 @@ cur = conn.cursor(cursor_factory=RealDictCursor)
 target_sports = SPORTS if args.sport == "ALL" else [args.sport.upper()]
 
 # ── 1. Summary ────────────────────────────────────────────────────────────────
-from datetime import datetime
 h(2, "Catalog Summary")
 if md:
-    from datetime import timezone
+    from datetime import datetime, timezone
     print(f"_Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}_\n")
     print("| Sport | Cards | Years | Sets | Players |")
     print("|-------|------:|------:|-----:|--------:|")
@@ -94,7 +185,8 @@ h(2, "Year Coverage Gaps")
 for sport in target_sports:
     if sport not in SPORT_YEAR_RANGES:
         continue
-    start_yr, end_yr = SPORT_YEAR_RANGES[sport]
+    raw_start, end_yr = SPORT_YEAR_RANGES[sport]
+    start_yr = args.year_from if args.year_from else raw_start
     cur.execute("""
         SELECT DISTINCT SPLIT_PART(year, '-', 1)::int AS yr
         FROM card_catalog
@@ -108,9 +200,7 @@ for sport in target_sports:
         status = "✅ Full coverage" if not gaps else f"⚠️ {len(gaps)} missing years"
         print(f"\n**{sport}** — {status}")
     else:
-        print(f"\n{'=' * 60}")
-        print(f"{sport} YEAR GAPS ({len(gaps)} missing years out of {end_yr - start_yr + 1})")
-        print("=" * 60)
+        print(f"\n  {sport} ({start_yr}–{end_yr}): {len(gaps)} missing years")
     if gaps:
         ranges, start = [], gaps[0]
         prev = gaps[0]
@@ -122,9 +212,9 @@ for sport in target_sports:
         ranges.append((start, prev))
         for s, e in ranges:
             label = str(s) if s == e else f"{s}–{e}"
-            print(f"  Missing: {label}" if not md else f"- Missing: {label}")
+            print(f"    Missing: {label}" if not md else f"- Missing: {label}")
     else:
-        print("  No gaps — full coverage!" if not md else "_No gaps — full coverage._")
+        print("    No gaps — full coverage!" if not md else "_No gaps — full coverage._")
 
 # ── 3. Thin sets (< 5 cards) ─────────────────────────────────────────────────
 h(2, "Thin Sets (< 5 cards) — possible scrape failures")
@@ -154,12 +244,12 @@ if rows:
 else:
     print("  None found." if not md else "_None found._")
 
-# ── 4 & 5. Data quality checks ────────────────────────────────────────────────
+# ── 4. Data quality checks ─────────────────────────────────────────────────────
 h(2, "Data Quality")
 checks = [
-    ("Missing player names", "player_name = '' OR player_name IS NULL"),
-    ("Missing card numbers", "card_number = '' OR card_number IS NULL"),
-    ("Checklist artifacts in set_name", "set_name ILIKE '%checklist%'"),
+    ("Missing player names",          "player_name = '' OR player_name IS NULL"),
+    ("Missing card numbers",          "card_number = '' OR card_number IS NULL"),
+    ("Checklist artifacts in set_name","set_name ILIKE '%checklist%'"),
 ]
 if md:
     print("\n| Check | Result |")
@@ -176,41 +266,89 @@ for label, cond in checks:
     else:
         print(f"  {label}: {cnt:,}" if cnt > 0 else f"  {label}: ✓ Clean")
 
-# ── 6. Top sets by card count ─────────────────────────────────────────────────
-h(2, "Top 10 Sets by Card Count")
+# ── 5. MISSING MAJOR SET FAMILIES ─────────────────────────────────────────────
+# This is the critical check: for each year a sport is active, verify that
+# expected major brands appear in the catalog.  A missing entry here means
+# an entire product line was never scraped — not just sparse, but totally absent.
+h(2, "Missing Major Set Families (CRITICAL)")
+
+total_missing = 0
 for sport in target_sports:
+    anchors = ANCHOR_SETS.get(sport, [])
+    if not anchors:
+        continue
+
+    raw_start, end_yr = SPORT_YEAR_RANGES.get(sport, (1990, 2026))
+    start_yr = args.year_from if args.year_from else raw_start
+
+    # Pull all set names for this sport in one shot (fast)
     cur.execute("""
-        SELECT year, set_name, COUNT(*) AS cnt
+        SELECT DISTINCT year, set_name
         FROM card_catalog
         WHERE sport = %s
-        GROUP BY year, set_name
-        ORDER BY cnt DESC
-        LIMIT 10
+          AND year ~ '^[0-9]{4}'
     """, (sport,))
-    rows = cur.fetchall()
-    if md:
-        print(f"\n**{sport}**\n")
-        print("| Year | Cards | Set |")
-        print("|------|------:|-----|")
-        for row in rows:
-            print(f"| {row['year']} | {row['cnt']:,} | {row['set_name']} |")
-    else:
-        print(f"\n  {sport}:")
-        for row in rows:
-            print(f"    {row['year']:7s} | {row['cnt']:>5,} cards | {row['set_name']}")
+    all_sets = cur.fetchall()
 
-# ── 7. Truncated major sets ───────────────────────────────────────────────────
-# For recurring brands (Topps, Upper Deck, Donruss, Panini, Bowman, Fleer, Score, SkyBox, OPC),
-# flag sets where card count is < 30% of the median for that brand in post-1980 years.
-print(f"\n{'=' * 60}")
-print("POSSIBLY TRUNCATED SETS (major brands, post-1980, <30% of brand median)")
-print("=" * 60)
+    # Build lookup: year_prefix (int) → list of lower-cased set names
+    from collections import defaultdict
+    sets_by_year = defaultdict(list)
+    for row in all_sets:
+        yr_prefix = int(row["year"].split("-")[0])
+        sets_by_year[yr_prefix].append(row["set_name"].lower())
+
+    sport_missing = []
+    for (label, include_pat, exclude_pats, anchor_from, anchor_to) in anchors:
+        check_from = max(start_yr, anchor_from)
+        check_to   = min(end_yr,   anchor_to)
+
+        inc = include_pat.replace("%", "").lower()
+        excs = [p.replace("%", "").lower() for p in exclude_pats]
+
+        for yr in range(check_from, check_to + 1):
+            year_sets = sets_by_year.get(yr, [])
+            # Does any set match the include pattern and none of the exclude patterns?
+            found = any(
+                inc in s and not any(ex in s for ex in excs)
+                for s in year_sets
+            )
+            if not found and year_sets:
+                # Only flag if we have OTHER cards for this year (proof the year was scraped)
+                sport_missing.append((yr, label))
+
+    if sport_missing:
+        total_missing += len(sport_missing)
+        if md:
+            print(f"\n**{sport}** — ⚠️ {len(sport_missing)} missing set families\n")
+            print("| Year | Missing Family |")
+            print("|------|----------------|")
+            for yr, label in sorted(sport_missing):
+                print(f"| {yr} | {label} |")
+        else:
+            print(f"\n  {sport}: ⚠️  {len(sport_missing)} MISSING set families")
+            for yr, label in sorted(sport_missing):
+                print(f"    {yr}: MISSING — {label}")
+    else:
+        msg = f"\n  {sport}: ✓ All major set families present"
+        print(msg if not md else f"\n**{sport}** — ✅ All major set families present")
+
+if total_missing == 0:
+    print("\n  All major set families accounted for across all sports." if not md
+          else "\n✅ **All major set families accounted for.**")
+else:
+    print(f"\n  TOTAL: {total_missing} year/family combinations missing from catalog." if not md
+          else f"\n⚠️ **Total: {total_missing} year/family combinations missing.**")
+
+# ── 6. Possibly truncated major sets ─────────────────────────────────────────
+h(2, "Possibly Truncated Sets (major brands, <30% of brand median)")
 
 MAJOR_BRANDS = ['Topps', 'Upper Deck', 'Donruss', 'Panini', 'Bowman',
                 'Fleer', 'Score', 'SkyBox', 'O-Pee-Chee', 'OPC', 'Pacific',
                 'Stadium Club', 'Ultra', 'Pinnacle', 'Leaf']
 
 for sport in target_sports:
+    raw_start, _ = SPORT_YEAR_RANGES.get(sport, (1990, 2026))
+    start_yr = args.year_from if args.year_from else raw_start
     cur.execute("""
         WITH brand_sets AS (
             SELECT set_name, year, COUNT(*) AS card_count,
@@ -230,7 +368,7 @@ for sport in target_sports:
                    END AS brand
             FROM card_catalog
             WHERE sport = %s
-              AND SPLIT_PART(year, '-', 1)::int >= 1980
+              AND SPLIT_PART(year, '-', 1)::int >= %s
             GROUP BY set_name, year
         ),
         brand_medians AS (
@@ -248,12 +386,13 @@ for sport in target_sports:
           AND bs.brand IS NOT NULL
         ORDER BY bm.brand, bs.year, bs.card_count
         LIMIT 50
-    """, (sport,))
+    """, (sport, start_yr))
     rows = cur.fetchall()
     if rows:
         print(f"\n  {sport}:")
         for row in rows:
-            print(f"    {row['year']:7s} | {row['card_count']:>3} cards (median {row['brand_median']}) | {row['brand']} — {row['set_name']}")
+            print(f"    {row['year']:7s} | {row['card_count']:>3} cards "
+                  f"(median {row['brand_median']}) | {row['brand']} — {row['set_name']}")
     else:
         print(f"\n  {sport}: no truncated major sets found")
 
@@ -261,8 +400,9 @@ cur.close()
 conn.close()
 
 if not md:
-    print(f"\n{'=' * 60}")
-    print("Done.")
+    print(f"\n{'=' * 70}")
+    print("  Done.")
+    print("=" * 70)
 
 if args.output:
     _out.close()
