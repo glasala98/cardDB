@@ -249,7 +249,7 @@ h(2, "Data Quality")
 checks = [
     ("Missing player names",          "player_name = '' OR player_name IS NULL"),
     ("Missing card numbers",          "card_number = '' OR card_number IS NULL"),
-    ("Checklist artifacts in set_name","set_name ILIKE '%checklist%'"),
+    ("Checklist artifacts in set_name","set_name ILIKE '%%checklist%%'"),
 ]
 if md:
     print("\n| Check | Result |")
