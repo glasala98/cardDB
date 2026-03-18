@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { getCatalogCard, getCatalogRawSales, getCatalog } from '../api/catalog'
+import { getCatalogCard, getCatalogRawSales, getCatalog, getCatalogCardHistory } from '../api/catalog'
 import SourceBadge from '../components/SourceBadge'
 import GradeBadge from '../components/GradeBadge'
 import { pushRecentlyViewed } from '../utils/recentlyViewed'
@@ -90,6 +90,13 @@ export default function CardSalesPage() {
         getCatalog({ player_name: c.player_name, sport: c.sport, per_page: 7, sort: 'num_sales', dir: 'desc' })
           .then(d => setSimilar((d.cards ?? []).filter(x => x.id !== catalogId).slice(0, 6)))
           .catch(() => {})
+        // Price history for sparkline
+        getCatalogCardHistory(catalogId)
+          .then(data => {
+            const pts = (data.history ?? []).map(h => h.fair_value).filter(Boolean)
+            if (pts.length >= 2) setTimeout(() => drawSparkline(canvasRef.current, pts), 0)
+          })
+          .catch(() => {})
       })
       .catch(() => setError('Card not found'))
   }, [catalogId])
@@ -118,9 +125,6 @@ export default function CardSalesPage() {
         setSales(s)
         setTotal(data.total ?? 0)
         if (data.stats) setStats(data.stats)
-        // Draw sparkline from date-asc prices
-        const prices = [...s].reverse().map(r => r.price_val).filter(Boolean)
-        setTimeout(() => drawSparkline(canvasRef.current, prices), 0)
       })
       .catch(e => setError(e?.message || 'Failed to load sales'))
       .finally(() => setLoading(false))
