@@ -1,9 +1,12 @@
 """
-migrate_fix_zero_prices.py — Null out market_prices.fair_value where it's <= 0.
+migrate_fix_zero_prices.py — Delete market_prices rows where fair_value <= 0.
 
-A fair_value of 0 means no real sales data was found; it should be NULL
-so the frontend correctly shows 'No price data' instead of '$0.00'.
-Safe to re-run.
+A fair_value of 0 means no real sales data was found. These rows are noise;
+deleting them lets the frontend correctly show 'No price data' for unpriced cards
+(via the LEFT JOIN in browse_catalog returning NULL for mp.fair_value).
+
+fair_value has a NOT NULL constraint so we delete instead of nulling.
+Safe to re-run (no rows to delete = no-op).
 """
 import os
 import psycopg2
@@ -21,14 +24,11 @@ def main():
 
     if count == 0:
         print("Nothing to fix.")
+        conn.close()
         return
 
-    cur.execute("""
-        UPDATE market_prices
-        SET fair_value = NULL
-        WHERE fair_value <= 0
-    """)
-    print(f"Nulled out {cur.rowcount:,} rows")
+    cur.execute("DELETE FROM market_prices WHERE fair_value <= 0")
+    print(f"Deleted {cur.rowcount:,} rows")
     conn.commit()
     cur.close()
     conn.close()
