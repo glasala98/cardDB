@@ -23,6 +23,7 @@ import Search from './pages/Search'
 import CardSalesPage from './pages/CardSalesPage'
 import SetBrowser from './pages/SetBrowser'
 import SetDetail from './pages/SetDetail'
+import Trending from './pages/Trending'
 import { PreferencesProvider } from './context/PreferencesContext'
 import styles from './App.module.css'
 
@@ -49,6 +50,7 @@ function AppShell() {
           <Route path="/catalog/:id"    element={<CardSalesPage />} />
           <Route path="/sets"           element={<SetBrowser />} />
           <Route path="/sets/detail"    element={<SetDetail />} />
+          <Route path="/trending"       element={<Trending />} />
         </Routes>
       </main>
     </div>

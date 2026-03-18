@@ -1,0 +1,173 @@
+.page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  min-height: 100vh;
+}
+
+.header {
+  margin-bottom: 24px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text, #e8e8f0);
+  margin: 0;
+}
+
+.sub {
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+}
+
+.sportTabs { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.tab {
+  background: none;
+  border: 1px solid var(--border, #333);
+  border-radius: 6px;
+  color: var(--text-muted, #888);
+  font-size: 0.82rem;
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.tab:hover  { border-color: var(--accent, #6c63ff); }
+.active     { border-color: var(--accent, #6c63ff); color: var(--accent, #6c63ff); background: var(--accent-dim, #6c63ff22); }
+
+.status {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--text-muted, #888); font-size: 0.9rem; padding: 24px 0;
+}
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid var(--border, #333);
+  border-top-color: var(--accent, #6c63ff);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error {
+  padding: 14px 16px; border: 1px solid #c0392b;
+  border-radius: 8px; color: #e74c3c; font-size: 0.9rem;
+}
+
+.empty {
+  text-align: center; padding: 48px;
+  color: var(--text-muted, #888); font-size: 0.9rem;
+}
+
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface, #1e1e2e);
+  border: 1px solid var(--border, #2a2a3e);
+  border-radius: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+  position: relative;
+}
+.card:hover {
+  border-color: var(--accent, #6c63ff);
+  transform: translateX(2px);
+}
+
+.rank {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-muted, #555);
+  min-width: 28px;
+  flex-shrink: 0;
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.player {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text, #e8e8f0);
+}
+
+.rc {
+  background: #e67e22;
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.meta {
+  font-size: 0.78rem;
+  color: var(--text-muted, #888);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.pct {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #2ecc71;
+}
+
+.price {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text, #e8e8f0);
+}
+
+.sales {
+  font-size: 0.7rem;
+  color: var(--text-muted, #666);
+}
+
+.sport {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--text-muted, #555);
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 640px) {
+  .page { padding: 16px 12px 48px; }
+  .title { font-size: 1.2rem; }
+  .meta { max-width: 180px; }
+}

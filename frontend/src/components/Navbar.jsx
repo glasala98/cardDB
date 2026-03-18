@@ -82,6 +82,7 @@ const NAV_ITEMS = [
       { to: '/catalog',    label: 'Browse'         },
       { to: '/releases',   label: 'New Releases'   },
       { to: '/sets',       label: 'Sets'           },
+      { to: '/trending',   label: 'Trending'       },
       { to: '/collection', label: 'My Collection', auth: true },
     ],
   },

@@ -50,3 +50,6 @@ export const getSetDetail = (year, setName, params = {}) =>
 
 export const suggestPlayers = (q, sport = null) =>
   client.get('/catalog/suggest', { params: { q, ...(sport ? { sport } : {}) } })
+
+export const getTrending = (sport = null, limit = 12) =>
+  client.get('/catalog/trending', { params: { ...(sport ? { sport } : {}), limit } })

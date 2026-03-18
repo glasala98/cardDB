@@ -1072,7 +1072,100 @@ def parse_card_query(q: str = Query(..., min_length=2)):
     return result
 
 
-_suggest_cache: TTLCache = TTLCache(maxsize=500, ttl=120)  # 2 min
+_trending_cache: TTLCache = TTLCache(maxsize=20, ttl=300)   # 5 min
+_suggest_cache:  TTLCache = TTLCache(maxsize=500, ttl=120)  # 2 min
+
+@router.get("/trending")
+def trending_cards(
+    sport: Optional[str] = Query(None),
+    limit: int           = Query(12, ge=1, le=50),
+):
+    """Cards with the highest price momentum (7d avg vs prior 7d avg).
+
+    Returns cards sorted by % price change descending, requiring at least
+    3 sales in the last 7 days so low-volume noise is filtered out.
+    """
+    cache_key = f"trending|{sport}|{limit}"
+    with _cache_lock:
+        if cache_key in _trending_cache:
+            return _trending_cache[cache_key]
+
+    sport_filter = "AND cc.sport = %s" if sport else ""
+    params: list = []
+    if sport:
+        params.append(sport.upper())
+
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("SET statement_timeout = '6s'")
+        cur.execute(f"""
+            SELECT
+                cc.id, cc.player_name, cc.sport, cc.year, cc.set_name,
+                cc.variant, cc.card_number, cc.is_rookie, cc.scrape_tier,
+                mp.fair_value, mp.num_sales, mp.image_url,
+                AVG(mrs.price_val) FILTER (
+                    WHERE mrs.sold_date >= CURRENT_DATE - 7 AND mrs.price_val > 0
+                ) AS avg_7d,
+                COUNT(mrs.id)      FILTER (
+                    WHERE mrs.sold_date >= CURRENT_DATE - 7 AND mrs.price_val > 0
+                ) AS cnt_7d,
+                AVG(mrs.price_val) FILTER (
+                    WHERE mrs.sold_date >= CURRENT_DATE - 14
+                      AND mrs.sold_date <  CURRENT_DATE - 7
+                      AND mrs.price_val > 0
+                ) AS avg_prev_7d
+            FROM card_catalog cc
+            JOIN market_prices mp ON mp.card_catalog_id = cc.id
+            JOIN market_raw_sales mrs ON mrs.card_catalog_id = cc.id
+            WHERE mrs.sold_date >= CURRENT_DATE - 14
+              AND mp.fair_value > 0
+              AND NOT COALESCE(mp.ignored, FALSE)
+              {sport_filter}
+            GROUP BY cc.id, cc.player_name, cc.sport, cc.year, cc.set_name,
+                     cc.variant, cc.card_number, cc.is_rookie, cc.scrape_tier,
+                     mp.fair_value, mp.num_sales, mp.image_url
+            HAVING
+                COUNT(mrs.id) FILTER (
+                    WHERE mrs.sold_date >= CURRENT_DATE - 7 AND mrs.price_val > 0
+                ) >= 3
+                AND AVG(mrs.price_val) FILTER (
+                    WHERE mrs.sold_date >= CURRENT_DATE - 14
+                      AND mrs.sold_date <  CURRENT_DATE - 7
+                      AND mrs.price_val > 0
+                ) > 0
+            ORDER BY (
+                AVG(mrs.price_val) FILTER (
+                    WHERE mrs.sold_date >= CURRENT_DATE - 7 AND mrs.price_val > 0
+                ) /
+                AVG(mrs.price_val) FILTER (
+                    WHERE mrs.sold_date >= CURRENT_DATE - 14
+                      AND mrs.sold_date <  CURRENT_DATE - 7
+                      AND mrs.price_val > 0
+                ) - 1
+            ) DESC NULLS LAST
+            LIMIT %s
+        """, params + [limit])
+
+        cols = [d[0] for d in cur.description]
+        rows = cur.fetchall()
+
+    cards = []
+    for row in rows:
+        r = dict(zip(cols, row))
+        avg_7d     = float(r["avg_7d"])     if r["avg_7d"]     is not None else None
+        avg_prev   = float(r["avg_prev_7d"]) if r["avg_prev_7d"] is not None else None
+        r["fair_value"] = float(r["fair_value"]) if r["fair_value"] is not None else None
+        r["pct_change"] = round((avg_7d - avg_prev) / avg_prev * 100, 1) if avg_7d and avg_prev and avg_prev > 0 else None
+        r["avg_7d"]     = avg_7d
+        r["cnt_7d"]     = r["cnt_7d"]
+        del r["avg_prev_7d"]
+        cards.append(r)
+
+    result = {"cards": cards}
+    with _cache_lock:
+        _trending_cache[cache_key] = result
+    return result
+
 
 @router.get("/suggest")
 def suggest(
