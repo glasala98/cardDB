@@ -27,7 +27,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run unit tests (no DB)
-        run: pytest tests/ -v -m "not db" --tb=short --ignore=tests/test_calculate_fair_price.py --ignore=tests/test_scrape_card_prices.py
+        run: pytest tests/ -v -m "not db" --tb=short --ignore=tests/test_calculate_fair_price.py --ignore=tests/test_scrape_card_prices.py --ignore=tests/test_catalog_quality.py
 
   # ── Python DB quality tests (requires live Railway DB) ─────────────────────
   python-db:
