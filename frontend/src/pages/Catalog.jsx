@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getCatalog, getCatalogFilters, getCatalogCardHistory, aiSearchCatalog } from '../api/catalog'
+import { getCatalog, getCatalogFilters, getCatalogCardHistory, aiSearchCatalog, suggestPlayers } from '../api/catalog'
 import { getOwnedIds, addToCollection, getGrades } from '../api/collection'
 import { useCurrency } from '../context/CurrencyContext'
 import { useAuth } from '../context/AuthContext'
@@ -108,6 +108,11 @@ export default function Catalog() {
   const [aiLoading,  setAiLoading]  = useState(false)
   const [aiFilters,  setAiFilters]  = useState(null)
   const [aiMode,     setAiMode]     = useState(false)
+
+  // Autocomplete
+  const [suggestions,     setSuggestions]     = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const searchRef = useRef(null)
 
   // Card detail panel
   const [detailCard,    setDetailCard]    = useState(null)
@@ -226,6 +231,24 @@ export default function Catalog() {
     return () => clearTimeout(searchTimer.current)
   }, [search, sport, year, setName, tierFilter, rcOnly, sortKey, sortDir]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Fetch autocomplete suggestions when search input changes
+  useEffect(() => {
+    if (search.length < 2) { setSuggestions([]); setShowSuggestions(false); return }
+    const t = setTimeout(() => {
+      suggestPlayers(search, sport || null)
+        .then(data => { setSuggestions(data || []); setShowSuggestions((data || []).length > 0) })
+        .catch(() => setSuggestions([]))
+    }, 200)
+    return () => clearTimeout(t)
+  }, [search, sport])
+
+  // Dismiss suggestions on click-outside
+  useEffect(() => {
+    const handler = (e) => { if (searchRef.current && !searchRef.current.contains(e.target)) setShowSuggestions(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
   const handleSort = (key) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('desc') }
@@ -310,13 +333,28 @@ export default function Catalog() {
             <button className={styles.drawerClose} onClick={() => setShowFilters(false)}>✕</button>
           </div>
 
-          <div className={styles.filterSection}>
+          <div className={styles.filterSection} ref={searchRef} style={{ position: 'relative' }}>
             <input
               className={styles.sideSearch}
               placeholder="Player or set…"
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => { setSearch(e.target.value); setShowSuggestions(true) }}
+              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
             />
+            {showSuggestions && suggestions.length > 0 && (
+              <ul className={styles.suggestions}>
+                {suggestions.map(s => (
+                  <li
+                    key={s.player_name}
+                    className={styles.suggestionItem}
+                    onMouseDown={() => { setSearch(s.player_name); setShowSuggestions(false) }}
+                  >
+                    <span>{s.player_name}</span>
+                    <span className={styles.suggestionCount}>{s.count}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className={styles.filterSection}>

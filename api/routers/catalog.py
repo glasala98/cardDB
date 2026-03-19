@@ -74,6 +74,7 @@ def browse_catalog(
 
     where_parts = []
     params = []
+    rank_params = []  # extra params injected into ORDER BY (after WHERE params)
 
     if sport:
         where_parts.append("cc.sport = %s")
@@ -100,8 +101,14 @@ def browse_catalog(
         params.append(f"%{card_number}%")
 
     if search:
-        where_parts.append("(cc.player_name ILIKE %s OR cc.set_name ILIKE %s OR cc.variant ILIKE %s)")
-        params.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
+        # Use FTS (search_vector GIN index) for multi-word/natural-language queries
+        # plus ILIKE fallback so short names and stop-word-only terms still match.
+        where_parts.append("""(
+            cc.search_vector @@ plainto_tsquery('english', %s)
+            OR cc.player_name ILIKE %s
+            OR cc.set_name ILIKE %s
+        )""")
+        params.extend([search, f"%{search}%", f"%{search}%"])
 
     if fts:
         # Multi-term AND: every token must appear in at least one of the key fields.
@@ -133,6 +140,16 @@ def browse_catalog(
 
     where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
 
+    # When search is active, prepend relevance rank so best matches sort first.
+    if search:
+        order_sql = (
+            f"ORDER BY ts_rank(cc.search_vector, plainto_tsquery('english', %s)) DESC,"
+            f" {sort_col} {sort_dir} NULLS LAST, cc.player_name ASC"
+        )
+        rank_params = [search]
+    else:
+        order_sql = f"ORDER BY {sort_col} {sort_dir} NULLS LAST, cc.player_name ASC"
+
     base_query = f"""
         FROM card_catalog cc
         LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
@@ -162,8 +179,7 @@ def browse_catalog(
             mp.scraped_at,
             COALESCE(mp.image_url, '') AS image_url
         {base_query}
-        ORDER BY {sort_col} {sort_dir} NULLS LAST,
-                 cc.player_name ASC
+        {order_sql}
         LIMIT %s OFFSET %s
     """
 
@@ -181,7 +197,7 @@ def browse_catalog(
             cur.execute("SELECT reltuples::bigint FROM pg_class WHERE relname = 'card_catalog'")
             total = cur.fetchone()[0] or 0
 
-        cur.execute(data_sql, params + [per_page, offset])
+        cur.execute(data_sql, params + rank_params + [per_page, offset])
         rows = cur.fetchall()
         cols = [d[0] for d in cur.description]
 

@@ -84,6 +84,37 @@
 .sideSearch::placeholder { color: var(--text-secondary); }
 .sideSearch:focus { border-color: var(--accent); }
 
+.suggestions {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0; right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin: 0; padding: 4px 0;
+  list-style: none;
+  z-index: 200;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  max-height: 220px;
+  overflow-y: auto;
+}
+.suggestionItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  gap: 8px;
+}
+.suggestionItem:hover { background: var(--bg-hover); }
+.suggestionCount {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
 .sideSelect {
   width: 100%;
   background: var(--bg-card);
