@@ -2,7 +2,7 @@ name: Catalog Tier — Stars (Weekly)
 
 on:
   schedule:
-    - cron: '0 14 * * 3'  # 2pm UTC Wednesday (spreads load from premium Mon, staple daily)
+    - cron: '0 12 * * *'  # noon UTC daily (backfill mode — revert to weekly after done)
   workflow_dispatch:
     inputs:
       sport:

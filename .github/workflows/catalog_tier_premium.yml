@@ -2,7 +2,7 @@ name: Catalog Tier — Premium (Weekly)
 
 on:
   schedule:
-    - cron: '0 10 * * 1'  # 10am UTC Monday (5am EST)
+    - cron: '0 10 * * *'  # 10am UTC daily (backfill mode — revert to weekly after done)
   workflow_dispatch:
     inputs:
       sport:
