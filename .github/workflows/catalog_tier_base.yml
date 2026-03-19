@@ -59,6 +59,23 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Notify — NHL scrape started
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.NOTIFY_GMAIL_USER }}
+          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.NOTIFY_EMAIL_TO }}
+          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
+          subject: "▶️ CardDB — Base scrape started: NHL"
+          body: |
+            NHL base-tier scrape has started successfully.
+
+            Triggered by: ${{ github.event_name }}
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       - name: Scrape NHL base prices
         run: |
           python -u scrape_master_db.py \
@@ -70,6 +87,48 @@ jobs:
             --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Generate cancellation report
+        id: cancel_report
+        if: cancelled()
+        continue-on-error: true
+        run: |
+          pip install psycopg2-binary -q
+          DB_SIZE=$(python -c "
+          import os, psycopg2
+          try:
+              conn = psycopg2.connect(os.environ['DATABASE_URL'])
+              cur = conn.cursor()
+              cur.execute(\"SELECT pg_size_pretty(pg_database_size(current_database()))\")
+              print(cur.fetchone()[0])
+              cur.close(); conn.close()
+          except:
+              print('unavailable')
+          ")
+          echo "db_size=$DB_SIZE" >> $GITHUB_OUTPUT
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Notify — NHL scrape cancelled
+        if: cancelled()
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.NOTIFY_GMAIL_USER }}
+          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.NOTIFY_EMAIL_TO }}
+          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
+          subject: "⚠️ CardDB — Base scrape STOPPED early: NHL"
+          body: |
+            NHL base-tier scrape was STOPPED before completing.
+
+            DB size at cancellation: ${{ steps.cancel_report.outputs.db_size }}
+
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            To restart NHL only:
+              gh workflow run catalog_tier_base.yml --ref main -f sport=NHL
 
   scrape-base-nba:
     needs: preflight
@@ -87,6 +146,23 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Notify — NBA scrape started
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.NOTIFY_GMAIL_USER }}
+          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.NOTIFY_EMAIL_TO }}
+          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
+          subject: "▶️ CardDB — Base scrape started: NBA"
+          body: |
+            NBA base-tier scrape has started successfully.
+
+            Triggered by: ${{ github.event_name }}
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       - name: Scrape NBA base prices
         run: |
           python -u scrape_master_db.py \
@@ -98,6 +174,48 @@ jobs:
             --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Generate cancellation report
+        id: cancel_report
+        if: cancelled()
+        continue-on-error: true
+        run: |
+          pip install psycopg2-binary -q
+          DB_SIZE=$(python -c "
+          import os, psycopg2
+          try:
+              conn = psycopg2.connect(os.environ['DATABASE_URL'])
+              cur = conn.cursor()
+              cur.execute(\"SELECT pg_size_pretty(pg_database_size(current_database()))\")
+              print(cur.fetchone()[0])
+              cur.close(); conn.close()
+          except:
+              print('unavailable')
+          ")
+          echo "db_size=$DB_SIZE" >> $GITHUB_OUTPUT
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Notify — NBA scrape cancelled
+        if: cancelled()
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.NOTIFY_GMAIL_USER }}
+          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.NOTIFY_EMAIL_TO }}
+          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
+          subject: "⚠️ CardDB — Base scrape STOPPED early: NBA"
+          body: |
+            NBA base-tier scrape was STOPPED before completing.
+
+            DB size at cancellation: ${{ steps.cancel_report.outputs.db_size }}
+
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            To restart NBA only:
+              gh workflow run catalog_tier_base.yml --ref main -f sport=NBA
 
   scrape-base-nfl:
     needs: preflight
@@ -115,6 +233,23 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Notify — NFL scrape started
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.NOTIFY_GMAIL_USER }}
+          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.NOTIFY_EMAIL_TO }}
+          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
+          subject: "▶️ CardDB — Base scrape started: NFL"
+          body: |
+            NFL base-tier scrape has started successfully.
+
+            Triggered by: ${{ github.event_name }}
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       - name: Scrape NFL base prices
         run: |
           python -u scrape_master_db.py \
@@ -126,6 +261,48 @@ jobs:
             --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Generate cancellation report
+        id: cancel_report
+        if: cancelled()
+        continue-on-error: true
+        run: |
+          pip install psycopg2-binary -q
+          DB_SIZE=$(python -c "
+          import os, psycopg2
+          try:
+              conn = psycopg2.connect(os.environ['DATABASE_URL'])
+              cur = conn.cursor()
+              cur.execute(\"SELECT pg_size_pretty(pg_database_size(current_database()))\")
+              print(cur.fetchone()[0])
+              cur.close(); conn.close()
+          except:
+              print('unavailable')
+          ")
+          echo "db_size=$DB_SIZE" >> $GITHUB_OUTPUT
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Notify — NFL scrape cancelled
+        if: cancelled()
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.NOTIFY_GMAIL_USER }}
+          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.NOTIFY_EMAIL_TO }}
+          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
+          subject: "⚠️ CardDB — Base scrape STOPPED early: NFL"
+          body: |
+            NFL base-tier scrape was STOPPED before completing.
+
+            DB size at cancellation: ${{ steps.cancel_report.outputs.db_size }}
+
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            To restart NFL only:
+              gh workflow run catalog_tier_base.yml --ref main -f sport=NFL
 
   scrape-base-mlb:
     needs: preflight
@@ -143,6 +320,23 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Notify — MLB scrape started
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.NOTIFY_GMAIL_USER }}
+          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.NOTIFY_EMAIL_TO }}
+          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
+          subject: "▶️ CardDB — Base scrape started: MLB"
+          body: |
+            MLB base-tier scrape has started successfully.
+
+            Triggered by: ${{ github.event_name }}
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       - name: Scrape MLB base prices
         run: |
           python -u scrape_master_db.py \
@@ -154,3 +348,45 @@ jobs:
             --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Generate cancellation report
+        id: cancel_report
+        if: cancelled()
+        continue-on-error: true
+        run: |
+          pip install psycopg2-binary -q
+          DB_SIZE=$(python -c "
+          import os, psycopg2
+          try:
+              conn = psycopg2.connect(os.environ['DATABASE_URL'])
+              cur = conn.cursor()
+              cur.execute(\"SELECT pg_size_pretty(pg_database_size(current_database()))\")
+              print(cur.fetchone()[0])
+              cur.close(); conn.close()
+          except:
+              print('unavailable')
+          ")
+          echo "db_size=$DB_SIZE" >> $GITHUB_OUTPUT
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Notify — MLB scrape cancelled
+        if: cancelled()
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.NOTIFY_GMAIL_USER }}
+          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.NOTIFY_EMAIL_TO }}
+          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
+          subject: "⚠️ CardDB — Base scrape STOPPED early: MLB"
+          body: |
+            MLB base-tier scrape was STOPPED before completing.
+
+            DB size at cancellation: ${{ steps.cancel_report.outputs.db_size }}
+
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            To restart MLB only:
+              gh workflow run catalog_tier_base.yml --ref main -f sport=MLB
