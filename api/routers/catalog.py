@@ -221,40 +221,6 @@ def browse_catalog(
     }
 
 
-@router.get("/{catalog_id}")
-def get_catalog_card(catalog_id: int):
-    """Return a single catalog card with its current market price."""
-    with get_db() as conn:
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT cc.id, cc.sport, cc.year, cc.brand, cc.set_name, cc.card_number,
-                   cc.player_name, cc.team, cc.variant, cc.print_run, cc.is_rookie,
-                   cc.scrape_tier,
-                   mp.fair_value, mp.prev_value, mp.trend, mp.confidence,
-                   mp.num_sales, mp.scraped_at, mp.image_url, mp.graded_data
-            FROM card_catalog cc
-            LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
-            WHERE cc.id = %s
-        """, [catalog_id])
-        row = cur.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Card not found")
-        cols = [d[0] for d in cur.description]
-        card = dict(zip(cols, row))
-        for k in ("fair_value", "prev_value"):
-            if card[k] is not None:
-                card[k] = float(card[k])
-        if card.get("graded_data") and isinstance(card["graded_data"], dict):
-            # Normalize graded_data values to float
-            card["graded_data"] = {
-                grade: {**v, "fair_value": float(v["fair_value"])} if v.get("fair_value") else v
-                for grade, v in card["graded_data"].items()
-            }
-        if card.get("scraped_at"):
-            card["scraped_at"] = card["scraped_at"].isoformat()
-    return card
-
-
 @router.get("/{catalog_id}/history")
 def catalog_card_history(catalog_id: int):
     """Return price history for a single catalog card."""
@@ -1235,3 +1201,40 @@ def suggest(
     with _cache_lock:
         _suggest_cache[cache_key] = deduped
     return deduped
+
+
+# ── Parameterized routes MUST come after all fixed-path routes ──────────────
+# FastAPI evaluates routes in definition order. /{catalog_id} would swallow
+# any fixed path like /filters, /suggest, /releases if defined first.
+
+@router.get("/{catalog_id}")
+def get_catalog_card(catalog_id: int):
+    """Return a single catalog card with its current market price."""
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT cc.id, cc.sport, cc.year, cc.brand, cc.set_name, cc.card_number,
+                   cc.player_name, cc.team, cc.variant, cc.print_run, cc.is_rookie,
+                   cc.scrape_tier,
+                   mp.fair_value, mp.prev_value, mp.trend, mp.confidence,
+                   mp.num_sales, mp.scraped_at, mp.image_url, mp.graded_data
+            FROM card_catalog cc
+            LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
+            WHERE cc.id = %s
+        """, [catalog_id])
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Card not found")
+        cols = [d[0] for d in cur.description]
+        card = dict(zip(cols, row))
+        for k in ("fair_value", "prev_value"):
+            if card[k] is not None:
+                card[k] = float(card[k])
+        if card.get("graded_data") and isinstance(card["graded_data"], dict):
+            card["graded_data"] = {
+                grade: {**v, "fair_value": float(v["fair_value"])} if v.get("fair_value") else v
+                for grade, v in card["graded_data"].items()
+            }
+        if card.get("scraped_at"):
+            card["scraped_at"] = card["scraped_at"].isoformat()
+    return card
