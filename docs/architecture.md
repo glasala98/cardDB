@@ -1,6 +1,6 @@
-# CardDB — Project Architecture
+# CardDB — System Architecture
 
-> **Status:** Production on Railway (Pro plan). PostgreSQL + FastAPI + React. No file-based storage.
+> **Status:** Production on Railway (Pro plan). PostgreSQL + FastAPI + React.
 > **Live at:** southwestsportscards.ca
 > **As of:** 2026-03
 
@@ -8,11 +8,11 @@
 
 ## What It Is
 
-CardDB is a sports card market tracker and personal collection manager for NHL, NBA, NFL, and MLB cards. It scrapes eBay sold prices for 1.26M+ cards in a central catalog, lets users manage their personal collection, and calculates grading ROI (PSA/BGS).
+CardDB is a sports card market tracker and personal collection manager for NHL, NBA, NFL, and MLB cards. It scrapes eBay sold prices for 1.26M+ cards in a central catalog, lets users manage their personal collection, calculates grading ROI (PSA/BGS), and stores every individual sold listing permanently for historical analysis.
 
 ---
 
-## High-Level Stack
+## System Diagram
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -20,7 +20,7 @@ CardDB is a sports card market tracker and personal collection manager for NHL, 
 │   React 18 + Vite  (southwestsportscards.ca)                 │
 │                                                              │
 │  Pages: /catalog  /collection  /ledger  /portfolio           │
-│         /charts   /settings    /archive  /master-db          │
+│         /charts   /settings    /archive  /admin              │
 │                                                              │
 │  Contexts: Auth · Currency · Preferences · PublicMode        │
 │  API:      src/api/*.js  (axios, Bearer JWT, auto-unwrap)    │
@@ -34,12 +34,12 @@ CardDB is a sports card market tracker and personal collection manager for NHL, 
 │  Routers:                                                    │
 │  /api/auth        login · /me · logout · JWT 7-day           │
 │  /api/cards       Ledger CRUD · scrape trigger · bulk import │
-│  /api/catalog     1.26M card browse · paginated · filters     │
+│  /api/catalog     1.26M card browse · paginated · filters    │
 │  /api/collection  User ownership layer (FK → card_catalog)   │
 │  /api/master-db   Young Guns analytics · grading ROI lookup  │
 │  /api/stats       Market alerts · workflow status · trigger  │
 │  /api/scan        Claude Vision card identification          │
-│  /api/admin       User CRUD (admin role required)            │
+│  /api/admin       User CRUD · scrape monitoring (admin only) │
 │  /api/health      DB ping · "ok" or "degraded"               │
 │                                                              │
 │  Static: React dist/ served via SPA catch-all fallback       │
@@ -47,44 +47,60 @@ CardDB is a sports card market tracker and personal collection manager for NHL, 
              │ psycopg2 ThreadedConnectionPool (1–10)
              ▼
 ┌──────────────────────────────────────────────────────────────┐
-│             RAILWAY PostgreSQL  (Pro — 10GB)                 │
+│         RAILWAY PostgreSQL  (Pro — 80GB volume)              │
+│         Current usage: ~5GB data, ~11GB filesystem           │
 │                                                              │
-│  ── Card Reference ───────────────────────────────────────── │
-│  card_catalog        1.26M cards (TCDB / CLI / CBC)           │
+│  ── Market Data ──────────────────────────────────────────── │
+│  card_catalog        1.26M cards (TCDB / CLI / CBC)          │
 │  market_prices       Current price + graded_data JSONB       │
 │  market_price_history  Delta-only SCD Type 2 price history   │
+│  market_raw_sales    Every eBay sold listing (880K+ rows)    │
+│  market_prices_status  View: staleness / freshness per card  │
 │                                                              │
 │  ── Personal Collection ──────────────────────────────────── │
 │  collection          user_id · card_catalog_id FK · grade    │
 │  cards               Ledger: user_id + card_name (text key)  │
-│  card_results        Raw eBay sales + image URLs             │
+│  card_results        Raw eBay sales per ledger card          │
 │  card_price_history  Per-card fair-value snapshots           │
 │  portfolio_history   Daily portfolio totals                  │
 │                                                              │
 │  ── Auth ─────────────────────────────────────────────────── │
 │  users               username · bcrypt hash · role           │
 │                                                              │
-│  ── Analytics (legacy) ───────────────────────────────────── │
+│  ── Scrape Tracking ──────────────────────────────────────── │
+│  scrape_runs         Status, progress, cards_processed       │
+│  scrape_run_errors   Per-card error log per run              │
+│                                                              │
+│  ── Sealed Products ──────────────────────────────────────── │
+│  sealed_products     Box/pack MSRP, pack config              │
+│  sealed_product_odds Pack odds per product                   │
+│                                                              │
+│  ── Analytics (legacy / supplementary) ───────────────────── │
 │  rookie_cards / rookie_price_history / player_stats          │
-│  standings / rookie_correlation_history                      │
+│  standings                                                   │
 └──────────────────────────────────────────────────────────────┘
              ↑ writes
 ┌──────────────────────────────────────────────────────────────┐
 │           GITHUB ACTIONS  (Scraping — cloud only)            │
 │                                                              │
+│  Core scripts:                                               │
 │  scrape_card_prices.py    eBay Selenium engine (shared lib)  │
 │  scrape_master_db.py      Bulk catalog scraper               │
 │  scrape_beckett_catalog.py  Populate card_catalog            │
 │  daily_scrape.py          Scrape ledger cards → cards table  │
+│  preflight_db_check.py    DB disk usage gate (absolute GB)   │
 │                                                              │
-│  Workflows (7):                                              │
-│  catalog_tier_staple.yml    Daily — staple-tier raw prices   │
-│  catalog_tier_premium.yml   Weekly — premium-tier prices     │
-│  catalog_tier_stars.yml     Weekly — stars-tier prices       │
+│  Scheduled workflows (key ones):                             │
+│  catalog_tier_base.yml      Daily 6am UTC — base backfill    │
+│  catalog_tier_staple.yml    Daily 8am UTC — staple prices    │
+│  catalog_tier_premium.yml   Daily 10am UTC — premium prices  │
+│  catalog_tier_stars.yml     Daily noon UTC — stars prices    │
 │  catalog_tier_graded.yml    Sunday — PSA/BGS graded prices   │
-│  master_db_daily.yml        Daily — 4-sport 2K card sweep    │
+│  master_db_daily.yml        Daily — 4-sport 1K card sweep    │
 │  master_db_weekly.yml       Sunday — full rookie sweep       │
-│  daily_scrape.yml           Ledger card scrape (on demand)   │
+│  backfill_all_tiers.yml     Daily 1:21pm — raw sales backfill│
+│  db_health_check.yml        Daily 5am — disk usage check     │
+│  daily_scrape.yml           On demand — ledger card scrape   │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -95,7 +111,7 @@ CardDB is a sports card market tracker and personal collection manager for NHL, 
 ```
 cardDB/
 ├── api/                        # FastAPI application
-│   ├── main.py                 # App factory, CORS, health, SPA
+│   ├── main.py                 # App factory, CORS, health, SPA static
 │   └── routers/                # One file per feature domain
 │       ├── auth.py             # Login / session / JWT
 │       ├── cards.py            # Card ledger CRUD + scrape trigger
@@ -114,17 +130,24 @@ cardDB/
 │       ├── context/            # Auth, Currency, Preferences, PublicMode
 │       └── api/                # Axios wrappers per domain
 │
-├── scrape_card_prices.py       # Core eBay scraping engine
-├── scrape_master_db.py         # Bulk catalog scraper
-├── scrape_beckett_catalog.py   # card_catalog populator
-├── daily_scrape.py             # Ledger card scraper
-├── dashboard_utils.py          # Shared Python utilities
-├── db.py                       # psycopg2 connection pool
-├── migrate_add_graded_data.py  # Idempotent DB migration (runs on deploy)
+├── scrape_card_prices.py       # Core eBay Selenium scraping engine
+├── scrape_master_db.py         # Bulk catalog scraper (raw + graded modes)
+├── scrape_beckett_catalog.py   # card_catalog populator (TCDB/CLI/CBC)
+├── scrape_set_info.py          # Sealed products scraper
+├── daily_scrape.py             # Personal ledger card scraper
+├── assign_catalog_tiers.py     # Classifies cards as staple/premium/stars/base
+├── preflight_db_check.py       # DB disk preflight (absolute GB thresholds)
+├── quarantine_outliers.py      # Flags statistical outliers in market_prices
+├── catalog_gap_analysis.py     # Audits coverage by sport/year
+├── dashboard_utils.py          # Shared Python utility layer
+├── db.py                       # psycopg2 ThreadedConnectionPool
+├── schema.sql                  # Full PostgreSQL schema
+├── migrate_add_graded_data.py  # Idempotent migration (runs on deploy)
+├── migrate_add_cards_processed.py  # Idempotent migration (runs on deploy)
 │
-├── .github/workflows/          # 7 scrape workflows + CI
+├── .github/workflows/          # 20+ workflows (all scraping, CI, migrations)
 ├── Dockerfile                  # Railway: python:3.11-slim + Node 20
-└── docs/                       # Component documentation
+└── docs/                       # Architecture, workflow, component docs
 ```
 
 ---
@@ -132,32 +155,45 @@ cardDB/
 ## Key Data Flows
 
 ### 1. Scraping Pipeline
+
 ```
 GitHub Actions trigger (schedule or workflow_dispatch)
-  → scrape_master_db.py reads card_catalog
+  → preflight_db_check.py: verify disk < 70GB (fail) / < 60GB (warn)
+  → scrape_master_db.py reads card_catalog (filtered by tier, sport, stale-days)
+      Note: SET max_parallel_workers_per_gather = 0 before load_cards() query
+            (prevents PostgreSQL DSM shared memory exhaustion on Railway)
   → For each card: scrape_card_prices.process_card()
-      → Headless Chrome → eBay sold listings
-      → _apply_variant_filter() — strips wrong parallels
-      → calculate_fair_price() → fair_value
-  → UPSERT market_prices (fair_value, trend, confidence)
+      → Headless Chrome → eBay sold listings page
+      → _apply_variant_filter() — strips wrong parallels from results
+      → parse sold prices → calculate_fair_price() → fair_value
+  → UPSERT market_prices (fair_value, trend, confidence, image_url)
   → INSERT market_price_history only when price changed (SCD Type 2)
+  → INSERT market_raw_sales individual listings (dedup by listing_hash)
   → Graded mode: accumulate graded_data JSONB → flush to market_prices
+  → scrape_runs row updated every 50 cards (cards_processed, cards_found)
+  → Graceful exit when elapsed >= --max-hours 5.75 (before GitHub 6h kill)
 ```
 
 ### 2. User Request
+
 ```
 Browser → FastAPI → psycopg2 pool → PostgreSQL → JSON → React renders
 ```
 
+The axios interceptor in `src/api/` automatically unwraps `res.data`, so callers receive the payload directly. All card-related endpoints use query parameters (not path segments) because card names frequently contain `[`, `]`, `#`, and `/`.
+
 ### 3. Authentication
+
 ```
-POST /api/auth/login → bcrypt verify → JWT (HS256, 7-day)
+POST /api/auth/login → bcrypt verify password → JWT (HS256, 7-day expiry)
   → stored in localStorage
-  → axios interceptor: Authorization: Bearer <token>
-  → get_current_user() dependency validates on protected routes
+  → axios interceptor adds: Authorization: Bearer <token>
+  → get_current_user() FastAPI dependency validates on all protected routes
+  → get_admin_user() dependency additionally checks role == 'admin'
 ```
 
 ### 4. Card Catalog Browse
+
 ```
 GET /api/catalog?sport=NHL&year=2024-25&page=1
   → SELECT FROM card_catalog cc
@@ -165,40 +201,63 @@ GET /api/catalog?sport=NHL&year=2024-25&page=1
     WHERE cc.sport='NHL' AND cc.year='2024-25'
     ORDER BY year DESC LIMIT 50 OFFSET 0
   Total count: pg_class estimate (avoids full-scan on 1.26M rows)
+  Results include: fair_value, trend, confidence, graded_data, image_url
 ```
 
 ### 5. Collection Management
+
 ```
 POST /api/collection {card_catalog_id, grade, cost_basis}
   → INSERT INTO collection ON CONFLICT (user_id, card_catalog_id, grade)
     DO UPDATE SET quantity = quantity + 1
 
 GET /api/collection/owned-ids
-  → Set of card_catalog_ids (used for ✓ badges on Catalog page)
+  → Returns set of card_catalog_ids (used for checkmark badges on Catalog page)
 ```
 
 ### 6. Grading ROI Lookup
+
 ```
 GET /api/master-db/grading-lookup?player=Bedard
-  Priority 1: young_guns.csv master DB (CSV-backed)
-  Priority 2: market_prices.graded_data JSONB (new — catalog-linked)
+  Priority 1: young_guns.csv master DB (CSV-backed, highest quality)
+  Priority 2: market_prices.graded_data JSONB (catalog-linked, up to date)
   Priority 3: rookie_price_history.graded_data (legacy fallback)
   → CardInspect renders ROI table: Raw / PSA 9 / PSA 10 / BGS 9.5 / BGS 10
 ```
 
+### 7. Raw Sales Storage
+
+```
+scrape_card_prices.py returns individual eBay sold listings per card
+  → listing_hash = md5(card_catalog_id|sold_date|title)
+  → INSERT INTO market_raw_sales ON CONFLICT (listing_hash) DO NOTHING
+  880K+ rows currently. Backfill via backfill_raw_sales.yml / backfill_all_tiers.yml.
+```
+
+### 8. Scrape Progress Monitoring
+
+```
+Admin → Pipeline tab polls GET /api/stats/workflow-status
+  → FastAPI queries GitHub API concurrently for latest run per workflow
+  → Overlay with scrape_runs table for in-progress DB state
+  → cards_processed / cards_found written every 50 cards mid-run
+  → Frontend shows: progress bar, hit rate, cards/hr, ETA, elapsed
+```
+
 ---
 
-## Deployment
+## Deployment Config
 
 | Setting | Value |
 |---|---|
-| Platform | Railway Pro plan |
+| Platform | Railway Pro plan (~8GB RAM) |
 | Builder | Dockerfile (python:3.11-slim + Node 20) |
-| Build | `pip install -r requirements.txt` → `npm run build` |
-| On deploy | `python migrate_add_graded_data.py` (idempotent) |
+| Build steps | `pip install -r requirements.txt` → `npm run build` |
+| On deploy | `python migrate_add_graded_data.py && python migrate_add_cards_processed.py` |
 | Start | `uvicorn api.main:app --host 0.0.0.0 --port $PORT` |
 | Auto-deploy | Push/merge to `main` → Railway rebuilds |
 | Custom domain | southwestsportscards.ca |
+| DB volume | 80GB (resized 2026-03-18 from 10GB) |
 
 ---
 
@@ -206,26 +265,31 @@ GET /api/master-db/grading-lookup?player=Bedard
 
 | Decision | Rationale |
 |---|---|
-| Single Railway service | FastAPI serves both API and React dist — one deploy |
-| Dockerfile over Nixpacks | Explicit control over Python + Node versions |
-| psycopg2 ThreadedConnectionPool | Sync FastAPI workers; pool avoids per-request reconnects |
-| All card endpoints use query params | Card names contain `[`, `]`, `#`, `/` — breaks URL path routing |
-| GitHub Actions for scraping | Chrome/Selenium needs real compute; GH Actions runners are free |
-| CSS Modules | Scoped styles per component, no collisions |
-| SCD Type 2 price history | Only write history rows when fair_value actually changes |
-| graded_data JSONB in market_prices | Single FK-linked source for PSA/BGS — no fragmentation |
-| PyJWT not python-jose | `import jwt` / `jwt.PyJWTError` — jose caused import issues on Railway |
+| Single Railway service | FastAPI serves both API and React dist — one deploy, no CORS complexity |
+| Dockerfile over Nixpacks | Explicit control over Python + Node versions; ensures Chrome installs correctly |
+| psycopg2 ThreadedConnectionPool | Sync FastAPI workers; pool avoids per-request reconnects, bounded at 10 |
+| All card endpoints use query params | Card names contain `[`, `]`, `#`, `/` — these break URL path routing |
+| GitHub Actions for scraping | Headless Chrome needs real compute; GH Actions runners are free and ephemeral |
+| CSS Modules | Scoped styles per component, no class name collisions |
+| SCD Type 2 price history | Only write history rows when fair_value actually changes — keeps table lean |
+| graded_data JSONB in market_prices | Single FK-linked source for PSA/BGS — no fragmentation across tables |
+| PyJWT not python-jose | `import jwt` / `jwt.PyJWTError` — python-jose caused import failures on Railway |
+| SET max_parallel_workers_per_gather = 0 | Prevents PostgreSQL DSM shared memory exhaustion in load_cards() on Railway |
+| Absolute GB preflight thresholds | `--warn-gb 60 --fail-gb 70` — percentage thresholds were unreliable as volume grew; absolute values are predictable |
+| listing_hash dedup on raw sales | md5(card_catalog_id|sold_date|title) — idempotent backfills, no duplicate sales rows |
+| Email notifications on start/cancel | dawidd6/action-send-mail@v3 on catalog_tier_base.yml and master_db_daily.yml — visibility into long-running jobs |
+| --max-hours 5.75 graceful exit | Scrapers self-terminate 15 minutes before GitHub's 6h runner kill, logging clean state |
 
 ---
 
-## Auth & Roles
+## Auth and Roles
 
 | Role | Access |
 |---|---|
-| `admin` | All pages + user management + scrape health panel |
+| `admin` | All pages + user management + admin dashboard + scrape health panel |
 | `user` | All personal pages (ledger, collection, portfolio) |
-| `guest` | Read-only access, no writes |
-| Public (`?public=true`) | Catalog browse only, no login required |
+| `guest` | Read-only access; write operations display prompt to sign in |
+| Public (no token) | Catalog browse only — `/catalog` is fully public |
 
 ---
 
@@ -235,9 +299,24 @@ GET /api/master-db/grading-lookup?player=Bedard
 |---|---|---|---|
 | NHL | ~310K | TCDB + CLI | 1951–2026 |
 | NBA | ~278K | TCDB | 1967–2026 |
-| NFL | ~643K | TCDB + CBC | 1948–2026 |
-| MLB | ~1.4M | TCDB + CBC + CLI | 1907–2026 |
-| **Total** | **~1.26M** | | |
+| NFL | ~316K | TCDB + CBC | 1948–2026 |
+| MLB | ~358K | TCDB + CBC + CLI | 1907–2026 |
+| **Total** | **~1,262,503** | | |
+
+---
+
+## Scrape Tier Details
+
+Tiers are assigned by `assign_catalog_tiers.py` and stored in `card_catalog.scrape_tier`.
+
+| Tier | Card types | Volume estimate | Current status |
+|---|---|---|---|
+| staple | YG, Prizm RC, Chrome RC, SP Authentic RCs | ~15K cards | 100% priced, daily |
+| premium | Autos, patches, serials, relics | ~80K cards | Backfill in progress |
+| stars | Major-brand rookie cards | ~200K cards | Backfill in progress |
+| base | Everything else 2010+ | ~800K cards | ~8.5% priced, backfill running |
+
+The variant filter (`_apply_variant_filter`) excludes superset variants from results — e.g., when scraping a "Rainbow" parallel, "Rainbow Color Wheel" listings are excluded to avoid contaminating the price.
 
 ---
 
@@ -245,7 +324,7 @@ GET /api/master-db/grading-lookup?player=Bedard
 
 | Document | What it covers |
 |---|---|
-| [concepts.md](concepts.md) | Key vocabulary and mental models (card format, tiers, confidence, etc.) |
+| [concepts.md](concepts.md) | Key vocabulary and mental models |
 | [backend.md](backend.md) | FastAPI routers — endpoints, inputs, outputs, auth |
 | [database.md](database.md) | PostgreSQL tables, schema, query patterns |
 | [frontend.md](frontend.md) | React pages, components, contexts, API layer |
@@ -253,3 +332,49 @@ GET /api/master-db/grading-lookup?player=Bedard
 | [scrape_engine.md](scrape_engine.md) | Deep function-level reference for the scraping pipeline |
 | [workflows.md](workflows.md) | GitHub Actions schedules, triggers, env vars |
 | [dashboard_utils.md](dashboard_utils.md) | Shared Python utility layer |
+
+---
+
+## Future Architecture
+
+### Post-Backfill Delta Mode (target: ~4-6 weeks from 2026-03)
+
+The current daily scrape runs are long (up to 5.75 hours) because they are filling in prices for cards that have never been scraped. Once all tiers reach 100% coverage:
+
+- All daily runs become pure delta — only cards older than `stale-days` are re-scraped
+- Estimated run time drops from 6-hour windows to ~10 minutes per sport per tier
+- All tiers can stay on daily schedules at essentially zero cost
+- Consider tightening stale-days after backfill: premium 7→3, stars 30→7 for fresher prices
+
+**Consolidation opportunity:** The four tier workflows (staple/premium/stars/base) may be merged into a single unified daily workflow once batches are small enough to finish in a single job.
+
+### Vector Search (medium-term)
+
+- Add `pgvector` extension to Railway PostgreSQL
+- Embed 1.26M card names for fuzzy matching and entity resolution
+- Replaces the manual `_apply_variant_filter` with semantic similarity matching
+- Requires: `CREATE EXTENSION IF NOT EXISTS vector` in schema.sql + Railway PostgreSQL support verification
+
+### Price Alerts (medium-term)
+
+- Email and/or in-app notification when a tracked card moves >10% in 7 days
+- Built on `market_price_history` delta queries + the existing `coverage_notify` email pattern (dawidd6/action-send-mail@v3)
+- Requires: user alert preferences table, scheduled check workflow
+
+### Caching Layer (medium-term)
+
+- Redis for expensive aggregate queries: portfolio total calculations, releases page card aggregations
+- Catalog browse response caching for popular filter combinations
+- Railway supports Redis add-on; would be a second Railway service
+
+### Public Sealed Products Page (near-term)
+
+- Browse sealed products by sport and year with MSRP, box price, and pack odds
+- Data already exists in `sealed_products` + `sealed_product_odds`, scraped monthly
+- Requires: new React page + public API endpoint (no auth required)
+
+### Raw Sales Analytics (near-term)
+
+- Expose `market_raw_sales` data in the UI: per-card sold history, price trend lines from raw data
+- 880K+ rows now permanently stored, growing daily
+- Could power: sale frequency charts, buy-window detection, seasonal price analysis
