@@ -1,0 +1,127 @@
+name: Scrape Progress — Hourly Email
+
+# Sends an hourly email during the base tier backfill showing
+# cards processed per sport, total coverage %, and DB size.
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # every hour on the hour
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Send email regardless (true/false)'
+        default: 'false'
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install psycopg2-binary
+
+      - name: Build progress report
+        id: report
+        run: |
+          python - <<'EOF'
+          import os, psycopg2
+          from datetime import datetime, timezone
+
+          conn = psycopg2.connect(os.environ["DATABASE_URL"])
+          cur  = conn.cursor()
+
+          # Total catalog cards
+          cur.execute("SELECT COUNT(*) FROM card_catalog")
+          total = cur.fetchone()[0]
+
+          # Priced cards total + per sport
+          cur.execute("""
+              SELECT cc.sport, COUNT(*) AS priced
+              FROM market_prices mp
+              JOIN card_catalog cc ON cc.id = mp.card_catalog_id
+              WHERE mp.fair_value IS NOT NULL AND mp.fair_value > 0
+              GROUP BY cc.sport ORDER BY cc.sport
+          """)
+          by_sport = {r[0]: r[1] for r in cur.fetchall()}
+          total_priced = sum(by_sport.values())
+
+          # Base tier cards per sport (2010+)
+          cur.execute("""
+              SELECT sport, COUNT(*) FROM card_catalog
+              WHERE scrape_tier = 'base' AND year >= '2010'
+              GROUP BY sport ORDER BY sport
+          """)
+          base_total = {r[0]: r[1] for r in cur.fetchall()}
+
+          # Base tier priced
+          cur.execute("""
+              SELECT cc.sport, COUNT(*) FROM market_prices mp
+              JOIN card_catalog cc ON cc.id = mp.card_catalog_id
+              WHERE cc.scrape_tier = 'base' AND cc.year >= '2010'
+                AND mp.fair_value IS NOT NULL AND mp.fair_value > 0
+              GROUP BY cc.sport ORDER BY cc.sport
+          """)
+          base_priced = {r[0]: r[1] for r in cur.fetchall()}
+
+          # Raw sales count
+          cur.execute("SELECT COUNT(*), COUNT(DISTINCT card_catalog_id) FROM market_raw_sales")
+          sales_total, sales_cards = cur.fetchone()
+
+          # DB size
+          cur.execute("SELECT pg_size_pretty(pg_database_size(current_database()))")
+          db_size = cur.fetchone()[0]
+
+          cur.close(); conn.close()
+
+          pct = total_priced / total * 100 if total else 0
+          now = datetime.now(timezone.utc).strftime("%b %d %Y at %H:%M UTC")
+
+          lines = [f"CardDB Scrape Progress — {now}", "=" * 55, ""]
+          lines.append(f"Overall coverage:  {total_priced:,} / {total:,} cards  ({pct:.1f}%)")
+          lines.append(f"Raw sales stored:  {sales_total:,} sales across {sales_cards:,} cards")
+          lines.append(f"DB size:           {db_size}")
+          lines.append("")
+          lines.append("Base tier progress (2010+):")
+          for sport in ["MLB", "NBA", "NFL", "NHL"]:
+              bt = base_total.get(sport, 0)
+              bp = base_priced.get(sport, 0)
+              sp = bp / bt * 100 if bt else 0
+              lines.append(f"  {sport}:  {bp:>7,} / {bt:>7,}  ({sp:.1f}%)")
+          lines.append("")
+          lines.append("By sport (all tiers):")
+          for sport, cnt in sorted(by_sport.items()):
+              lines.append(f"  {sport}:  {cnt:,}")
+
+          body = "\n".join(lines)
+          subject = f"CardDB — {pct:.1f}% priced | {total_priced:,} cards"
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"subject={subject}\n")
+              # multiline body
+              import hashlib
+              delim = "EOF_" + hashlib.md5(body.encode()).hexdigest()[:8]
+              f.write(f"body<<{delim}\n{body}\n{delim}\n")
+              f.write("should_send=true\n")
+          EOF
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Send progress email
+        if: steps.report.outputs.should_send == 'true'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.NOTIFY_GMAIL_USER }}
+          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.NOTIFY_EMAIL_TO }}
+          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
+          subject: ${{ steps.report.outputs.subject }}
+          body: ${{ steps.report.outputs.body }}
