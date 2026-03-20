@@ -8,7 +8,8 @@ name: Catalog Tier — Base (Daily during backfill)
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # 6am UTC daily during backfill
+    - cron: '0 6 * * *'   # 6am UTC — run 1 of 2
+    - cron: '0 18 * * *'  # 6pm UTC — run 2 of 2 (doubles daily throughput during backfill)
   workflow_dispatch:
     inputs:
       sport:
@@ -81,7 +82,7 @@ jobs:
           python -u scrape_master_db.py \
             --catalog-tier base \
             --sport NHL \
-            --workers 5 \
+            --workers 10 \
             --year-from ${{ github.event.inputs.year_from || '2010' }} \
             --stale-days ${{ github.event.inputs.stale_days || '30' }} \
             --limit ${{ github.event.inputs.limit || '0' }}
@@ -168,7 +169,7 @@ jobs:
           python -u scrape_master_db.py \
             --catalog-tier base \
             --sport NBA \
-            --workers 5 \
+            --workers 10 \
             --year-from ${{ github.event.inputs.year_from || '2010' }} \
             --stale-days ${{ github.event.inputs.stale_days || '30' }} \
             --limit ${{ github.event.inputs.limit || '0' }}
@@ -255,7 +256,7 @@ jobs:
           python -u scrape_master_db.py \
             --catalog-tier base \
             --sport NFL \
-            --workers 5 \
+            --workers 10 \
             --year-from ${{ github.event.inputs.year_from || '2010' }} \
             --stale-days ${{ github.event.inputs.stale_days || '30' }} \
             --limit ${{ github.event.inputs.limit || '0' }}
@@ -342,7 +343,7 @@ jobs:
           python -u scrape_master_db.py \
             --catalog-tier base \
             --sport MLB \
-            --workers 5 \
+            --workers 10 \
             --year-from ${{ github.event.inputs.year_from || '2010' }} \
             --stale-days ${{ github.event.inputs.stale_days || '30' }} \
             --limit ${{ github.event.inputs.limit || '0' }}
