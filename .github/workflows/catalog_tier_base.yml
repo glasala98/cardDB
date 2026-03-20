@@ -1,7 +1,8 @@
 name: Catalog Tier — Base (Daily during backfill)
 
-# Scrapes price data for base-tier cards (modern era only — 2010+).
-# Pre-2010 base cards typically have no eBay sold activity so are skipped.
+# Scrapes price data for base-tier cards (modern era only — 2015+).
+# Pre-2015 base cards have very low eBay sold activity so are skipped to reduce
+# time wasted on dead cards. Override with year_from=2010 for older card coverage.
 # Running daily during initial backfill. Once all base cards have been priced
 # once, stale-days=30 means each run is tiny (only repricing month-old cards).
 # Switch back to weekly (0 6 * * 3) after backfill is complete.
@@ -17,9 +18,9 @@ on:
         required: false
         default: ''
       year_from:
-        description: 'Start year (default: 2010)'
+        description: 'Start year (default: 2015)'
         required: false
-        default: '2010'
+        default: '2015'
       limit:
         description: 'Max cards per sport (0=all)'
         required: false
@@ -83,7 +84,7 @@ jobs:
             --catalog-tier base \
             --sport NHL \
             --workers 5 \
-            --year-from ${{ github.event.inputs.year_from || '2010' }} \
+            --year-from ${{ github.event.inputs.year_from || '2015' }} \
             --stale-days ${{ github.event.inputs.stale_days || '30' }} \
             --limit ${{ github.event.inputs.limit || '0' }}
         env:
@@ -170,7 +171,7 @@ jobs:
             --catalog-tier base \
             --sport NBA \
             --workers 5 \
-            --year-from ${{ github.event.inputs.year_from || '2010' }} \
+            --year-from ${{ github.event.inputs.year_from || '2015' }} \
             --stale-days ${{ github.event.inputs.stale_days || '30' }} \
             --limit ${{ github.event.inputs.limit || '0' }}
         env:
@@ -257,7 +258,7 @@ jobs:
             --catalog-tier base \
             --sport NFL \
             --workers 5 \
-            --year-from ${{ github.event.inputs.year_from || '2010' }} \
+            --year-from ${{ github.event.inputs.year_from || '2015' }} \
             --stale-days ${{ github.event.inputs.stale_days || '30' }} \
             --limit ${{ github.event.inputs.limit || '0' }}
         env:
@@ -344,7 +345,7 @@ jobs:
             --catalog-tier base \
             --sport MLB \
             --workers 5 \
-            --year-from ${{ github.event.inputs.year_from || '2010' }} \
+            --year-from ${{ github.event.inputs.year_from || '2015' }} \
             --stale-days ${{ github.event.inputs.stale_days || '30' }} \
             --limit ${{ github.event.inputs.limit || '0' }}
         env:

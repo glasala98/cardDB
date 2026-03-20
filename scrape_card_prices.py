@@ -751,10 +751,22 @@ def search_ebay_sold(driver, card_name, max_results=240, search_query=None, page
     try:
         driver.get(url)
 
-        # Wait for card-based results to load
-        WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, '.s-card'))
-        )
+        # Wait for card-based results OR eBay's "no results" message — whichever comes first.
+        # 8s timeout (down from 15s); dead cards bail in ~2s when no-results renders.
+        try:
+            WebDriverWait(driver, 8).until(
+                EC.any_of(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, '.s-card')),
+                    EC.presence_of_element_located((By.CSS_SELECTOR, '.srp-save-null-search__heading')),
+                    EC.presence_of_element_located((By.CSS_SELECTOR, 'h1.srp-controls__count-heading')),
+                )
+            )
+        except Exception:
+            return []
+
+        # If eBay showed a no-results page, bail immediately
+        if driver.find_elements(By.CSS_SELECTOR, '.srp-save-null-search__heading'):
+            return []
 
         sales = []
         items = driver.find_elements(By.CSS_SELECTOR, '.s-card')

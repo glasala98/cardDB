@@ -210,7 +210,7 @@ def load_cards(args) -> list:
         conditions.append(f"(mp.scraped_at IS NULL OR mp.scraped_at < NOW() - INTERVAL '{stale_days} days')")
         where = " AND ".join(conditions)
         select_extra = "mp.fair_value AS existing_price, mp.scraped_at AS last_scraped"
-        order_clause = "mp.scraped_at NULLS FIRST, cc.is_rookie DESC, cc.year DESC"
+        order_clause = "mp.scraped_at NULLS FIRST, COALESCE(mp.num_sales, 0) DESC, cc.is_rookie DESC, cc.year DESC"
 
     sql = f"""
         SELECT cc.id, cc.sport, cc.year, cc.brand, cc.set_name,
