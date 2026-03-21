@@ -186,7 +186,8 @@ def load_cards(args) -> list:
     shard_count = getattr(args, 'shard_count', 1)
     shard_index = getattr(args, 'shard_index', 0)
     if shard_count > 1:
-        conditions.append(f"cc.id % {shard_count} = {shard_index}")
+        # Use %% so psycopg2 doesn't treat the modulo % as a parameter placeholder
+        conditions.append(f"cc.id %% {shard_count} = {shard_index}")
 
     # --backfill: only cards with zero rows in market_raw_sales AND not already confirmed no_market
     if getattr(args, 'backfill', False):
