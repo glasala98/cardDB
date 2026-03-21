@@ -181,6 +181,13 @@ def load_cards(args) -> list:
     if getattr(args, 'rookies', False):
         conditions.append("cc.is_rookie = TRUE")
 
+    # --shard-index / --shard-count: each runner handles a deterministic slice by card ID.
+    # Avoids overlap between parallel runners; no coordination needed.
+    shard_count = getattr(args, 'shard_count', 1)
+    shard_index = getattr(args, 'shard_index', 0)
+    if shard_count > 1:
+        conditions.append(f"cc.id % {shard_count} = {shard_index}")
+
     # --backfill: only cards with zero rows in market_raw_sales AND not already confirmed no_market
     if getattr(args, 'backfill', False):
         conditions.append(
@@ -622,6 +629,11 @@ def main():
                              "Paginates full 90 days of history. Does NOT write market_prices or "
                              "market_price_history — price is already current. Run per-tier manually "
                              "until market_raw_sales is fully populated.")
+    parser.add_argument('--shard-index',  type=int,   default=0,    dest='shard_index',
+                        help="0-based shard index for parallel runners (used with --shard-count).")
+    parser.add_argument('--shard-count',  type=int,   default=1,    dest='shard_count',
+                        help="Total number of shards. Each runner handles cc.id %% shard_count = shard_index. "
+                             "Each runner gets a different GH Actions IP → independent eBay rate limit.")
     args = parser.parse_args()
 
     if args.graded:
