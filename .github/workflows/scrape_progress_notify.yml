@@ -42,40 +42,51 @@ jobs:
           # ── DB queries (consolidated for speed) ───────────────────────────
           conn = psycopg2.connect(os.environ["DATABASE_URL"])
           cur  = conn.cursor()
-          cur.execute("SET statement_timeout = '120s'")
-
-          # Single pass: catalog counts + priced counts per sport/tier/year
+          # Catalog counts — no join, string year comparison avoids cast (index-friendly)
           cur.execute("""
-              SELECT
-                  cc.sport,
-                  cc.scrape_tier,
-                  CASE WHEN cc.year::int >= 2015 THEN '2015' ELSE '2010' END AS yr_bucket,
-                  COUNT(*)                                                    AS catalog_cnt,
-                  COUNT(mp.card_catalog_id)                                  AS priced_cnt
-              FROM card_catalog cc
-              LEFT JOIN market_prices mp
-                     ON mp.card_catalog_id = cc.id
-                    AND mp.fair_value IS NOT NULL AND mp.fair_value > 0
-              WHERE cc.scrape_tier = 'base' AND cc.year::int >= 2010
-              GROUP BY cc.sport, cc.scrape_tier, yr_bucket
+              SELECT sport,
+                     COUNT(*) FILTER (WHERE year >= '2010') AS cnt_2010,
+                     COUNT(*) FILTER (WHERE year >= '2015') AS cnt_2015
+              FROM card_catalog
+              WHERE scrape_tier = 'base'
+              GROUP BY sport
           """)
-          base_target   = {}   # sport → catalog count (2015+, NFL/NBA/MLB)
-          base_priced   = {}   # sport → priced count  (2015+, NFL/NBA/MLB)
-          base_total_2010  = {}
+          base_total_2010 = {}
+          base_target     = {}   # 2015+, NFL/NBA/MLB only
+          for sport, cnt_2010, cnt_2015 in cur.fetchall():
+              base_total_2010[sport] = cnt_2010
+              if sport in ('NFL', 'NBA', 'MLB'):
+                  base_target[sport] = cnt_2015
+
+          # Priced counts — inner join (only hits priced rows, faster than LEFT JOIN)
+          cur.execute("""
+              SELECT cc.sport,
+                     COUNT(*) FILTER (WHERE cc.year >= '2010') AS priced_2010,
+                     COUNT(*) FILTER (WHERE cc.year >= '2015') AS priced_2015
+              FROM market_prices mp
+              JOIN card_catalog cc ON cc.id = mp.card_catalog_id
+              WHERE mp.fair_value > 0
+                AND cc.scrape_tier = 'base'
+              GROUP BY cc.sport
+          """)
           base_priced_2010 = {}
-          for sport, tier, yr_bucket, cat_cnt, priced_cnt in cur.fetchall():
-              base_total_2010[sport]  = base_total_2010.get(sport, 0)  + cat_cnt
-              base_priced_2010[sport] = base_priced_2010.get(sport, 0) + priced_cnt
-              if yr_bucket == '2015' and sport in ('NFL', 'NBA', 'MLB'):
-                  base_target[sport]  = base_target.get(sport, 0)  + cat_cnt
-                  base_priced[sport]  = base_priced.get(sport, 0)  + priced_cnt
+          base_priced      = {}   # 2015+, NFL/NBA/MLB only
+          for sport, p_2010, p_2015 in cur.fetchall():
+              base_priced_2010[sport] = p_2010
+              if sport in ('NFL', 'NBA', 'MLB'):
+                  base_priced[sport] = p_2015
+
           total_base_target = sum(base_target.values())
           total_base_priced = sum(base_priced.values())
 
-          # Overall totals (fast — no JOIN)
-          cur.execute("SELECT COUNT(*) FROM card_catalog")
+          # Overall totals — pg_class estimates (instant)
+          cur.execute("""
+              SELECT reltuples::bigint FROM pg_class WHERE relname = 'card_catalog'
+          """)
           total_catalog = cur.fetchone()[0]
-          cur.execute("SELECT COUNT(*) FROM market_prices WHERE fair_value IS NOT NULL AND fair_value > 0")
+          cur.execute("""
+              SELECT reltuples::bigint FROM pg_class WHERE relname = 'market_prices'
+          """)
           total_priced = cur.fetchone()[0]
 
           # Raw sales — use pg_class estimates (instant, avoids full seq scan)
