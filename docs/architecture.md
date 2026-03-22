@@ -8,7 +8,16 @@
 
 ## What It Is
 
-CardDB is a sports card market tracker and personal collection manager for NHL, NBA, NFL, and MLB cards. It scrapes eBay sold prices for 1.26M+ cards in a central catalog, lets users manage their personal collection, calculates grading ROI (PSA/BGS), and stores every individual sold listing permanently for historical analysis.
+CardDB is a free sports card market intelligence platform. The data is the product.
+
+800K+ cards with daily-updated eBay sold prices, graded values (PSA/BGS), and price history accumulating over time — across NHL, NBA, NFL, and MLB. Free, when everything comparable costs money.
+
+Three monetization layers:
+1. **Price checker + public catalog** — drives traffic, ad impressions
+2. **Portfolio tracker** — creates returning users
+3. **Public API** *(roadmap)* — developers, resellers, hobbyists
+
+The moat is time: anyone can build a scraper, but the price history dataset only grows from the day you start collecting it.
 
 ---
 
@@ -19,8 +28,8 @@ CardDB is a sports card market tracker and personal collection manager for NHL, 
 │                        BROWSER                               │
 │   React 18 + Vite  (southwestsportscards.ca)                 │
 │                                                              │
-│  Pages: /catalog  /collection  /ledger  /portfolio           │
-│         /charts   /settings    /archive  /admin              │
+│  Pages: /catalog  /my-cards  /my-cards/collection  /scan     │
+│         /young-guns  /portfolio  /charts  /settings  /admin  │
 │                                                              │
 │  Contexts: Auth · Currency · Preferences · PublicMode        │
 │  API:      src/api/*.js  (axios, Bearer JWT, auto-unwrap)    │
@@ -335,46 +344,65 @@ The variant filter (`_apply_variant_filter`) excludes superset variants from res
 
 ---
 
-## Future Architecture
+## Roadmap
 
-### Post-Backfill Delta Mode (target: ~4-6 weeks from 2026-03)
+### Now — Base Tier Backfill (~7 days from 2026-03-22)
 
-The current daily scrape runs are long (up to 5.75 hours) because they are filling in prices for cards that have never been scraped. Once all tiers reach 100% coverage:
+12 parallel GH Actions runners, 3 runs/day (6am/noon/6pm UTC), ~135K cards/day. Once all base-tier cards have a first price:
+- Daily runs become pure delta — only stale cards re-scraped
+- Estimated runtime drops from 5.75h → ~10 min per sport per tier
+- All tier workflows can consolidate into one unified daily job
 
-- All daily runs become pure delta — only cards older than `stale-days` are re-scraped
-- Estimated run time drops from 6-hour windows to ~10 minutes per sport per tier
-- All tiers can stay on daily schedules at essentially zero cost
-- Consider tightening stale-days after backfill: premium 7→3, stars 30→7 for fresher prices
+### Near-term — Monetization Foundation
 
-**Consolidation opportunity:** The four tier workflows (staple/premium/stars/base) may be merged into a single unified daily workflow once batches are small enough to finish in a single job.
+**SEO card pages**
+- Individual card pages need to be indexable by Google
+- Currently a React SPA — Google can crawl it but it's not optimal
+- Options: prerendering via react-snap, SSR via a lightweight Node layer, or static generation for high-value cards
+- Goal: `/catalog/12345` → Google indexes "Patrick Mahomes 2020 Prizm RC price" → organic traffic → ad impressions
 
-### Vector Search (medium-term)
+**Ad integration**
+- Google AdSense on public pages (Catalog, card detail, Trending, Releases)
+- Protected pages (My Cards, Portfolio) stay ad-free to preserve UX for returning users
 
-- Add `pgvector` extension to Railway PostgreSQL
-- Embed 1.26M card names for fuzzy matching and entity resolution
-- Replaces the manual `_apply_variant_filter` with semantic similarity matching
-- Requires: `CREATE EXTENSION IF NOT EXISTS vector` in schema.sql + Railway PostgreSQL support verification
+**Price alerts**
+- Email/in-app when a tracked card moves >10% in 7 days
+- Built on `market_price_history` delta queries + existing email infra (dawidd6/action-send-mail@v3)
+- Requires: user alert preferences table + scheduled check workflow
 
-### Price Alerts (medium-term)
-
-- Email and/or in-app notification when a tracked card moves >10% in 7 days
-- Built on `market_price_history` delta queries + the existing `coverage_notify` email pattern (dawidd6/action-send-mail@v3)
-- Requires: user alert preferences table, scheduled check workflow
-
-### Caching Layer (medium-term)
-
-- Redis for expensive aggregate queries: portfolio total calculations, releases page card aggregations
-- Catalog browse response caching for popular filter combinations
-- Railway supports Redis add-on; would be a second Railway service
-
-### Public Sealed Products Page (near-term)
-
-- Browse sealed products by sport and year with MSRP, box price, and pack odds
+**Sealed products public page**
 - Data already exists in `sealed_products` + `sealed_product_odds`, scraped monthly
-- Requires: new React page + public API endpoint (no auth required)
+- Just needs a public React page + unauthenticated API endpoint
 
-### Raw Sales Analytics (near-term)
+### Medium-term — Platform
 
-- Expose `market_raw_sales` data in the UI: per-card sold history, price trend lines from raw data
-- 880K+ rows now permanently stored, growing daily
-- Could power: sale frequency charts, buy-window detection, seasonal price analysis
+**Public API**
+- Versioned, rate-limited REST API for card price data
+- Free tier with rate limits; potential paid tier for higher limits
+- FastAPI is already there — needs public endpoints, API key auth, and docs page
+- Developers, resellers, and hobbyists are the target users
+
+**Offsite database backups**
+- Weekly `pg_dump` to Cloudflare R2 via GitHub Actions (~$1/month)
+- The dataset is the core business asset — single Railway instance is a single point of failure
+- Must be tested with a restore before it counts
+
+**Vector search**
+- `pgvector` extension on Railway PostgreSQL
+- Embed card names for fuzzy matching and entity resolution
+- Replaces manual `_apply_variant_filter` with semantic similarity
+- Requires: `CREATE EXTENSION IF NOT EXISTS vector` in schema.sql + Railway support verification
+
+**Multi-source pricing**
+- eBay is the primary and current only source
+- COMC, Goldin, Whatnot sold data would diversify and strengthen prices
+- Each new source requires a new scraper and deduplication logic against `market_raw_sales`
+
+### Long-term — Defensibility
+
+The longer CardDB runs, the harder it is to replicate:
+- 1 year of daily prices = a dataset competitors cannot recreate retroactively
+- 2 years = a genuine historical archive no free competitor has
+- Price history + portfolio tracking = user lock-in (their data lives here)
+
+**Volume resize:** At current growth (~340 MB/day filesystem), resize 80GB → 160GB planned for ~August 2026.

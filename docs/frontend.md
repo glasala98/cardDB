@@ -16,10 +16,17 @@ BrowserRouter
       Routes
 ```
 
-Public routes (no auth): `/login`, `/signup`, `/catalog`
+Public routes (no auth): `/login`, `/signup`, `/catalog`, `/catalog/:id`, `/trending`, `/releases`, `/sets`, `/sets/detail`, `/search`
 Protected routes: everything else — wrapped in `<ProtectedRoute>` which redirects to `/login` if no valid token.
 
-Default route: `/` → redirect to `/catalog`.
+Default route: `/` → `/catalog` (public homepage).
+
+Legacy redirects (permanent, no broken bookmarks):
+- `/ledger` → `/my-cards`
+- `/ledger/:cardName` → `/my-cards/:cardName`
+- `/archive` → `/my-cards/archive`
+- `/collection` → `/my-cards/collection`
+- `/master-db` → `/young-guns`
 
 ---
 
@@ -42,9 +49,24 @@ Browse all 1.26M+ cards in the reference database.
 
 ---
 
-### `/collection` — My Collection (`Collection.jsx`)
+### `/my-cards` — My Cards (`CardLedger.jsx`)
 
-The user's catalog-linked ownership record.
+The user's personal tracked card list (text-keyed). Three tabs: Tracked | Collection | Archive.
+
+**Features:**
+- All tracked cards with fair value, cost basis, gain/loss, confidence badge, trend badge
+- Rescrape individual card (triggers background scrape via API)
+- Edit card (fair value override, cost basis, purchase date, tags)
+- Archive card (soft delete with restore)
+- Bulk import via CSV upload
+- Scan card (→ `/scan` page or inline modal → Claude Vision → pre-fills add form)
+- Rescrape All button — dispatches GitHub Actions workflow, opens `ScrapeProgressModal`
+
+---
+
+### `/my-cards/collection` — My Collection (`Collection.jsx`)
+
+The user's catalog-linked ownership record. Tab under My Cards.
 
 **Features:**
 - Cards joined with catalog + market prices
@@ -53,30 +75,17 @@ The user's catalog-linked ownership record.
 - Edit grade/qty/cost/notes inline
 - Delete row
 
-**What it is NOT:** this is not the ledger (legacy personal cards). It's the catalog-FK system.
+---
+
+### `/my-cards/archive` — Archive (`Archive.jsx`)
+
+Soft-deleted tracked cards. Restore button returns card to My Cards. Tab under My Cards.
 
 ---
 
-### `/ledger` — Card Ledger (`CardLedger.jsx`)
+### `/my-cards/:cardName` — Card Inspect (`CardInspect.jsx`)
 
-The user's personal card list — text-keyed, predates the catalog system.
-
-**Features:**
-- All user's cards with fair value, cost basis, gain/loss, confidence badge, trend badge
-- Rescrape individual card (triggers background scrape via API)
-- Edit card (fair value override, cost basis, purchase date, tags)
-- Archive card (soft delete with restore)
-- Bulk import via CSV upload
-- Scan card via camera/image upload (→ Claude Vision → pre-fills add form)
-- Rescrape All button — dispatches GitHub Actions workflow, opens `ScrapeProgressModal`
-
-**State:** cards list, loading, scraping states, active modals.
-
----
-
-### `/ledger/:cardName` — Card Inspect (`CardInspect.jsx`)
-
-Detailed view for a single ledger card.
+Detailed view for a single tracked card.
 
 **Layout:** Side-by-side — card image (200×280) left, title + metrics right.
 
@@ -89,12 +98,16 @@ Detailed view for a single ledger card.
 - Lightbox on image click — 3D front/back flip if back image available
 - Manual price override form (shown for "not found" cards)
 - Grading ROI Calculator table:
-  - Raw baseline
-  - PSA 9, PSA 10 (if data available)
-  - BGS 9.5, BGS 10 (if data available)
-  - TAG (fee shown, no market data)
+  - Raw baseline → PSA 9 / PSA 10 / BGS 9.5 / BGS 10
   - Green/red ROI highlighting
   - Data sourced from: master DB CSV → market_prices.graded_data → rookie_price_history
+
+---
+
+### `/scan` — Scan a Card (`ScanPage.jsx`)
+
+Photograph a card → Claude Vision identifies player, year, set, parallel, grade, serial.
+Pre-fills the Add Card form. Redirects to `/my-cards` on add or close.
 
 ---
 
@@ -166,42 +179,41 @@ Full scrape monitoring and data management. Admin role required. Five tabs:
 
 ---
 
-### `/master-db` — Young Guns Market DB (`MasterDB.jsx`)
+### `/young-guns` — Young Guns (`MasterDB.jsx`)
 
-Legacy analytics page for the YG/Rookie market CSV database. Accessible by URL but not in sidebar navigation.
+Young Guns and rookie card market analytics. Two tabs: Young Guns | NHL Stats.
 
 **Sections:**
-1. Overview table with PSA/BGS prices
+1. Overview table with raw + PSA/BGS prices, trend badges
 2. Rookie cards owned / not owned filter
 3. Grade comparison (PSA 9 vs PSA 10 premiums)
 4. Price history charts per player
-5. Portfolio tracking
+5. Market movers (gainers/losers)
 6. Player bios / NHL stats integration
-7. Standings
-8. Correlation analytics (price vs performance R²)
-9. Raw sales viewer
+7. Correlation analytics (price vs performance R²)
+8. Raw sales viewer
 
 ---
 
 ### `/nhl-stats` — NHL Stats (`NHLStats.jsx`)
 
-NHL player stats cross-referenced with card values. Not in sidebar, accessible by URL.
-
----
+NHL player stats cross-referenced with card values. Tab under Young Guns.
 
 ---
 
 ## Components
 
 ### `Navbar.jsx`
-- Desktop: vertical sidebar (left) — Card Catalog · Card Ledger · Portfolio + settings gear
-- Mobile: fixed bottom tab bar — Catalog · Ledger · Portfolio · Settings
-- Shows logged-in username and logout button
+- Desktop: vertical sidebar (left) — Catalog · My Cards · Scan Card · Portfolio + settings gear
+- Mobile: fixed bottom tab bar with sub-nav strip above
+- Catalog sub: Browse · New Releases · Sets · Trending · Young Guns (auth)
+- My Cards sub: Tracked · Collection · Archive
+- Shows logged-in username, logout, share button
 
 ### `PageTabs.jsx`
 Shared tab bar for page-group navigation:
-- `/catalog` ↔ `/collection` (Browse | My Collection)
-- `/ledger` ↔ `/archive` (Active | Archive)
+- `/my-cards` ↔ `/my-cards/collection` ↔ `/my-cards/archive` (Tracked | Collection | Archive)
+- `/young-guns` ↔ `/nhl-stats` (Young Guns | NHL Stats)
 - `/portfolio` ↔ `/charts` (Overview | Charts)
 
 ### `CardTable.jsx`

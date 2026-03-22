@@ -1,17 +1,37 @@
-# CardDB — Sports Card Market Tracker
+# CardDB — Free Sports Card Market Intelligence
 
-A full-stack platform for tracking sports card collections, monitoring eBay market prices, and building long-term historical price data across NHL, NBA, NFL, and MLB.
+> Give every sports card collector free access to the market intelligence that only serious investors currently have.
 
 **Live:** [southwestsportscards.ca](https://southwestsportscards.ca)
 
 ---
 
-## Overview
+## What It Is
 
-CardDB is built around two goals:
+CardDB is a free sports card market intelligence platform. **The data is the product.**
 
-1. **Your collection** — track cards you own, cost basis, current market value, and P&L over time.
-2. **The market** — a catalog of 1.26M+ cards with daily eBay price scraping, graded card values (PSA/BGS), sealed product MSRP/box prices, and append-only price history for long-term trend analysis.
+800K+ cards with daily-updated eBay sold prices, graded values (PSA/BGS), and price history building over time — across NHL, NBA, NFL, and MLB. Free, when everything comparable costs money.
+
+The website monetizes that data through three layers:
+1. **Price checker + catalog** — drives traffic, ad impressions
+2. **Portfolio tracker** — creates returning users
+3. **Public API** *(roadmap)* — developers, resellers, hobbyists
+
+The moat is time. Anyone can build a scraper. Nobody can go back and collect the data being collected right now.
+
+---
+
+## The Gap We Fill
+
+| Competitor | Problem |
+|---|---|
+| 130point | Free but price-lookup only — no portfolio, no history, no API |
+| Card Ladder | Good data but paywalled ($15+/month) |
+| Beckett | Paywalled, slow to update, seen as out of touch |
+| Market Movers | Subscription, hockey-heavy, limited sports |
+| Slabstox | Graded only, subscription |
+
+**What doesn't exist for free:** multi-sport, daily-updated prices + portfolio tracking + grading ROI + API in one place. That's CardDB.
 
 ---
 
@@ -31,19 +51,35 @@ CardDB is built around two goals:
 
 ## Pages / Routes
 
+**Public (no login required):**
+
 | Route | Description |
 |-------|-------------|
-| `/catalog` | Public card catalog — 1.26M+ cards, sport/year/set filters, tier badges, price sparklines, slide-in detail panel. No login required. |
-| `/collection` | My Collection — cards you own, P&L, add/remove |
-| `/ledger` | Personal ledger (text-keyed cards) — search, filter, cost basis edit, bulk import, AI scan, export CSV |
-| `/ledger/:name` | Card detail — price history chart, raw eBay sales, grading ROI calculator, card image lightbox |
-| `/archive` | Archived ledger cards — view and restore |
-| `/portfolio` | Portfolio overview — total value, P&L, trend breakdown, top cards, gainers/losers |
-| `/charts` | Portfolio charts — value distribution, trend breakdown, grade mix, set analysis |
-| `/admin` | Admin dashboard — scrape monitoring, user management, outlier review, sealed products, pipeline health |
-| `/settings` | User settings |
+| `/catalog` | Browse 1.26M+ cards — sport/year/set filters, tier badges, price sparklines, slide-in detail. Homepage. |
+| `/catalog/:id` | Card detail — price history, eBay sales, grading ROI (auth users) |
+| `/trending` | Top movers in the last 24h |
+| `/releases` | New product releases with MSRP + pack config |
+| `/sets` | Browse all sets by sport and year |
+
+**Authenticated:**
+
+| Route | Description |
+|-------|-------------|
+| `/my-cards` | Tracked cards — price history, cost basis, bulk import, AI scan |
+| `/my-cards/collection` | Cards you own — grade, qty, cost basis, P&L |
+| `/my-cards/archive` | Archived tracked cards — restore |
+| `/my-cards/:name` | Card detail — price chart, grading ROI, raw eBay sales, image lightbox |
+| `/scan` | Scan a card photo — Claude Vision identifies player/year/set/grade |
+| `/young-guns` | Young Guns market DB — PSA/BGS prices, analytics, market movers |
+| `/nhl-stats` | NHL player stats cross-referenced with card values |
+| `/portfolio` | Portfolio overview — total value, P&L, top cards, gainers/losers |
+| `/charts` | Portfolio charts — value distribution, grade mix, set analysis |
+| `/settings` | Currency toggle, display density |
+| `/admin` | Admin dashboard — scrape monitoring, pipeline health, user management |
 
 Default route: `/` → `/catalog`
+
+Legacy routes (`/ledger`, `/archive`, `/collection`, `/master-db`) permanently redirect to their new equivalents.
 
 ---
 
@@ -310,12 +346,23 @@ The Dockerfile:
 
 ---
 
-## Future Plans
+## Roadmap
 
-See `docs/architecture.md` for the full roadmap. Key initiatives:
+### Now — Data foundation
+- Base tier backfill: ~800K cards being priced for the first time (~7 days to complete at current rate)
+- 12 parallel GH Actions runners, 3 runs/day, ~135K cards/day
+- Once done: daily runs drop to pure delta (~10 min/sport instead of 6 hours)
 
-1. **Post-backfill delta mode** — Once all base-tier cards are priced (~4-6 weeks out), daily runs switch to pure delta. Estimated: 6-hour runs shrink to ~10 minutes.
-2. **Vector search** — pgvector on Railway PostgreSQL for fuzzy card name matching and entity resolution.
-3. **Price alerts** — Email/in-app notification when a tracked card moves >10% in 7 days.
-4. **Caching layer** — Redis for expensive aggregate queries (portfolio total, releases page).
-5. **Public sealed products page** — Browse sealed products by sport/year with MSRP and pack odds. Data already exists in `sealed_products` + `sealed_product_odds`.
+### Next — Monetization
+- **SEO card pages** — server-renderable routes so Google indexes individual card prices → organic traffic → ad impressions
+- **Google AdSense** integration
+- **Price alerts** — email/in-app when a tracked card moves >10% in 7 days
+- **Sealed products public page** — data exists in `sealed_products`, just needs a public route
+
+### Later — Platform
+- **Public API** — versioned, rate-limited, documented. Free tier + potential paid tier.
+- **Offsite backups** — weekly `pg_dump` to Cloudflare R2 (the data is the product; protect it)
+- **Vector search** — pgvector for fuzzy card name matching and entity resolution
+- **Multi-source pricing** — COMC, Goldin, Whatnot sold data alongside eBay
+
+See `docs/architecture.md` for the full system diagram and data flow details.
