@@ -51,7 +51,7 @@ jobs:
           if [ -n "${{ github.event.inputs.sport }}" ]; then
             SPORT_ARG="--sport ${{ github.event.inputs.sport }}"
           fi
-          python -u scrape_master_db.py \
+          python -u scraping/scrape_master_db.py \
             --backfill \
             --catalog-tier ${{ github.event.inputs.tier }} \
             $SPORT_ARG \

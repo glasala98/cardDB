@@ -48,7 +48,7 @@ jobs:
 
       - name: Scrape graded prices — ${{ matrix.sport }} staple cards
         run: |
-          python -u scrape_master_db.py \
+          python -u scraping/scrape_master_db.py \
             --sport ${{ matrix.sport }} \
             --catalog-tier staple \
             --graded \

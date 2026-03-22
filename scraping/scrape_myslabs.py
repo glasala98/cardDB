@@ -18,6 +18,10 @@ from datetime import date, datetime, timedelta
 import requests
 
 from auction_match import CatalogMatcher
+import os as _os, sys as _sys
+_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+if _ROOT not in _sys.path:
+    _sys.path.insert(0, _ROOT)
 from db import get_db
 
 # ---------------------------------------------------------------------------

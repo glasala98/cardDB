@@ -5,7 +5,8 @@ and updates them in batches. Safe to re-run — only touches NULL rows.
 """
 import os
 import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(_ROOT, "scraping"))  # auction_title_parser lives here
 import psycopg2
 import psycopg2.extras
 from auction_title_parser import parse_title

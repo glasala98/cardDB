@@ -47,7 +47,7 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NHL staple prices
-        run: python -u scrape_master_db.py --catalog-tier staple --sport NHL --workers 5 --stale-days 1 --year-from 2000 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport NHL --workers 5 --stale-days 1 --year-from 2000 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -68,7 +68,7 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NBA staple prices
-        run: python -u scrape_master_db.py --catalog-tier staple --sport NBA --workers 5 --stale-days 1 --year-from 2000 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport NBA --workers 5 --stale-days 1 --year-from 2000 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -89,7 +89,7 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NFL staple prices
-        run: python -u scrape_master_db.py --catalog-tier staple --sport NFL --workers 5 --stale-days 1 --year-from 2000 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport NFL --workers 5 --stale-days 1 --year-from 2000 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -110,6 +110,6 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape MLB staple prices
-        run: python -u scrape_master_db.py --catalog-tier staple --sport MLB --workers 5 --stale-days 1 --year-from 2000 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport MLB --workers 5 --stale-days 1 --year-from 2000 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

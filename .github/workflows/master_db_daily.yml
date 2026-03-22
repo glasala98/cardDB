@@ -63,7 +63,7 @@ jobs:
             Triggered by: ${{ github.event_name }}
             Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       - name: Scrape NHL prices
-        run: python -u scrape_master_db.py --sport NHL --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '1000' }}
+        run: python -u scraping/scrape_master_db.py --sport NHL --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '1000' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Scrape NHL player stats
@@ -147,7 +147,7 @@ jobs:
             Triggered by: ${{ github.event_name }}
             Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       - name: Scrape NBA prices
-        run: python -u scrape_master_db.py --sport NBA --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '1000' }}
+        run: python -u scraping/scrape_master_db.py --sport NBA --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '1000' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Generate cancellation report
@@ -227,7 +227,7 @@ jobs:
             Triggered by: ${{ github.event_name }}
             Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       - name: Scrape NFL prices
-        run: python -u scrape_master_db.py --sport NFL --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '1000' }}
+        run: python -u scraping/scrape_master_db.py --sport NFL --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '1000' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Generate cancellation report
@@ -307,7 +307,7 @@ jobs:
             Triggered by: ${{ github.event_name }}
             Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       - name: Scrape MLB prices
-        run: python -u scrape_master_db.py --sport MLB --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '1000' }}
+        run: python -u scraping/scrape_master_db.py --sport MLB --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '1000' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Generate cancellation report

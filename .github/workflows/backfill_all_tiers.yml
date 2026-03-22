@@ -33,7 +33,7 @@ jobs:
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Backfill staple tier (${{ matrix.sport }})
         run: |
-          python -u scrape_master_db.py \
+          python -u scraping/scrape_master_db.py \
             --backfill \
             --catalog-tier staple \
             --sport ${{ matrix.sport }} \
@@ -67,7 +67,7 @@ jobs:
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Backfill premium tier (${{ matrix.sport }})
         run: |
-          python -u scrape_master_db.py \
+          python -u scraping/scrape_master_db.py \
             --backfill \
             --catalog-tier premium \
             --sport ${{ matrix.sport }} \
@@ -101,7 +101,7 @@ jobs:
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Backfill stars tier (${{ matrix.sport }})
         run: |
-          python -u scrape_master_db.py \
+          python -u scraping/scrape_master_db.py \
             --backfill \
             --catalog-tier stars \
             --sport ${{ matrix.sport }} \
@@ -135,7 +135,7 @@ jobs:
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Backfill base tier (${{ matrix.sport }})
         run: |
-          python -u scrape_master_db.py \
+          python -u scraping/scrape_master_db.py \
             --backfill \
             --catalog-tier base \
             --sport ${{ matrix.sport }} \

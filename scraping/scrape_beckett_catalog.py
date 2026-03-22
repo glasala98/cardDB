@@ -33,6 +33,10 @@ Usage:
     python scrape_beckett_catalog.py --reset                 # clear checkpoint
 """
 
+import os as _os, sys as _sys
+_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+if _ROOT not in _sys.path:
+    _sys.path.insert(0, _ROOT)
 import os, sys, re, time, random, json, argparse, logging, threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime

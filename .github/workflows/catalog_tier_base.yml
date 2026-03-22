@@ -118,7 +118,7 @@ jobs:
       - name: Scrape base prices
         if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == matrix.sport }}
         run: |
-          python -u scrape_master_db.py \
+          python -u scraping/scrape_master_db.py \
             --catalog-tier base \
             --sport ${{ matrix.sport }} \
             --workers 5 \

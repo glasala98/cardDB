@@ -26,6 +26,6 @@ jobs:
         run: pip install -r requirements.txt webdriver-manager scipy
 
       - name: Run scraper
-        run: python daily_scrape.py --workers 3
+        run: python scraping/daily_scrape.py --workers 3
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

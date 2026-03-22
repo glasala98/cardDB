@@ -20,6 +20,10 @@ os.chdir(SCRIPT_DIR)
 from dotenv import load_dotenv
 load_dotenv()
 
+import os as _os, sys as _sys
+_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+if _ROOT not in _sys.path:
+    _sys.path.insert(0, _ROOT)
 from scrape_card_prices import process_card
 from dashboard_utils import (
     load_data, save_data,

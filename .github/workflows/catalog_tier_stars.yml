@@ -31,7 +31,7 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NHL stars prices
-        run: python -u scrape_master_db.py --catalog-tier stars --sport NHL --workers 5 --stale-days 30 --max-hours 5 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scraping/scrape_master_db.py --catalog-tier stars --sport NHL --workers 5 --stale-days 30 --max-hours 5 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -51,7 +51,7 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NBA stars prices
-        run: python -u scrape_master_db.py --catalog-tier stars --sport NBA --workers 5 --stale-days 30 --max-hours 5 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scraping/scrape_master_db.py --catalog-tier stars --sport NBA --workers 5 --stale-days 30 --max-hours 5 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -71,7 +71,7 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NFL stars prices
-        run: python -u scrape_master_db.py --catalog-tier stars --sport NFL --workers 5 --stale-days 30 --max-hours 5 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scraping/scrape_master_db.py --catalog-tier stars --sport NFL --workers 5 --stale-days 30 --max-hours 5 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -91,6 +91,6 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape MLB stars prices
-        run: python -u scrape_master_db.py --catalog-tier stars --sport MLB --workers 5 --stale-days 30 --max-hours 5 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scraping/scrape_master_db.py --catalog-tier stars --sport MLB --workers 5 --stale-days 30 --max-hours 5 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
