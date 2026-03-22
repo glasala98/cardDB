@@ -2,7 +2,13 @@ import { useState, useEffect, useMemo } from 'react'
 import CardTable from '../components/CardTable'
 import { getNHLStats } from '../api/masterDb'
 import { useCurrency } from '../context/CurrencyContext'
+import PageTabs from '../components/PageTabs'
 import styles from './Page.module.css'
+
+const YG_TABS = [
+  { to: '/young-guns', label: 'Young Guns' },
+  { to: '/nhl-stats',  label: 'NHL Stats'  },
+]
 
 const COLUMNS = (fmtPrice) => [
   { key: 'player',       label: 'Player' },
@@ -79,6 +85,7 @@ export default function NHLStats() {
 
   return (
     <div className={styles.page}>
+      <PageTabs tabs={YG_TABS} />
       <div className={styles.header}>
         <h1 className={styles.title}>NHL Player Stats</h1>
         <span className={styles.count}>{filtered.length} of {players.length} players</span>

@@ -18,8 +18,9 @@ import styles from './CardLedger.module.css'
 import pageStyles from './Page.module.css'
 
 const LEDGER_TABS = [
-  { to: '/ledger',  label: 'Active'  },
-  { to: '/archive', label: 'Archive' },
+  { to: '/my-cards',            label: 'Tracked'    },
+  { to: '/my-cards/collection', label: 'Collection' },
+  { to: '/my-cards/archive',    label: 'Archive'    },
 ]
 
 const TRENDS = ['up', 'stable', 'down', 'no data']
@@ -513,7 +514,7 @@ export default function CardLedger() {
                     <tr key={card.card_name} className={styles.tr}>
                       <td
                         className={`${styles.td} ${styles.tdThumb}`}
-                        onClick={() => navigate(`/ledger/${encodeURIComponent(card.card_name)}`)}
+                        onClick={() => navigate(`/my-cards/${encodeURIComponent(card.card_name)}`)}
                       >
                         <CardThumb
                           playerName={card.player || card.card_name}
@@ -523,7 +524,7 @@ export default function CardLedger() {
                       </td>
                       <td
                         className={`${styles.td} ${styles.nameCell}`}
-                        onClick={() => navigate(`/ledger/${encodeURIComponent(card.card_name)}`)}
+                        onClick={() => navigate(`/my-cards/${encodeURIComponent(card.card_name)}`)}
                         title={card.card_name}
                       >
                         <span className={styles.cardPlayer}>{card.player || card.card_name}</span>

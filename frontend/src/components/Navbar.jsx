@@ -70,28 +70,36 @@ const Icons = {
       <circle cx="8" cy="12" r="0.6" fill="currentColor"/>
     </svg>
   ),
+  Scan: () => (
+    <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+      <rect x="2" y="5" width="14" height="10" rx="2"/>
+      <circle cx="9" cy="10" r="2.5"/>
+      <path d="M6 5V4a1 1 0 011-1h4a1 1 0 011 1v1"/>
+    </svg>
+  ),
 }
 
 const NAV_ITEMS = [
   {
-    to: '/search', label: 'Search', Icon: Icons.Search, public: true,
-  },
-  {
     to: '/catalog', label: 'Catalog', Icon: Icons.Catalog, public: true,
     sub: [
-      { to: '/catalog',    label: 'Browse'         },
-      { to: '/releases',   label: 'New Releases'   },
-      { to: '/sets',       label: 'Sets'           },
-      { to: '/trending',   label: 'Trending'       },
-      { to: '/collection', label: 'My Collection', auth: true },
+      { to: '/catalog',     label: 'Browse'       },
+      { to: '/releases',    label: 'New Releases' },
+      { to: '/sets',        label: 'Sets'         },
+      { to: '/trending',    label: 'Trending'     },
+      { to: '/young-guns',  label: 'Young Guns',  auth: true },
     ],
   },
   {
-    to: '/ledger', label: 'Ledger', Icon: Icons.Ledger, public: false,
+    to: '/my-cards', label: 'My Cards', Icon: Icons.Ledger, public: false,
     sub: [
-      { to: '/ledger',  label: 'Active'  },
-      { to: '/archive', label: 'Archive' },
+      { to: '/my-cards',            label: 'Tracked'    },
+      { to: '/my-cards/collection', label: 'Collection' },
+      { to: '/my-cards/archive',    label: 'Archive'    },
     ],
+  },
+  {
+    to: '/scan', label: 'Scan Card', Icon: Icons.Scan, public: false,
   },
   {
     to: '/portfolio', label: 'Portfolio', Icon: Icons.Portfolio, public: false,

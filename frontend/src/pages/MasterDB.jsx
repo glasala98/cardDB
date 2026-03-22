@@ -6,8 +6,14 @@ import PriceChart from '../components/PriceChart'
 import { getYoungGuns, getMarketMovers, getNHLStats, getSeasonalTrends,
          getYGPriceHistoryByName, updateYGOwnership, scrapeYGCard } from '../api/masterDb'
 import { useCurrency } from '../context/CurrencyContext'
+import PageTabs from '../components/PageTabs'
 import styles from './MasterDB.module.css'
 import pageStyles from './Page.module.css'
+
+const YG_TABS = [
+  { to: '/young-guns', label: 'Young Guns' },
+  { to: '/nhl-stats',  label: 'NHL Stats'  },
+]
 
 const PRICE_MODES = [
   { key: 'fair_value',  label: 'Raw' },
@@ -120,8 +126,10 @@ export default function MasterDB() {
   return (
     <div className={pageStyles.page}>
 
+      <PageTabs tabs={YG_TABS} />
+
       <div className={pageStyles.header}>
-        <h1 className={pageStyles.title}>Young Guns Master DB</h1>
+        <h1 className={pageStyles.title}>Young Guns</h1>
         <span className={pageStyles.count}>{cards.length.toLocaleString()} cards</span>
       </div>
 

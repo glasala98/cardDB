@@ -6,8 +6,9 @@ import styles from './Archive.module.css'
 import pageStyles from './Page.module.css'
 
 const LEDGER_TABS = [
-  { to: '/ledger',  label: 'Active'  },
-  { to: '/archive', label: 'Archive' },
+  { to: '/my-cards',            label: 'Tracked'    },
+  { to: '/my-cards/collection', label: 'Collection' },
+  { to: '/my-cards/archive',    label: 'Archive'    },
 ]
 
 export default function Archive() {

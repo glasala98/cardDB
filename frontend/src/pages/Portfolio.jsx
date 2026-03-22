@@ -174,7 +174,7 @@ export default function Portfolio() {
                   <tr
                     key={card.card_name}
                     className={styles.topRow}
-                    onClick={() => navigate(`/ledger/${encodeURIComponent(card.card_name)}`)}
+                    onClick={() => navigate(`/my-cards/${encodeURIComponent(card.card_name)}`)}
                     title="Click to inspect"
                   >
                     <td className={`${styles.topTd} ${styles.rankCell}`}>{i + 1}</td>
@@ -244,7 +244,7 @@ function GainLossTable({ title, rows, navigate, fmtPrice, positive }) {
             <tr
               key={card.card_name}
               className={styles.topRow}
-              onClick={() => navigate(`/ledger/${encodeURIComponent(card.card_name)}`)}
+              onClick={() => navigate(`/my-cards/${encodeURIComponent(card.card_name)}`)}
             >
               <td className={`${styles.topTd} ${styles.nameCell}`}>{card.card_name}</td>
               <td className={`${styles.topTd}`} style={{ color: positive ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>
@@ -284,7 +284,7 @@ function RecentlyScraped({ cards, navigate, fmtPrice }) {
             <tr
               key={card.card_name}
               className={styles.topRow}
-              onClick={() => navigate(`/ledger/${encodeURIComponent(card.card_name)}`)}
+              onClick={() => navigate(`/my-cards/${encodeURIComponent(card.card_name)}`)}
               title="Click to inspect"
             >
               <td className={`${styles.topTd} ${styles.nameCell}`}>{card.card_name}</td>

@@ -135,7 +135,7 @@ export default function CardInspect() {
       {toast && <div className={`${styles.toast} ${styles[toast.type]}`}>{toast.msg}</div>}
 
       <div className={styles.topBar}>
-        <Link to="/ledger" className={styles.back}>← Back to Ledger</Link>
+        <Link to="/my-cards" className={styles.back}>← Back to My Cards</Link>
       </div>
 
       <div className={styles.cardHeader}>

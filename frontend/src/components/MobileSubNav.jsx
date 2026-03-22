@@ -4,18 +4,21 @@ import styles from './MobileSubNav.module.css'
 
 const GROUPS = [
   {
-    routes: ['/catalog', '/releases', '/collection'],
+    routes: ['/catalog', '/releases', '/sets', '/trending', '/young-guns'],
     sub: [
-      { to: '/catalog',    label: 'Browse'        },
-      { to: '/releases',   label: 'New Releases'  },
-      { to: '/collection', label: 'My Collection', auth: true },
+      { to: '/catalog',    label: 'Browse'       },
+      { to: '/releases',   label: 'New Releases' },
+      { to: '/sets',       label: 'Sets'         },
+      { to: '/trending',   label: 'Trending'     },
+      { to: '/young-guns', label: 'Young Guns',  auth: true },
     ],
   },
   {
-    routes: ['/ledger', '/archive'],
+    routes: ['/my-cards', '/my-cards/archive', '/my-cards/collection'],
     sub: [
-      { to: '/ledger',  label: 'Active'  },
-      { to: '/archive', label: 'Archive' },
+      { to: '/my-cards',            label: 'Tracked'    },
+      { to: '/my-cards/collection', label: 'Collection' },
+      { to: '/my-cards/archive',    label: 'Archive'    },
     ],
   },
   {

@@ -14,7 +14,7 @@ export default function Login() {
   const [error,    setError]    = useState(null)
   const [loading,  setLoading]  = useState(false)
 
-  const from = location.state?.from?.pathname || '/ledger'
+  const from = location.state?.from?.pathname || '/my-cards'
 
   const handleSubmit = async e => {
     e.preventDefault()

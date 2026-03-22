@@ -6,8 +6,9 @@ import styles from './Collection.module.css'
 import pageStyles from './Page.module.css'
 
 const CATALOG_TABS = [
-  { to: '/catalog',    label: 'Browse'        },
-  { to: '/collection', label: 'My Collection' },
+  { to: '/my-cards',            label: 'Tracked'    },
+  { to: '/my-cards/collection', label: 'Collection' },
+  { to: '/my-cards/archive',    label: 'Archive'    },
 ]
 
 const SPORTS = ['NHL', 'NBA', 'NFL', 'MLB']
