@@ -15,6 +15,6 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
       - name: Run sport mismatch cleanup
-        run: python -u fix_sealed_products_sport.py
+        run: python -u scripts/fix_sealed_products_sport.py
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

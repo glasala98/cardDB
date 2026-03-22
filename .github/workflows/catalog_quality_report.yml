@@ -37,7 +37,7 @@ jobs:
 
       - name: Run gap analysis (Markdown)
         run: |
-          python -X utf8 catalog_gap_analysis.py \
+          python -X utf8 diagnostics/catalog_gap_analysis.py \
             --sport ${{ github.event.inputs.sport || 'ALL' }} \
             --markdown \
             --output gap_report.md

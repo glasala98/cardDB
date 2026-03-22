@@ -32,7 +32,7 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install psycopg2-binary
-      - run: python migrate_add_sealed_products.py
+      - run: python migrations/migrate_add_sealed_products.py
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
@@ -67,6 +67,6 @@ jobs:
           fi
           echo "args=$ARGS" >> $GITHUB_OUTPUT
       - name: Scrape set product info
-        run: python -u scrape_set_info.py ${{ steps.args.outputs.args }}
+        run: python -u scraping/scrape_set_info.py ${{ steps.args.outputs.args }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

@@ -13,6 +13,6 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install psycopg2-binary
-      - run: python migrate_add_graded_data.py
+      - run: python migrations/migrate_add_graded_data.py
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
