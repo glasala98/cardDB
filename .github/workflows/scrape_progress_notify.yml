@@ -1,7 +1,7 @@
 name: Scrape Progress — Hourly Email
 
 # Sends an hourly email during the base tier backfill showing
-# cards processed per sport, total coverage %, and DB size.
+# cards processed per sport, total coverage %, pace vs target, and ETA.
 
 on:
   schedule:
@@ -30,36 +30,60 @@ jobs:
         id: report
         run: |
           python - <<'EOF'
-          import os, psycopg2
-          from datetime import datetime, timezone
+          import os, psycopg2, math
+          from datetime import datetime, timezone, date, timedelta
 
+          # ── Timeline constants ─────────────────────────────────────────────
+          BACKFILL_START   = date(2026, 3, 22)   # first clean run date
+          TARGET_DAILY     = 135_000             # cards/day at full capacity
+          # Milestones: (pct, label)
+          MILESTONES = [(25, "25%"), (50, "50%"), (75, "75%"), (90, "90%"), (100, "100%")]
+
+          # ── DB queries ────────────────────────────────────────────────────
           conn = psycopg2.connect(os.environ["DATABASE_URL"])
           cur  = conn.cursor()
 
-          # Total catalog cards
+          # Total catalog
           cur.execute("SELECT COUNT(*) FROM card_catalog")
-          total = cur.fetchone()[0]
+          total_catalog = cur.fetchone()[0]
 
-          # Priced cards total + per sport
+          # Overall priced
           cur.execute("""
-              SELECT cc.sport, COUNT(*) AS priced
-              FROM market_prices mp
-              JOIN card_catalog cc ON cc.id = mp.card_catalog_id
+              SELECT COUNT(*) FROM market_prices mp
               WHERE mp.fair_value IS NOT NULL AND mp.fair_value > 0
+          """)
+          total_priced = cur.fetchone()[0]
+
+          # Base tier target: NFL/NBA/MLB 2015+ (active backfill scope)
+          cur.execute("""
+              SELECT sport, COUNT(*) FROM card_catalog
+              WHERE scrape_tier = 'base' AND year >= '2015'
+                AND sport IN ('NFL','NBA','MLB')
+              GROUP BY sport ORDER BY sport
+          """)
+          base_target = {r[0]: r[1] for r in cur.fetchall()}
+          total_base_target = sum(base_target.values())
+
+          # Base tier priced: NFL/NBA/MLB 2015+
+          cur.execute("""
+              SELECT cc.sport, COUNT(*) FROM market_prices mp
+              JOIN card_catalog cc ON cc.id = mp.card_catalog_id
+              WHERE cc.scrape_tier = 'base' AND cc.year >= '2015'
+                AND cc.sport IN ('NFL','NBA','MLB')
+                AND mp.fair_value IS NOT NULL AND mp.fair_value > 0
               GROUP BY cc.sport ORDER BY cc.sport
           """)
-          by_sport = {r[0]: r[1] for r in cur.fetchall()}
-          total_priced = sum(by_sport.values())
+          base_priced = {r[0]: r[1] for r in cur.fetchall()}
+          total_base_priced = sum(base_priced.values())
 
-          # Base tier cards per sport (2010+)
+          # Base tier totals (2010+) for context in email
           cur.execute("""
               SELECT sport, COUNT(*) FROM card_catalog
               WHERE scrape_tier = 'base' AND year >= '2010'
               GROUP BY sport ORDER BY sport
           """)
-          base_total = {r[0]: r[1] for r in cur.fetchall()}
+          base_total_2010 = {r[0]: r[1] for r in cur.fetchall()}
 
-          # Base tier priced
           cur.execute("""
               SELECT cc.sport, COUNT(*) FROM market_prices mp
               JOIN card_catalog cc ON cc.id = mp.card_catalog_id
@@ -67,9 +91,9 @@ jobs:
                 AND mp.fair_value IS NOT NULL AND mp.fair_value > 0
               GROUP BY cc.sport ORDER BY cc.sport
           """)
-          base_priced = {r[0]: r[1] for r in cur.fetchall()}
+          base_priced_2010 = {r[0]: r[1] for r in cur.fetchall()}
 
-          # Raw sales count
+          # Raw sales
           cur.execute("SELECT COUNT(*), COUNT(DISTINCT card_catalog_id) FROM market_raw_sales")
           sales_total, sales_cards = cur.fetchone()
 
@@ -79,38 +103,151 @@ jobs:
 
           cur.close(); conn.close()
 
-          pct = total_priced / total * 100 if total else 0
-          now = datetime.now(timezone.utc).strftime("%b %d %Y at %H:%M UTC")
+          # ── Pace calculations ─────────────────────────────────────────────
+          today       = date.today()
+          days_elapsed = max((today - BACKFILL_START).days, 1)
 
-          lines = [f"CardDB Scrape Progress — {now}", "=" * 55, ""]
-          lines.append(f"Overall coverage:  {total_priced:,} / {total:,} cards  ({pct:.1f}%)")
-          lines.append(f"Raw sales stored:  {sales_total:,} sales across {sales_cards:,} cards")
-          lines.append(f"DB size:           {db_size}")
+          # Expected based on linear schedule
+          expected_priced = min(total_base_target, days_elapsed * TARGET_DAILY)
+          delta = total_base_priced - expected_priced
+          delta_pct = delta / total_base_target * 100
+
+          # Actual daily rate (avg since start)
+          actual_daily = total_base_priced / days_elapsed
+
+          # Projected completion
+          remaining = total_base_target - total_base_priced
+          if actual_daily > 0:
+              days_to_finish = math.ceil(remaining / actual_daily)
+              eta = today + timedelta(days=days_to_finish)
+              eta_str = eta.strftime("%b %d, %Y")
+          else:
+              eta_str = "unknown"
+
+          # Target completion (linear)
+          days_target_total = math.ceil(total_base_target / TARGET_DAILY)
+          target_end = BACKFILL_START + timedelta(days=days_target_total)
+          target_end_str = target_end.strftime("%b %d, %Y")
+
+          # Base pct
+          base_pct = total_base_priced / total_base_target * 100 if total_base_target else 0
+          overall_pct = total_priced / total_catalog * 100 if total_catalog else 0
+
+          # Next milestone
+          next_ms = None
+          for ms_pct, ms_label in MILESTONES:
+              if base_pct < ms_pct:
+                  next_ms = (ms_pct, ms_label, total_base_target * ms_pct / 100)
+                  break
+
+          # Pace emoji + label
+          if delta >= 0:
+              pace_emoji = "✅"
+              pace_label = f"+{delta:,} ahead of schedule ({delta_pct:+.1f}%)"
+          else:
+              pace_emoji = "⚠️"
+              pace_label = f"{delta:,} behind schedule ({delta_pct:+.1f}%)"
+
+          # ── Milestone schedule table ───────────────────────────────────────
+          ms_lines = ["Milestone schedule (NFL/NBA/MLB 2015+):"]
+          ms_lines.append(f"  {'Goal':>6}  {'Target date':>12}  {'Cards needed':>13}  {'Status'}")
+          ms_lines.append(f"  {'-'*6}  {'-'*12}  {'-'*13}  {'-'*20}")
+          for ms_pct, ms_label in MILESTONES:
+              ms_cards  = total_base_target * ms_pct / 100
+              ms_day    = BACKFILL_START + timedelta(days=math.ceil(ms_cards / TARGET_DAILY))
+              ms_date   = ms_day.strftime("%b %d, %Y")
+              if total_base_priced >= ms_cards:
+                  status = "✓ Done"
+              elif today > ms_day:
+                  shortfall = ms_cards - total_base_priced
+                  status = f"⚠ {shortfall:,.0f} short"
+              else:
+                  days_away = (ms_day - today).days
+                  status = f"in {days_away}d"
+              ms_lines.append(f"  {ms_label:>6}  {ms_date:>12}  {ms_cards:>13,.0f}  {status}")
+
+          # ── Assemble email body ───────────────────────────────────────────
+          now_str = datetime.now(timezone.utc).strftime("%b %d %Y at %H:%M UTC")
+          lines = [f"CardDB Backfill Progress — {now_str}", "=" * 60, ""]
+
+          lines.append(f"PACE  {pace_emoji}  {pace_label}")
+          lines.append(f"      Actual rate:    {actual_daily:,.0f} cards/day")
+          lines.append(f"      Target rate:    {TARGET_DAILY:,} cards/day")
+          lines.append(f"      Target ETA:     {target_end_str}")
+          lines.append(f"      Projected ETA:  {eta_str}")
           lines.append("")
-          lines.append("Base tier progress (2010+):")
-          for sport in ["MLB", "NBA", "NFL", "NHL"]:
-              bt = base_total.get(sport, 0)
+
+          lines.append(f"ACTIVE BACKFILL — Base tier NFL/NBA/MLB 2015+")
+          lines.append(f"  Total priced:   {total_base_priced:,} / {total_base_target:,}  ({base_pct:.1f}%)")
+          lines.append(f"  Day {days_elapsed} of backfill — expected {expected_priced:,} by now")
+          lines.append("")
+          for sport in ["MLB", "NBA", "NFL"]:
+              bt = base_target.get(sport, 0)
               bp = base_priced.get(sport, 0)
               sp = bp / bt * 100 if bt else 0
-              lines.append(f"  {sport}:  {bp:>7,} / {bt:>7,}  ({sp:.1f}%)")
+              bar_filled = int(sp / 5)
+              bar = "█" * bar_filled + "░" * (20 - bar_filled)
+              lines.append(f"  {sport}  [{bar}] {sp:5.1f}%  ({bp:,} / {bt:,})")
           lines.append("")
-          lines.append("By sport (all tiers):")
-          for sport, cnt in sorted(by_sport.items()):
-              lines.append(f"  {sport}:  {cnt:,}")
 
-          body = "\n".join(lines)
-          subject = f"CardDB — {pct:.1f}% priced | {total_priced:,} cards"
+          lines.append("\n".join(ms_lines))
+          lines.append("")
 
+          if next_ms:
+              ms_pct, ms_label, ms_cards = next_ms
+              cards_needed = max(0, ms_cards - total_base_priced)
+              days_needed  = math.ceil(cards_needed / actual_daily) if actual_daily > 0 else 0
+              lines.append(f"NEXT MILESTONE: {ms_label} — {cards_needed:,.0f} cards to go (~{days_needed} days at current rate)")
+              lines.append("")
+
+          lines.append("─" * 60)
+          lines.append(f"Overall catalog:  {total_priced:,} / {total_catalog:,}  ({overall_pct:.1f}%)")
+          lines.append(f"Raw sales:        {sales_total:,} sales across {sales_cards:,} cards")
+          lines.append(f"DB size:          {db_size}")
+          lines.append("")
+          lines.append("All tiers (2010+):")
+          for sport in ["MLB", "NBA", "NFL", "NHL"]:
+              bt = base_total_2010.get(sport, 0)
+              bp = base_priced_2010.get(sport, 0)
+              sp = bp / bt * 100 if bt else 0
+              lines.append(f"  {sport}:  {bp:>7,} / {bt:>7,}  ({sp:.1f}%)")
+
+          body    = "\n".join(lines)
+          subject = f"CardDB — {base_pct:.1f}% base priced | {pace_emoji} {pace_label[:30]}"
+
+          # ── Smart send logic ──────────────────────────────────────────────
+          # Only send if:
+          #   1. Forced via workflow_dispatch
+          #   2. A milestone was just crossed (within the last ~65 min window)
+          #   3. Once per day at noon UTC (12:00 run) as a daily digest
+          #   4. Pace flipped from ahead→behind or behind→ahead vs last hour
+          force = os.environ.get("FORCE_SEND", "false").lower() == "true"
+
+          current_hour = datetime.now(timezone.utc).hour
+          is_daily_digest = (current_hour == 12)
+
+          # Check if a milestone was just crossed
+          milestone_crossed = False
+          for ms_pct, ms_label in MILESTONES:
+              ms_cards = total_base_target * ms_pct / 100
+              # crossed if we are within one day's worth of cards above the milestone
+              if total_base_priced >= ms_cards and (total_base_priced - ms_cards) < TARGET_DAILY:
+                  milestone_crossed = True
+                  subject = f"🎯 CardDB — {ms_label} base tier reached! | ETA {eta_str}"
+                  break
+
+          should_send = force or is_daily_digest or milestone_crossed
+
+          import hashlib
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"subject={subject}\n")
-              # multiline body
-              import hashlib
               delim = "EOF_" + hashlib.md5(body.encode()).hexdigest()[:8]
               f.write(f"body<<{delim}\n{body}\n{delim}\n")
-              f.write("should_send=true\n")
+              f.write(f"should_send={'true' if should_send else 'false'}\n")
           EOF
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          FORCE_SEND: ${{ github.event.inputs.force || 'false' }}
 
       - name: Send progress email
         if: steps.report.outputs.should_send == 'true'
