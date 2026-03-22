@@ -15,7 +15,7 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -39,63 +39,51 @@ jobs:
           # Milestones: (pct, label)
           MILESTONES = [(25, "25%"), (50, "50%"), (75, "75%"), (90, "90%"), (100, "100%")]
 
-          # ── DB queries ────────────────────────────────────────────────────
+          # ── DB queries (consolidated for speed) ───────────────────────────
           conn = psycopg2.connect(os.environ["DATABASE_URL"])
           cur  = conn.cursor()
 
-          # Total catalog
-          cur.execute("SELECT COUNT(*) FROM card_catalog")
-          total_catalog = cur.fetchone()[0]
-
-          # Overall priced
+          # Single pass: catalog counts + priced counts per sport/tier/year
           cur.execute("""
-              SELECT COUNT(*) FROM market_prices mp
-              WHERE mp.fair_value IS NOT NULL AND mp.fair_value > 0
+              SELECT
+                  cc.sport,
+                  cc.scrape_tier,
+                  CASE WHEN cc.year::int >= 2015 THEN '2015' ELSE '2010' END AS yr_bucket,
+                  COUNT(*)                                                    AS catalog_cnt,
+                  COUNT(mp.card_catalog_id)                                  AS priced_cnt
+              FROM card_catalog cc
+              LEFT JOIN market_prices mp
+                     ON mp.card_catalog_id = cc.id
+                    AND mp.fair_value IS NOT NULL AND mp.fair_value > 0
+              WHERE cc.scrape_tier = 'base' AND cc.year::int >= 2010
+              GROUP BY cc.sport, cc.scrape_tier, yr_bucket
           """)
-          total_priced = cur.fetchone()[0]
-
-          # Base tier target: NFL/NBA/MLB 2015+ (active backfill scope)
-          cur.execute("""
-              SELECT sport, COUNT(*) FROM card_catalog
-              WHERE scrape_tier = 'base' AND year >= '2015'
-                AND sport IN ('NFL','NBA','MLB')
-              GROUP BY sport ORDER BY sport
-          """)
-          base_target = {r[0]: r[1] for r in cur.fetchall()}
+          base_target   = {}   # sport → catalog count (2015+, NFL/NBA/MLB)
+          base_priced   = {}   # sport → priced count  (2015+, NFL/NBA/MLB)
+          base_total_2010  = {}
+          base_priced_2010 = {}
+          for sport, tier, yr_bucket, cat_cnt, priced_cnt in cur.fetchall():
+              base_total_2010[sport]  = base_total_2010.get(sport, 0)  + cat_cnt
+              base_priced_2010[sport] = base_priced_2010.get(sport, 0) + priced_cnt
+              if yr_bucket == '2015' and sport in ('NFL', 'NBA', 'MLB'):
+                  base_target[sport]  = base_target.get(sport, 0)  + cat_cnt
+                  base_priced[sport]  = base_priced.get(sport, 0)  + priced_cnt
           total_base_target = sum(base_target.values())
-
-          # Base tier priced: NFL/NBA/MLB 2015+
-          cur.execute("""
-              SELECT cc.sport, COUNT(*) FROM market_prices mp
-              JOIN card_catalog cc ON cc.id = mp.card_catalog_id
-              WHERE cc.scrape_tier = 'base' AND cc.year >= '2015'
-                AND cc.sport IN ('NFL','NBA','MLB')
-                AND mp.fair_value IS NOT NULL AND mp.fair_value > 0
-              GROUP BY cc.sport ORDER BY cc.sport
-          """)
-          base_priced = {r[0]: r[1] for r in cur.fetchall()}
           total_base_priced = sum(base_priced.values())
 
-          # Base tier totals (2010+) for context in email
-          cur.execute("""
-              SELECT sport, COUNT(*) FROM card_catalog
-              WHERE scrape_tier = 'base' AND year >= '2010'
-              GROUP BY sport ORDER BY sport
-          """)
-          base_total_2010 = {r[0]: r[1] for r in cur.fetchall()}
+          # Overall totals (fast — no JOIN)
+          cur.execute("SELECT COUNT(*) FROM card_catalog")
+          total_catalog = cur.fetchone()[0]
+          cur.execute("SELECT COUNT(*) FROM market_prices WHERE fair_value IS NOT NULL AND fair_value > 0")
+          total_priced = cur.fetchone()[0]
 
+          # Raw sales (pg_class estimate is instant; exact count on smaller distinct)
           cur.execute("""
-              SELECT cc.sport, COUNT(*) FROM market_prices mp
-              JOIN card_catalog cc ON cc.id = mp.card_catalog_id
-              WHERE cc.scrape_tier = 'base' AND cc.year >= '2010'
-                AND mp.fair_value IS NOT NULL AND mp.fair_value > 0
-              GROUP BY cc.sport ORDER BY cc.sport
+              SELECT reltuples::bigint FROM pg_class WHERE relname = 'market_raw_sales'
           """)
-          base_priced_2010 = {r[0]: r[1] for r in cur.fetchall()}
-
-          # Raw sales
-          cur.execute("SELECT COUNT(*), COUNT(DISTINCT card_catalog_id) FROM market_raw_sales")
-          sales_total, sales_cards = cur.fetchone()
+          sales_total = cur.fetchone()[0]
+          cur.execute("SELECT COUNT(DISTINCT card_catalog_id) FROM market_raw_sales")
+          sales_cards = cur.fetchone()[0]
 
           # DB size
           cur.execute("SELECT pg_size_pretty(pg_database_size(current_database()))")
