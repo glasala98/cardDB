@@ -9,14 +9,15 @@ name: Catalog Tier — Base (Daily during backfill)
 #
 # Sharding: each sport is split across N parallel runners (each with a different
 # GH Actions IP → independent eBay rate limit). Shard counts:
-#   NFL: 3 shards (372K cards)   NBA: 3 shards (244K cards)
-#   MLB: 2 shards                NHL: 1 shard (89%+ miss rate, early bail keeps it fast)
-# = 9 parallel runners total (up from 4). Scale shard_count up to push faster.
+#   NFL: 5 shards (372K cards)   NBA: 4 shards (244K cards)
+#   MLB: 3 shards                NHL: skipped (89%+ miss rate on base cards)
+# = 12 parallel runners. 3 runs/day (6am/noon/6pm UTC) → ~135K cards/day → ~7 day backfill.
 
 on:
   schedule:
-    - cron: '0 6 * * *'    # 6am  UTC — run 1 of 2
-    - cron: '0 18 * * *'   # 6pm  UTC — run 2 of 2
+    - cron: '0 6 * * *'    # 6am  UTC — run 1 of 3
+    - cron: '0 12 * * *'   # noon UTC — run 2 of 3
+    - cron: '0 18 * * *'   # 6pm  UTC — run 3 of 3
   workflow_dispatch:
     inputs:
       sport:
@@ -63,37 +64,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # NFL — 3 shards (~124K cards each)
-          - sport: NFL
-            shard_index: 0
-            shard_count: 3
-          - sport: NFL
-            shard_index: 1
-            shard_count: 3
-          - sport: NFL
-            shard_index: 2
-            shard_count: 3
-          # NBA — 3 shards (~82K cards each)
-          - sport: NBA
-            shard_index: 0
-            shard_count: 3
-          - sport: NBA
-            shard_index: 1
-            shard_count: 3
-          - sport: NBA
-            shard_index: 2
-            shard_count: 3
-          # MLB — 2 shards
-          - sport: MLB
-            shard_index: 0
-            shard_count: 2
-          - sport: MLB
-            shard_index: 1
-            shard_count: 2
-          # NHL — 1 shard (89%+ miss rate on base cards; early bail keeps it fast)
-          - sport: NHL
-            shard_index: 0
-            shard_count: 1
+          # NFL — 5 shards (~74K cards each)
+          - { sport: NFL, shard_index: 0, shard_count: 5 }
+          - { sport: NFL, shard_index: 1, shard_count: 5 }
+          - { sport: NFL, shard_index: 2, shard_count: 5 }
+          - { sport: NFL, shard_index: 3, shard_count: 5 }
+          - { sport: NFL, shard_index: 4, shard_count: 5 }
+          # NBA — 4 shards (~61K cards each)
+          - { sport: NBA, shard_index: 0, shard_count: 4 }
+          - { sport: NBA, shard_index: 1, shard_count: 4 }
+          - { sport: NBA, shard_index: 2, shard_count: 4 }
+          - { sport: NBA, shard_index: 3, shard_count: 4 }
+          # MLB — 3 shards (~60K cards each)
+          - { sport: MLB, shard_index: 0, shard_count: 3 }
+          - { sport: MLB, shard_index: 1, shard_count: 3 }
+          - { sport: MLB, shard_index: 2, shard_count: 3 }
+          # NHL — skipped from base backfill (89%+ miss rate; revisit after other sports done)
 
     steps:
       - uses: actions/checkout@v4
