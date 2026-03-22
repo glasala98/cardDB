@@ -58,16 +58,19 @@ jobs:
               if sport in ('NFL', 'NBA', 'MLB'):
                   base_target[sport] = cnt_2015
 
-          # Priced counts — inner join (only hits priced rows, faster than LEFT JOIN)
+          # Priced counts — use EXISTS subquery to leverage mp index on card_catalog_id
           cur.execute("""
-              SELECT cc.sport,
-                     COUNT(*) FILTER (WHERE cc.year >= '2010') AS priced_2010,
-                     COUNT(*) FILTER (WHERE cc.year >= '2015') AS priced_2015
-              FROM market_prices mp
-              JOIN card_catalog cc ON cc.id = mp.card_catalog_id
-              WHERE mp.fair_value > 0
-                AND cc.scrape_tier = 'base'
-              GROUP BY cc.sport
+              SELECT sport,
+                     COUNT(*) FILTER (WHERE year >= '2010') AS priced_2010,
+                     COUNT(*) FILTER (WHERE year >= '2015') AS priced_2015
+              FROM card_catalog cc
+              WHERE scrape_tier = 'base'
+                AND EXISTS (
+                    SELECT 1 FROM market_prices mp
+                    WHERE mp.card_catalog_id = cc.id
+                      AND mp.fair_value > 0
+                )
+              GROUP BY sport
           """)
           base_priced_2010 = {}
           base_priced      = {}   # 2015+, NFL/NBA/MLB only
