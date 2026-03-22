@@ -34,7 +34,7 @@ jobs:
           ARGS="--threshold ${{ github.event.inputs.threshold || '3.0' }}"
           if [ "${{ github.event.inputs.ai || 'true' }}" = "true" ]; then ARGS="$ARGS --ai"; fi
           if [ "${{ github.event.inputs.dry_run || 'false' }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
-          python quarantine_outliers.py $ARGS
+          python scripts/quarantine_outliers.py $ARGS
         env:
           DATABASE_URL:        ${{ secrets.DATABASE_URL }}
           ANTHROPIC_API_KEY:   ${{ secrets.ANTHROPIC_API_KEY }}

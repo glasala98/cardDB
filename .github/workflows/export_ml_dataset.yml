@@ -31,7 +31,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          python export_ml_dataset.py \
+          python scripts/export_ml_dataset.py \
             --out /tmp/sales_ml.csv \
             --days ${{ github.event.inputs.days || '730' }} \
             --min-sales ${{ github.event.inputs.min_sales || '3' }}

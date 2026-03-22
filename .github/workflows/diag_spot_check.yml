@@ -13,6 +13,6 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install psycopg2-binary
-      - run: python diag_spot_check.py
+      - run: python diagnostics/diag_spot_check.py
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

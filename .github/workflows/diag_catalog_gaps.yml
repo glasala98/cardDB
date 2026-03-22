@@ -32,7 +32,7 @@ jobs:
 
       - name: Run diagnostic
         run: |
-          python diag_catalog_gaps.py \
+          python diagnostics/diag_catalog_gaps.py \
             --sport "${{ github.event.inputs.sport || 'ALL' }}" \
             --min-sales "${{ github.event.inputs.min_sales || '10' }}" \
             --limit "${{ github.event.inputs.limit || '100' }}"

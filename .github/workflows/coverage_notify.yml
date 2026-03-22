@@ -38,7 +38,7 @@ jobs:
 
       - name: Check coverage milestones
         id: check
-        run: python coverage_notify.py
+        run: python scripts/coverage_notify.py
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           FORCE_NOTIFY: ${{ github.event.inputs.force || 'false' }}

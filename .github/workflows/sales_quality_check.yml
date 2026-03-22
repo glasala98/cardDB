@@ -51,7 +51,7 @@ jobs:
             ARGS="$ARGS --sample $SAMPLE"
           fi
 
-          python analyze_sales_quality.py $ARGS
+          python diagnostics/analyze_sales_quality.py $ARGS
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 

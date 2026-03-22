@@ -17,6 +17,6 @@ jobs:
       - name: Install dependencies
         run: pip install psycopg2-binary
       - name: Backfill normalized fields
-        run: python -u backfill_normalized_fields.py
+        run: python -u scripts/backfill_normalized_fields.py
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
