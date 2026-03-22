@@ -126,7 +126,8 @@ jobs:
             --stale-days ${{ github.event.inputs.stale_days || '30' }} \
             --limit ${{ github.event.inputs.limit || '0' }} \
             --shard-index ${{ matrix.shard_index }} \
-            --shard-count ${{ matrix.shard_count }}
+            --shard-count ${{ matrix.shard_count }} \
+            --max-hours 5.75
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
