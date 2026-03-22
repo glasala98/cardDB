@@ -4,7 +4,9 @@ Tests the pure helper functions and CSV output structure.
 No database required.
 """
 import sys, os, csv, tempfile
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(_ROOT, "scripts"))
+sys.path.insert(0, _ROOT)  # db.py lives at root
 
 import pytest
 from unittest.mock import patch, MagicMock

@@ -4,7 +4,8 @@ Tests every grade company, serial/print-run patterns, and edge cases.
 No database or network access required.
 """
 import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(_ROOT, "scraping"))
 
 import pytest
 from auction_title_parser import parse_title, is_graded, _parse_serial_print
