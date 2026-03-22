@@ -15,7 +15,7 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -42,6 +42,7 @@ jobs:
           # ── DB queries (consolidated for speed) ───────────────────────────
           conn = psycopg2.connect(os.environ["DATABASE_URL"])
           cur  = conn.cursor()
+          cur.execute("SET statement_timeout = '120s'")
 
           # Single pass: catalog counts + priced counts per sport/tier/year
           cur.execute("""
@@ -77,13 +78,18 @@ jobs:
           cur.execute("SELECT COUNT(*) FROM market_prices WHERE fair_value IS NOT NULL AND fair_value > 0")
           total_priced = cur.fetchone()[0]
 
-          # Raw sales (pg_class estimate is instant; exact count on smaller distinct)
+          # Raw sales — use pg_class estimates (instant, avoids full seq scan)
           cur.execute("""
               SELECT reltuples::bigint FROM pg_class WHERE relname = 'market_raw_sales'
           """)
           sales_total = cur.fetchone()[0]
-          cur.execute("SELECT COUNT(DISTINCT card_catalog_id) FROM market_raw_sales")
-          sales_cards = cur.fetchone()[0]
+          # Distinct card count: approximate via pg_stats if available, else skip
+          cur.execute("""
+              SELECT n_distinct FROM pg_stats
+              WHERE tablename = 'market_raw_sales' AND attname = 'card_catalog_id'
+          """)
+          row = cur.fetchone()
+          sales_cards = int(abs(row[0])) if row and row[0] else 0
 
           # DB size
           cur.execute("SELECT pg_size_pretty(pg_database_size(current_database()))")
