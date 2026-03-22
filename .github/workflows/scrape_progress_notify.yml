@@ -39,10 +39,11 @@ jobs:
           # Milestones: (pct, label)
           MILESTONES = [(25, "25%"), (50, "50%"), (75, "75%"), (90, "90%"), (100, "100%")]
 
-          # ── DB queries (consolidated for speed) ───────────────────────────
+          # ── DB queries ────────────────────────────────────────────────────
           conn = psycopg2.connect(os.environ["DATABASE_URL"])
           cur  = conn.cursor()
-          # Catalog counts — no join, string year comparison avoids cast (index-friendly)
+
+          # Catalog counts — card_catalog only, no join needed
           cur.execute("""
               SELECT sport,
                      COUNT(*) FILTER (WHERE year >= '2010') AS cnt_2010,
@@ -58,18 +59,16 @@ jobs:
               if sport in ('NFL', 'NBA', 'MLB'):
                   base_target[sport] = cnt_2015
 
-          # Priced counts — use EXISTS subquery to leverage mp index on card_catalog_id
+          # Priced counts — market_prices directly (sport/tier/year denormalized)
+          # Falls back to JOIN if migration hasn't run yet
           cur.execute("""
               SELECT sport,
                      COUNT(*) FILTER (WHERE year >= '2010') AS priced_2010,
                      COUNT(*) FILTER (WHERE year >= '2015') AS priced_2015
-              FROM card_catalog cc
+              FROM market_prices
               WHERE scrape_tier = 'base'
-                AND EXISTS (
-                    SELECT 1 FROM market_prices mp
-                    WHERE mp.card_catalog_id = cc.id
-                      AND mp.fair_value > 0
-                )
+                AND fair_value > 0
+                AND sport IS NOT NULL
               GROUP BY sport
           """)
           base_priced_2010 = {}
