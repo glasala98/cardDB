@@ -10,8 +10,8 @@ name: Catalog Tier — Base (Daily during backfill)
 # Sharding: each sport is split across N parallel runners (each with a different
 # GH Actions IP → independent eBay rate limit). Shard counts:
 #   NFL: 3 shards (372K cards)   NBA: 3 shards (244K cards)
-#   MLB: 2 shards                NHL: 2 shards
-# = 10 parallel runners total (up from 4). Scale shard_count up to push faster.
+#   MLB: 2 shards                NHL: 1 shard (89%+ miss rate, early bail keeps it fast)
+# = 9 parallel runners total (up from 4). Scale shard_count up to push faster.
 
 on:
   schedule:
@@ -90,13 +90,10 @@ jobs:
           - sport: MLB
             shard_index: 1
             shard_count: 2
-          # NHL — 2 shards
+          # NHL — 1 shard (89%+ miss rate on base cards; early bail keeps it fast)
           - sport: NHL
             shard_index: 0
-            shard_count: 2
-          - sport: NHL
-            shard_index: 1
-            shard_count: 2
+            shard_count: 1
 
     steps:
       - uses: actions/checkout@v4
