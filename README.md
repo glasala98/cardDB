@@ -8,16 +8,25 @@
 
 ## What It Is
 
-CardDB is a free sports card market intelligence platform. **The data is the product.**
+CardDB is a free sports card market intelligence platform built on three pillars:
 
-800K+ cards with daily-updated eBay sold prices, graded values (PSA/BGS), and price history building over time — across NHL, NBA, NFL, and MLB. Free, when everything comparable costs money.
+**1. The Data** *(foundation — being built now)*
+800K+ cards with daily-updated eBay sold prices, graded values (PSA/BGS), and price history accumulating over time — across NHL, NBA, NFL, and MLB. The moat is time: anyone can build a scraper, nobody can go back and collect the data being collected right now.
 
-The website monetizes that data through three layers:
-1. **Price checker + catalog** — drives traffic, ad impressions
-2. **Portfolio tracker** — creates returning users
-3. **Public API** *(roadmap)* — developers, resellers, hobbyists
+**2. The Platform** *(live)*
+- Price checker + public catalog — drives traffic, ad impressions
+- Portfolio tracker — creates returning users
+- Grading ROI calculator — high-intent users
+- Public API *(roadmap)* — developers, resellers, hobbyists
 
-The moat is time. Anyone can build a scraper. Nobody can go back and collect the data being collected right now.
+**3. The AI Layer** *(live and expanding)*
+Claude is the intelligence layer on top of the dataset. Most card sites are data dumps. CardDB explains the data — in plain English, on demand, for free.
+- **Card Scanner** — photograph a card, Claude identifies player/year/set/parallel/grade/serial *(live)*
+- **Grading Advisor** — "should I grade this card?" Claude reads ROI data and gives a plain English verdict *(live)*
+- **Market Digest** — weekly plain English summary of what moved and why *(roadmap)*
+- **Price Alerts** — notify users when a tracked card moves >10% in 7 days *(roadmap)*
+- **Deal Finder** — surfaces cards with high grading upside at current raw prices *(roadmap)*
+- **Natural language portfolio queries** — "what are my most undervalued cards?" *(roadmap)*
 
 ---
 
@@ -25,13 +34,13 @@ The moat is time. Anyone can build a scraper. Nobody can go back and collect the
 
 | Competitor | Problem |
 |---|---|
-| 130point | Free but price-lookup only — no portfolio, no history, no API |
-| Card Ladder | Good data but paywalled ($15+/month) |
-| Beckett | Paywalled, slow to update, seen as out of touch |
+| 130point | Free but price-lookup only — no portfolio, no history, no AI, no API |
+| Card Ladder | Good data but paywalled ($15+/month), no AI features |
+| Beckett | Paywalled, slow to update, out of touch |
 | Market Movers | Subscription, hockey-heavy, limited sports |
 | Slabstox | Graded only, subscription |
 
-**What doesn't exist for free:** multi-sport, daily-updated prices + portfolio tracking + grading ROI + API in one place. That's CardDB.
+**What doesn't exist for free:** multi-sport daily prices + portfolio tracking + grading ROI + AI intelligence layer + API. That's CardDB.
 
 ---
 
@@ -43,7 +52,7 @@ The moat is time. Anyone can build a scraper. Nobody can go back and collect the
 | Backend | FastAPI (Python 3.11), psycopg2 ThreadedConnectionPool 1-10 |
 | Database | PostgreSQL (Railway Pro, 80GB volume) |
 | Scraping | Selenium + headless Chrome, curl_cffi |
-| AI | Anthropic Claude (card photo scanning) |
+| AI | Anthropic Claude (card scanning, grading advice, market digest, portfolio queries) |
 | Hosting | Railway Pro plan (~8GB RAM), Dockerfile, auto-deploy from `main` |
 | CI | GitHub Actions (all scraping — no local compute) |
 
@@ -97,7 +106,8 @@ cardDB/
 │       ├── master_db.py         # Grading lookup: CSV → graded_data → rookie_price_history
 │       ├── stats.py             # Portfolio history, GH Actions trigger, scrape status
 │       ├── admin.py             # User mgmt, scrape monitoring, outlier review
-│       └── scan.py              # Claude Vision card image analysis
+│       ├── scan.py              # Claude Vision card image analysis
+│       └── ai.py                # AI endpoints: grading advisor, market digest, deal finder
 ├── frontend/                    # Vite + React SPA
 │   └── src/
 │       ├── pages/               # Catalog, Ledger, Portfolio, Admin, Settings, ...
@@ -348,21 +358,41 @@ The Dockerfile:
 
 ## Roadmap
 
-### Now — Data foundation
-- Base tier backfill: ~800K cards being priced for the first time (~7 days to complete at current rate)
-- 12 parallel GH Actions runners, 3 runs/day, ~135K cards/day
-- Once done: daily runs drop to pure delta (~10 min/sport instead of 6 hours)
+### Now — Data Foundation *(active)*
+- Base tier backfill: ~800K cards, 12 parallel GH Actions runners, 3 runs/day (~135K cards/day)
+- Estimated completion: ~7 days from 2026-03-22
+- Once done: daily runs drop to pure delta — ~10 min/sport instead of 6 hours
+- NHL base tier revisit after NFL/NBA/MLB backfill completes (89%+ miss rate currently)
 
-### Next — Monetization
-- **SEO card pages** — server-renderable routes so Google indexes individual card prices → organic traffic → ad impressions
-- **Google AdSense** integration
-- **Price alerts** — email/in-app when a tracked card moves >10% in 7 days
-- **Sealed products public page** — data exists in `sealed_products`, just needs a public route
+### Next — Monetization + AI *(1–2 weeks)*
+- **Offsite DB backups** — weekly `pg_dump` to Cloudflare R2 (the dataset is the core asset — protect it first)
+- **Google AdSense** on public pages (`/catalog`, `/trending`, `/releases`, `/sets`)
+- **eBay affiliate links** — add tracking IDs to existing eBay listing links (easy revenue)
+- **Market Digest** — weekly Claude summary of biggest price movers per sport, stored in DB + delivered by email
+- **Price alerts** — notify users when a tracked card moves >10% in 7 days (uses `market_price_history` + email)
 
-### Later — Platform
-- **Public API** — versioned, rate-limited, documented. Free tier + potential paid tier.
-- **Offsite backups** — weekly `pg_dump` to Cloudflare R2 (the data is the product; protect it)
+### Soon — Platform *(1 month)*
+- **SEO card pages** — prerender or SSR public catalog pages so Google indexes individual card prices
+- **Deal Finder AI** — Claude surfaces cards with high grading upside at current raw prices
+- **NHL base tier** — revisit after other sports priced (drop year filter, full sweep)
+- **Guest → signup conversion** — clear CTAs when guests hit auth walls
+
+### Medium-term — Expansion *(2–3 months)*
+- **Multi-source pricing** — eBay is the foundation; adding more sources deepens and validates every price point
+  - **PWCC / Goldin / Heritage** — auction house sold data (high-end cards, PSA slabs)
+  - **Whatnot** — live auction sold data (growing fast, younger collectors)
+  - **COMC** — fixed-price marketplace, good for bulk base cards
+  - **StockX** (cards) — if data becomes accessible
+  - Each source: new scraper → dedup against `market_raw_sales` by listing_hash → same price pipeline
+  - Multi-source = better confidence scores, wider coverage, harder to replicate
+- **Public API v1** — versioned, rate-limited REST API. Free tier + paid tier (Stripe long-term)
+- **Natural language portfolio queries** — "what's my best performing card this month?" (Claude + user data)
 - **Vector search** — pgvector for fuzzy card name matching and entity resolution
-- **Multi-source pricing** — COMC, Goldin, Whatnot sold data alongside eBay
+
+### Long-term — Defensibility *(6+ months)*
+- 1 year of daily prices = dataset competitors cannot recreate retroactively
+- 2 years = genuine historical archive no free competitor has
+- Premium tier: ad-free + unlimited AI + higher API limits (Stripe)
+- Price history + portfolio tracking = user lock-in (their data lives here)
 
 See `docs/architecture.md` for the full system diagram and data flow details.

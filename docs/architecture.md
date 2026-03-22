@@ -48,6 +48,7 @@ The moat is time: anyone can build a scraper, but the price history dataset only
 │  /api/master-db   Young Guns analytics · grading ROI lookup  │
 │  /api/stats       Market alerts · workflow status · trigger  │
 │  /api/scan        Claude Vision card identification          │
+│  /api/ai          Grading advisor · market digest · deal finder│
 │  /api/admin       User CRUD · scrape monitoring (admin only) │
 │  /api/health      DB ping · "ok" or "degraded"               │
 │                                                              │
@@ -129,6 +130,7 @@ cardDB/
 │       ├── master_db.py        # Young Guns DB + grading ROI
 │       ├── stats.py            # Workflow status + scrape trigger
 │       ├── scan.py             # Claude Vision card identification
+│       ├── ai.py               # AI endpoints (grading advisor, market digest, deal finder)
 │       └── admin.py            # User management (admin only)
 │
 ├── frontend/                   # React 18 + Vite
@@ -346,63 +348,94 @@ The variant filter (`_apply_variant_filter`) excludes superset variants from res
 
 ## Roadmap
 
-### Now — Base Tier Backfill (~7 days from 2026-03-22)
+### Now — Base Tier Backfill *(active, ~7 days from 2026-03-22)*
 
-12 parallel GH Actions runners, 3 runs/day (6am/noon/6pm UTC), ~135K cards/day. Once all base-tier cards have a first price:
+12 parallel GH Actions runners, 3 runs/day (6am/noon/6pm UTC), ~135K cards/day.
+
+Once all base-tier cards have a first price:
 - Daily runs become pure delta — only stale cards re-scraped
-- Estimated runtime drops from 5.75h → ~10 min per sport per tier
-- All tier workflows can consolidate into one unified daily job
+- Runtime drops from 5.75h → ~10 min per sport per tier
+- NHL base tier revisit (currently 89%+ miss rate, paused during backfill)
 
-### Near-term — Monetization Foundation
+### Near-term — Monetization + AI *(1–2 weeks)*
 
-**SEO card pages**
-- Individual card pages need to be indexable by Google
-- Currently a React SPA — Google can crawl it but it's not optimal
-- Options: prerendering via react-snap, SSR via a lightweight Node layer, or static generation for high-value cards
-- Goal: `/catalog/12345` → Google indexes "Patrick Mahomes 2020 Prizm RC price" → organic traffic → ad impressions
-
-**Ad integration**
-- Google AdSense on public pages (Catalog, card detail, Trending, Releases)
-- Protected pages (My Cards, Portfolio) stay ad-free to preserve UX for returning users
-
-**Price alerts**
-- Email/in-app when a tracked card moves >10% in 7 days
-- Built on `market_price_history` delta queries + existing email infra (dawidd6/action-send-mail@v3)
-- Requires: user alert preferences table + scheduled check workflow
-
-**Sealed products public page**
-- Data already exists in `sealed_products` + `sealed_product_odds`, scraped monthly
-- Just needs a public React page + unauthenticated API endpoint
-
-### Medium-term — Platform
-
-**Public API**
-- Versioned, rate-limited REST API for card price data
-- Free tier with rate limits; potential paid tier for higher limits
-- FastAPI is already there — needs public endpoints, API key auth, and docs page
-- Developers, resellers, and hobbyists are the target users
-
-**Offsite database backups**
+**Offsite DB backups** *(highest priority — protect the moat)*
 - Weekly `pg_dump` to Cloudflare R2 via GitHub Actions (~$1/month)
-- The dataset is the core business asset — single Railway instance is a single point of failure
+- Single Railway instance is a single point of failure for the core asset
 - Must be tested with a restore before it counts
 
+**Ad integration**
+- Google AdSense on public pages: `/catalog`, `/trending`, `/releases`, `/sets`, card detail pages
+- Protected pages (My Cards, Portfolio) stay ad-free to preserve UX for returning users
+
+**eBay affiliate links**
+- Add eBay Partner Network tracking IDs to existing listing links — zero extra scraping required
+
+**Market Digest AI** (`POST /api/ai/market-digest`)
+- Weekly GitHub Actions cron queries `market_price_history` for biggest 7-day movers
+- One Claude call → 3-paragraph plain English summary per sport
+- Stored in DB, surfaced on a `/digest` page + optional email delivery
+
+**Price alerts**
+- Scheduled GH Actions checks `market_price_history` for >10% moves in 7 days
+- Queries users who track the card → sends email via existing dawidd6/action-send-mail@v3 infra
+- Requires: `user_alert_prefs` table migration
+
+### Soon — Platform *(1 month)*
+
+**SEO card pages**
+- Individual catalog pages need to be Google-indexable
+- Options: prerendering via react-snap, SSR layer, or static generation for high-value cards
+- Goal: `/catalog/12345` → Google indexes "Patrick Mahomes 2020 Prizm RC price" → organic traffic → ads
+
+**Deal Finder AI** (`POST /api/ai/deal-finder`)
+- Claude surfaces cards where raw price is anomalously low vs graded comps (high upside)
+- Data already in `market_prices.graded_data` — zero extra scraping
+
+**Guest → signup conversion**
+- Clear CTAs when guests hit auth walls in the catalog and card detail views
+
+### Medium-term — Multi-Source Pricing *(2–3 months)*
+
+eBay is the foundation. Adding more sold-data sources deepens every price point and widens coverage:
+
+| Source | Card type | Why |
+|---|---|---|
+| **PWCC** | PSA/BGS slabs, high-end | Largest auction house — sets market price for premium cards |
+| **Goldin** | PSA/BGS slabs, vintage | Key for vintage and graded comps |
+| **Heritage Auctions** | Vintage, sets | Completeness for pre-1980 cards |
+| **Whatnot** | Raw + slabs, all price points | Fastest-growing card marketplace — younger collectors |
+| **COMC** | Raw base cards | Fixed-price; great for bulk/base coverage |
+| **StockX** (cards) | Graded slabs | If data becomes accessible |
+
+**Integration pattern:**
+- New scraper per source → dedup against `market_raw_sales` via `listing_hash` → same price pipeline
+- `market_raw_sales.source` column (add via migration) tracks where each sale came from
+- Multi-source = better confidence scores, wider coverage, harder to replicate
+
+**Public API v1**
+- Versioned REST API: `GET /api/v1/cards/{id}/price`, `/history`
+- API key auth separate from user JWT
+- Free tier (100 req/day) + paid tier (Stripe, long-term)
+- Documentation page at `/docs/api`
+
+**Natural language portfolio queries** (`/api/ai/portfolio-query`)
+- Chat input on Portfolio page — "what's my best performing card this month?"
+- Claude answers from the authenticated user's ledger + price history data
+
 **Vector search**
-- `pgvector` extension on Railway PostgreSQL
-- Embed card names for fuzzy matching and entity resolution
-- Replaces manual `_apply_variant_filter` with semantic similarity
-- Requires: `CREATE EXTENSION IF NOT EXISTS vector` in schema.sql + Railway support verification
+- `pgvector` on Railway PostgreSQL for fuzzy card name matching and entity resolution
+- Would eventually replace the manual `_apply_variant_filter` logic
+- Requires: `CREATE EXTENSION IF NOT EXISTS vector` in schema.sql + Railway support check first
 
-**Multi-source pricing**
-- eBay is the primary and current only source
-- COMC, Goldin, Whatnot sold data would diversify and strengthen prices
-- Each new source requires a new scraper and deduplication logic against `market_raw_sales`
-
-### Long-term — Defensibility
+### Long-term — Defensibility *(6+ months)*
 
 The longer CardDB runs, the harder it is to replicate:
-- 1 year of daily prices = a dataset competitors cannot recreate retroactively
-- 2 years = a genuine historical archive no free competitor has
-- Price history + portfolio tracking = user lock-in (their data lives here)
+- 1 year of daily prices = dataset competitors cannot recreate retroactively
+- 2 years = genuine historical archive no free alternative has
+- Multi-source data = price validation no scraper-only site can match
+- Portfolio tracking + price history = user lock-in (their data lives here)
 
-**Volume resize:** At current growth (~340 MB/day filesystem), resize 80GB → 160GB planned for ~August 2026.
+**Premium tier:** ad-free + unlimited AI + higher API rate limits (Stripe billing)
+
+**Volume resize:** At current growth (~340 MB/day filesystem), 80GB → 160GB planned for ~August 2026.

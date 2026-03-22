@@ -5,6 +5,7 @@ import ConfidenceBadge from '../components/ConfidenceBadge'
 import TrendBadge from '../components/TrendBadge'
 import { getCardDetail, scrapeCard, updateCard, fetchImage } from '../api/cards'
 import { getGradingLookup } from '../api/masterDb'
+import { getGradingAdvice } from '../api/ai'
 import { useCurrency } from '../context/CurrencyContext'
 import pageStyles from './Page.module.css'
 import styles from './CardInspect.module.css'
@@ -23,6 +24,11 @@ export default function CardInspect() {
   const GRADING_COSTS = { psa: 35, bgs: 18, tag: 20 }
   const [gradingData,   setGradingData]   = useState(null)
   const [gradingResult, setGradingResult] = useState(null)
+
+  // AI grading advice
+  const [aiAdvice,    setAiAdvice]    = useState(null)
+  const [aiLoading,   setAiLoading]   = useState(false)
+  const [aiError,     setAiError]     = useState(null)
 
   // Price override (for "not found" cards)
   const [overrideVal,     setOverrideVal]     = useState('')
@@ -379,6 +385,45 @@ export default function CardInspect() {
               )
               return null
             })()}
+
+            {/* AI Grading Advisor */}
+            <div className={styles.aiAdvisorRow}>
+              <button
+                className={styles.aiBtn}
+                disabled={aiLoading}
+                onClick={async () => {
+                  setAiAdvice(null)
+                  setAiError(null)
+                  setAiLoading(true)
+                  try {
+                    const res = await getGradingAdvice({
+                      card_name: name,
+                      raw_value: gradingResult.raw,
+                      psa9:  gradingResult.psa.gr9.price  || null,
+                      psa10: gradingResult.psa.gr10.price || null,
+                      bgs95: gradingResult.bgs.gr95.price || null,
+                      bgs10: gradingResult.bgs.gr10.price || null,
+                      psa_fee: gradingResult.psa.fee,
+                      bgs_fee: gradingResult.bgs.fee,
+                    })
+                    setAiAdvice(res.advice)
+                  } catch (e) {
+                    setAiError(e.message || 'AI advice unavailable')
+                  } finally {
+                    setAiLoading(false)
+                  }
+                }}
+              >
+                {aiLoading ? '⟳ Thinking…' : '✦ Ask AI Grading Advisor'}
+              </button>
+            </div>
+            {aiError && <p className={styles.aiError}>{aiError}</p>}
+            {aiAdvice && (
+              <div className={styles.aiAdvice}>
+                <span className={styles.aiLabel}>AI Grading Advisor</span>
+                <p className={styles.aiText}>{aiAdvice}</p>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -79,7 +79,7 @@ class RateLimitMiddleware:
         bucket.append(now)
         await self.app(scope, receive, send)
 
-from api.routers import cards, master_db, stats, auth, scan, admin, catalog, collection, search
+from api.routers import cards, master_db, stats, auth, scan, admin, catalog, collection, search, ai
 from db import get_db
 
 app = FastAPI(title="Card Dashboard API", version="0.1.0")
@@ -109,6 +109,7 @@ app.include_router(admin.router,     prefix="/api/admin",     tags=["admin"])
 app.include_router(catalog.router,     prefix="/api/catalog",     tags=["catalog"])
 app.include_router(collection.router,  prefix="/api/collection",  tags=["collection"])
 app.include_router(search.router,      prefix="/api/search",      tags=["search"])
+app.include_router(ai.router,          prefix="/api/ai",           tags=["ai"])
 
 
 @app.get("/api/health")

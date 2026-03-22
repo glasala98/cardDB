@@ -364,6 +364,58 @@
 .roiMarginal { color: #f0b429; }
 .roiNotWorth { color: var(--danger); }
 
+/* ── AI Grading Advisor ──────────────────────────────────────── */
+.aiAdvisorRow {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.aiBtn {
+  background: linear-gradient(135deg, #6c47ff 0%, #a259ff 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.aiBtn:hover    { opacity: 0.88; }
+.aiBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.aiAdvice {
+  margin: 0 16px 14px;
+  padding: 14px 16px;
+  background: rgba(108, 71, 255, 0.08);
+  border: 1px solid rgba(108, 71, 255, 0.25);
+  border-radius: 10px;
+}
+
+.aiLabel {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #a259ff;
+  margin-bottom: 8px;
+}
+
+.aiText {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.aiError {
+  font-size: 12px;
+  color: var(--danger);
+  padding: 0 16px 12px;
+}
+
 /* ── Toast ───────────────────────────────────────────────────── */
 .toast {
   position: fixed;
