@@ -9,7 +9,7 @@
 
 | Item | Notes |
 |---|---|
-| **Base-tier backfill** | NFL/NBA/MLB 2015+ in progress. ~135K cards/day, ~7 days from 2026-03-22 |
+| **Base-tier backfill** | NFL/NBA/MLB 2015+ in progress. ~135K/day target, ETA ~Apr 15. Progress email fires daily at noon + on milestone cross |
 | **market_raw_sales backfill** | `backfill_all_tiers.yml` running daily — capturing full eBay history |
 
 ---
@@ -17,9 +17,9 @@
 ## P1 — Do Next
 
 ### Data / Infra
-- [ ] **Offsite DB backups** — weekly `pg_dump` to Cloudflare R2 via GitHub Actions; test restore before it counts
-- [ ] **eBay affiliate links** — add Partner Network tracking IDs to existing listing links (zero extra scraping)
+- [ ] **Offsite DB backups** — weekly `pg_dump` to Cloudflare R2 via GitHub Actions; test restore before it counts ⚠️ highest priority — 1.7M raw sales rows can't be re-scraped
 - [ ] **Connection retry resilience** — `assign_catalog_tiers.py` + `scrape_nhl_stats.py` crash on `server closed the connection unexpectedly`; add reconnect in `db.py`
+- [ ] **eBay affiliate links** — add Partner Network tracking IDs to existing listing links (zero extra scraping)
 
 ### Frontend / UX
 - [ ] **Mobile catalog layout** — card catalog needs responsive column collapse; live but broken on mobile
@@ -41,7 +41,7 @@
 - [ ] **Guest → signup conversion** — clear CTAs when guests hit auth walls
 
 ### Data / Backend
-- [ ] **Raw sales analytics API** — expose `market_raw_sales` in endpoints: per-card volume, price trend (880K+ rows underutilised)
+- [ ] **Raw sales analytics API** — expose `market_raw_sales` in endpoints: per-card volume, price trend (1.7M+ rows underutilised)
 - [ ] **Sealed products public page** — data ready in `sealed_products` + `sealed_product_odds`; needs a public page
 - [ ] **master_db_daily sport filter** — when triggered with `sport=NHL`, NBA/NFL/MLB jobs queue as skipped; should not start
 
@@ -57,10 +57,11 @@
 
 ---
 
-## Post-Backfill (do when base tier hits ~100%)
+## Post-Backfill (do when base tier hits ~100%, ~Apr 15)
 
 - [ ] Consolidate tier workflows — merge staple/premium/stars/base into one unified daily job
 - [ ] Tighten stale-days — premium 7→3 days, stars 30→7 days for fresher prices
 - [ ] Return premium/stars to weekly schedule; base stays daily at stale-days 30
 - [ ] Disable/throttle `backfill_all_tiers.yml` — weekly once raw sales fully populated
+- [ ] Switch progress notify to monthly-only after backfill complete
 - [ ] NHL base tier full sweep — drop year filter from 2015 to 2010, run full pass
