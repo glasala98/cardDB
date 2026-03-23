@@ -36,7 +36,7 @@ def _send_email(subject: str, body: str):
     print(f"[progress_report] email sent: {subject}")
 
 
-def run():
+def run(force: bool = False):
     try:
         conn = psycopg2.connect(os.environ["DATABASE_URL"])
         cur  = conn.cursor()
@@ -125,7 +125,7 @@ DB size:         {db_size}
             subject = f"🎯 CardDB — {ms_label} base tier reached! | ETA {eta_str}"
             break
 
-    if is_first_hour or is_noon or milestone_crossed:
+    if force or is_first_hour or is_noon or milestone_crossed:
         _send_email(subject, body)
     else:
         print(f"[progress_report] skipping send (not first hour/noon/milestone) — {base_pct:.1f}% priced")

@@ -11,6 +11,7 @@ from typing import Optional
 
 from db import get_db
 from api.routers.auth import get_current_user
+from scripts.progress_report import run as _progress_run
 
 GITHUB_OWNER = "glasala98"
 GITHUB_REPO  = "cardDB"
@@ -1072,3 +1073,13 @@ def bulk_ignore_outliers(
             count = cur.rowcount
         conn.commit()
     return {"ignored": count}
+
+
+@router.post("/send-progress-email")
+def send_progress_email(_admin: str = Depends(_require_admin)):
+    """Force-send a progress report email immediately via Railway SMTP."""
+    try:
+        _progress_run(force=True)
+        return {"sent": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
