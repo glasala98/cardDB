@@ -74,15 +74,17 @@ Current settings (base scrape): `max-parallel: 8` × `pool-max: 5` = **40 connec
 
 ## Backfill Timeline (as of 2026-03-23)
 
+First clean run: **Mar 23, 2026** (Mar 22 lost to DB crashes and debug runs)
+
 | Milestone | Target date | Cards needed | Status |
 |---|---|---|---|
-| 25% base priced | ~Mar 31 | 385,882 | in progress |
-| 50% base priced | ~Apr 10 | 771,765 | — |
-| 75% base priced | ~Apr 20 | 1,157,647 | — |
-| 100% base priced | ~Apr 30 | 1,543,529 | — |
+| 25% base priced | ~Mar 24 | 385,882 | in progress |
+| 50% base priced | ~Mar 26 | 771,765 | — |
+| 75% base priced | ~Mar 28 | 1,157,647 | — |
+| 100% base priced | ~Mar 30 | 1,543,529 | — |
 
 **Base tier target:** NFL 479,793 · NBA 298,550 · MLB 765,186 (2015+)
-**Rate:** 135,000 cards/day target · ETA ~Apr 30, 2026
+**Rate:** 270,000 cards/day target (24 shards × 4 runs) · ETA ~Mar 28–30, 2026
 
 ---
 

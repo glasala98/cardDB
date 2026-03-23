@@ -11,8 +11,8 @@ import psycopg2
 from datetime import datetime, timezone, date, timedelta
 from email.mime.text import MIMEText
 
-BACKFILL_START = date(2026, 3, 22)
-TARGET_DAILY   = 270_000   # updated: 24 shards × 4 runs
+BACKFILL_START = date(2026, 3, 23)   # first clean run (Mar 22 was crashes/debug only)
+TARGET_DAILY   = 270_000             # 24 shards × 4 runs/day
 MILESTONES     = [(25, "25%"), (50, "50%"), (75, "75%"), (90, "90%"), (100, "100%")]
 
 BASE_TARGET = {"NFL": 479_793, "NBA": 298_550, "MLB": 765_186}

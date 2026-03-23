@@ -34,8 +34,8 @@ jobs:
           from datetime import datetime, timezone, date, timedelta
 
           # ── Timeline constants ─────────────────────────────────────────────
-          BACKFILL_START   = date(2026, 3, 22)   # first clean run date
-          TARGET_DAILY     = 135_000             # cards/day at full capacity
+          BACKFILL_START   = date(2026, 3, 23)   # first clean run (Mar 22 was crashes/debug)
+          TARGET_DAILY     = 270_000             # 24 shards × 4 runs/day
           MILESTONES = [(25, "25%"), (50, "50%"), (75, "75%"), (90, "90%"), (100, "100%")]
 
           # Hardcoded catalog targets (base tier 2015+) — updated 2026-03-22
