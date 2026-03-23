@@ -51,6 +51,7 @@ jobs:
     timeout-minutes: 360
     strategy:
       fail-fast: false
+      max-parallel: 8
       matrix:
         include:
           # NFL — 10 shards (~48K cards each)
@@ -122,7 +123,7 @@ jobs:
           python -u scraping/scrape_master_db.py \
             --catalog-tier base \
             --sport ${{ matrix.sport }} \
-            --workers 8 \
+            --workers 4 \
             --year-from ${{ github.event.inputs.year_from || '2015' }} \
             --stale-days ${{ github.event.inputs.stale_days || '30' }} \
             --limit ${{ github.event.inputs.limit || '0' }} \
