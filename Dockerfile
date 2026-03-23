@@ -29,4 +29,6 @@ EXPOSE 8000
 #   migrate_fix_raw_sales_constraint — UPDATE market_raw_sales full table scan + ADD CONSTRAINT
 #   migrate_clean_raw_sales_titles   — UPDATE market_raw_sales LIKE scan
 #   migrate_clean_boilerplate_titles — DELETE market_raw_sales ILIKE scan
-CMD ["sh", "-c", "python migrations/migrate_add_perf_indexes.py && python migrations/migrate_add_sealed_products.py && python migrations/migrate_add_scrape_error_log.py && python migrations/migrate_add_cards_processed.py && python migrations/migrate_add_market_prices_status.py && python migrations/migrate_add_market_raw_sales.py && python migrations/migrate_fix_market_raw_sales.py && python migrations/migrate_add_raw_sales_indexes.py && python migrations/migrate_add_auction_source.py && python migrations/migrate_add_auction_unmatched.py && python migrations/migrate_normalize_raw_sales.py && python migrations/migrate_add_search_indexes.py && python migrations/migrate_add_search_log.py && python migrations/migrate_add_market_prices_sport.py && uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Schema is fully applied — migrations skipped to unblock startup.
+# Re-add new migrations here only when adding new columns/tables.
+CMD ["sh", "-c", "uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
