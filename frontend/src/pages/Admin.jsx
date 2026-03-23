@@ -9,7 +9,7 @@ import {
   getScrapeRuns, getScrapeRunsSummary, getDataQuality, getSnapshotAudit,
   getScrapeRunErrors,
   getSealedProductsAdmin, updateSealedProduct, getSealedQuality, deleteSealedMismatches,
-  triggerWorkflow, bulkIgnoreOutliers, getPricingProgress,
+  triggerWorkflow, bulkIgnoreOutliers, getPricingProgress, sendProgressEmail,
 } from '../api/admin'
 import { useAuth } from '../context/AuthContext'
 import pageStyles from './Page.module.css'
@@ -634,6 +634,7 @@ function PipelineTab() {
   const [error,       setError]       = useState(null)
   const [triggering,  setTriggering]  = useState(null)  // workflow file currently being triggered
   const [triggerMsg,  setTriggerMsg]  = useState(null)  // success/error message
+  const [emailSending, setEmailSending] = useState(false)
 
   const load = useCallback((isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
@@ -656,6 +657,19 @@ function PipelineTab() {
     const id = setInterval(() => load(true), 30000)
     return () => clearInterval(id)
   }, [workflows, load])
+
+  const handleSendEmail = async () => {
+    setEmailSending(true)
+    setTriggerMsg(null)
+    try {
+      await sendProgressEmail()
+      setTriggerMsg({ type: 'success', text: 'Progress email sent! Check your inbox.' })
+    } catch (e) {
+      setTriggerMsg({ type: 'error', text: `Email failed: ${e.message}` })
+    } finally {
+      setEmailSending(false)
+    }
+  }
 
   const handleTrigger = async (wf) => {
     if (!confirm(`Trigger "${wf.name}"?\nThis will start a new GitHub Actions run.`)) return
@@ -692,6 +706,9 @@ function PipelineTab() {
         </div>
         <button className={styles.refreshBtn} onClick={() => load(true)} disabled={refreshing}>
           {refreshing ? '↻' : '↻'} Refresh
+        </button>
+        <button className={styles.refreshBtn} onClick={handleSendEmail} disabled={emailSending} title="Force-send a progress report email now via Railway">
+          {emailSending ? 'Sending…' : '✉ Email Report'}
         </button>
       </div>
 

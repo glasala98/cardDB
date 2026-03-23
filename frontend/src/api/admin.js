@@ -26,3 +26,4 @@ export const deleteSealedMismatches  = ()             => client.delete('/admin/s
 export const triggerWorkflow    = (workflowFile, inputs = {}) => client.post('/admin/trigger-workflow', { workflow_file: workflowFile, inputs })
 export const bulkIgnoreOutliers = (ids)                       => client.post('/admin/outliers/bulk-ignore', { ids })
 export const getPricingProgress = ()                          => client.get('/admin/pricing-progress')
+export const sendProgressEmail  = ()                          => client.post('/admin/send-progress-email')
