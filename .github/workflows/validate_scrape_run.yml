@@ -1,6 +1,6 @@
 name: Validate Scrape Run
 
-# Fires after catalog_tier_base completes, or manually.
+# Fires after catalog_tier_base completes, or run manually via workflow_dispatch.
 # Checks that shards actually wrote data — not just that they ran.
 
 on:
