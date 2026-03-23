@@ -7,6 +7,12 @@ Format: `### [date] — description`
 
 ## 2026-03-23
 
+### Scrape validation workflow added
+- `validate_scrape_run.yml` fires automatically after every base tier run
+- Checks new prices written in last 7h by sport (NFL/NBA/MLB)
+- Fails + emails alert if any sport wrote 0 or <1K prices
+- Also runnable manually with configurable window
+
 ### Scraping throughput doubled — 24 shards, 4 runs/day, 8 workers
 - NFL: 5→10 shards, NBA: 4→8, MLB: 3→6 = 24 parallel runners (was 12)
 - Added midnight UTC run — now 4 runs/day (was 3)
