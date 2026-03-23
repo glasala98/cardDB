@@ -34,7 +34,7 @@ jobs:
           from datetime import datetime, timezone, date, timedelta
 
           # ── Timeline constants ─────────────────────────────────────────────
-          BACKFILL_START   = date(2026, 3, 23)   # first clean run (Mar 22 was crashes/debug)
+          BACKFILL_START   = date(2026, 3, 24)   # Day 1 = first full clean day
           TARGET_DAILY     = 270_000             # 24 shards × 4 runs/day
           MILESTONES = [(25, "25%"), (50, "50%"), (75, "75%"), (90, "90%"), (100, "100%")]
 

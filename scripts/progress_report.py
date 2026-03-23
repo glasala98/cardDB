@@ -11,7 +11,7 @@ import psycopg2
 from datetime import datetime, timezone, date, timedelta
 from email.mime.text import MIMEText
 
-BACKFILL_START = date(2026, 3, 23)   # first clean run (Mar 22 was crashes/debug only)
+BACKFILL_START = date(2026, 3, 24)   # Day 1 = first full clean day (Mar 23 evening was setup)
 TARGET_DAILY   = 270_000             # 24 shards × 4 runs/day
 MILESTONES     = [(25, "25%"), (50, "50%"), (75, "75%"), (90, "90%"), (100, "100%")]
 
@@ -57,15 +57,11 @@ def run(force: bool = False):
     total_base_priced = int(total_priced * base_share)
 
     today        = date.today()
-    now_utc      = datetime.now(timezone.utc)
-    # Use fractional days (hours elapsed) so pace is fair on day 1
-    start_dt     = datetime(BACKFILL_START.year, BACKFILL_START.month, BACKFILL_START.day, tzinfo=timezone.utc)
-    hours_elapsed = max((now_utc - start_dt).total_seconds() / 3600, 1)
-    days_elapsed  = max((today - BACKFILL_START).days, 1)
-    actual_daily  = total_base_priced / (hours_elapsed / 24)
-    remaining     = TOTAL_BASE_TARGET - total_base_priced
-    expected      = min(TOTAL_BASE_TARGET, hours_elapsed / 24 * TARGET_DAILY)
-    delta         = total_base_priced - expected
+    days_elapsed = max((today - BACKFILL_START).days, 1)
+    actual_daily = total_base_priced / days_elapsed
+    remaining    = TOTAL_BASE_TARGET - total_base_priced
+    expected     = min(TOTAL_BASE_TARGET, days_elapsed * TARGET_DAILY)
+    delta        = total_base_priced - expected
     delta_pct    = delta / TOTAL_BASE_TARGET * 100
     base_pct     = total_base_priced / TOTAL_BASE_TARGET * 100
     overall_pct  = total_priced / max(total_catalog, 1) * 100
@@ -76,7 +72,7 @@ def run(force: bool = False):
         eta_str = "unknown"
 
     pace_emoji = "✅" if delta >= 0 else "⚠️"
-    pace_label = f"{'+' if delta >= 0 else ''}{delta:,} {'ahead' if delta >= 0 else 'behind'} of schedule ({delta_pct:+.1f}%)"
+    pace_label = f"{'+' if delta >= 0 else ''}{int(delta):,} {'ahead' if delta >= 0 else 'behind'} of schedule ({delta_pct:+.1f}%)"
 
     # Milestone table
     ms_lines = ["Milestone schedule (NFL/NBA/MLB 2015+):",
@@ -103,7 +99,7 @@ PACE  {pace_emoji}  {pace_label}
 
 ACTIVE BACKFILL — Base tier NFL/NBA/MLB 2015+
   Total priced: {total_base_priced:,} / {TOTAL_BASE_TARGET:,}  ({base_pct:.1f}%)
-  Hour {int(hours_elapsed):.0f} of backfill — expected {expected:,.0f} by now
+  Day {days_elapsed} of backfill — expected {int(expected):,} by now
 
 {chr(10).join(ms_lines)}
 
