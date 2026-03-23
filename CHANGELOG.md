@@ -7,6 +7,12 @@ Format: `### [date] — description`
 
 ## 2026-03-23
 
+### Scraping throughput doubled — 24 shards, 4 runs/day, 8 workers
+- NFL: 5→10 shards, NBA: 4→8, MLB: 3→6 = 24 parallel runners (was 12)
+- Added midnight UTC run — now 4 runs/day (was 3)
+- Increased `--workers` 5→8 per runner
+- Combined effect: ~270K cards/day (was ~135K), ETA ~Apr 15 (was ~Apr 30)
+
 ### Progress email fixed — hardcoded catalog targets, pg_class-only queries
 - Removed all slow `COUNT(*)` queries from the hourly progress email
 - Catalog targets hardcoded (NFL 479,793 / NBA 298,550 / MLB 765,186) — stable between set releases
