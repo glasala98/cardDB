@@ -15,7 +15,7 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
@@ -36,31 +36,19 @@ jobs:
           # ── Timeline constants ─────────────────────────────────────────────
           BACKFILL_START   = date(2026, 3, 22)   # first clean run date
           TARGET_DAILY     = 135_000             # cards/day at full capacity
-          # Milestones: (pct, label)
           MILESTONES = [(25, "25%"), (50, "50%"), (75, "75%"), (90, "90%"), (100, "100%")]
 
-          # ── DB queries ────────────────────────────────────────────────────
+          # Hardcoded catalog targets (base tier 2015+) — updated 2026-03-22
+          # These change only when new sets are added (monthly), not during backfill
+          base_target     = {"NFL": 479_793, "NBA": 298_550, "MLB": 765_186}
+          base_total_2010 = {"NFL": 479_793, "NBA": 298_550, "MLB": 765_186, "NHL": 282_400}
+
+          # ── DB queries — all instant (pg_class or indexed single-table) ───
           conn = psycopg2.connect(os.environ["DATABASE_URL"])
           cur  = conn.cursor()
 
-          # Catalog counts — card_catalog only, no join needed
-          cur.execute("""
-              SELECT sport,
-                     COUNT(*) FILTER (WHERE year >= '2010') AS cnt_2010,
-                     COUNT(*) FILTER (WHERE year >= '2015') AS cnt_2015
-              FROM card_catalog
-              WHERE scrape_tier = 'base'
-              GROUP BY sport
-          """)
-          base_total_2010 = {}
-          base_target     = {}   # 2015+, NFL/NBA/MLB only
-          for sport, cnt_2010, cnt_2015 in cur.fetchall():
-              base_total_2010[sport] = cnt_2010
-              if sport in ('NFL', 'NBA', 'MLB'):
-                  base_target[sport] = cnt_2015
-
-          # Priced counts — market_prices directly (sport/tier/year denormalized)
-          # Falls back to JOIN if migration hasn't run yet
+          # Priced counts per sport — uses denormalized sport col (instant after backfill)
+          # Returns 0 rows until backfill_market_prices_sport.yml completes
           cur.execute("""
               SELECT sport,
                      COUNT(*) FILTER (WHERE year >= '2010') AS priced_2010,
@@ -72,7 +60,7 @@ jobs:
               GROUP BY sport
           """)
           base_priced_2010 = {}
-          base_priced      = {}   # 2015+, NFL/NBA/MLB only
+          base_priced      = {}
           for sport, p_2010, p_2015 in cur.fetchall():
               base_priced_2010[sport] = p_2010
               if sport in ('NFL', 'NBA', 'MLB'):
@@ -81,32 +69,17 @@ jobs:
           total_base_target = sum(base_target.values())
           total_base_priced = sum(base_priced.values())
 
-          # Overall totals — pg_class estimates (instant)
+          # Overall totals + raw sales — pg_class estimates (instant)
           cur.execute("""
-              SELECT reltuples::bigint FROM pg_class WHERE relname = 'card_catalog'
+              SELECT
+                (SELECT reltuples::bigint FROM pg_class WHERE relname = 'card_catalog'),
+                (SELECT reltuples::bigint FROM pg_class WHERE relname = 'market_prices'),
+                (SELECT reltuples::bigint FROM pg_class WHERE relname = 'market_raw_sales'),
+                (SELECT n_distinct FROM pg_stats WHERE tablename = 'market_raw_sales' AND attname = 'card_catalog_id'),
+                pg_size_pretty(pg_database_size(current_database()))
           """)
-          total_catalog = cur.fetchone()[0]
-          cur.execute("""
-              SELECT reltuples::bigint FROM pg_class WHERE relname = 'market_prices'
-          """)
-          total_priced = cur.fetchone()[0]
-
-          # Raw sales — use pg_class estimates (instant, avoids full seq scan)
-          cur.execute("""
-              SELECT reltuples::bigint FROM pg_class WHERE relname = 'market_raw_sales'
-          """)
-          sales_total = cur.fetchone()[0]
-          # Distinct card count: approximate via pg_stats if available, else skip
-          cur.execute("""
-              SELECT n_distinct FROM pg_stats
-              WHERE tablename = 'market_raw_sales' AND attname = 'card_catalog_id'
-          """)
-          row = cur.fetchone()
-          sales_cards = int(abs(row[0])) if row and row[0] else 0
-
-          # DB size
-          cur.execute("SELECT pg_size_pretty(pg_database_size(current_database()))")
-          db_size = cur.fetchone()[0]
+          total_catalog, total_priced, sales_total, nd, db_size = cur.fetchone()
+          sales_cards = int(abs(nd)) if nd else 0
 
           cur.close(); conn.close()
 
