@@ -5,6 +5,7 @@ environment.  Import ``get_db`` as a context manager that yields a
 connection, commits on clean exit, and rolls back on exception.
 """
 import os
+import time
 import psycopg2
 import psycopg2.pool
 import psycopg2.extras
@@ -13,6 +14,8 @@ from datetime import datetime
 import hashlib
 
 _pool = None
+_DB_RETRIES = 3
+_DB_RETRY_DELAY = 5  # seconds between retries
 
 
 def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
@@ -22,31 +25,55 @@ def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
     return _pool
 
 
+def _reset_pool():
+    """Close the pool and force a fresh one on next use."""
+    global _pool
+    try:
+        if _pool:
+            _pool.closeall()
+    except Exception:
+        pass
+    _pool = None
+
+
 @contextmanager
 def get_db():
     """Yield a psycopg2 connection from the pool.
 
-    Commits on clean exit, rolls back on exception, always returns the
-    connection to the pool.  Example::
-
-        from db import get_db
-        from psycopg2.extras import RealDictCursor
-
-        with get_db() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("SELECT * FROM cards WHERE user_id = %s", (username,))
-                rows = cur.fetchall()
+    Retries up to _DB_RETRIES times on SSL/connection errors — handles
+    'SSL SYSCALL error: EOF detected' and 'connection already closed'
+    which occur when the DB drops idle connections under heavy load.
     """
-    pool = _get_pool()
-    conn = pool.getconn()
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        pool.putconn(conn)
+    last_err = None
+    for attempt in range(_DB_RETRIES):
+        try:
+            pool = _get_pool()
+            conn = pool.getconn()
+            # Verify connection is alive before handing it out
+            if conn.closed:
+                pool.putconn(conn, close=True)
+                raise psycopg2.OperationalError("connection is closed")
+            try:
+                yield conn
+                conn.commit()
+                return
+            except Exception:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                raise
+            finally:
+                try:
+                    pool.putconn(conn)
+                except Exception:
+                    pass
+        except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+            last_err = e
+            print(f"[db] connection error (attempt {attempt + 1}/{_DB_RETRIES}): {e} — retrying in {_DB_RETRY_DELAY}s")
+            _reset_pool()
+            time.sleep(_DB_RETRY_DELAY)
+    raise last_err
 
 
 def _sale_hash(card_catalog_id: int, sold_date, title: str) -> str:
