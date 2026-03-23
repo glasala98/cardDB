@@ -21,7 +21,7 @@ _DB_RETRY_DELAY = 5  # seconds between retries
 def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
     global _pool
     if _pool is None:
-        _pool = psycopg2.pool.ThreadedConnectionPool(1, 10, os.environ["DATABASE_URL"])
+        _pool = psycopg2.pool.ThreadedConnectionPool(1, 5, os.environ["DATABASE_URL"])
     return _pool
 
 
@@ -129,6 +129,11 @@ def save_raw_sales(card_catalog_id: int, raw_sales: list, conn=None,
         price_val = float(price_val)
         sold_date = sale.get('sold_date')       # 'YYYY-MM-DD' string or None
         title = (sale.get('title') or '')[:500]
+
+        # Skip eBay boilerplate scraping artifacts
+        _tl = title.lower()
+        if 'opens in a new window' in _tl or 'new window or tab' in _tl:
+            continue
 
         # Shipping — "$3.50" string or numeric float
         raw_ship = sale.get('shipping', 0)
