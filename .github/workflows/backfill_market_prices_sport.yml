@@ -9,7 +9,7 @@ on:
 jobs:
   backfill:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
 
@@ -30,7 +30,7 @@ jobs:
           cur = conn.cursor()
 
           # Batch update to avoid lock timeout
-          batch = 10_000
+          batch = 50_000
           total = 0
           while True:
               cur.execute("""
