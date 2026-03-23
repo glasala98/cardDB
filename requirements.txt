@@ -28,3 +28,4 @@ psycopg2-binary>=2.9
 # Testing
 pytest>=7.4
 httpx>=0.25
+apscheduler>=3.10
