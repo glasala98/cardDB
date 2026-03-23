@@ -230,14 +230,9 @@ def load_cards(args) -> list:
                cc.variant, cc.print_run, cc.is_rookie, cc.search_query,
                cc.scrape_tier,
                {select_extra},
-               mrs_max.last_sale_date
+               NULL::text AS last_sale_date
         FROM card_catalog cc
         {join_clause}
-        LEFT JOIN (
-            SELECT card_catalog_id, MAX(sold_date)::text AS last_sale_date
-            FROM market_raw_sales
-            GROUP BY card_catalog_id
-        ) mrs_max ON mrs_max.card_catalog_id = cc.id
         WHERE {where}
         ORDER BY {order_clause}
         {limit_clause}
