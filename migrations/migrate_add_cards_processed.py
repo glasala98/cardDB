@@ -4,7 +4,8 @@ This column tracks how many cards have been processed (attempted) so far
 during a live scrape run, updated every 50-card batch. Enables real-time
 progress bars in the Admin dashboard without waiting for finish_scrape_run.
 """
-import sys
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db import get_db
 
 def main():

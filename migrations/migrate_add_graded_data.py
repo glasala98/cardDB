@@ -57,9 +57,9 @@ def main():
     cur.execute("""
         UPDATE market_prices
         SET graded_data = rph.graded_data
-        FROM rookie_price_history rph
-        JOIN card_catalog cc ON cc.id = market_prices.card_catalog_id
-        WHERE rph.graded_data != '{}'
+        FROM rookie_price_history rph, card_catalog cc
+        WHERE cc.id = market_prices.card_catalog_id
+          AND rph.graded_data != '{}'
           AND rph.player ILIKE cc.player_name
           AND market_prices.graded_data = '{}'
           AND rph.date = (
