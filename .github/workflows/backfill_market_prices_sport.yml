@@ -1,0 +1,56 @@
+name: Backfill market_prices sport/tier/year
+
+# One-time backfill: populate sport/scrape_tier/year columns in market_prices
+# from card_catalog. Run manually after migrate_add_market_prices_sport deploys.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install psycopg2-binary
+
+      - name: Run backfill
+        run: |
+          python - <<'EOF'
+          import os, psycopg2
+
+          conn = psycopg2.connect(os.environ["DATABASE_URL"])
+          conn.autocommit = True
+          cur = conn.cursor()
+
+          # Batch update to avoid lock timeout
+          batch = 10_000
+          total = 0
+          while True:
+              cur.execute("""
+                  UPDATE market_prices mp
+                  SET sport       = cc.sport,
+                      scrape_tier = cc.scrape_tier,
+                      year        = cc.year
+                  FROM card_catalog cc
+                  WHERE mp.card_catalog_id = cc.id
+                    AND mp.sport IS NULL
+                  LIMIT %s
+              """, (batch,))
+              updated = cur.rowcount
+              total += updated
+              print(f"  updated {total:,} rows so far...")
+              if updated < batch:
+                  break
+
+          print(f"Done. Total rows backfilled: {total:,}")
+          cur.close(); conn.close()
+          EOF
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

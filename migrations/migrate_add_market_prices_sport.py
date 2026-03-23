@@ -22,17 +22,9 @@ def main():
     """)
     print("market_prices: sport/scrape_tier/year columns added (or already existed)")
 
-    # Backfill from card_catalog (one-time, skips already-populated rows)
-    cur.execute("""
-        UPDATE market_prices mp
-        SET sport      = cc.sport,
-            scrape_tier = cc.scrape_tier,
-            year        = cc.year
-        FROM card_catalog cc
-        WHERE mp.card_catalog_id = cc.id
-          AND mp.sport IS NULL;
-    """)
-    print(f"market_prices: backfilled {cur.rowcount} rows with sport/tier/year")
+    # NOTE: backfill (UPDATE market_prices SET sport=...) is run separately
+    # via GH Actions workflow backfill_market_prices_sport.yml — not here,
+    # because it is too slow to block a Railway deploy.
 
     # Indexes for fast filtering
     cur.execute("""
