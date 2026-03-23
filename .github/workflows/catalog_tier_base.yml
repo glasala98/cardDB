@@ -51,6 +51,9 @@ jobs:
     timeout-minutes: 360
     strategy:
       fail-fast: false
+      # CONNECTION BUDGET: max-parallel(8) × db-pool-max(5) = 40 scraper connections
+      # + Railway app pool (5) + monitoring (5) = 50 total — well under Railway PG limit of 100.
+      # DO NOT raise max-parallel or --workers without recalculating. See CLAUDE.md.
       max-parallel: 8
       matrix:
         include:

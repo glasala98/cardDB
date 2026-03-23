@@ -44,6 +44,27 @@ dashboard_utils.py — shared utilities (root)
 - Never do a JOIN between `market_prices` and `card_catalog` in a time-sensitive query — use denormalized `sport`/`scrape_tier`/`year` columns on `market_prices` instead
 - Always test new DB queries with a timeout before scheduling them
 
+### Database connection budget — HARD LIMIT
+Railway PostgreSQL max_connections = **100**. Never exceed this or the DB kills all connections and the site goes 502.
+
+**Allocation:**
+| Consumer | Pool max | Notes |
+|---|---|---|
+| Railway app (FastAPI) | 5 | `db.py` ThreadedConnectionPool max |
+| Railway dashboard / monitoring | 5 | reserved |
+| GH Actions scrapers | ≤ 80 | `max-parallel × pool-max` |
+
+**Formula: `max-parallel × pool-max ≤ 80`**
+
+Current settings (base scrape): `max-parallel: 8` × `pool-max: 5` = **40 connections** ✅
+
+**Rules:**
+- `db.py` pool max is **5** — never raise it without recalculating the budget
+- `--workers N` in scraper args must be ≤ pool-max (workers share the pool)
+- Before increasing `max-parallel` or `--workers`: recalculate `max-parallel × pool-max ≤ 80`
+- Never run two parallel scrape workflows at the same time (e.g. base + staple) — they share the same connection budget
+- Never query `market_raw_sales` with a `GROUP BY card_catalog_id` or similar full-scan inside the catalog load path — it blocks all 24 shards simultaneously
+
 ### GitHub Actions limits
 - Scheduled jobs have a **6-hour hard kill** — always pass `--max-hours 5.75` to scrapers
 - Job `timeout-minutes` should be set conservatively based on expected runtime
