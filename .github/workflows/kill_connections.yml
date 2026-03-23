@@ -1,0 +1,36 @@
+name: Kill stale DB connections
+on:
+  workflow_dispatch:
+jobs:
+  kill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Terminate idle connections
+        run: |
+          pip install psycopg2-binary -q
+          python - << 'PYEOF'
+          import os, psycopg2
+          conn = psycopg2.connect(os.environ["DATABASE_URL"])
+          conn.autocommit = True
+          cur = conn.cursor()
+          cur.execute("""
+            SELECT COUNT(*) FROM pg_stat_activity WHERE state != 'active'
+          """)
+          idle = cur.fetchone()[0]
+          print(f"Idle connections: {idle}")
+          cur.execute("""
+            SELECT pg_terminate_backend(pid)
+            FROM pg_stat_activity
+            WHERE pid <> pg_backend_pid()
+              AND state IN ('idle', 'idle in transaction', 'idle in transaction (aborted)')
+          """)
+          killed = cur.rowcount
+          print(f"Terminated {killed} idle connections")
+          cur.execute("SELECT COUNT(*) FROM pg_stat_activity")
+          total = cur.fetchone()[0]
+          print(f"Remaining connections: {total}")
+          cur.close(); conn.close()
+          PYEOF
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
