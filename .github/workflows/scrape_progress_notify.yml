@@ -197,9 +197,10 @@ jobs:
           # Send every 15 min during the first hour of each scrape run
           # Scrape runs start at 0/6/12/18 UTC — "first hour" = minutes 0–74
           scrape_start_hours = [0, 6, 12, 18]
-          minutes_since_scrape = min((current_hour % 6) * 60 + now_utc.minute
-                                     for h in scrape_start_hours
-                                     if (current_hour - h) % 24 < 2)
+          candidates = [(current_hour % 6) * 60 + now_utc.minute
+                        for h in scrape_start_hours
+                        if (current_hour - h) % 24 < 2]
+          minutes_since_scrape = min(candidates) if candidates else 999
           is_first_hour = minutes_since_scrape < 75
 
           # Check if a milestone was just crossed
