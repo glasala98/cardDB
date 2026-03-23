@@ -5,7 +5,10 @@ name: Scrape Progress — Hourly Email
 
 on:
   schedule:
-    - cron: '0 * * * *'  # every hour on the hour
+    - cron: '0 * * * *'     # every hour on the hour
+    - cron: '15 * * * *'    # :15 past every hour
+    - cron: '30 * * * *'    # :30 past every hour
+    - cron: '45 * * * *'    # :45 past every hour
   workflow_dispatch:
     inputs:
       force:
@@ -190,20 +193,28 @@ jobs:
           #   4. Pace flipped from ahead→behind or behind→ahead vs last hour
           force = os.environ.get("FORCE_SEND", "false").lower() == "true"
 
-          current_hour = datetime.now(timezone.utc).hour
-          is_daily_digest = (current_hour == 12)
+          now_utc = datetime.now(timezone.utc)
+          current_hour = now_utc.hour
+          is_daily_digest = (current_hour == 12 and now_utc.minute < 15)
+
+          # Send every 15 min during the first hour of each scrape run
+          # Scrape runs start at 0/6/12/18 UTC — "first hour" = minutes 0–74
+          scrape_start_hours = [0, 6, 12, 18]
+          minutes_since_scrape = min((current_hour % 6) * 60 + now_utc.minute
+                                     for h in scrape_start_hours
+                                     if (current_hour - h) % 24 < 2)
+          is_first_hour = minutes_since_scrape < 75
 
           # Check if a milestone was just crossed
           milestone_crossed = False
           for ms_pct, ms_label in MILESTONES:
               ms_cards = total_base_target * ms_pct / 100
-              # crossed if we are within one day's worth of cards above the milestone
               if total_base_priced >= ms_cards and (total_base_priced - ms_cards) < TARGET_DAILY:
                   milestone_crossed = True
                   subject = f"🎯 CardDB — {ms_label} base tier reached! | ETA {eta_str}"
                   break
 
-          should_send = force or is_daily_digest or milestone_crossed
+          should_send = force or is_daily_digest or milestone_crossed or is_first_hour
 
           import hashlib
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:

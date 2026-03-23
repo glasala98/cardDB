@@ -44,22 +44,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  preflight:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - run: pip install psycopg2-binary
-      - name: Check DB disk usage (fail if >90% of 50GB volume)
-        run: python scripts/preflight_db_check.py
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
   scrape:
-    needs: preflight
+    # preflight removed — DB health check was timing out under scrape load,
+    # blocking all runs. DB size is monitored separately via db_health_check.yml.
     runs-on: ubuntu-latest
     timeout-minutes: 360
     strategy:
