@@ -4,11 +4,8 @@ name: Scrape Progress — Hourly Email
 # cards processed per sport, total coverage %, pace vs target, and ETA.
 
 on:
-  schedule:
-    - cron: '0 * * * *'     # every hour on the hour
-    - cron: '15 * * * *'    # :15 past every hour
-    - cron: '30 * * * *'    # :30 past every hour
-    - cron: '45 * * * *'    # :45 past every hour
+  # Cron disabled — progress emails now run via Railway APScheduler (scripts/progress_report.py)
+  # Keep workflow_dispatch for manual one-off sends only
   workflow_dispatch:
     inputs:
       force:
