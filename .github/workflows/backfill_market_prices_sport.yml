@@ -40,8 +40,9 @@ jobs:
                       year        = cc.year
                   FROM card_catalog cc
                   WHERE mp.card_catalog_id = cc.id
-                    AND mp.sport IS NULL
-                  LIMIT %s
+                    AND mp.id IN (
+                        SELECT id FROM market_prices WHERE sport IS NULL LIMIT %s
+                    )
               """, (batch,))
               updated = cur.rowcount
               total += updated
