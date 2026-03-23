@@ -23,7 +23,7 @@ Usage:
 import sys, os, argparse
 sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', buffering=1)
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 try:
     from dotenv import load_dotenv
