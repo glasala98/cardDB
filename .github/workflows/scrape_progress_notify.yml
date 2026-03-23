@@ -43,33 +43,10 @@ jobs:
           base_target     = {"NFL": 479_793, "NBA": 298_550, "MLB": 765_186}
           base_total_2010 = {"NFL": 479_793, "NBA": 298_550, "MLB": 765_186, "NHL": 282_400}
 
-          # ── DB queries — all instant (pg_class or indexed single-table) ───
+          # ── DB queries — pg_class only (all instant, no table scans) ─────
           conn = psycopg2.connect(os.environ["DATABASE_URL"])
           cur  = conn.cursor()
 
-          # Priced counts per sport — uses denormalized sport col (instant after backfill)
-          # Returns 0 rows until backfill_market_prices_sport.yml completes
-          cur.execute("""
-              SELECT sport,
-                     COUNT(*) FILTER (WHERE year >= '2010') AS priced_2010,
-                     COUNT(*) FILTER (WHERE year >= '2015') AS priced_2015
-              FROM market_prices
-              WHERE scrape_tier = 'base'
-                AND fair_value > 0
-                AND sport IS NOT NULL
-              GROUP BY sport
-          """)
-          base_priced_2010 = {}
-          base_priced      = {}
-          for sport, p_2010, p_2015 in cur.fetchall():
-              base_priced_2010[sport] = p_2010
-              if sport in ('NFL', 'NBA', 'MLB'):
-                  base_priced[sport] = p_2015
-
-          total_base_target = sum(base_target.values())
-          total_base_priced = sum(base_priced.values())
-
-          # Overall totals + raw sales — pg_class estimates (instant)
           cur.execute("""
               SELECT
                 (SELECT reltuples::bigint FROM pg_class WHERE relname = 'card_catalog'),
@@ -82,6 +59,16 @@ jobs:
           sales_cards = int(abs(nd)) if nd else 0
 
           cur.close(); conn.close()
+
+          # Per-sport priced breakdown not available until backfill_market_prices_sport.yml
+          # completes. Use pg_class total_priced as overall estimate in the meantime.
+          base_priced      = {}
+          base_priced_2010 = {}
+          total_base_target = sum(base_target.values())
+          # Approximate: scale total priced by base-tier share of catalog
+          base_catalog_share = total_base_target / max(total_catalog, 1)
+          total_base_priced = int(total_priced * base_catalog_share)
+          backfill_pending  = True
 
           # ── Pace calculations ─────────────────────────────────────────────
           today       = date.today()
