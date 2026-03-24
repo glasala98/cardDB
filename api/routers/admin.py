@@ -1078,8 +1078,21 @@ def bulk_ignore_outliers(
 @router.post("/send-progress-email")
 def send_progress_email(_admin: str = Depends(_require_admin)):
     """Force-send a progress report email immediately via Railway SMTP."""
+    import smtplib, os
+    from email.mime.text import MIMEText
+
+    gmail_user = os.environ.get("NOTIFY_GMAIL_USER")
+    gmail_pass = os.environ.get("NOTIFY_GMAIL_APP_PASSWORD")
+    to_addr    = os.environ.get("NOTIFY_EMAIL_TO")
+
+    if not all([gmail_user, gmail_pass, to_addr]):
+        missing = [k for k, v in {"NOTIFY_GMAIL_USER": gmail_user, "NOTIFY_GMAIL_APP_PASSWORD": gmail_pass, "NOTIFY_EMAIL_TO": to_addr}.items() if not v]
+        raise HTTPException(status_code=500, detail=f"Missing Railway env vars: {missing}")
+
     try:
         _progress_run(force=True)
-        return {"sent": True}
+        return {"sent": True, "to": to_addr, "from": gmail_user}
+    except smtplib.SMTPAuthenticationError as e:
+        raise HTTPException(status_code=500, detail=f"SMTP auth failed — check NOTIFY_GMAIL_APP_PASSWORD: {e}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
