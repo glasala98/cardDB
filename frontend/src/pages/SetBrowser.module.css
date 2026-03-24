@@ -1,7 +1,7 @@
 .page {
   min-height: 100vh;
   padding: 24px 16px 48px;
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -29,7 +29,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .sportTabs { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -40,11 +40,12 @@
   border-radius: 6px;
   color: var(--text-muted, #888);
   font-size: 0.82rem;
-  padding: 5px 14px;
+  padding: 5px 16px;
   cursor: pointer;
   transition: all 0.15s;
+  font-weight: 600;
 }
-.sportTab:hover { border-color: var(--accent, #6c63ff); }
+.sportTab:hover { border-color: var(--accent, #6c63ff); color: var(--text, #e8e8f0); }
 .active { border-color: var(--accent, #6c63ff); color: var(--accent, #6c63ff); background: var(--accent-dim, #6c63ff22); }
 
 .filters { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -57,7 +58,7 @@
   border-radius: 8px;
   color: var(--text, #e8e8f0);
   font-size: 0.9rem;
-  padding: 8px 12px;
+  padding: 9px 14px;
 }
 .searchInput:focus { outline: none; border-color: var(--accent, #6c63ff); }
 
@@ -67,7 +68,8 @@
   border-radius: 8px;
   color: var(--text, #e8e8f0);
   font-size: 0.9rem;
-  padding: 8px 10px;
+  padding: 9px 12px;
+  min-width: 120px;
 }
 
 /* Status */
@@ -87,32 +89,65 @@
   border-top-color: var(--accent, #6c63ff);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
+  display: inline-block;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Set grid */
+/* Set grid — 3 columns */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
   margin-bottom: 24px;
 }
 
 .setCard {
   background: var(--surface, #1e1e2e);
   border: 1px solid var(--border, #2a2a3e);
-  border-radius: 10px;
-  padding: 14px 16px;
+  border-radius: 12px;
   text-align: left;
   cursor: pointer;
   transition: all 0.15s;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  overflow: hidden;
 }
 .setCard:hover {
   border-color: var(--accent, #6c63ff);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+/* Box art area — placeholder until real images exist */
+.boxArt {
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+}
+
+.boxYear {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: rgba(255,255,255,0.15);
+  letter-spacing: -0.02em;
+}
+
+.boxSport {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  opacity: 0.8;
+}
+
+/* Card body */
+.cardBody {
+  padding: 12px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
 }
 
 .setName {
@@ -120,22 +155,6 @@
   font-weight: 700;
   color: var(--text, #e8e8f0);
   line-height: 1.3;
-}
-
-.setYear {
-  font-size: 0.8rem;
-  color: var(--text-muted, #888);
-}
-
-.sportBadge {
-  background: var(--bg, #12121f);
-  border: 1px solid var(--border, #333);
-  border-radius: 3px;
-  font-size: 0.65rem;
-  padding: 1px 5px;
-  font-weight: 600;
-  color: var(--text-muted, #888);
-  letter-spacing: 0.04em;
 }
 
 .brand {
@@ -149,6 +168,7 @@
   margin-top: 6px;
   font-size: 0.75rem;
   color: var(--text-muted, #888);
+  flex-wrap: wrap;
 }
 .stats strong { color: var(--text, #e8e8f0); }
 
@@ -156,6 +176,7 @@
   text-align: center;
   padding: 48px;
   color: var(--text-muted, #888);
+  grid-column: 1 / -1;
 }
 
 /* Pagination */
@@ -172,8 +193,9 @@
   border-radius: 6px;
   color: var(--text, #e8e8f0);
   font-size: 0.85rem;
-  padding: 7px 14px;
+  padding: 7px 16px;
   cursor: pointer;
+  transition: border-color 0.15s;
 }
 .pageBtn:hover:not(:disabled) { border-color: var(--accent, #6c63ff); }
 .pageBtn:disabled { opacity: 0.35; cursor: default; }
@@ -188,10 +210,13 @@
   margin-bottom: 16px;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 900px) {
+  .grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 580px) {
   .page { padding: 16px 12px 48px; }
   .title { font-size: 1.2rem; }
   .grid { grid-template-columns: 1fr; }
-  .stats { flex-wrap: wrap; gap: 8px; }
   .searchInput { min-width: 0; }
 }

@@ -6,6 +6,20 @@ import styles from './SetBrowser.module.css'
 const SPORTS = ['NHL', 'NBA', 'NFL', 'MLB']
 const PAGE_SIZE = 60
 
+const SPORT_COLORS = {
+  NHL: '#4a9eff',
+  NBA: '#ff6b35',
+  NFL: '#5cb85c',
+  MLB: '#e74c3c',
+}
+
+const SPORT_INITIALS = {
+  NHL: 'HK',
+  NBA: 'BB',
+  NFL: 'FB',
+  MLB: 'BB',
+}
+
 export default function SetBrowser() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -23,13 +37,11 @@ export default function SetBrowser() {
 
   const debounceRef = useRef(null)
 
-  // Load year list when sport changes
+  // Load all years on mount, then re-filter when sport changes
   useEffect(() => {
-    if (!sport) { setYears([]); setYear(''); return }
-    getCatalogFilters(sport).then(d => setYears(d.years ?? [])).catch(() => {})
+    getCatalogFilters(sport || null).then(d => setYears(d.years ?? [])).catch(() => {})
   }, [sport])
 
-  // Load sets
   useEffect(() => {
     clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => fetchSets(1), 300)
@@ -67,12 +79,15 @@ export default function SetBrowser() {
         {total != null && <span className={styles.count}>{total.toLocaleString()} sets</span>}
       </div>
 
+      {/* Filters */}
       <div className={styles.controls}>
         <div className={styles.sportTabs}>
           <button className={`${styles.sportTab} ${sport === '' ? styles.active : ''}`}
             onClick={() => { setSport(''); setYear('') }}>All</button>
           {SPORTS.map(s => (
-            <button key={s} className={`${styles.sportTab} ${sport === s ? styles.active : ''}`}
+            <button key={s}
+              className={`${styles.sportTab} ${sport === s ? styles.active : ''}`}
+              style={sport === s ? { borderColor: SPORT_COLORS[s], color: SPORT_COLORS[s], background: SPORT_COLORS[s] + '22' } : {}}
               onClick={() => { setSport(s); setYear('') }}>{s}</button>
           ))}
         </div>
@@ -84,34 +99,41 @@ export default function SetBrowser() {
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
-          {years.length > 0 && (
-            <select className={styles.yearSelect} value={year} onChange={e => setYear(e.target.value)}>
-              <option value="">All years</option>
-              {years.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-          )}
+          <select className={styles.yearSelect} value={year} onChange={e => setYear(e.target.value)}>
+            <option value="">All years</option>
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
         </div>
       </div>
 
       {loading && <div className={styles.status}><span className={styles.spinner} /> Loading…</div>}
-
-      {error && <div className={styles.error}>{error}</div>}
+      {error   && <div className={styles.error}>{error}</div>}
 
       {!loading && !error && (
         <>
           <div className={styles.grid}>
-            {sets.map((s, i) => (
-              <button key={i} className={styles.setCard} onClick={() => goToSet(s)}>
-                <div className={styles.setName}>{s.set_name}</div>
-                <div className={styles.setYear}>{s.year} · <span className={styles.sportBadge}>{s.sport}</span></div>
-                {s.brand && <div className={styles.brand}>{s.brand}</div>}
-                <div className={styles.stats}>
-                  <span><strong>{s.total_cards?.toLocaleString()}</strong> cards</span>
-                  <span><strong>{s.total_variants?.toLocaleString()}</strong> variants</span>
-                  <span><strong>{s.total_players?.toLocaleString()}</strong> players</span>
-                </div>
-              </button>
-            ))}
+            {sets.map((s, i) => {
+              const color = SPORT_COLORS[s.sport] ?? '#6c63ff'
+              return (
+                <button key={i} className={styles.setCard} onClick={() => goToSet(s)}>
+                  {/* Box art area */}
+                  <div className={styles.boxArt} style={{ background: `linear-gradient(135deg, ${color}22, ${color}08)`, borderBottom: `2px solid ${color}44` }}>
+                    <span className={styles.boxYear}>{s.year}</span>
+                    <span className={styles.boxSport} style={{ color }}>{s.sport}</span>
+                  </div>
+
+                  <div className={styles.cardBody}>
+                    <div className={styles.setName}>{s.set_name}</div>
+                    {s.brand && <div className={styles.brand}>{s.brand}</div>}
+                    <div className={styles.stats}>
+                      <span><strong>{s.total_cards?.toLocaleString()}</strong> cards</span>
+                      <span><strong>{s.total_variants?.toLocaleString()}</strong> variants</span>
+                      <span><strong>{s.total_players?.toLocaleString()}</strong> players</span>
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
           </div>
 
           {sets.length === 0 && (
