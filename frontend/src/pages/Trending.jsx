@@ -10,6 +10,12 @@ function fmt(val) {
   return '$' + Number(val).toLocaleString('en-US', { maximumFractionDigits: 0 })
 }
 
+function fmtDelta(card) {
+  if (card.avg_7d == null || card.pct_change == null) return null
+  const sign = card.pct_change >= 0 ? '+' : ''
+  return `${sign}${card.pct_change.toFixed(1)}%`
+}
+
 export default function Trending() {
   const navigate = useNavigate()
   const [sport,   setSport]   = useState('')
@@ -64,8 +70,8 @@ export default function Trending() {
                 </div>
               </div>
               <div className={styles.right}>
-                <div className={styles.pct}>
-                  {card.pct_change != null ? `+${card.pct_change.toFixed(1)}%` : '—'}
+                <div className={card.pct_change != null && card.pct_change < 0 ? styles.pctDown : styles.pct}>
+                  {fmtDelta(card) ?? '—'}
                 </div>
                 <div className={styles.price}>{fmt(card.fair_value)}</div>
                 <div className={styles.sales}>{card.cnt_7d} sales / 7d</div>

@@ -1127,7 +1127,10 @@ def trending_cards(
                     WHERE mrs.sold_date >= CURRENT_DATE - 14
                       AND mrs.sold_date <  CURRENT_DATE - 7
                       AND mrs.price_val > 0
-                ) > 0
+                ) >= 2.0
+                AND AVG(mrs.price_val) FILTER (
+                    WHERE mrs.sold_date >= CURRENT_DATE - 7 AND mrs.price_val > 0
+                ) >= 2.0
             ORDER BY (
                 AVG(mrs.price_val) FILTER (
                     WHERE mrs.sold_date >= CURRENT_DATE - 7 AND mrs.price_val > 0

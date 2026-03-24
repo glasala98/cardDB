@@ -20,7 +20,7 @@ function buildCardName(data, serialOverride) {
   return [seg1, seg2, seg3].filter(Boolean).join(' - ').trim()
 }
 
-export default function ScanCardModal({ onClose, onAdded }) {
+export default function ScanCardModal({ onClose, onAdded, pageMode = false }) {
   const isGuest = useIsGuest()
   const [frontFile,  setFrontFile]  = useState(null)
   const [backFile,   setBackFile]   = useState(null)
@@ -146,21 +146,14 @@ export default function ScanCardModal({ onClose, onAdded }) {
   const missingBrand  = analyzed && result && !result.parse_error && result.is_sports_card !== false && !result.brand
   const missingSerial = analyzed && result && !result.parse_error && result.is_sports_card !== false && !result.serial_number
 
-  return (
-    <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className={styles.modal}>
-        <div className={styles.header}>
-          <h2 className={styles.title}>Scan Card</h2>
-          <button className={styles.closeBtn} onClick={onClose}>✕</button>
+  const bodyContent = (
+    <>
+      {/* ── Guest lock banner ── */}
+      {isGuest && (
+        <div className={styles.guestBanner}>
+          <strong>Guest access only.</strong> You can view the scanner but scanning cards requires a full account. Contact an admin to upgrade.
         </div>
-
-        <div className={styles.body}>
-          {/* ── Guest lock banner ── */}
-          {isGuest && (
-            <div className={styles.guestBanner}>
-              <strong>Guest access only.</strong> You can view the scanner but scanning cards requires a full account. Contact an admin to upgrade.
-            </div>
-          )}
+      )}
 
           {/* ── Image upload (full) — shown before analysis ── */}
           {!saved && !analyzed && (
@@ -390,6 +383,34 @@ export default function ScanCardModal({ onClose, onAdded }) {
               </button>
             )}
           </div>
+        </>
+  )
+
+  if (pageMode) {
+    return (
+      <div className={styles.pageContainer}>
+        <div className={styles.pageCard}>
+          <div className={styles.pageHeader}>
+            <h1 className={styles.pageTitle}>Scan Card</h1>
+            <p className={styles.pageSub}>Upload a photo of your card — AI identifies it instantly</p>
+          </div>
+          <div className={styles.body}>
+            {bodyContent}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className={styles.modal}>
+        <div className={styles.header}>
+          <h2 className={styles.title}>Scan Card</h2>
+          <button className={styles.closeBtn} onClick={onClose}>✕</button>
+        </div>
+        <div className={styles.body}>
+          {bodyContent}
         </div>
       </div>
     </div>

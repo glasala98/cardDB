@@ -5,6 +5,21 @@ Format: `### [date] — description`
 
 ---
 
+## 2026-03-24
+
+### Trending page fixed — minimum price floor eliminates garbage % spikes
+- Added `>= $2.00` minimum price threshold to HAVING clause on both current and previous 7d windows
+- Cards going from $0.01 to $6 no longer show as +187,000% movers
+- % now shows negative values in red (was always hardcoded green)
+- `fmtDelta()` helper handles both positive and negative formatting
+
+### Scan Card page — proper full-page layout (no more modal wrapper)
+- `ScanPage.jsx` now renders `ScanCardModal` in `pageMode` — no overlay, no backdrop
+- Added `pageContainer`, `pageCard`, `pageHeader` CSS for clean page layout
+- `ScanCardModal` accepts `pageMode` prop; shares all logic/state between modal and page modes
+
+---
+
 ## 2026-03-23
 
 ### Scrape validation workflow added

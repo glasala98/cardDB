@@ -378,6 +378,38 @@
   word-break: break-word;
 }
 
+/* ── Page mode (full-page layout, no overlay) ───────────────── */
+.pageContainer {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  min-height: 100vh;
+}
+
+.pageCard {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.pageHeader {
+  padding: 24px 24px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pageTitle {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+
+.pageSub {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
 .guestBanner {
   background: rgba(240, 180, 60, 0.1);
   border: 1px solid rgba(240, 180, 60, 0.35);

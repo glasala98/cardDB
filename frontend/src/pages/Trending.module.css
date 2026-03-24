@@ -145,6 +145,12 @@
   color: #2ecc71;
 }
 
+.pctDown {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #e74c3c;
+}
+
 .price {
   font-size: 0.82rem;
   font-weight: 600;
