@@ -875,6 +875,14 @@ def search_ebay_sold(driver, card_name, max_results=240, search_query=None, page
                 except Exception:
                     pass
 
+                # Condition — eBay shows e.g. "Pre-Owned", "Brand New", "Near Mint or Better"
+                item_condition = None
+                try:
+                    cond_elem = item.find_element(By.CSS_SELECTOR, '.s-item__subtitle, .SECONDARY_INFO')
+                    item_condition = cond_elem.text.strip() or None
+                except Exception:
+                    pass
+
                 sales.append({
                     'title': title,
                     'item_price': price_str,
@@ -885,6 +893,7 @@ def search_ebay_sold(driver, card_name, max_results=240, search_query=None, page
                     'listing_url': listing_url,
                     'search_url': url,
                     'image_url': item_image_url,
+                    'condition': item_condition,
                 })
 
                 if len(sales) >= max_results:

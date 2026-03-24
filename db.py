@@ -157,6 +157,7 @@ def save_raw_sales(card_catalog_id: int, raw_sales: list, conn=None,
         buyer_prem       = sale.get('buyer_premium_pct')
         image_url        = (sale.get('image_url') or '')[:2000]
         is_auction       = bool(sale.get('is_auction', False))
+        condition        = (sale.get('condition') or '')[:100] or None
         raw_meta         = sale.get('raw_metadata') or {}
         raw_meta_json    = json.dumps(raw_meta) if isinstance(raw_meta, dict) else (raw_meta or '{}')
 
@@ -168,7 +169,7 @@ def save_raw_sales(card_catalog_id: int, raw_sales: list, conn=None,
             serial_number, print_run,
             lot_url, lot_id,
             hammer_price, buyer_prem, image_url,
-            is_auction, raw_meta_json,
+            is_auction, condition, raw_meta_json,
         ))
 
     if not rows:
@@ -182,7 +183,7 @@ def save_raw_sales(card_catalog_id: int, raw_sales: list, conn=None,
             serial_number, print_run,
             lot_url, lot_id,
             hammer_price, buyer_premium_pct, image_url,
-            is_auction, raw_metadata
+            is_auction, condition, raw_metadata
         )
         VALUES %s
         ON CONFLICT (listing_hash) DO NOTHING
