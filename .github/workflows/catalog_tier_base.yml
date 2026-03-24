@@ -51,10 +51,11 @@ jobs:
     timeout-minutes: 360
     strategy:
       fail-fast: false
-      # CONNECTION BUDGET: max-parallel(8) × db-pool-max(5) = 40 scraper connections
-      # + Railway app pool (5) + monitoring (5) = 50 total — well under Railway PG limit of 100.
-      # DO NOT raise max-parallel or --workers without recalculating. See CLAUDE.md.
-      max-parallel: 8
+      # CONNECTION BUDGET: max-parallel(4) × db-pool-max(5) = 20 scraper connections per run.
+      # Two runs can overlap (wall time ~15hrs vs 6hr schedule) → max 8 shards × 5 = 40 connections.
+      # + Railway app pool (5) + monitoring (5) = 50 total — stable under Railway PG limit of 100.
+      # DO NOT raise max-parallel without recalculating for 2 overlapping runs. See CLAUDE.md.
+      max-parallel: 4
       matrix:
         include:
           # NFL — 10 shards (~48K cards each)

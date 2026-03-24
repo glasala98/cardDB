@@ -56,7 +56,7 @@ Railway PostgreSQL max_connections = **100**. Never exceed this or the DB kills 
 
 **Formula: `max-parallel × pool-max ≤ 80`**
 
-Current settings (base scrape): `max-parallel: 8` × `pool-max: 5` = **40 connections** ✅
+Current settings (base scrape): `max-parallel: 4` × `pool-max: 5` × `2 overlapping runs` = **40 connections** ✅
 
 **Rules:**
 - `db.py` pool max is **5** — never raise it without recalculating the budget
