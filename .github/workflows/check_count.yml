@@ -1,0 +1,30 @@
+name: Check live price count
+on:
+  workflow_dispatch:
+jobs:
+  count:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Get live count
+        run: |
+          pip install psycopg2-binary -q
+          python - << 'PYEOF'
+          import os, psycopg2
+          conn = psycopg2.connect(os.environ["DATABASE_URL"])
+          cur = conn.cursor()
+          cur.execute("""
+            SELECT
+              COUNT(*) as total_priced,
+              COUNT(*) FILTER (WHERE scraped_at > NOW() - INTERVAL '6 hours') as last_6h,
+              COUNT(*) FILTER (WHERE scraped_at > NOW() - INTERVAL '1 hour') as last_1h
+            FROM market_prices
+          """)
+          total, last_6h, last_1h = cur.fetchone()
+          print(f"Total priced:     {total:,}")
+          print(f"Last 6 hours:     {last_6h:,}")
+          print(f"Last 1 hour:      {last_1h:,}")
+          cur.close(); conn.close()
+          PYEOF
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
