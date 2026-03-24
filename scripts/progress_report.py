@@ -11,7 +11,7 @@ import psycopg2
 from datetime import datetime, timezone, date, timedelta
 from email.mime.text import MIMEText
 
-BACKFILL_START = date(2026, 3, 24)   # Day 1 = first full clean day (Mar 23 evening was setup)
+BACKFILL_START = date(2026, 3, 23)   # First clean run Mar 23 evening
 TARGET_DAILY   = 270_000             # 24 shards × 4 runs/day
 MILESTONES     = [(25, "25%"), (50, "50%"), (75, "75%"), (90, "90%"), (100, "100%")]
 
