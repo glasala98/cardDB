@@ -43,18 +43,28 @@ def run(force: bool = False):
         cur.execute("""
             SELECT
               (SELECT reltuples::bigint FROM pg_class WHERE relname = 'card_catalog'),
-              (SELECT reltuples::bigint FROM pg_class WHERE relname = 'market_prices'),
-              (SELECT reltuples::bigint FROM pg_class WHERE relname = 'market_raw_sales'),
+              (SELECT COUNT(*) FROM market_prices),
+              (SELECT COUNT(*) FROM market_raw_sales),
               pg_size_pretty(pg_database_size(current_database()))
         """)
         total_catalog, total_priced, sales_total, db_size = cur.fetchone()
+
+        # Count cards priced that are in the base backfill target (NFL/NBA/MLB 2015+)
+        cur.execute("""
+            SELECT COUNT(*)
+            FROM market_prices mp
+            JOIN card_catalog cc ON cc.id = mp.card_catalog_id
+            WHERE cc.sport IN ('NFL','NBA','MLB')
+              AND cc.scrape_tier = 'base'
+              AND SPLIT_PART(cc.year,'-',1) ~ '^\d{4}$'
+              AND SPLIT_PART(cc.year,'-',1)::int >= 2015
+        """)
+        total_base_priced = cur.fetchone()[0]
+
         cur.close(); conn.close()
     except Exception as e:
         print(f"[progress_report] DB error: {e}")
         return
-
-    base_share        = TOTAL_BASE_TARGET / max(total_catalog, 1)
-    total_base_priced = int(total_priced * base_share)
 
     today        = date.today()
     days_elapsed = max((today - BACKFILL_START).days, 1)
