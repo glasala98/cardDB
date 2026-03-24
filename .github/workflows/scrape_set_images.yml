@@ -1,0 +1,60 @@
+name: Scrape Set Box Images (TCDB)
+
+on:
+  schedule:
+    - cron: '0 5 1 * *'  # 5am UTC 1st of each month (just before set info scrape)
+  workflow_dispatch:
+    inputs:
+      sport:
+        description: 'Sport (NHL NBA NFL MLB, space-separated, blank=all)'
+        required: false
+        default: ''
+      year_from:
+        description: 'Start year (default: 3 years ago)'
+        required: false
+        default: ''
+      force:
+        description: 'Re-fetch even if already stored (true/false)'
+        required: false
+        default: 'false'
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install psycopg2-binary
+      - run: python migrations/migrate_add_catalog_sets.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  scrape:
+    needs: migrate
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install psycopg2-binary beautifulsoup4 curl_cffi python-dotenv
+      - name: Scrape set box images
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.sport }}" ]; then
+            ARGS="$ARGS --sport ${{ github.event.inputs.sport }}"
+          fi
+          if [ -n "${{ github.event.inputs.year_from }}" ]; then
+            ARGS="$ARGS --year-from ${{ github.event.inputs.year_from }}"
+          fi
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            ARGS="$ARGS --force"
+          fi
+          python -u scraping/scrape_set_images.py $ARGS
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

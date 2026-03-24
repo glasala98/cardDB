@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { browseSets, getCatalogFilters } from '../api/catalog'
 import styles from './SetBrowser.module.css'
@@ -18,6 +18,22 @@ const SPORT_INITIALS = {
   NBA: 'BB',
   NFL: 'FB',
   MLB: 'BB',
+}
+
+function BoxArt({ imageUrl, year, sport, color }) {
+  const [imgFailed, setImgFailed] = useState(false)
+  const showImg = imageUrl && !imgFailed
+  return (
+    <div className={styles.boxArt} style={{ background: `linear-gradient(135deg, ${color}22, ${color}08)`, borderBottom: `2px solid ${color}44` }}>
+      {showImg
+        ? <img src={imageUrl} alt="" className={styles.boxImg} onError={() => setImgFailed(true)} />
+        : <>
+            <span className={styles.boxYear}>{year}</span>
+            <span className={styles.boxSport} style={{ color }}>{sport}</span>
+          </>
+      }
+    </div>
+  )
 }
 
 export default function SetBrowser() {
@@ -116,11 +132,8 @@ export default function SetBrowser() {
               const color = SPORT_COLORS[s.sport] ?? '#6c63ff'
               return (
                 <button key={i} className={styles.setCard} onClick={() => goToSet(s)}>
-                  {/* Box art area */}
-                  <div className={styles.boxArt} style={{ background: `linear-gradient(135deg, ${color}22, ${color}08)`, borderBottom: `2px solid ${color}44` }}>
-                    <span className={styles.boxYear}>{s.year}</span>
-                    <span className={styles.boxSport} style={{ color }}>{s.sport}</span>
-                  </div>
+                  {/* Box art — real image if available, gradient fallback */}
+                  <BoxArt imageUrl={s.box_image_url} year={s.year} sport={s.sport} color={color} />
 
                   <div className={styles.cardBody}>
                     <div className={styles.setName}>{s.set_name}</div>

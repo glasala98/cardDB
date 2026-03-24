@@ -633,13 +633,13 @@ def browse_sets(
     params: list = []
 
     if sport:
-        conditions.append("sport = %s")
+        conditions.append("cc.sport = %s")
         params.append(sport.upper())
     if year:
-        conditions.append("year = %s")
+        conditions.append("cc.year = %s")
         params.append(year)
     if search:
-        conditions.append("set_name ILIKE %s")
+        conditions.append("cc.set_name ILIKE %s")
         params.append(f"%{search}%")
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
@@ -650,24 +650,31 @@ def browse_sets(
         cur.execute("SET statement_timeout = '8s'")
 
         cur.execute(f"""
-            SELECT COUNT(DISTINCT (year, set_name)) FROM card_catalog {where}
+            SELECT COUNT(DISTINCT (cc.year, cc.set_name))
+            FROM card_catalog cc
+            LEFT JOIN catalog_sets cs
+                ON cs.year = cc.year AND cs.set_name = cc.set_name AND cs.sport = cc.sport
+            {where}
         """, params)
         total = cur.fetchone()[0]
 
         cur.execute(f"""
             SELECT
-                year,
-                set_name,
-                sport,
+                cc.year,
+                cc.set_name,
+                cc.sport,
                 COUNT(*) AS total_entries,
-                COUNT(DISTINCT player_name) AS total_players,
-                COUNT(DISTINCT card_number) AS total_cards,
-                COUNT(DISTINCT variant) AS total_variants,
-                MIN(brand) AS brand
-            FROM card_catalog
+                COUNT(DISTINCT cc.player_name) AS total_players,
+                COUNT(DISTINCT cc.card_number) AS total_cards,
+                COUNT(DISTINCT cc.variant) AS total_variants,
+                MIN(cc.brand) AS brand,
+                MAX(cs.box_image_url) AS box_image_url
+            FROM card_catalog cc
+            LEFT JOIN catalog_sets cs
+                ON cs.year = cc.year AND cs.set_name = cc.set_name AND cs.sport = cc.sport
             {where}
-            GROUP BY year, set_name, sport
-            ORDER BY year DESC NULLS LAST, set_name ASC
+            GROUP BY cc.year, cc.set_name, cc.sport
+            ORDER BY cc.year DESC NULLS LAST, cc.set_name ASC
             LIMIT %s OFFSET %s
         """, params + [per_page, offset])
 
