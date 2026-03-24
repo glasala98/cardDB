@@ -64,6 +64,7 @@ Current settings (base scrape): `max-parallel: 8` × `pool-max: 5` = **40 connec
 - Before increasing `max-parallel` or `--workers`: recalculate `max-parallel × pool-max ≤ 80`
 - Never run two parallel scrape workflows at the same time (e.g. base + staple) — they share the same connection budget
 - Never query `market_raw_sales` with a `GROUP BY card_catalog_id` or similar full-scan inside the catalog load path — it blocks all 24 shards simultaneously
+- **Never set `--stale-days` above 60 for any tier** — eBay sold listings expire after 90 days. 60 days gives a 30-day safety buffer. Missing a rescrape window = permanent data loss.
 
 ### GitHub Actions limits
 - Scheduled jobs have a **6-hour hard kill** — always pass `--max-hours 5.75` to scrapers
