@@ -9,7 +9,7 @@
 
 | Item | Notes |
 |---|---|
-| **Base-tier backfill** | NFL/NBA/MLB 2015+ in progress. ~135K/day target, ETA ~Apr 15. Progress email fires daily at noon + on milestone cross |
+| **Base-tier backfill** | NFL/NBA/MLB 2015+ in progress. Now 2x/day (was 4x — fixed 34.5h queue bug). ETA ~Apr 15. |
 | **market_raw_sales backfill** | `backfill_all_tiers.yml` running daily — capturing full eBay history |
 | **DB architecture migration** | Everything becomes a view of `card_catalog + market_prices`. Phase 1 in progress (see section below) |
 
@@ -22,7 +22,7 @@
 - [x] **Write optimization** — skip no-op market_prices UPDATEs; LATERAL JOIN replaces correlated subquery in price_history; pre-filter raw_sales hashes before insert to eliminate dead tuples
 - [ ] **Connection retry resilience** — `assign_catalog_tiers.py` + `scrape_nhl_stats.py` crash on `server closed the connection unexpectedly`; add reconnect in `db.py`
 - [ ] **eBay affiliate links** — add Partner Network tracking IDs to existing listing links (zero extra scraping)
-- [ ] **VACUUM tuning** — add `ALTER TABLE market_raw_sales SET (autovacuum_vacuum_scale_factor = 0.01)` to keep dead tuple ratio low under heavy insert load
+- [x] **VACUUM tuning** — `migrate_autovacuum_tuning.py` runs on deploy; scale_factor=1% on market_raw_sales, market_prices, market_price_history
 
 ### Frontend / UX
 - [ ] **Mobile catalog layout** — card catalog needs responsive column collapse; live but broken on mobile
