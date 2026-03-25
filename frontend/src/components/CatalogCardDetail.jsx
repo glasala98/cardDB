@@ -45,6 +45,7 @@ export default function CatalogCardDetail({ card, history, loading, isLoggedIn, 
   const maxVal = hasPriceHistory ? Math.max(...history.map(h => h.fair_value || 0)) : 0
 
   return (
+    <>
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.panel} ref={panelRef} onClick={e => e.stopPropagation()}>
         <div className={styles.header}>
@@ -238,5 +239,6 @@ export default function CatalogCardDetail({ card, history, loading, isLoggedIn, 
         onClose={() => setLightbox(false)}
       />
     )}
+    </>
   )
 }
