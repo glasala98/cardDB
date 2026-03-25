@@ -7,6 +7,9 @@ Format: `### [date] — description`
 
 ## 2026-03-25
 
+### Fix: email failures no longer block scraping
+Added `continue-on-error: true` at the **job level** on `notify-start` in all 3 tier workflows (staple, premium, stars), and `if: always()` on the first downstream job in each. Previously, a transient SMTP failure caused `notify-start` to fail, which skipped all downstream scrape jobs. Now email and scraping are fully decoupled — SMTP down = email skipped, scraping runs anyway.
+
 ### Email notifications for staple, premium, stars scrapes
 Added start + completion email notifications to `catalog_tier_staple.yml`, `catalog_tier_premium.yml`, and `catalog_tier_stars.yml`. Each workflow now emails on start and sends a per-sport result summary (success/failure/skipped) when all sports complete. Uses `if: always()` on the done job so you get notified even on failures. Emails fire automatically from dashboard ▶ Run button too since `notify-start` is the first job.
 
