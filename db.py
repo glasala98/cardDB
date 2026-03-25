@@ -17,11 +17,26 @@ _pool = None
 _DB_RETRIES = 3
 _DB_RETRY_DELAY = 5  # seconds between retries
 
+# TCP keepalive options — prevent Railway from silently killing idle connections.
+# keepalives_idle=30: start probing after 30s idle
+# keepalives_interval=10: probe every 10s
+# keepalives_count=5: 5 missed probes = declare dead and raise OperationalError
+_KEEPALIVE_OPTS = {
+    "keepalives":          1,
+    "keepalives_idle":     30,
+    "keepalives_interval": 10,
+    "keepalives_count":    5,
+}
+
+_CONN_ERRORS = (psycopg2.OperationalError, psycopg2.InterfaceError)
+
 
 def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
     global _pool
     if _pool is None:
-        _pool = psycopg2.pool.ThreadedConnectionPool(1, 5, os.environ["DATABASE_URL"])
+        _pool = psycopg2.pool.ThreadedConnectionPool(
+            1, 5, os.environ["DATABASE_URL"], **_KEEPALIVE_OPTS
+        )
     return _pool
 
 
@@ -36,27 +51,58 @@ def _reset_pool():
     _pool = None
 
 
+def _ping(conn) -> bool:
+    """Return True if the connection is alive, False if it needs replacing."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+        return True
+    except Exception:
+        return False
+
+
 @contextmanager
 def get_db():
-    """Yield a psycopg2 connection from the pool.
+    """Yield a live psycopg2 connection from the pool.
 
-    Retries up to _DB_RETRIES times on SSL/connection errors — handles
-    'SSL SYSCALL error: EOF detected' and 'connection already closed'
-    which occur when the DB drops idle connections under heavy load.
+    Retries up to _DB_RETRIES times on connection errors — covers:
+    - Stale pool connections detected by liveness ping before yield
+    - 'SSL SYSCALL error: EOF detected' / 'server closed the connection'
+    - Railway dropping idle connections under load
+
+    TCP keepalives prevent silent drops during long-running scrape batches.
     """
     last_err = None
     for attempt in range(_DB_RETRIES):
+        conn = None
         try:
             pool = _get_pool()
             conn = pool.getconn()
-            # Verify connection is alive before handing it out
-            if conn.closed:
+
+            # Liveness check — catches stale connections from the pool.
+            # This is inside the retry loop so a dead connection triggers
+            # pool reset + fresh connection on the next attempt.
+            if conn.closed or not _ping(conn):
                 pool.putconn(conn, close=True)
-                raise psycopg2.OperationalError("connection is closed")
+                conn = None
+                raise psycopg2.OperationalError("connection failed liveness check")
+
             try:
                 yield conn
                 conn.commit()
                 return
+            except _CONN_ERRORS:
+                # Connection died mid-query — close it, reset pool, retry.
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+                try:
+                    pool.putconn(conn, close=True)
+                except Exception:
+                    pass
+                conn = None
+                raise
             except Exception:
                 try:
                     conn.rollback()
@@ -64,15 +110,18 @@ def get_db():
                     pass
                 raise
             finally:
-                try:
-                    pool.putconn(conn)
-                except Exception:
-                    pass
-        except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+                if conn is not None:
+                    try:
+                        pool.putconn(conn)
+                    except Exception:
+                        pass
+
+        except _CONN_ERRORS as e:
             last_err = e
             print(f"[db] connection error (attempt {attempt + 1}/{_DB_RETRIES}): {e} — retrying in {_DB_RETRY_DELAY}s")
             _reset_pool()
             time.sleep(_DB_RETRY_DELAY)
+
     raise last_err
 
 

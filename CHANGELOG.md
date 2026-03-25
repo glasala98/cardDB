@@ -7,6 +7,11 @@ Format: `### [date] — description`
 
 ## 2026-03-24
 
+### Connection retry resilience — fix "server closed the connection unexpectedly"
+- TCP keepalive added to pool (`keepalives_idle=30s`, `interval=10s`, `count=5`) — prevents Railway from silently killing idle connections during long scrape batches
+- Liveness ping (`SELECT 1`) before every connection yield — detects stale pool connections inside the retry loop so they trigger a fresh connection, not a crash
+- Mid-query connection drops now close + reset the pool and retry (previously re-raised immediately to the caller)
+
 ### Write optimization — reduce Railway DB churn
 - `market_prices` ON CONFLICT now skips UPDATE when fair_value/num_sales/confidence unchanged — eliminates WAL churn for stable prices (critical post-backfill)
 - `market_price_history` correlated subquery replaced with LATERAL JOIN — single index sweep instead of N per-card subqueries for batches of 1000+ cards

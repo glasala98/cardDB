@@ -20,7 +20,7 @@
 ### Data / Infra
 - [x] **DB backups** — weekly `pg_dump` via `db_backup.yml`, artifact uploaded to GitHub Actions (90-day retention); download manually from Actions tab
 - [x] **Write optimization** — skip no-op market_prices UPDATEs; LATERAL JOIN replaces correlated subquery in price_history; pre-filter raw_sales hashes before insert to eliminate dead tuples
-- [ ] **Connection retry resilience** — `assign_catalog_tiers.py` + `scrape_nhl_stats.py` crash on `server closed the connection unexpectedly`; add reconnect in `db.py`
+- [x] **Connection retry resilience** — TCP keepalive on pool + liveness ping before yield + mid-query drop handling; all in `db.py`
 - [ ] **eBay affiliate links** — add Partner Network tracking IDs to existing listing links (zero extra scraping)
 - [x] **VACUUM tuning** — `migrate_autovacuum_tuning.py` runs on deploy; scale_factor=1% on market_raw_sales, market_prices, market_price_history
 
