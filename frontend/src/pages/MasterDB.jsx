@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ScatterChart, Scatter, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
          BarChart, Bar, Cell, LineChart, Line, Legend } from 'recharts'
 import TrendBadge from '../components/TrendBadge'
@@ -335,6 +336,7 @@ function MyCardsSummary({ cards, priceMode, fmt }) {
 // ── YG Card Deep-Dive Panel ──────────────────────────────────────────────────
 
 function YGCardDetail({ card, nhlStats, fmt, onOwnershipSaved }) {
+  const navigate = useNavigate()
   const [history,   setHistory]   = useState([])
   const [owned,     setOwned]     = useState(card.owned || false)
   const [cost,      setCost]      = useState(String(card.cost_basis ?? ''))
@@ -496,8 +498,16 @@ function YGCardDetail({ card, nhlStats, fmt, onOwnershipSaved }) {
         </div>
       </div>
 
-      {/* ── Scrape button ── */}
+      {/* ── Action buttons ── */}
       <div className={styles.detailScrapeRow}>
+        {card.catalog_id && (
+          <button
+            className={styles.viewSalesBtn}
+            onClick={() => navigate(`/catalog/${card.catalog_id}`)}
+          >
+            View Sale History →
+          </button>
+        )}
         <button
           className={styles.scrapeYGBtn}
           onClick={handleScrape}

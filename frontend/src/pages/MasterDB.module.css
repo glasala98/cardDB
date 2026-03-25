@@ -682,6 +682,19 @@
 .scrapeYGBtn:hover:not(:disabled) { background: var(--bg-card); border-color: var(--accent); }
 .scrapeYGBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.viewSalesBtn {
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 7px 16px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.viewSalesBtn:hover { opacity: 0.85; }
+
 /* ── Trajectory Summary Row ──────────────────────────────────── */
 .trajectoryRow {
   display: flex;

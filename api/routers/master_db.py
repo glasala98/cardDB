@@ -72,7 +72,8 @@ def list_young_guns(search: str = ""):
         with get_db() as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(f"""
-                    SELECT cc.player_name, cc.year, cc.set_name, cc.card_number,
+                    SELECT cc.id AS catalog_id,
+                           cc.player_name, cc.year, cc.set_name, cc.card_number,
                            cc.team, cc.variant,
                            mp.fair_value, mp.num_sales, mp.trend,
                            mp.scraped_at, mp.graded_data
@@ -129,6 +130,7 @@ def list_young_guns(search: str = ""):
                     "cost_basis":    None,
                     "purchase_date": "",
                     "card_name":     f"{r['year']} {r['set_name']}{suffix} - {r['player_name']}",
+                    "catalog_id":    r["catalog_id"],
                 })
 
             seasons = sorted(all_seasons, reverse=True)
