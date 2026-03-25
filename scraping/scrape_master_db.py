@@ -326,6 +326,10 @@ def save_prices_batch(results: list):
     with get_db() as conn:
         with conn.cursor() as cur:
             from psycopg2.extras import execute_values
+
+            # Only UPDATE market_prices when the value actually changed.
+            # Skipping no-op updates eliminates WAL churn for unchanged prices —
+            # critical post-backfill when most prices are stable day-to-day.
             execute_values(cur, """
                 INSERT INTO market_prices
                     (card_catalog_id, fair_value, trend, confidence, num_sales, scraped_at, image_url)
@@ -340,9 +344,14 @@ def save_prices_batch(results: list):
                     image_url  = CASE WHEN EXCLUDED.image_url != '' THEN EXCLUDED.image_url
                                       ELSE market_prices.image_url END,
                     updated_at = NOW()
+                WHERE market_prices.fair_value IS DISTINCT FROM EXCLUDED.fair_value
+                   OR market_prices.num_sales  IS DISTINCT FROM EXCLUDED.num_sales
+                   OR market_prices.confidence IS DISTINCT FROM EXCLUDED.confidence
             """, mp_rows)
 
-            # SCD Type 2: only insert history row when fair_value changed
+            # SCD Type 2: only insert history row when fair_value changed.
+            # Uses a single lateral join to get each card's latest price instead
+            # of a correlated subquery per row — avoids N index lookups for N cards.
             execute_values(cur, """
                 INSERT INTO market_price_history
                     (card_catalog_id, scraped_at, fair_value, confidence, num_sales,
@@ -351,22 +360,39 @@ def save_prices_batch(results: list):
                        i.num_sales, i.top_3_prices, i.min_price, i.max_price, i.source
                 FROM (VALUES %s) AS i(card_catalog_id, scraped_at, fair_value, confidence,
                                       num_sales, top_3_prices, min_price, max_price, source)
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM market_price_history h
-                    WHERE h.card_catalog_id = i.card_catalog_id
-                      AND h.fair_value = i.fair_value
-                      AND h.scraped_at = (
-                          SELECT MAX(scraped_at) FROM market_price_history
-                          WHERE card_catalog_id = i.card_catalog_id
-                      )
-                )
+                LEFT JOIN LATERAL (
+                    SELECT fair_value AS last_val
+                    FROM market_price_history
+                    WHERE card_catalog_id = i.card_catalog_id
+                    ORDER BY scraped_at DESC
+                    LIMIT 1
+                ) latest ON true
+                WHERE latest.last_val IS DISTINCT FROM i.fair_value
                 ON CONFLICT (card_catalog_id, scraped_at) DO NOTHING
             """, [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], 'ebay')
                   for r in hist_rows])
 
-            # Persist every individual eBay sale — deduped on (card_catalog_id, sold_date, title)
+            # Bulk raw sales: pre-filter already-seen hashes in one query to avoid
+            # dead tuples from ON CONFLICT DO NOTHING on every duplicate attempt.
+            all_hashes = [
+                _sale_hash(cid, s.get('sold_date'), (s.get('title') or ''))
+                for cid, sales in raw_sales_by_card
+                for s in sales
+            ]
+            if all_hashes:
+                cur.execute(
+                    "SELECT listing_hash FROM market_raw_sales WHERE listing_hash = ANY(%s)",
+                    (all_hashes,)
+                )
+                seen = {r[0] for r in cur.fetchall()}
+            else:
+                seen = set()
+
             for catalog_id, raw_sales in raw_sales_by_card:
-                save_raw_sales(catalog_id, raw_sales, conn=conn)
+                filtered = [s for s in raw_sales
+                            if _sale_hash(catalog_id, s.get('sold_date'), (s.get('title') or ''))
+                            not in seen]
+                save_raw_sales(catalog_id, filtered, conn=conn)
 
         conn.commit()
 

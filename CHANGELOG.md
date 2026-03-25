@@ -7,6 +7,11 @@ Format: `### [date] — description`
 
 ## 2026-03-24
 
+### Write optimization — reduce Railway DB churn
+- `market_prices` ON CONFLICT now skips UPDATE when fair_value/num_sales/confidence unchanged — eliminates WAL churn for stable prices (critical post-backfill)
+- `market_price_history` correlated subquery replaced with LATERAL JOIN — single index sweep instead of N per-card subqueries for batches of 1000+ cards
+- `save_prices_batch` now pre-fetches existing `listing_hash` values in one query before bulk insert — eliminates dead tuples from ON CONFLICT DO NOTHING on duplicates
+
 ### DB Backup — delta exports after every scrape run
 - `migrate_add_raw_sales_created_at.py` — adds `created_at TIMESTAMPTZ DEFAULT NOW()` + index to `market_raw_sales` for delta filtering
 - `db_backup_delta.yml` — triggers via `workflow_run` after any scraper workflow completes; exports last 25h of `market_raw_sales` + `market_price_history` as gzipped CSV artifacts (30-day retention)
