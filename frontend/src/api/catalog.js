@@ -5,10 +5,11 @@ export const getCatalog = (params = {}) =>
   client.get('/catalog', { params })
 
 /** Get filter dropdown options (sports, years, sets). */
-export const getCatalogFilters = (sport = null, year = null) => {
+export const getCatalogFilters = (sport = null, year = null, search = null) => {
   const params = {}
-  if (sport) params.sport = sport
-  if (year)  params.year  = year
+  if (sport)  params.sport  = sport
+  if (year)   params.year   = year
+  if (search) params.search = search
   return client.get('/catalog/filters', { params })
 }
 

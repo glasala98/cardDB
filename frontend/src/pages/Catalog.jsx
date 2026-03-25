@@ -177,22 +177,24 @@ export default function Catalog() {
 
   const searchTimer = useRef(null)
 
-  // Reload years when sport changes; reset dependent filters
+  // Reload years when sport or search changes
   useEffect(() => {
     setYear('')
     setSetName('')
-    setYears([])
     setSets([])
-    if (!sport) return
-    getCatalogFilters(sport, null)
+    // Need at least a sport or a meaningful search term to scope years
+    const q = search.length >= 2 ? search : null
+    if (!sport && !q) { setYears([]); return }
+    getCatalogFilters(sport || null, null, q)
       .then(data => setYears(data.years || []))
       .catch(() => {})
-  }, [sport])
+  }, [sport, search]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reload sets when year changes
+  // Reload sets when year changes (also scoped to current search)
   useEffect(() => {
     if (!year) return
-    getCatalogFilters(sport || null, year)
+    const q = search.length >= 2 ? search : null
+    getCatalogFilters(sport || null, year, q)
       .then(data => setSets(data.sets || []))
       .catch(() => {})
     setSetName('')
@@ -385,9 +387,9 @@ export default function Catalog() {
               className={styles.sideSelect}
               value={year}
               onChange={e => setYear(e.target.value)}
-              disabled={!sport}
+              disabled={!sport && search.length < 2}
             >
-              <option value="">{sport ? 'All Years' : 'Select sport first'}</option>
+              <option value="">{sport || search.length >= 2 ? 'All Years' : 'Select sport first'}</option>
               {years.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>

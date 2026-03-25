@@ -791,25 +791,30 @@ def catalog_set_detail(
 
 @router.get("/filters")
 def catalog_filters(
-    sport: Optional[str] = Query(None),
-    year:  Optional[str] = Query(None),
+    sport:  Optional[str] = Query(None),
+    year:   Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
 ):
     """Return unique sports, years, and set names for filter dropdowns.
 
-    Sets are scoped by both sport and year when supplied, so the dropdown
-    only shows sets that actually exist for the selected sport+year combo.
+    When search is supplied, years and sets are scoped to rows that match
+    that search term (player_name ILIKE or set_name ILIKE), so the dropdowns
+    only show options that actually exist for the active query.
 
     Args:
-        sport: Scope years and sets to this sport.
-        year:  Scope sets to this year (requires sport to be useful).
+        sport:  Scope to this sport.
+        year:   Scope sets to this year.
+        search: Scope years and sets to rows matching this player/set search.
 
     Returns:
         Dict with keys: sports (list), years (list desc), sets (list).
     """
-    cache_key = f"{sport}|{year}"
-    with _cache_lock:
-        if cache_key in _filters_cache:
-            return _filters_cache[cache_key]
+    # Don't cache search-scoped results (too many combos); cache only plain sport|year
+    cache_key = f"{sport}|{year}" if not search else None
+    if cache_key:
+        with _cache_lock:
+            if cache_key in _filters_cache:
+                return _filters_cache[cache_key]
 
     with get_db() as conn:
         cur = conn.cursor()
@@ -818,22 +823,35 @@ def catalog_filters(
         cur.execute("SELECT DISTINCT sport FROM card_catalog ORDER BY sport")
         sports = [r[0] for r in cur.fetchall()]
 
-        # Only load years/sets when a sport is selected — too expensive unfiltered
-        if not sport:
+        # Need at least sport OR search to scope years — bare unfiltered year scan is too slow
+        if not sport and not search:
             return {"sports": sports, "years": [], "sets": []}
 
+        # Build base WHERE conditions shared by both year and set queries
+        base_conds  = []
+        base_params = []
+        if sport:
+            base_conds.append("sport = %s")
+            base_params.append(sport.upper())
+        if search:
+            base_conds.append("(player_name ILIKE %s OR set_name ILIKE %s)")
+            like = f"%{search}%"
+            base_params.extend([like, like])
+
+        base_where = ("WHERE " + " AND ".join(base_conds)) if base_conds else ""
+
         cur.execute(
-            "SELECT DISTINCT year FROM card_catalog WHERE sport = %s ORDER BY year DESC",
-            [sport.upper()]
+            f"SELECT DISTINCT year FROM card_catalog {base_where} ORDER BY year DESC",
+            base_params
         )
         years = [r[0] for r in cur.fetchall()]
 
-        set_conds = ["sport = %s"]
-        set_params = [sport.upper()]
+        set_conds  = list(base_conds)
+        set_params = list(base_params)
         if year:
             set_conds.append("year = %s")
             set_params.append(year)
-        set_where = "WHERE " + " AND ".join(set_conds)
+        set_where = ("WHERE " + " AND ".join(set_conds)) if set_conds else ""
         cur.execute(
             f"""SELECT set_name, COUNT(*) cnt
                 FROM card_catalog {set_where}
@@ -845,8 +863,9 @@ def catalog_filters(
         sets = [r[0] for r in cur.fetchall()]
 
     result = {"sports": sports, "years": years, "sets": sets}
-    with _cache_lock:
-        _filters_cache[cache_key] = result
+    if cache_key:
+        with _cache_lock:
+            _filters_cache[cache_key] = result
     return result
 
 

@@ -13,6 +13,15 @@ Format: `### [date] — description`
 - % now shows negative values in red (was always hardcoded green)
 - `fmtDelta()` helper handles both positive and negative formatting
 
+### Catalog filters scoped to active search — no phantom years/sets
+- `/catalog/filters` API now accepts `search` param; scopes years and sets
+  to rows matching that player/set name (ILIKE), so "Connor McDavid" only
+  shows years he actually has cards in
+- Years reload when search term changes (≥2 chars), not just on sport change
+- Sets reload scoped to current search + year combo
+- Year dropdown stays enabled when a search is active (not just when sport selected)
+- Search-scoped filter results bypass the TTL cache (too many combos)
+
 ### Global design system polish — enterprise feel across all pages
 - Define missing `--bg-hover: #192030` CSS variable (was referenced but undefined)
 - Global table: bolder header labels (10.5px/700/0.7px tracking), tighter column header, +2px row padding for breathing room, use `--bg-hover` on row hover
