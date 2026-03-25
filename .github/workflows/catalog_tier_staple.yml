@@ -1,8 +1,14 @@
 name: Catalog Tier — Staple (Daily)
 
+# Staple = highest-value cards. Runs 3x/day now that base is paused.
+# Connection budget: 4 sports × 5 workers = 20 connections per run.
+# With base paused: staple(20) + premium(20) + stars(20) + app(5) = 65 max ✅
+
 on:
   schedule:
-    - cron: '0 8 * * *'  # 8am UTC daily (3am EST) — after master_db_daily at 6am
+    - cron: '0 0 * * *'   # midnight UTC
+    - cron: '0 8 * * *'   # 8am UTC
+    - cron: '0 16 * * *'  # 4pm UTC
   workflow_dispatch:
     inputs:
       sport:
@@ -20,6 +26,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: dawidd6/action-send-mail@v3
+        continue-on-error: true
         with:
           server_address: smtp.gmail.com
           server_port: 465
@@ -142,6 +149,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: dawidd6/action-send-mail@v3
+        continue-on-error: true
         with:
           server_address: smtp.gmail.com
           server_port: 465

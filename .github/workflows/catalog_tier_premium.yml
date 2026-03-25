@@ -1,14 +1,14 @@
-name: Catalog Tier — Premium (Weekly)
+name: Catalog Tier — Premium (Daily)
+
+# Premium = high-value cards, 22% complete with 417K remaining — highest ROI after staple.
+# Runs 4x/day. With base paused: premium(20) + staple(20) + stars(20) + app(5) = 65 max ✅
 
 on:
   schedule:
-    # 4x/day during backfill — premium is 22% complete, 417K cards remaining, highest ROI after staple.
-    # Slots chosen to avoid overlapping with base (midnight/noon, runs 5.5h) and stars (3pm, 5h).
-    # Peak budget: base(48) + premium(20) = 68 connections — under Railway limit of 100.
-    - cron: '0 6 * * *'   # 6am  UTC — after base midnight run finishes (5:30am)
-    - cron: '0 10 * * *'  # 10am UTC — overlaps base noon start briefly: 68 connections ✅
-    - cron: '0 18 * * *'  # 6pm  UTC — after base noon run finishes (5:30pm)
-    - cron: '0 22 * * *'  # 10pm UTC — overlaps base midnight start briefly: 68 connections ✅
+    - cron: '0 2 * * *'   # 2am  UTC
+    - cron: '0 10 * * *'  # 10am UTC
+    - cron: '0 18 * * *'  # 6pm  UTC
+    - cron: '0 22 * * *'  # 10pm UTC
   workflow_dispatch:
     inputs:
       sport:
@@ -26,6 +26,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: dawidd6/action-send-mail@v3
+        continue-on-error: true
         with:
           server_address: smtp.gmail.com
           server_port: 465
@@ -132,6 +133,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: dawidd6/action-send-mail@v3
+        continue-on-error: true
         with:
           server_address: smtp.gmail.com
           server_port: 465

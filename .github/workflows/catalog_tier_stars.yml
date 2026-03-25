@@ -1,11 +1,12 @@
-name: Catalog Tier — Stars (Weekly)
+name: Catalog Tier — Stars (Daily)
+
+# Stars = 66% complete, ~16.5K cards remaining. Runs 2x/day.
+# With base paused: stars(20) + staple(20) + premium(20) + app(5) = 65 max ✅
 
 on:
   schedule:
-    # 3pm UTC — only 16,510 cards remaining, finishes in days at 1x/day.
-    # Moved from noon to 3pm to avoid 3-way overlap with base noon (48) + premium 10am (20) + stars (20) = 88 ❌
-    # At 3pm: base noon ends at 5:30pm, premium 10am ends at 2:30pm — stars runs clean: 20 connections ✅
-    - cron: '0 15 * * *'
+    - cron: '0 4 * * *'   # 4am  UTC
+    - cron: '0 14 * * *'  # 2pm  UTC
   workflow_dispatch:
     inputs:
       sport:
@@ -23,6 +24,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: dawidd6/action-send-mail@v3
+        continue-on-error: true
         with:
           server_address: smtp.gmail.com
           server_port: 465
@@ -129,6 +131,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: dawidd6/action-send-mail@v3
+        continue-on-error: true
         with:
           server_address: smtp.gmail.com
           server_port: 465
