@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { getCatalog, getCatalogFilters, getCatalogCardHistory, aiSearchCatalog, suggestPlayers } from '../api/catalog'
 import { getOwnedIds, addToCollection, getGrades } from '../api/collection'
 import { useCurrency } from '../context/CurrencyContext'
@@ -68,6 +68,7 @@ export default function Catalog() {
   const { fmtPrice } = useCurrency()
   const { user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const isLoggedIn = !!user
 
   const [cards,     setCards]     = useState([])
@@ -133,6 +134,24 @@ export default function Catalog() {
     if (metaDesc) metaDesc.setAttribute('content',
       'Free sports card price database. Search NHL, NBA, NFL, and MLB card values with recent eBay sales history and market trends.')
   }, [])
+
+  // Pick up AI search result passed from the home page
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    if (params.get('ai') !== '1') return
+    const stored = sessionStorage.getItem('aiHomeResult')
+    if (!stored) return
+    sessionStorage.removeItem('aiHomeResult')
+    try {
+      const data = JSON.parse(stored)
+      setAiQuery(data.query || '')
+      setCards(data.cards || [])
+      setTotal(data.total || 0)
+      setPages(data.pages || 1)
+      setAiFilters(data.filters || {})
+      setAiMode(true)
+    } catch (_) {}
+  }, [location.search]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!isLoggedIn) return
