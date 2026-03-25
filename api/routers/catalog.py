@@ -29,6 +29,16 @@ SORT_COLS = {
     "sport":       "cc.sport",
 }
 
+# Multi-column relevance sort: tier → has price → sales volume → value → rookie → name
+FEATURED_ORDER = """
+    CASE cc.scrape_tier WHEN 'staple' THEN 3 WHEN 'premium' THEN 2 WHEN 'stars' THEN 1 ELSE 0 END DESC,
+    CASE WHEN mp.fair_value IS NOT NULL THEN 1 ELSE 0 END DESC,
+    COALESCE(mp.num_sales, 0) DESC,
+    COALESCE(mp.fair_value, 0) DESC,
+    CASE WHEN cc.is_rookie THEN 1 ELSE 0 END DESC,
+    cc.player_name ASC
+"""
+
 
 @router.get("")
 def browse_catalog(
@@ -43,10 +53,10 @@ def browse_catalog(
     card_number: Optional[str]  = Query(None),
     tier:        Optional[str]  = Query(None),
     has_price:   Optional[bool] = Query(None),
-    sort:        str            = Query("year"),
+    sort:        str            = Query("featured"),
     dir:         str            = Query("desc"),
     page:        int            = Query(1, ge=1),
-    per_page:    int            = Query(50, ge=1, le=200),
+    per_page:    int            = Query(25, ge=1, le=200),
 ):
     """Paginated browse of card_catalog with optional market_prices join.
 
@@ -69,7 +79,8 @@ def browse_catalog(
     Returns:
         Dict with keys: cards (list), total (int), page (int), pages (int), per_page (int).
     """
-    sort_col = SORT_COLS.get(sort, "cc.year")
+    use_featured = (sort == "featured")
+    sort_col = SORT_COLS.get(sort, "cc.year") if not use_featured else None
     sort_dir = "DESC" if dir.lower() == "desc" else "ASC"
 
     where_parts = []
@@ -140,15 +151,19 @@ def browse_catalog(
 
     where_sql = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
 
-    # When search is active, prepend relevance rank so best matches sort first.
+    # When search is active, prepend FTS rank so best matches sort first.
     if search:
+        tail = FEATURED_ORDER if use_featured else f"{sort_col} {sort_dir} NULLS LAST, cc.player_name ASC"
         order_sql = (
-            f"ORDER BY ts_rank(cc.search_vector, plainto_tsquery('english', %s)) DESC,"
-            f" {sort_col} {sort_dir} NULLS LAST, cc.player_name ASC"
+            f"ORDER BY ts_rank(cc.search_vector, plainto_tsquery('english', %s)) DESC, {tail}"
         )
         rank_params = [search]
+    elif use_featured:
+        order_sql = f"ORDER BY {FEATURED_ORDER}"
+        rank_params = []
     else:
         order_sql = f"ORDER BY {sort_col} {sort_dir} NULLS LAST, cc.player_name ASC"
+        rank_params = []
 
     base_query = f"""
         FROM card_catalog cc

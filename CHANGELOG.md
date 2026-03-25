@@ -13,6 +13,15 @@ Format: `### [date] — description`
 - % now shows negative values in red (was always hardcoded green)
 - `fmtDelta()` helper handles both positive and negative formatting
 
+### Catalog: featured sort + 25-per-page for faster, better first impressions
+- Default sort changed from `year DESC` to `featured` — surfaces most desirable
+  cards: staple tier → has price → num_sales DESC → fair_value DESC → rookie → name
+- PER_PAGE reduced 50→25: half the DB rows fetched, faster initial load, less scroll
+- `✦` button in table header last column to toggle featured sort on/off
+- Sales column header is now clickable to sort by num_sales
+- `FEATURED_ORDER` SQL constant in catalog.py; search+featured combo: FTS rank first,
+  then featured order as tiebreaker
+
 ### All filter dropdowns now cascade — no phantom options anywhere
 - **CardLedger**: set dropdown scoped to selected year; grade dropdown scoped
   to selected year + set; changing year auto-clears set + grade; changing

@@ -540,6 +540,10 @@
 
 .sortArrow { color: var(--accent); }
 
+.featuredActive   { color: var(--accent); cursor: pointer; }
+.featuredInactive { color: var(--text-muted); cursor: pointer; transition: color 0.12s; }
+.featuredInactive:hover { color: var(--accent); }
+
 .td {
   padding: 10px 14px;
   border-bottom: 1px solid var(--border);

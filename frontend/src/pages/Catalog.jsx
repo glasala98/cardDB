@@ -61,7 +61,7 @@ function CardThumb({ sport, playerName, imageUrl }) {
   )
 }
 
-const PER_PAGE = 50
+const PER_PAGE = 25
 
 export default function Catalog() {
   const { fmtPrice } = useCurrency()
@@ -86,7 +86,7 @@ export default function Catalog() {
   const [showFilters, setShowFilters] = useState(false)
 
   // Sort
-  const [sortKey, setSortKey] = useState('year')
+  const [sortKey, setSortKey] = useState('featured')
   const [sortDir, setSortDir] = useState('desc')
 
   // Quick filters
@@ -256,6 +256,7 @@ export default function Catalog() {
   }, [])
 
   const handleSort = (key) => {
+    if (key === 'featured') { setSortKey('featured'); setSortDir('desc'); return }
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(key); setSortDir('desc') }
   }
@@ -274,7 +275,7 @@ export default function Catalog() {
     setTierFilter('')
     setRcOnly(false)
     setHasPriceFilter(false)
-    setSortKey('year')
+    setSortKey('featured')
     setSortDir('desc')
   }
 
@@ -586,8 +587,23 @@ export default function Catalog() {
                         {sortKey === 'fair_value' && <span className={styles.sortArrow}>{sortDir === 'asc' ? ' ↑' : ' ↓'}</span>}
                       </th>
                       {visibleCols.confidence && <th className={styles.th}>Conf.</th>}
-                      {visibleCols.num_sales  && <th className={`${styles.th} ${styles.thRight}`}>Sales</th>}
-                      <th className={styles.th} style={{ width: 72 }} />
+                      {visibleCols.num_sales  && <th className={`${styles.th} ${styles.thRight}`}>
+                        <span
+                          className={styles.sortable}
+                          onClick={() => handleSort('num_sales')}
+                        >
+                          Sales{sortKey === 'num_sales' && <span className={styles.sortArrow}>{sortDir === 'asc' ? ' ↑' : ' ↓'}</span>}
+                        </span>
+                      </th>}
+                      <th className={styles.th} style={{ width: 72 }}>
+                        <span
+                          className={`${styles.sortable} ${sortKey === 'featured' ? styles.featuredActive : styles.featuredInactive}`}
+                          onClick={() => handleSort('featured')}
+                          title="Sort by most desirable: tier + price + sales activity"
+                        >
+                          ✦{sortKey === 'featured' && <span className={styles.sortArrow}> on</span>}
+                        </span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
