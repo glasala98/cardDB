@@ -7,6 +7,12 @@ Format: `### [date] — description`
 
 ## 2026-03-24
 
+### DB Backup — weekly pg_dump to GitHub Actions artifact
+- `db_backup.yml` runs every Sunday at 2am UTC (after graded scraper finishes)
+- `pg_dump --format=custom --compress=9` — compact binary, restore with `pg_restore`
+- Artifact retained 90 days — download from Actions tab → DB Backup → Artifacts
+- Manual trigger available via `workflow_dispatch` for on-demand backups
+
 ### NHL Stats — now live on player_stats DB + card_catalog prices (DB-first)
 - `nhl_stats` endpoint rewritten: pulls player stats from `player_stats` table (sport='NHL'), joins best rookie card price per player from `card_catalog + market_prices`
 - `catalog_id` included in response — NHLStats page can now deep-link to card sales (Phase 1 TODO)

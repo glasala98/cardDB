@@ -1,0 +1,43 @@
+name: DB Backup — Weekly pg_dump
+
+# Dumps the Railway PostgreSQL database and uploads as a GitHub Actions artifact.
+# Download from: Actions tab → DB Backup → click any run → Artifacts → db-backup
+#
+# Artifact retention: 90 days (GitHub default for paid plans)
+# Schedule: every Sunday at 2am UTC (after graded scraper finishes ~1:30am)
+# Manual trigger also available via workflow_dispatch
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'   # Sunday 2am UTC
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y postgresql-client
+
+      - name: Run pg_dump
+        run: |
+          # Parse connection string into pg_dump args
+          pg_dump "$DATABASE_URL" \
+            --no-password \
+            --format=custom \
+            --compress=9 \
+            --file=carddb_backup_$(date +%Y-%m-%d).dump
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_number }}-${{ github.run_id }}
+          path: carddb_backup_*.dump
+          retention-days: 90
+          if-no-files-found: error

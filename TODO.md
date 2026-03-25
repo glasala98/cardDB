@@ -18,7 +18,7 @@
 ## P1 — Do Next
 
 ### Data / Infra
-- [ ] **Offsite DB backups** — weekly `pg_dump` to Cloudflare R2 via GitHub Actions; test restore before it counts ⚠️ highest priority — 1.7M raw sales rows can't be re-scraped
+- [x] **DB backups** — weekly `pg_dump` via `db_backup.yml`, artifact uploaded to GitHub Actions (90-day retention); download manually from Actions tab
 - [ ] **Connection retry resilience** — `assign_catalog_tiers.py` + `scrape_nhl_stats.py` crash on `server closed the connection unexpectedly`; add reconnect in `db.py`
 - [ ] **eBay affiliate links** — add Partner Network tracking IDs to existing listing links (zero extra scraping)
 
