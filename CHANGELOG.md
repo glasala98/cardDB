@@ -7,6 +7,19 @@ Format: `### [date] — description`
 
 ## 2026-03-24
 
+### NHL Stats — now live on player_stats DB + card_catalog prices (DB-first)
+- `nhl_stats` endpoint rewritten: pulls player stats from `player_stats` table (sport='NHL'), joins best rookie card price per player from `card_catalog + market_prices`
+- `catalog_id` included in response — NHLStats page can now deep-link to card sales (Phase 1 TODO)
+- CSV fallback retained; response shape unchanged, no frontend changes needed
+- Phase 1 DB migration: both Young Guns and NHL Stats now off CSV for primary data
+
+### Graded scraper widened — premium + stars tiers now included
+- `catalog_tier_graded.yml` now runs 3 jobs each Sunday: staple (9am), premium (11am), stars (1pm UTC)
+- Staggered to avoid overlap with base scraper at 6am UTC
+- min_raw_value thresholds: staple $5, premium $3, stars $8 (only high-value stars cards worth grading)
+- PSA/BGS graded prices will now populate for all NHL/NBA/NFL/MLB rookie tiers
+- Connection budget: 4 sports × 3 workers = 12 connections per tier — well within 80 limit
+
 ### Young Guns — now live on card_catalog + market_prices (DB-first)
 - `list_young_guns` endpoint rewritten to query `card_catalog JOIN market_prices WHERE is_rookie=TRUE AND sport='NHL' AND scrape_tier IN ('staple','premium','stars')`
 - Response shape is identical — frontend (MasterDB.jsx) requires zero changes

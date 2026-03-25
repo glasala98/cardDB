@@ -68,9 +68,9 @@ Legacy tables stay until data is fully migrated, then drop them.
 
 ### Phase 1 — Young Guns live on DB *(in progress)*
 - [x] Rewrite `list_young_guns` → queries `card_catalog + market_prices` WHERE `is_rookie=TRUE AND sport='NHL'`; CSV is now fallback only
-- [ ] Widen `catalog_tier_graded.yml` to cover `premium` + `stars` tier rookies (currently staple-only) — more PSA/BGS data in `market_prices.graded_data`
-- [ ] Wire NHL Stats page (`/nhl-stats`) to pull card prices from DB instead of CSV; player stats already in `player_stats` table
-- [ ] Add `catalog_id` field to Young Guns cards response so frontend can deep-link to `/catalog/:id` sales page
+- [x] Widen `catalog_tier_graded.yml` to cover `premium` + `stars` tier rookies — staple 9am, premium 11am, stars 1pm UTC each Sunday
+- [x] Wire `nhl_stats` endpoint to `player_stats` DB table + `card_catalog + market_prices`; CSV fallback retained
+- [x] Add `catalog_id` to Young Guns + NHL Stats responses for `/catalog/:id` deep-links
 
 ### Phase 2 — Ownership migration *(post-backfill, ~Apr 15)*
 - [ ] Young Guns ownership (Owned/CostBasis) migrated from CSV to `collection` table — today it's CSV-backed per user

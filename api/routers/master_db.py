@@ -241,53 +241,119 @@ def yg_portfolio_history():
 
 @router.get("/nhl-stats")
 def nhl_stats():
-    """Return YG cards merged with current-season NHL player stats.
+    """Return NHL players merged with current-season stats and rookie card prices.
 
-    Joins the master DB rows with the nhl_player_stats JSON keyed by player
-    name. Includes skater stats (goals, assists, points, plus_minus, shots),
-    goalie stats (wins, save_pct, gaa), biographical data (birth_country,
-    draft_overall, draft_round), and card pricing.
-
-    Returns:
-        Dict with key 'players' containing a list of merged row dicts.
-        Players not found in the NHL stats data have None for stat fields.
+    DB-first: queries player_stats table for NHL players, then joins card prices
+    from card_catalog + market_prices (best-priced rookie card per player).
+    Falls back to CSV if player_stats table is empty.
     """
+    from psycopg2.extras import RealDictCursor
+
+    # ── DB path ──────────────────────────────────────────────────────────────
+    try:
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # All NHL players from player_stats table
+                cur.execute("""
+                    SELECT player, data
+                    FROM player_stats
+                    WHERE sport = 'NHL'
+                    ORDER BY player
+                """)
+                stat_rows = cur.fetchall()
+
+                # Best rookie card price per player (highest fair_value)
+                cur.execute("""
+                    SELECT DISTINCT ON (cc.player_name)
+                        cc.player_name, cc.year, cc.id AS catalog_id,
+                        mp.fair_value, mp.num_sales, mp.graded_data
+                    FROM card_catalog cc
+                    JOIN market_prices mp ON mp.card_catalog_id = cc.id
+                    WHERE cc.is_rookie = TRUE
+                      AND cc.sport = 'NHL'
+                      AND cc.scrape_tier IN ('staple', 'premium', 'stars')
+                      AND mp.fair_value > 0
+                    ORDER BY cc.player_name, mp.fair_value DESC
+                """)
+                price_rows = {r["player_name"]: r for r in cur.fetchall()}
+
+        if stat_rows:
+            def _gv(gd, grade):
+                v = (gd.get(grade) or {}).get("fair_value")
+                return float(v) if v else None
+
+            result = []
+            for row in stat_rows:
+                player = row["player"]
+                d      = row["data"] or {}
+                cs     = d.get("current_season") or {}
+                bio    = d.get("bio") or {}
+                pr     = price_rows.get(player) or {}
+                gd     = pr.get("graded_data") or {}
+
+                result.append({
+                    "player":        player,
+                    "team":          d.get("current_team", ""),
+                    "position":      d.get("type", ""),
+                    "season":        str(pr.get("year") or ""),
+                    "catalog_id":    pr.get("catalog_id"),
+                    "fair_value":    float(pr["fair_value"]) if pr.get("fair_value") else None,
+                    "psa10_price":   _gv(gd, "PSA 10"),
+                    "psa9_price":    _gv(gd, "PSA 9"),
+                    "num_sales":     int(pr["num_sales"]) if pr.get("num_sales") else None,
+                    "games_played":  cs.get("games_played"),
+                    "goals":         cs.get("goals"),
+                    "assists":       cs.get("assists"),
+                    "points":        cs.get("points"),
+                    "plus_minus":    cs.get("plus_minus"),
+                    "shots":         cs.get("shots"),
+                    "wins":          cs.get("wins"),
+                    "save_pct":      cs.get("save_pct"),
+                    "gaa":           cs.get("gaa"),
+                    "birth_country": bio.get("birth_country", ""),
+                    "draft_overall": bio.get("draft_overall"),
+                    "draft_round":   bio.get("draft_round"),
+                })
+            return {"players": result, "source": "db"}
+
+    except Exception as e:
+        print(f"[nhl_stats] DB query failed, falling back to CSV: {e}")
+
+    # ── CSV fallback ──────────────────────────────────────────────────────────
     df = load_master_db()
-    stats_data = load_nhl_player_stats()
+    stats_data   = load_nhl_player_stats()
     players_data = stats_data.get("players", {})
 
     result = []
     for _, r in df.fillna("").iterrows():
         player_name = r.get("PlayerName", "")
-        ps = players_data.get(player_name, {})
-        cs = ps.get("current_season", {})
+        ps  = players_data.get(player_name, {})
+        cs  = ps.get("current_season", {})
         bio = ps.get("bio", {})
         result.append({
             "player":        player_name,
             "team":          r.get("Team", ""),
             "position":      r.get("Position", ""),
             "season":        r.get("Season", ""),
+            "catalog_id":    None,
             "fair_value":    _num(r, "FairValue"),
             "psa10_price":   _num(r, "PSA10_Value"),
             "psa9_price":    _num(r, "PSA9_Value"),
             "num_sales":     _num(r, "NumSales"),
-            # Current-season stats (skaters)
             "games_played":  cs.get("games_played"),
             "goals":         cs.get("goals"),
             "assists":       cs.get("assists"),
             "points":        cs.get("points"),
             "plus_minus":    cs.get("plus_minus"),
             "shots":         cs.get("shots"),
-            # Goalie-specific stats
             "wins":          cs.get("wins"),
             "save_pct":      cs.get("save_pct"),
             "gaa":           cs.get("gaa"),
-            # Bio
             "birth_country": bio.get("birth_country", ""),
             "draft_overall": bio.get("draft_overall"),
             "draft_round":   bio.get("draft_round"),
         })
-    return {"players": result}
+    return {"players": result, "source": "csv"}
 
 
 @router.get("/seasonal-trends")

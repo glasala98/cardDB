@@ -1,15 +1,27 @@
-name: Catalog — Graded Prices (Staple Tier)
+name: Catalog — Graded Prices (Staple + Premium + Stars)
 
-# Scrapes PSA/BGS graded prices for all staple-tier catalog cards.
+# Scrapes PSA/BGS graded prices for staple, premium, and stars tier catalog cards.
 # Writes results into market_prices.graded_data (JSONB) so the
-# Grading ROI Calculator has data for any card in the catalog.
+# Grading ROI Calculator and Young Guns page have full graded price coverage.
+#
+# Schedule (staggered to avoid DB connection overlap with base scraper at 6am UTC):
+#   Staple  — Sunday  9am UTC  (highest priority, lowest min_raw_value)
+#   Premium — Sunday 11am UTC  (medium priority, $3+ raw value)
+#   Stars   — Sunday  1pm UTC  (lower priority, $8+ raw value — only worthwhile cards)
+#
+# Connection budget: 4 sports × 3 workers = 12 connections per tier run (well under 80 limit)
 
 on:
   schedule:
-    # Every Sunday at 6am UTC (after staple raw prices run at 8am UTC Sat)
-    - cron: '0 6 * * 0'
+    - cron: '0 9 * * 0'   # Sunday 9am UTC — staple
+    - cron: '0 11 * * 0'  # Sunday 11am UTC — premium
+    - cron: '0 13 * * 0'  # Sunday 1pm UTC — stars
   workflow_dispatch:
     inputs:
+      tier:
+        description: 'Catalog tier to scrape (staple/premium/stars)'
+        required: false
+        default: 'staple'
       sport:
         description: 'Sport filter (NHL/NBA/NFL/MLB or blank for all)'
         required: false
@@ -21,38 +33,101 @@ on:
 
 jobs:
   graded-staple:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.tier == 'staple' || github.event.schedule == '0 9 * * 0'
     runs-on: ubuntu-latest
     timeout-minutes: 300
-
     strategy:
       matrix:
         sport: [NHL, NBA, NFL, MLB]
       fail-fast: false
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
       - name: Install Python deps
         run: pip install -r requirements.txt
-
       - name: Install Chrome
         run: |
           wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
           sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
           sudo apt-get update -q
           sudo apt-get install -y google-chrome-stable
-
-      - name: Scrape graded prices — ${{ matrix.sport }} staple cards
+      - name: Scrape graded prices — ${{ matrix.sport }} staple
         run: |
           python -u scraping/scrape_master_db.py \
             --sport ${{ matrix.sport }} \
             --catalog-tier staple \
             --graded \
             --min-raw-value ${{ github.event.inputs.min_raw_value || '5.0' }} \
+            --max-hours 4.5 \
+            --workers 3
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+
+  graded-premium:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.tier == 'premium' || github.event.schedule == '0 11 * * 0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      matrix:
+        sport: [NHL, NBA, NFL, MLB]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+      - name: Install Chrome
+        run: |
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+          sudo apt-get update -q
+          sudo apt-get install -y google-chrome-stable
+      - name: Scrape graded prices — ${{ matrix.sport }} premium
+        run: |
+          python -u scraping/scrape_master_db.py \
+            --sport ${{ matrix.sport }} \
+            --catalog-tier premium \
+            --graded \
+            --min-raw-value 3.0 \
+            --max-hours 4.5 \
+            --workers 3
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+
+  graded-stars:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.tier == 'stars' || github.event.schedule == '0 13 * * 0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      matrix:
+        sport: [NHL, NBA, NFL, MLB]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python deps
+        run: pip install -r requirements.txt
+      - name: Install Chrome
+        run: |
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+          sudo apt-get update -q
+          sudo apt-get install -y google-chrome-stable
+      - name: Scrape graded prices — ${{ matrix.sport }} stars
+        run: |
+          python -u scraping/scrape_master_db.py \
+            --sport ${{ matrix.sport }} \
+            --catalog-tier stars \
+            --graded \
+            --min-raw-value 8.0 \
             --max-hours 4.5 \
             --workers 3
         env:
