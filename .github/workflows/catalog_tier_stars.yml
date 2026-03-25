@@ -22,6 +22,7 @@ jobs:
   notify-start:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    continue-on-error: true
     steps:
       - uses: dawidd6/action-send-mail@v3
         continue-on-error: true
@@ -42,9 +43,9 @@ jobs:
 
   scrape-stars-nhl:
     needs: notify-start
+    if: always() && (github.event.inputs.sport == '' || github.event.inputs.sport == 'NHL')
     runs-on: ubuntu-latest
     timeout-minutes: 360
-    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NHL' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -63,9 +64,9 @@ jobs:
 
   scrape-stars-nba:
     needs: notify-start
+    if: always() && (github.event.inputs.sport == '' || github.event.inputs.sport == 'NBA')
     runs-on: ubuntu-latest
     timeout-minutes: 360
-    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NBA' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -84,9 +85,9 @@ jobs:
 
   scrape-stars-nfl:
     needs: notify-start
+    if: always() && (github.event.inputs.sport == '' || github.event.inputs.sport == 'NFL')
     runs-on: ubuntu-latest
     timeout-minutes: 360
-    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NFL' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -105,9 +106,9 @@ jobs:
 
   scrape-stars-mlb:
     needs: notify-start
+    if: always() && (github.event.inputs.sport == '' || github.event.inputs.sport == 'MLB')
     runs-on: ubuntu-latest
     timeout-minutes: 360
-    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'MLB' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
