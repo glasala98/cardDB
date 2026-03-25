@@ -145,21 +145,66 @@ SITE_URL = os.environ.get("SITE_URL", "https://southwestsportscards.ca")
 def robots_txt():
     return f"User-agent: *\nAllow: /\nSitemap: {SITE_URL}/sitemap.xml\n"
 
+_SITEMAP_PAGE_SIZE = 45000  # well under Google's 50K limit per file
+
 @app.get("/sitemap.xml")
-def sitemap_xml():
-    """Generate sitemap of all priced catalog cards for Google indexing."""
+def sitemap_index():
+    """Sitemap index — points to /sitemap-0.xml, /sitemap-1.xml, etc."""
     from fastapi.responses import Response as FastAPIResponse
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
-                cur.execute("SET statement_timeout = '10s'")
+                cur.execute("SET statement_timeout = '5s'")
+                cur.execute("SELECT COUNT(*) FROM market_prices WHERE fair_value > 0")
+                total = cur.fetchone()[0]
+    except Exception:
+        total = 0
+
+    num_shards = max(1, math.ceil(total / _SITEMAP_PAGE_SIZE))
+    parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        # Static pages sitemap always first
+        f'  <sitemap><loc>{SITE_URL}/sitemap-static.xml</loc></sitemap>',
+    ]
+    for i in range(num_shards):
+        parts.append(f'  <sitemap><loc>{SITE_URL}/sitemap-cards-{i}.xml</loc></sitemap>')
+    parts.append('</sitemapindex>')
+    return FastAPIResponse('\n'.join(parts), media_type='application/xml')
+
+
+@app.get("/sitemap-static.xml")
+def sitemap_static():
+    """Sitemap for main site pages."""
+    from fastapi.responses import Response as FastAPIResponse
+    parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        f'  <url><loc>{SITE_URL}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>',
+        f'  <url><loc>{SITE_URL}/catalog</loc><changefreq>daily</changefreq><priority>0.9</priority></url>',
+        f'  <url><loc>{SITE_URL}/trending</loc><changefreq>daily</changefreq><priority>0.8</priority></url>',
+        f'  <url><loc>{SITE_URL}/sets</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>',
+        f'  <url><loc>{SITE_URL}/releases</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>',
+        '</urlset>',
+    ]
+    return FastAPIResponse('\n'.join(parts), media_type='application/xml')
+
+
+@app.get("/sitemap-cards-{shard}.xml")
+def sitemap_cards(shard: int):
+    """Sitemap shard for card detail pages."""
+    from fastapi.responses import Response as FastAPIResponse
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SET statement_timeout = '15s'")
                 cur.execute("""
                     SELECT mp.card_catalog_id
                     FROM market_prices mp
                     WHERE mp.fair_value > 0
                     ORDER BY mp.card_catalog_id
-                    LIMIT 50000
-                """)
+                    LIMIT %s OFFSET %s
+                """, [_SITEMAP_PAGE_SIZE, shard * _SITEMAP_PAGE_SIZE])
                 ids = [row[0] for row in cur.fetchall()]
     except Exception:
         ids = []
@@ -167,10 +212,6 @@ def sitemap_xml():
     parts = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-        f'  <url><loc>{SITE_URL}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>',
-        f'  <url><loc>{SITE_URL}/catalog</loc><changefreq>daily</changefreq><priority>0.9</priority></url>',
-        f'  <url><loc>{SITE_URL}/trending</loc><changefreq>daily</changefreq><priority>0.7</priority></url>',
-        f'  <url><loc>{SITE_URL}/sets</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>',
     ]
     for cid in ids:
         parts.append(f'  <url><loc>{SITE_URL}/catalog/{cid}</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>')
