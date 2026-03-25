@@ -89,6 +89,9 @@ export default function Catalog() {
   const [sortKey, setSortKey] = useState('year')
   const [sortDir, setSortDir] = useState('desc')
 
+  // Quick filters
+  const [hasPriceFilter, setHasPriceFilter] = useState(false)
+
   // Filter options
   const [years, setYears] = useState([])
   const [sets,  setSets]  = useState([])
@@ -203,12 +206,13 @@ export default function Catalog() {
       per_page: PER_PAGE,
       sort:     sortKey,
       dir:      sortDir,
-      ...(search     && { search }),
-      ...(sport      && { sport }),
-      ...(year       && { year }),
-      ...(setName    && { set_name: setName }),
-      ...(tierFilter && { tier: tierFilter }),
-      ...(rcOnly     && { is_rookie: true }),
+      ...(search          && { search }),
+      ...(sport           && { sport }),
+      ...(year            && { year }),
+      ...(setName         && { set_name: setName }),
+      ...(tierFilter      && { tier: tierFilter }),
+      ...(rcOnly          && { is_rookie: true }),
+      ...(hasPriceFilter  && { has_price: true }),
       ...overrides,
     }
     getCatalog(params)
@@ -220,7 +224,7 @@ export default function Catalog() {
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [search, sport, year, setName, tierFilter, rcOnly, sortKey, sortDir])
+  }, [search, sport, year, setName, tierFilter, rcOnly, hasPriceFilter, sortKey, sortDir])
 
   useEffect(() => {
     clearTimeout(searchTimer.current)
@@ -229,7 +233,7 @@ export default function Catalog() {
       fetchPage(1)
     }, search ? 350 : 0)
     return () => clearTimeout(searchTimer.current)
-  }, [search, sport, year, setName, tierFilter, rcOnly, sortKey, sortDir]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [search, sport, year, setName, tierFilter, rcOnly, hasPriceFilter, sortKey, sortDir]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch autocomplete suggestions when search input changes
   useEffect(() => {
@@ -267,6 +271,7 @@ export default function Catalog() {
     setSetName('')
     setTierFilter('')
     setRcOnly(false)
+    setHasPriceFilter(false)
     setSortKey('year')
     setSortDir('desc')
   }
@@ -297,7 +302,7 @@ export default function Catalog() {
     fetchPage(1)
   }
 
-  const hasFilters = !!(search || sport || year || setName || tierFilter || rcOnly)
+  const hasFilters = !!(search || sport || year || setName || tierFilter || rcOnly || hasPriceFilter)
 
   return (
     <div className={pageStyles.page}>
@@ -307,7 +312,9 @@ export default function Catalog() {
       <div className={styles.topBar}>
         <div className={styles.topBarLeft}>
           <h1 className={styles.pageTitle}>Card Catalog</h1>
-          <span className={styles.countBadge}>{total.toLocaleString()} cards</span>
+          <span className={styles.countBadge}>
+            {hasFilters ? `${total.toLocaleString()} results` : `${total.toLocaleString()} cards`}
+          </span>
           <button
             className={`${styles.filterToggleBtn} ${hasFilters ? styles.filterToggleActive : ''}`}
             onClick={() => setShowFilters(true)}
@@ -374,8 +381,13 @@ export default function Catalog() {
 
           <div className={styles.filterSection}>
             <span className={styles.filterLabel}>Year</span>
-            <select className={styles.sideSelect} value={year} onChange={e => setYear(e.target.value)}>
-              <option value="">All Years</option>
+            <select
+              className={styles.sideSelect}
+              value={year}
+              onChange={e => setYear(e.target.value)}
+              disabled={!sport}
+            >
+              <option value="">{sport ? 'All Years' : 'Select sport first'}</option>
               {years.map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
@@ -420,6 +432,54 @@ export default function Catalog() {
 
         {/* ── Main area ──────────────────────────────────────────── */}
         <div className={styles.mainArea}>
+
+          {/* Sport quick-tabs + Priced toggle */}
+          <div className={styles.quickFilters}>
+            <div className={styles.sportTabsMain}>
+              {['', ...SPORTS].map(s => {
+                const color = s ? SPORT_COLORS[s]?.text : null
+                const isActive = sport === s
+                return (
+                  <button
+                    key={s || 'all'}
+                    className={`${styles.sportTabMain} ${isActive ? styles.sportTabMainActive : ''}`}
+                    style={isActive && color ? { borderColor: color, color, background: color + '22' } : {}}
+                    onClick={() => { setSport(s); setYear(''); setSetName('') }}
+                  >{s || 'All'}</button>
+                )
+              })}
+            </div>
+            <button
+              className={`${styles.pricedBtn} ${hasPriceFilter ? styles.pricedBtnActive : ''}`}
+              onClick={() => setHasPriceFilter(v => !v)}
+              title="Only show cards with a market price"
+            >Priced</button>
+          </div>
+
+          {/* Active filter chips */}
+          {hasFilters && !aiMode && (
+            <div className={styles.filterChips}>
+              {search && (
+                <span className={styles.filterChip}>"{search}" <button onClick={() => setSearch('')}>×</button></span>
+              )}
+              {year && (
+                <span className={styles.filterChip}>{year} <button onClick={() => setYear('')}>×</button></span>
+              )}
+              {setName && (
+                <span className={styles.filterChip}>{setName.length > 22 ? setName.slice(0, 20) + '…' : setName} <button onClick={() => setSetName('')}>×</button></span>
+              )}
+              {tierFilter && (
+                <span className={styles.filterChip}>{TIER_LABELS[tierFilter]} <button onClick={() => setTierFilter('')}>×</button></span>
+              )}
+              {rcOnly && (
+                <span className={styles.filterChip}>RC Only <button onClick={() => setRcOnly(false)}>×</button></span>
+              )}
+              {hasPriceFilter && (
+                <span className={styles.filterChip}>Priced <button onClick={() => setHasPriceFilter(false)}>×</button></span>
+              )}
+              <button className={styles.clearAllChip} onClick={clearFilters}>Clear all</button>
+            </div>
+          )}
 
           {/* AI search bar */}
           <form className={styles.aiSearchBar} onSubmit={handleAiSearch}>

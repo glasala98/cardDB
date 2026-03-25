@@ -13,6 +13,13 @@ Format: `### [date] — description`
 - % now shows negative values in red (was always hardcoded green)
 - `fmtDelta()` helper handles both positive and negative formatting
 
+### Catalog Browse — sport tabs, active filter chips, Priced toggle
+- Sport quick-tabs now visible in main area above AI search (All/NHL/NBA/NFL/MLB)
+- Active filter chips appear below sport tabs showing what's filtered, each removable with ×
+- "Priced" quick toggle to show only cards with a market price (useful during backfill)
+- Year dropdown disables + shows "Select sport first" hint when no sport selected
+- Count badge says "X results" when filters active vs "X cards" when unfiltered
+
 ### Scan Card page — proper full-page layout (no more modal wrapper)
 - `ScanPage.jsx` now renders `ScanCardModal` in `pageMode` — no overlay, no backdrop
 - Added `pageContainer`, `pageCard`, `pageHeader` CSS for clean page layout
