@@ -109,7 +109,7 @@ scrape_card_prices._thread_local = _thread_local
 scrape_card_prices.get_driver = _get_fast_driver
 _orig_sleep = time.sleep
 scrape_card_prices.time = type(time)('time')
-scrape_card_prices.time.sleep = lambda s: _orig_sleep(min(s, 0.3))
+scrape_card_prices.time.sleep = lambda s: _orig_sleep(min(s, 2.0))  # was 0.3 — increased to reduce eBay bot detection
 scrape_card_prices.time.time = time.time
 
 

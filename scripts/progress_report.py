@@ -163,10 +163,11 @@ DB size:         {db_size}
 """
     subject = f"CardDB — S:{tier_rows.get('staple', {}).get('priced', 0) / max(tier_rows.get('staple', {}).get('total', 1), 1) * 100:.0f}% P:{tier_rows.get('premium', {}).get('priced', 0) / max(tier_rows.get('premium', {}).get('total', 1), 1) * 100:.0f}% St:{tier_rows.get('stars', {}).get('priced', 0) / max(tier_rows.get('stars', {}).get('total', 1), 1) * 100:.0f}% B:{base_pct:.0f}% | {pace_emoji} base"
 
-    # Smart send: first hour of scrape (0/6/8/10/12/15/18/22 UTC), noon digest, milestones
+    # Smart send: first 20min of each scrape trigger hour + noon digest + milestones
+    # Staple: 0, 8, 16 UTC | Stars: 4, 14 UTC | Premium: 0, 4, 8, 12, 16, 20 UTC
     now_utc = datetime.now(timezone.utc)
     h, m    = now_utc.hour, now_utc.minute
-    scrape_hours  = {0, 6, 8, 10, 12, 15, 18, 22}
+    scrape_hours  = {0, 4, 8, 12, 14, 16, 20}
     is_first_hour = h in scrape_hours and m < 20
     is_noon       = (h == 12 and m < 20)
 

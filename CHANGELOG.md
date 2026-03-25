@@ -7,6 +7,12 @@ Format: `### [date] — description`
 
 ## 2026-03-25
 
+### Perf: increase eBay sleep cap 0.3s → 2.0s to reduce bot detection
+The scraper was overriding all internal sleeps to max 0.3s, causing eBay to detect and block GitHub Actions runner IPs after ~300 cards. Increasing to 2.0s extends the fresh-IP window significantly before blocking kicks in.
+
+### Fix: progress email smart-send hours updated to match current schedules
+Was firing at `{0,6,8,10,12,15,18,22}` UTC — missing 4, 14, 16, 20 UTC. Updated to `{0,4,8,12,14,16,20}` to match actual Staple (0/8/16), Stars (4/14), and Premium (0/4/8/12/16/20) trigger times.
+
 ### Fix: progress email hides misleading base ETA when paused
 Added `BASE_PAUSED` flag to `scripts/progress_report.py`. When True, the base backfill section shows a clean "⏸ Paused" status instead of a behind-schedule warning and stale ETA. Set to False when base schedule is re-enabled.
 
