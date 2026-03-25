@@ -12,6 +12,7 @@ from email.mime.text import MIMEText
 
 BACKFILL_START = date(2026, 3, 23)   # First clean run Mar 23 evening
 TARGET_DAILY   = 270_000             # 24 shards × 4 runs/day
+BASE_PAUSED    = True                # Set False when base schedule re-enabled
 MILESTONES     = [(25, "25%"), (50, "50%"), (75, "75%"), (90, "90%"), (100, "100%")]
 
 BASE_TARGET = {"NFL": 479_793, "NBA": 298_550, "MLB": 765_186}
@@ -127,12 +128,16 @@ def run(force: bool = False):
         )
 
     now_str = datetime.now(timezone.utc).strftime("%b %d %Y at %H:%M UTC")
-    body = f"""CardDB Scrape Progress — {now_str}
-{"=" * 60}
 
-{chr(10).join(tier_lines)}
-
-{"─" * 60}
+    if BASE_PAUSED:
+        base_section = f"""{"─" * 60}
+BASE BACKFILL — NFL/NBA/MLB 2015+
+  STATUS  ⏸  Paused — priority tiers (staple/premium/stars) running first
+  Progress so far: {total_base_priced:,} / {TOTAL_BASE_TARGET:,}  ({base_pct:.1f}%)
+  Will resume when staple ~100%, premium ~80%, stars ~100%"""
+        pace_emoji = "⏸"
+    else:
+        base_section = f"""{"─" * 60}
 BASE BACKFILL — NFL/NBA/MLB 2015+
   PACE  {pace_emoji}  {pace_label}
   Actual rate:   {actual_daily:,.0f} cards/day
@@ -142,7 +147,14 @@ BASE BACKFILL — NFL/NBA/MLB 2015+
   Total priced: {total_base_priced:,} / {TOTAL_BASE_TARGET:,}  ({base_pct:.1f}%)
   Day {days_elapsed} of backfill — expected {int(expected):,} by now
 
-{chr(10).join(ms_lines)}
+{chr(10).join(ms_lines)}"""
+
+    body = f"""CardDB Scrape Progress — {now_str}
+{"=" * 60}
+
+{chr(10).join(tier_lines)}
+
+{base_section}
 
 {"─" * 60}
 Overall catalog: {total_priced:,} / {total_catalog:,}  ({overall_pct:.1f}%)

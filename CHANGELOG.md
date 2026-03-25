@@ -7,6 +7,9 @@ Format: `### [date] — description`
 
 ## 2026-03-25
 
+### Fix: progress email hides misleading base ETA when paused
+Added `BASE_PAUSED` flag to `scripts/progress_report.py`. When True, the base backfill section shows a clean "⏸ Paused" status instead of a behind-schedule warning and stale ETA. Set to False when base schedule is re-enabled.
+
 ### Fix: email failures no longer block scraping
 Added `continue-on-error: true` at the **job level** on `notify-start` in all 3 tier workflows (staple, premium, stars), and `if: always()` on the first downstream job in each. Previously, a transient SMTP failure caused `notify-start` to fail, which skipped all downstream scrape jobs. Now email and scraping are fully decoupled — SMTP down = email skipped, scraping runs anyway.
 
