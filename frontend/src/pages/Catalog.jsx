@@ -6,6 +6,7 @@ import { useCurrency } from '../context/CurrencyContext'
 import { useAuth } from '../context/AuthContext'
 import PageTabs from '../components/PageTabs'
 import CatalogCardDetail from '../components/CatalogCardDetail'
+import ImageLightbox from '../components/ImageLightbox'
 import styles from './Catalog.module.css'
 import pageStyles from './Page.module.css'
 
@@ -41,14 +42,14 @@ function loadColPrefs() {
   } catch { return DEFAULT_VISIBLE }
 }
 
-function CardThumb({ sport, playerName, imageUrl }) {
+function CardThumb({ sport, playerName, imageUrl, hasImage }) {
   const colors = SPORT_COLORS[sport] || { bg: '#1e1e2e', text: '#888' }
   const initials = playerName
     ? playerName.split(' ').filter(Boolean).map(p => p[0]).slice(0, 2).join('').toUpperCase()
     : '?'
   if (imageUrl) {
     return (
-      <div className={styles.cardThumb}>
+      <div className={styles.cardThumb} style={hasImage ? { cursor: 'zoom-in' } : {}}>
         <img src={imageUrl} alt={playerName} className={styles.cardThumbImg} />
       </div>
     )
@@ -121,6 +122,10 @@ export default function Catalog() {
   const [detailCard,    setDetailCard]    = useState(null)
   const [detailHistory, setDetailHistory] = useState([])
   const [detailLoading, setDetailLoading] = useState(false)
+
+  // Lightbox
+  const [lightboxSrc,  setLightboxSrc]  = useState(null)
+  const [lightboxAlt,  setLightboxAlt]  = useState('')
 
   useEffect(() => {
     if (!isLoggedIn) return
@@ -586,8 +591,8 @@ export default function Catalog() {
                         Price
                         {sortKey === 'fair_value' && <span className={styles.sortArrow}>{sortDir === 'asc' ? ' ↑' : ' ↓'}</span>}
                       </th>
-                      {visibleCols.confidence && <th className={styles.th}>Conf.</th>}
-                      {visibleCols.num_sales  && <th className={`${styles.th} ${styles.thRight}`}>
+                      {visibleCols.confidence && <th className={`${styles.th} ${styles.hideMobile}`}>Conf.</th>}
+                      {visibleCols.num_sales  && <th className={`${styles.th} ${styles.thRight} ${styles.hideMobile}`}>
                         <span
                           className={styles.sortable}
                           onClick={() => handleSort('num_sales')}
@@ -614,11 +619,15 @@ export default function Catalog() {
                         onClick={() => handleRowClick(row)}
                       >
                         {/* Thumbnail */}
-                        <td className={`${styles.td} ${styles.tdThumb}`}>
+                        <td
+                          className={`${styles.td} ${styles.tdThumb}`}
+                          onClick={row.image_url ? (e) => { e.stopPropagation(); setLightboxSrc(row.image_url); setLightboxAlt(row.player_name) } : undefined}
+                        >
                           <CardThumb
                             sport={row.sport}
                             playerName={row.player_name}
                             imageUrl={row.image_url}
+                            hasImage={!!row.image_url}
                           />
                         </td>
 
@@ -679,7 +688,7 @@ export default function Catalog() {
 
                         {/* Optional: Confidence */}
                         {visibleCols.confidence && (
-                          <td className={styles.td}>
+                          <td className={`${styles.td} ${styles.hideMobile}`}>
                             {row.confidence
                               ? <span className={`${styles.conf} ${styles['conf_' + row.confidence]}`}>{row.confidence}</span>
                               : <span className={styles.muted}>—</span>
@@ -689,7 +698,7 @@ export default function Catalog() {
 
                         {/* Optional: Sales */}
                         {visibleCols.num_sales && (
-                          <td className={`${styles.td} ${styles.tdRight}`}>
+                          <td className={`${styles.td} ${styles.tdRight} ${styles.hideMobile}`}>
                             <span className={styles.muted}>{row.num_sales ?? '—'}</span>
                           </td>
                         )}
@@ -749,6 +758,15 @@ export default function Catalog() {
           isOwned={ownedIds.has(detailCard.id)}
           onAdd={() => { setDetailCard(null); handleAdd(detailCard) }}
           onClose={() => setDetailCard(null)}
+        />
+      )}
+
+      {/* Image lightbox */}
+      {lightboxSrc && (
+        <ImageLightbox
+          src={lightboxSrc}
+          alt={lightboxAlt}
+          onClose={() => setLightboxSrc(null)}
         />
       )}
 

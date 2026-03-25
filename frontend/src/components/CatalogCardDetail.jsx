@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCurrency } from '../context/CurrencyContext'
 import { getCatalogRawSales } from '../api/catalog'
+import ImageLightbox from './ImageLightbox'
 import styles from './CatalogCardDetail.module.css'
 
 export default function CatalogCardDetail({ card, history, loading, isLoggedIn, isOwned, onAdd, onClose }) {
@@ -12,6 +13,7 @@ export default function CatalogCardDetail({ card, history, loading, isLoggedIn, 
   const [rawLoading, setRawLoading] = useState(false)
   const [rawOffset, setRawOffset] = useState(0)
   const [rawTotal, setRawTotal] = useState(0)
+  const [lightbox, setLightbox] = useState(false)
   const PAGE = 50
 
   const loadRawSales = useCallback((offset = 0) => {
@@ -65,6 +67,19 @@ export default function CatalogCardDetail({ card, history, loading, isLoggedIn, 
           </div>
           <button className={styles.closeBtn} onClick={onClose}>✕</button>
         </div>
+
+        {/* Card image */}
+        {card.image_url && (
+          <div className={styles.imageWrap}>
+            <img
+              src={card.image_url}
+              alt={card.player_name}
+              className={styles.cardImage}
+              onClick={() => setLightbox(true)}
+              title="Click to enlarge"
+            />
+          </div>
+        )}
 
         {/* Price summary */}
         <div className={styles.priceRow}>
@@ -215,5 +230,13 @@ export default function CatalogCardDetail({ card, history, loading, isLoggedIn, 
         </div>
       </div>
     </div>
+
+    {lightbox && card.image_url && (
+      <ImageLightbox
+        src={card.image_url}
+        alt={card.player_name}
+        onClose={() => setLightbox(false)}
+      />
+    )}
   )
 }

@@ -25,9 +25,9 @@
 - [x] **VACUUM tuning** — `migrate_autovacuum_tuning.py` runs on deploy; scale_factor=1% on market_raw_sales, market_prices, market_price_history
 
 ### Frontend / UX
-- [ ] **Mobile catalog layout** — card catalog needs responsive column collapse; live but broken on mobile
+- [x] **Mobile catalog layout** — Confidence/Sales columns hidden on mobile; column toggles hidden; table fits at 375px
 - [ ] **Google AdSense** — integrate on public pages (`/catalog`, `/trending`, `/releases`, `/sets`)
-- [ ] **Portfolio value over time chart** — data exists in `portfolio_history`, needs the line chart on `/charts`
+- [x] **Portfolio value over time chart** — AreaChart on `/charts` using `GET /cards/portfolio-history`
 
 ---
 

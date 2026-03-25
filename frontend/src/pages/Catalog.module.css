@@ -819,6 +819,26 @@
   animation: shimmer 1.4s infinite linear;
 }
 
+/* ── Mobile-responsive column hiding ──────────────────── */
+@media (max-width: 600px) {
+  .hideMobile { display: none !important; }
+
+  /* Tighten padding on small screens */
+  .td, .th { padding-left: 8px; padding-right: 8px; }
+  .tdThumb  { padding-left: 8px; }
+  .tdAction { padding-right: 8px; }
+
+  /* Hide column toggles on mobile — not useful at this width */
+  .colToggleRow { display: none; }
+
+  /* Compress sport tabs */
+  .sportTabMain { padding: 4px 9px; font-size: 11px; }
+  .pricedBtn    { padding: 4px 9px; font-size: 11px; }
+
+  /* Shorten pagination info */
+  .pgInfo { display: none; }
+}
+
 /* ── Loading bar ───────────────────────────────────────── */
 .loadingBar {
   height: 2px;

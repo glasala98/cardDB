@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts'
-import { getCards } from '../api/cards'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend, AreaChart, Area, CartesianGrid } from 'recharts'
+import { getCards, getPortfolioHistory } from '../api/cards'
 import { useCurrency } from '../context/CurrencyContext'
 import PageTabs from '../components/PageTabs'
 import pageStyles from './Page.module.css'
@@ -15,14 +15,23 @@ const TREND_COLORS = { up: '#4caf82', stable: '#4f8ef7', down: '#e05c5c', 'no da
 const GRADE_COLORS = ['#4f8ef7','#7c5cbf','#e0a43c','#4caf82','#e05c5c','#9aa0b4']
 
 export default function Charts() {
-  const [cards,   setCards]   = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error,   setError]   = useState(null)
+  const [cards,         setCards]         = useState([])
+  const [portfolioHist, setPortfolioHist] = useState([])
+  const [loading,       setLoading]       = useState(true)
+  const [error,         setError]         = useState(null)
   const { fmtPrice } = useCurrency()
 
   useEffect(() => {
-    getCards()
-      .then(d => setCards(d.cards || []))
+    Promise.all([
+      getCards().then(d => setCards(d.cards || [])),
+      getPortfolioHistory().then(d => {
+        const hist = (d.history || []).map(h => ({
+          ...h,
+          dateLabel: h.date ? h.date.slice(5) : h.date, // MM-DD
+        }))
+        setPortfolioHist(hist)
+      }).catch(() => {}),
+    ])
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
@@ -116,6 +125,48 @@ export default function Charts() {
         <StatCard label="Unrealized P&L"  value={fmtPrice(totalValue - totalCost)}
           color={totalValue >= totalCost ? 'success' : 'danger'} />
       </div>
+
+      {/* Portfolio Value Over Time */}
+      {portfolioHist.length > 1 && (
+        <div className={styles.chartSection}>
+          <h2 className={styles.chartTitle}>Portfolio Value Over Time</h2>
+          <p className={styles.chartSub}>Total collection value by date</p>
+          <ResponsiveContainer width="100%" height={260}>
+            <AreaChart data={portfolioHist} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+              <defs>
+                <linearGradient id="portfolioGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#00d4aa" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#00d4aa" stopOpacity={0}    />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <XAxis
+                dataKey="dateLabel"
+                tick={{ fill: '#9aa0b4', fontSize: 10 }}
+                interval="preserveStartEnd"
+              />
+              <YAxis
+                tick={{ fill: '#9aa0b4', fontSize: 11 }}
+                tickFormatter={v => `$${v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v}`}
+              />
+              <Tooltip
+                contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8 }}
+                formatter={(v) => [fmtPrice(v), 'Portfolio Value']}
+                labelFormatter={(label, payload) => payload?.[0]?.payload?.date || label}
+              />
+              <Area
+                type="monotone"
+                dataKey="total_value"
+                stroke="#00d4aa"
+                strokeWidth={2}
+                fill="url(#portfolioGrad)"
+                dot={portfolioHist.length <= 30}
+                activeDot={{ r: 4, fill: '#00d4aa' }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Price Distribution */}
       <div className={styles.chartSection}>
