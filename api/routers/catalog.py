@@ -341,7 +341,7 @@ def catalog_raw_sales(
         low_val  = float(agg[3]) if agg[3] is not None else None
 
         cur.execute(f"""
-            SELECT id, sold_date, price_val, title, source,
+            SELECT id, sold_date, price_val, shipping_val, title, source,
                    grade, grade_company, grade_numeric,
                    serial_number, print_run,
                    lot_url, image_url,
@@ -358,6 +358,7 @@ def catalog_raw_sales(
         for r in cur.fetchall():
             s = dict(zip(cols, r))
             s["price_val"]     = float(s["price_val"])     if s["price_val"]     is not None else None
+            s["shipping_val"]  = float(s["shipping_val"])  if s["shipping_val"]  is not None else None
             s["grade_numeric"] = float(s["grade_numeric"]) if s["grade_numeric"] is not None else None
             s["hammer_price"]  = float(s["hammer_price"])  if s["hammer_price"]  is not None else None
             s["sold_date"]     = s["sold_date"].isoformat()  if s["sold_date"]  else None

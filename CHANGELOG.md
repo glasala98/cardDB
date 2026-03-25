@@ -7,6 +7,26 @@ Format: `### [date] — description`
 
 ## 2026-03-24
 
+### Young Guns — now live on card_catalog + market_prices (DB-first)
+- `list_young_guns` endpoint rewritten to query `card_catalog JOIN market_prices WHERE is_rookie=TRUE AND sport='NHL' AND scrape_tier IN ('staple','premium','stars')`
+- Response shape is identical — frontend (MasterDB.jsx) requires zero changes
+- CSV (`load_master_db`) is now a fallback only; once DB has full NHL rookie coverage the CSV path will be removed
+- Graded prices (PSA 8/9/10, BGS 9/9.5/10) pulled from `market_prices.graded_data` JSONB
+- Ownership (`owned`, `cost_basis`) not available from DB source — tracked in `collection` table per user; will be wired in Phase 2
+- Added `source` field to response (`"db"` or `"csv"`) for debugging
+- Phase 1 of DB architecture migration documented in TODO.md
+
+### Card Sales page — listing thumbnail + shipping cost added
+- Each sale row now shows the eBay listing photo (44×60px thumbnail) as the first column
+- Shipping cost displayed below the sale price: `+$X.XX ship` (muted) or `Free ship` (green)
+- `shipping_val` added to `/catalog/{id}/raw-sales` API SELECT (was already in DB, just not returned)
+- Mobile: thumbnail column preserved; grade + serial hidden to keep table readable at small widths
+- Free shipping highlighted in green; paid shipping shown in muted text below the price
+
+---
+
+## 2026-03-24
+
 ### Trending page fixed — minimum price floor eliminates garbage % spikes
 - Added `>= $2.00` minimum price threshold to HAVING clause on both current and previous 7d windows
 - Cards going from $0.01 to $6 no longer show as +187,000% movers

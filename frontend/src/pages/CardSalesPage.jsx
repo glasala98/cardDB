@@ -259,6 +259,7 @@ export default function CardSalesPage() {
             ) : (
               <div className={styles.table}>
                 <div className={styles.tableHead}>
+                  <span></span>
                   <span>Date</span>
                   <span>Source</span>
                   <span>Title</span>
@@ -275,6 +276,11 @@ export default function CardSalesPage() {
                     rel="noopener noreferrer"
                     style={s.lot_url ? { cursor: 'pointer' } : { cursor: 'default' }}
                   >
+                    <span className={styles.thumb}>
+                      {s.image_url
+                        ? <img src={s.image_url} alt="" className={styles.thumbImg} loading="lazy" />
+                        : <span className={styles.thumbEmpty} />}
+                    </span>
                     <span className={styles.date}>{fmtDate(s.sold_date)}</span>
                     <span><SourceBadge source={s.source} size="sm" /></span>
                     <span className={styles.title}>{s.title}</span>
@@ -282,10 +288,16 @@ export default function CardSalesPage() {
                     <span className={styles.serial}>
                       {s.serial_number && s.print_run ? `#${s.serial_number}/${s.print_run}` : '—'}
                     </span>
-                    <span className={`${styles.price} ${styles.right}`}>
-                      {fmt(s.price_val)}
+                    <span className={`${styles.priceCell} ${styles.right}`}>
+                      <span className={styles.price}>{fmt(s.price_val)}</span>
                       {s.hammer_price && (
-                        <span className={styles.hammer}> (hammer {fmt(s.hammer_price)})</span>
+                        <span className={styles.hammer}>(hammer {fmt(s.hammer_price)})</span>
+                      )}
+                      {s.shipping_val != null && s.shipping_val > 0 && (
+                        <span className={styles.shipping}>+{fmt(s.shipping_val)} ship</span>
+                      )}
+                      {s.shipping_val === 0 && (
+                        <span className={styles.freeShip}>Free ship</span>
                       )}
                     </span>
                   </a>

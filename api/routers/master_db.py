@@ -38,23 +38,107 @@ def _num(r, col):
 
 @router.get("")
 def list_young_guns(search: str = ""):
-    """Return all Young Guns cards with full graded price and ownership data.
+    """Return NHL rookie cards with full graded price data.
 
-    Optionally filters by a free-text search string matched against player
-    name, season, set, and team fields. Always returns the full unique
-    season and team lists for populating filter dropdowns.
+    DB-first: queries card_catalog + market_prices WHERE is_rookie=TRUE AND sport='NHL'.
+    Falls back to legacy CSV if DB returns no results (e.g. during initial setup).
 
-    Args:
-        search: Optional free-text filter applied across PlayerName, Season,
-                Set, and Team columns (case-insensitive substring match).
-                Defaults to '' (no filter).
-
-    Returns:
-        Dict with keys 'cards' (list of card dicts with raw, PSA, and BGS
-        price fields plus ownership info), 'seasons' (sorted list of unique
-        season strings, descending), and 'teams' (sorted list of unique team
-        strings).
+    Response shape is identical regardless of source so the frontend is unaffected.
+    Ownership (owned/cost_basis) is not available from DB source — use the
+    collection table endpoints for per-user ownership data.
     """
+    # ── DB path ──────────────────────────────────────────────────────────────
+    try:
+        from psycopg2.extras import RealDictCursor
+
+        conditions = [
+            "cc.is_rookie = TRUE",
+            "cc.sport = 'NHL'",
+            "cc.scrape_tier IN ('staple', 'premium', 'stars')",
+            "mp.fair_value > 0",
+        ]
+        params: list = []
+
+        if search:
+            conditions.append("""(
+                cc.player_name ILIKE %s OR cc.set_name ILIKE %s OR
+                cc.team        ILIKE %s OR cc.year     ILIKE %s
+            )""")
+            s = f"%{search}%"
+            params.extend([s, s, s, s])
+
+        where = " AND ".join(conditions)
+
+        with get_db() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(f"""
+                    SELECT cc.player_name, cc.year, cc.set_name, cc.card_number,
+                           cc.team, cc.variant,
+                           mp.fair_value, mp.num_sales, mp.trend,
+                           mp.scraped_at, mp.graded_data
+                    FROM card_catalog cc
+                    JOIN market_prices mp ON mp.card_catalog_id = cc.id
+                    WHERE {where}
+                    ORDER BY mp.fair_value DESC NULLS LAST
+                    LIMIT 1000
+                """, params)
+                rows = cur.fetchall()
+
+        if rows:
+            def _gv(gd, grade):
+                v = (gd.get(grade) or {}).get("fair_value")
+                return float(v) if v else None
+            def _gs(gd, grade):
+                v = (gd.get(grade) or {}).get("num_sales")
+                return int(v) if v else None
+
+            cards = []
+            all_seasons: set = set()
+            all_teams: set   = set()
+
+            for r in rows:
+                gd      = r.get("graded_data") or {}
+                variant = (r.get("variant") or "").strip()
+                suffix  = f" {variant}" if variant and variant.lower() != "base" else ""
+                season  = str(r["year"] or "")
+                team    = str(r["team"] or "")
+                if season: all_seasons.add(season)
+                if team:   all_teams.add(team)
+
+                cards.append({
+                    "player":        r["player_name"],
+                    "season":        season,
+                    "set":           r["set_name"] or "",
+                    "card_number":   r["card_number"] or "",
+                    "team":          team,
+                    "position":      "",
+                    "fair_value":    float(r["fair_value"]) if r["fair_value"] else None,
+                    "num_sales":     int(r["num_sales"])    if r["num_sales"]  else None,
+                    "min":           None,
+                    "max":           None,
+                    "trend":         r["trend"] or "",
+                    "last_scraped":  r["scraped_at"].isoformat() if r["scraped_at"] else "",
+                    "psa8_price":    _gv(gd, "PSA 8"),   "psa8_sales":  _gs(gd, "PSA 8"),
+                    "psa9_price":    _gv(gd, "PSA 9"),   "psa9_sales":  _gs(gd, "PSA 9"),
+                    "psa10_price":   _gv(gd, "PSA 10"),  "psa10_sales": _gs(gd, "PSA 10"),
+                    "bgs9_price":    _gv(gd, "BGS 9"),   "bgs9_sales":  _gs(gd, "BGS 9"),
+                    "bgs95_price":   _gv(gd, "BGS 9.5"), "bgs95_sales": _gs(gd, "BGS 9.5"),
+                    "bgs10_price":   _gv(gd, "BGS 10"),  "bgs10_sales": _gs(gd, "BGS 10"),
+                    # Ownership not available from DB source — tracked in collection table
+                    "owned":         False,
+                    "cost_basis":    None,
+                    "purchase_date": "",
+                    "card_name":     f"{r['year']} {r['set_name']}{suffix} - {r['player_name']}",
+                })
+
+            seasons = sorted(all_seasons, reverse=True)
+            teams   = sorted(t for t in all_teams if t)
+            return {"cards": cards, "seasons": seasons, "teams": teams, "source": "db"}
+
+    except Exception as e:
+        print(f"[young_guns] DB query failed, falling back to CSV: {e}")
+
+    # ── CSV fallback ──────────────────────────────────────────────────────────
     df = load_master_db()
     if search:
         s = search.lower()
@@ -69,44 +153,33 @@ def list_young_guns(search: str = ""):
     cards = []
     for _, r in df.fillna("").iterrows():
         cards.append({
-            "player":       r.get("PlayerName", ""),
-            "season":       r.get("Season", ""),
-            "set":          r.get("Set", ""),
-            "card_number":  r.get("CardNumber", ""),
-            "team":         r.get("Team", ""),
-            "position":     r.get("Position", ""),
-            "fair_value":   _num(r, "FairValue"),
-            "num_sales":    _num(r, "NumSales"),
-            "min":          _num(r, "Min"),
-            "max":          _num(r, "Max"),
-            "trend":        r.get("Trend", ""),
-            "last_scraped": r.get("LastScraped", ""),
-            # Graded prices
-            "psa8_price":   _num(r, "PSA8_Value"),
-            "psa8_sales":   _num(r, "PSA8_Sales"),
-            "psa9_price":   _num(r, "PSA9_Value"),
-            "psa9_sales":   _num(r, "PSA9_Sales"),
-            "psa10_price":  _num(r, "PSA10_Value"),
-            "psa10_sales":  _num(r, "PSA10_Sales"),
-            "bgs9_price":   _num(r, "BGS9_Value"),
-            "bgs9_sales":   _num(r, "BGS9_Sales"),
-            "bgs95_price":  _num(r, "BGS9_5_Value"),
-            "bgs95_sales":  _num(r, "BGS9_5_Sales"),
-            "bgs10_price":  _num(r, "BGS10_Value"),
-            "bgs10_sales":  _num(r, "BGS10_Sales"),
-            # Ownership
-            "owned":        bool(r.get("Owned", 0)),
-            "cost_basis":   _num(r, "CostBasis"),
+            "player":        r.get("PlayerName", ""),
+            "season":        r.get("Season", ""),
+            "set":           r.get("Set", ""),
+            "card_number":   r.get("CardNumber", ""),
+            "team":          r.get("Team", ""),
+            "position":      r.get("Position", ""),
+            "fair_value":    _num(r, "FairValue"),
+            "num_sales":     _num(r, "NumSales"),
+            "min":           _num(r, "Min"),
+            "max":           _num(r, "Max"),
+            "trend":         r.get("Trend", ""),
+            "last_scraped":  r.get("LastScraped", ""),
+            "psa8_price":    _num(r, "PSA8_Value"),  "psa8_sales":  _num(r, "PSA8_Sales"),
+            "psa9_price":    _num(r, "PSA9_Value"),  "psa9_sales":  _num(r, "PSA9_Sales"),
+            "psa10_price":   _num(r, "PSA10_Value"), "psa10_sales": _num(r, "PSA10_Sales"),
+            "bgs9_price":    _num(r, "BGS9_Value"),  "bgs9_sales":  _num(r, "BGS9_Sales"),
+            "bgs95_price":   _num(r, "BGS9_5_Value"),"bgs95_sales": _num(r, "BGS9_5_Sales"),
+            "bgs10_price":   _num(r, "BGS10_Value"), "bgs10_sales": _num(r, "BGS10_Sales"),
+            "owned":         bool(r.get("Owned", 0)),
+            "cost_basis":    _num(r, "CostBasis"),
             "purchase_date": r.get("PurchaseDate", "") or "",
-            # Full name for price-history lookup
-            "card_name":    r.get("CardName", ""),
+            "card_name":     r.get("CardName", ""),
         })
 
-    # Unique season + team lists for filter dropdowns
     seasons = sorted(df["Season"].dropna().astype(str).unique().tolist(), reverse=True)
     teams   = sorted(df["Team"].dropna().unique().tolist())
-
-    return {"cards": cards, "seasons": seasons, "teams": teams}
+    return {"cards": cards, "seasons": seasons, "teams": teams, "source": "csv"}
 
 
 @router.get("/market-movers")

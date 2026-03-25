@@ -247,7 +247,7 @@
 
 .tableHead {
   display: grid;
-  grid-template-columns: 110px 80px 1fr 90px 80px 100px;
+  grid-template-columns: 52px 110px 80px 1fr 90px 80px 110px;
   gap: 8px;
   padding: 10px 14px;
   background: var(--surface2, #16162a);
@@ -261,9 +261,9 @@
 
 .tableRow {
   display: grid;
-  grid-template-columns: 110px 80px 1fr 90px 80px 100px;
+  grid-template-columns: 52px 110px 80px 1fr 90px 80px 110px;
   gap: 8px;
-  padding: 10px 14px;
+  padding: 8px 14px;
   border-bottom: 1px solid var(--border, #1e1e2e);
   color: var(--text, #e8e8f0);
   text-decoration: none;
@@ -277,9 +277,19 @@
 .date   { color: var(--text-muted, #888); white-space: nowrap; }
 .title  { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted, #aaa); }
 .serial { color: var(--text-muted, #888); }
-.price  { font-weight: 700; color: var(--text, #e8e8f0); }
-.hammer { font-size: 0.75rem; font-weight: 400; color: var(--text-muted, #888); }
 .right  { text-align: right; }
+
+/* Thumbnail */
+.thumb       { display: flex; align-items: center; justify-content: center; }
+.thumbImg    { width: 44px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border, #2a2a3e); display: block; }
+.thumbEmpty  { width: 44px; height: 60px; border-radius: 4px; background: var(--surface2, #16162a); border: 1px solid var(--border, #2a2a3e); display: block; }
+
+/* Price cell — stacked: price / hammer / shipping */
+.priceCell   { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.price       { font-weight: 700; color: var(--text, #e8e8f0); }
+.hammer      { font-size: 0.72rem; font-weight: 400; color: var(--text-muted, #888); }
+.shipping    { font-size: 0.72rem; font-weight: 400; color: var(--text-muted, #888); }
+.freeShip    { font-size: 0.72rem; font-weight: 400; color: #5cb85c; }
 
 /* Pagination */
 .pagination {
@@ -429,10 +439,12 @@
 
   .tableHead,
   .tableRow {
-    grid-template-columns: 80px 70px 1fr 80px;
+    grid-template-columns: 44px 80px 60px 1fr 90px;
   }
+  /* Hide Grade (child 5) and Serial (child 6) on mobile; keep thumb/date/source/title/price */
   .tableHead :nth-child(5),
   .tableHead :nth-child(6),
   .tableRow  :nth-child(5),
   .tableRow  :nth-child(6) { display: none; }
+  .thumbImg, .thumbEmpty   { width: 36px; height: 50px; }
 }
