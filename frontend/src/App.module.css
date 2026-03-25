@@ -5,8 +5,9 @@
 
 .main {
   flex: 1;
-  padding: 24px 32px;
+  padding: 28px 36px;
   overflow-x: hidden;
+  max-width: calc(100vw - var(--nav-width));
 }
 
 @media (max-width: 768px) {

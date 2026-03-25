@@ -13,6 +13,13 @@ Format: `### [date] — description`
 - % now shows negative values in red (was always hardcoded green)
 - `fmtDelta()` helper handles both positive and negative formatting
 
+### Global design system polish — enterprise feel across all pages
+- Define missing `--bg-hover: #192030` CSS variable (was referenced but undefined)
+- Global table: bolder header labels (10.5px/700/0.7px tracking), tighter column header, +2px row padding for breathing room, use `--bg-hover` on row hover
+- `Page.module.css` header: 22px→24px/800 title, letter-spacing −0.5px, bottom border separator, new `.subtitle` class
+- `Navbar`: section labels "Discover" and "My Portfolio" appear above nav groups in desktop sidebar; hidden in mobile tab bar
+- App main area: padding 24→28px top, 32→36px sides, max-width clamp so content doesn't over-stretch on ultrawide
+
 ### Catalog Browse — sport tabs, active filter chips, Priced toggle
 - Sport quick-tabs now visible in main area above AI search (All/NHL/NBA/NFL/MLB)
 - Active filter chips appear below sport tabs showing what's filtered, each removable with ×

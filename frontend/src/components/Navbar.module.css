@@ -24,9 +24,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 16px;
+  padding: 16px 16px 15px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  flex-shrink: 0;
 }
 
 .logoImg {
@@ -69,6 +70,17 @@
   border-radius: 4px;
   padding: 2px 6px;
   white-space: nowrap;
+}
+
+/* ── Nav section labels ────────────────────────────────────── */
+.navSection {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 14px 10px 4px;
+  user-select: none;
 }
 
 /* ── Nav links ─────────────────────────────────────────────── */
@@ -323,6 +335,9 @@
 
   /* Hide logo on mobile */
   .logo { display: none; }
+
+  /* Hide section labels in mobile tab bar */
+  .navSection { display: none; }
 
   /* User area: compact row below tabs */
   .userArea {

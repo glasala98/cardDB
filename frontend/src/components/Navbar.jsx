@@ -80,6 +80,7 @@ const Icons = {
 }
 
 const NAV_ITEMS = [
+  { type: 'section', label: 'Discover', public: true },
   {
     to: '/catalog', label: 'Catalog', Icon: Icons.Catalog, public: true,
     sub: [
@@ -90,6 +91,7 @@ const NAV_ITEMS = [
       { to: '/young-guns',  label: 'Young Guns',  auth: true },
     ],
   },
+  { type: 'section', label: 'My Portfolio', public: false },
   {
     to: '/my-cards', label: 'My Cards', Icon: Icons.Ledger, public: false,
     sub: [
@@ -142,7 +144,11 @@ export default function Navbar() {
       </div>
 
       <ul className={styles.links}>
-        {NAV_ITEMS.filter(item => user || item.public).map(({ to, label, Icon, sub }) => {
+        {NAV_ITEMS.filter(item => user || item.public).map((item, i) => {
+          if (item.type === 'section') {
+            return <li key={`s-${i}`} className={styles.navSection}>{item.label}</li>
+          }
+          const { to, label, Icon, sub } = item
           const sectionActive = sub
             ? sub.some(s => pathname === s.to || pathname.startsWith(s.to + '/'))
             : pathname === to || pathname.startsWith(to + '/')
