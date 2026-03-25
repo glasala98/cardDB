@@ -7,6 +7,11 @@ Format: `### [date] — description`
 
 ## 2026-03-24
 
+### DB Backup — delta exports after every scrape run
+- `migrate_add_raw_sales_created_at.py` — adds `created_at TIMESTAMPTZ DEFAULT NOW()` + index to `market_raw_sales` for delta filtering
+- `db_backup_delta.yml` — triggers via `workflow_run` after any scraper workflow completes; exports last 25h of `market_raw_sales` + `market_price_history` as gzipped CSV artifacts (30-day retention)
+- Dockerfile updated to run migration on deploy
+
 ### DB Backup — weekly pg_dump to GitHub Actions artifact
 - `db_backup.yml` runs every Sunday at 2am UTC (after graded scraper finishes)
 - `pg_dump --format=custom --compress=9` — compact binary, restore with `pg_restore`
