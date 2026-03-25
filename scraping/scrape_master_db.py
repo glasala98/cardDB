@@ -56,6 +56,7 @@ _lock = threading.Lock()
 _progress = {
     "done": 0, "found": 0, "not_found": 0, "errors": 0, "deltas": 0,
     "consec_errors": 0,   # consecutive failures — triggers rate-limit backoff
+    "consec_not_found": 0, # consecutive not-found — triggers IP-block early exit
     "error_log": [],      # list of (card_catalog_id, card_name, error_type, error_msg)
 }
 # Backoff thresholds: after N consecutive errors, sleep this many seconds
@@ -541,10 +542,12 @@ def scrape_one(card: dict) -> tuple:
                 _progress['consec_errors'] = 0  # reset on success
                 if stats.get('num_sales', 0) > 0:
                     _progress['found'] += 1
+                    _progress['consec_not_found'] = 0  # reset on any find
                     if old_price is None or abs(float(old_price) - new_price) > 0.01:
                         _progress['deltas'] += 1
                 else:
                     _progress['not_found'] += 1
+                    _progress['consec_not_found'] += 1
             return card['id'], result
         except Exception as exc:
             last_exc = exc
@@ -849,6 +852,15 @@ def main():
                         print(f"\n  Time limit ({args.max_hours}h) reached — "
                               f"saved {done_count:,}/{total:,} cards. "
                               f"Next run will resume from card {done_count + 1}.", flush=True)
+                        timed_out = True
+                        break
+                    # Early exit if eBay is blocking — 500 consecutive not-found means
+                    # the runner IP is blocked. Exit now so the next scheduled trigger
+                    # gets a fresh runner IP rather than wasting 5+ hours on dead requests.
+                    if not args.backfill and _progress['consec_not_found'] >= 500 and done_count >= 500:
+                        print(f"\n  [IP-BLOCKED] {_progress['consec_not_found']} consecutive cards returned "
+                              f"no eBay results — exiting early to free runner. "
+                              f"Next trigger will get a fresh IP.", flush=True)
                         timed_out = True
                         break
         executor.shutdown(wait=False, cancel_futures=True)
