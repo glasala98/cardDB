@@ -1,14 +1,21 @@
 name: Catalog Tier — Premium (Daily)
 
-# Premium = high-value cards, 22% complete with 417K remaining — highest ROI after staple.
-# Runs 4x/day. With base paused: premium(20) + staple(20) + stars(20) + app(5) = 65 max ✅
+# Premium = 22% complete, 417K cards remaining — highest priority.
+# SHARDED: 2 shards per sport = 8 parallel runners per trigger.
+# Each shard finishes in ~2-2.5h vs 4.5h unsharded → run 6x/day without overlap.
+#
+# Connection budget: 8 jobs × 5 workers = 40 connections per run.
+# Worst case with staple+stars: 40 + 20 + 20 + 5(app) = 85 — under Railway limit of 100 ✅
+# Expected ETA with 6x/day sharded: ~Apr 8 (down from ~Apr 22 unsharded)
 
 on:
   schedule:
-    - cron: '0 2 * * *'   # 2am  UTC
-    - cron: '0 10 * * *'  # 10am UTC
-    - cron: '0 18 * * *'  # 6pm  UTC
-    - cron: '0 22 * * *'  # 10pm UTC
+    - cron: '0 0 * * *'   # midnight UTC
+    - cron: '0 4 * * *'   # 4am UTC
+    - cron: '0 8 * * *'   # 8am UTC
+    - cron: '0 12 * * *'  # noon UTC
+    - cron: '0 16 * * *'  # 4pm UTC
+    - cron: '0 20 * * *'  # 8pm UTC
   workflow_dispatch:
     inputs:
       sport:
@@ -16,7 +23,7 @@ on:
         required: false
         default: ''
       limit:
-        description: 'Max cards per sport (0=all)'
+        description: 'Max cards per shard (0=all)'
         required: false
         default: '0'
 
@@ -35,18 +42,34 @@ jobs:
           password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
           to: ${{ secrets.NOTIFY_EMAIL_TO }}
           from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
-          subject: "▶️ CardDB — Premium scrape started (NHL/NBA/NFL/MLB)"
+          subject: "▶️ CardDB — Premium scrape started (8 shards)"
           body: |
-            Premium-tier scrape has started across all 4 sports (parallel).
+            Premium-tier scrape has started (2 shards × 4 sports = 8 parallel runners).
 
             Triggered by: ${{ github.event_name }}
             Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-  scrape-premium-nhl:
+  scrape:
     needs: notify-start
     runs-on: ubuntu-latest
     timeout-minutes: 300
-    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NHL' }}
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        include:
+          # NHL — 2 shards
+          - { sport: NHL, shard_index: 0, shard_count: 2 }
+          - { sport: NHL, shard_index: 1, shard_count: 2 }
+          # NBA — 2 shards
+          - { sport: NBA, shard_index: 0, shard_count: 2 }
+          - { sport: NBA, shard_index: 1, shard_count: 2 }
+          # NFL — 2 shards
+          - { sport: NFL, shard_index: 0, shard_count: 2 }
+          - { sport: NFL, shard_index: 1, shard_count: 2 }
+          # MLB — 2 shards
+          - { sport: MLB, shard_index: 0, shard_count: 2 }
+          - { sport: MLB, shard_index: 1, shard_count: 2 }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -58,76 +81,23 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Scrape NHL premium prices
-        run: python -u scraping/scrape_master_db.py --catalog-tier premium --sport NHL --workers 5 --stale-days 7 --max-hours 4.5 --limit ${{ github.event.inputs.limit || '0' }}
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-  scrape-premium-nba:
-    needs: notify-start
-    runs-on: ubuntu-latest
-    timeout-minutes: 300
-    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NBA' }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install Chrome
+      - name: Scrape ${{ matrix.sport }} premium (shard ${{ matrix.shard_index }}/${{ matrix.shard_count }})
+        if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == matrix.sport }}
         run: |
-          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Scrape NBA premium prices
-        run: python -u scraping/scrape_master_db.py --catalog-tier premium --sport NBA --workers 5 --stale-days 7 --max-hours 4.5 --limit ${{ github.event.inputs.limit || '0' }}
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-  scrape-premium-nfl:
-    needs: notify-start
-    runs-on: ubuntu-latest
-    timeout-minutes: 300
-    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NFL' }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install Chrome
-        run: |
-          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Scrape NFL premium prices
-        run: python -u scraping/scrape_master_db.py --catalog-tier premium --sport NFL --workers 5 --stale-days 7 --max-hours 4.5 --limit ${{ github.event.inputs.limit || '0' }}
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-  scrape-premium-mlb:
-    needs: notify-start
-    runs-on: ubuntu-latest
-    timeout-minutes: 300
-    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'MLB' }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install Chrome
-        run: |
-          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Scrape MLB premium prices
-        run: python -u scraping/scrape_master_db.py --catalog-tier premium --sport MLB --workers 5 --stale-days 7 --max-hours 4.5 --limit ${{ github.event.inputs.limit || '0' }}
+          python -u scraping/scrape_master_db.py \
+            --catalog-tier premium \
+            --sport ${{ matrix.sport }} \
+            --workers 5 \
+            --stale-days 7 \
+            --shard-index ${{ matrix.shard_index }} \
+            --shard-count ${{ matrix.shard_count }} \
+            --max-hours 4.5 \
+            --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   notify-done:
-    needs: [scrape-premium-nhl, scrape-premium-nba, scrape-premium-nfl, scrape-premium-mlb]
+    needs: scrape
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -142,13 +112,10 @@ jobs:
           password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
           to: ${{ secrets.NOTIFY_EMAIL_TO }}
           from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
-          subject: "✅ CardDB — Premium scrape done (NHL/NBA/NFL/MLB)"
+          subject: "✅ CardDB — Premium scrape done (8 shards)"
           body: |
-            Premium-tier scrape has completed.
+            Premium-tier sharded scrape has completed.
 
-            NHL: ${{ needs.scrape-premium-nhl.result }}
-            NBA: ${{ needs.scrape-premium-nba.result }}
-            NFL: ${{ needs.scrape-premium-nfl.result }}
-            MLB: ${{ needs.scrape-premium-mlb.result }}
+            Result: ${{ needs.scrape.result }}
 
             Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

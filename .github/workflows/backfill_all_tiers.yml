@@ -1,14 +1,15 @@
 name: Backfill Raw Sales — All Tiers (Sequential)
 
 on:
+  # Schedule disabled — sequential staple→premium→stars→base chain runs 20h+ and was
+  # creating 26h zombie runs that consumed all GH Actions runner slots, blocking tier scrapes.
+  # Re-enable manually if raw_sales backfill needs to resume for a specific tier.
   workflow_dispatch:
     inputs:
       workers:
         description: 'Parallel Chrome workers per sport job'
         required: false
         default: '5'
-  schedule:
-    - cron: '0 12 * * *'  # noon UTC daily — picks up wherever the previous run left off
 
 jobs:
   # ── STAPLE: 4 sports in parallel ──────────────────────────────────────────
