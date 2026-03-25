@@ -132,8 +132,16 @@ export default function CardLedger() {
   }
 
   const years   = useMemo(() => [...new Set(cards.map(c => c.year).filter(Boolean))].sort(), [cards])
-  const grades  = useMemo(() => [...new Set(cards.map(c => c.grade).filter(Boolean))].sort(), [cards])
-  const sets    = useMemo(() => [...new Set(cards.map(c => c.set_name).filter(Boolean))].sort(), [cards])
+  // sets scoped to selected year; grades scoped to selected year+set
+  const sets    = useMemo(() => {
+    const base = yearFilter ? cards.filter(c => c.year === yearFilter) : cards
+    return [...new Set(base.map(c => c.set_name).filter(Boolean))].sort()
+  }, [cards, yearFilter])
+  const grades  = useMemo(() => {
+    let base = yearFilter ? cards.filter(c => c.year === yearFilter) : cards
+    if (setFilter) base = base.filter(c => c.set_name === setFilter)
+    return [...new Set(base.map(c => c.grade).filter(Boolean))].sort()
+  }, [cards, yearFilter, setFilter])
   const allTags = useMemo(() => {
     const t = new Set()
     cards.forEach(c => (c.tags || '').split(',').forEach(tag => { const s = tag.trim(); if (s) t.add(s) }))
@@ -199,6 +207,11 @@ export default function CardLedger() {
       return next
     })
   }
+
+  // Cascade: clear set when year changes (selected set may not exist in new year)
+  useEffect(() => { setSetFilter(''); setGradeFilter('') }, [yearFilter])   // eslint-disable-line react-hooks/exhaustive-deps
+  // Cascade: clear grade when set changes
+  useEffect(() => { setGradeFilter('') }, [setFilter])                      // eslint-disable-line react-hooks/exhaustive-deps
 
   const clearFilters = () => {
     setSearch(''); setMinPrice(''); setMaxPrice('')

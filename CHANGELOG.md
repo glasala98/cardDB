@@ -13,6 +13,13 @@ Format: `### [date] — description`
 - % now shows negative values in red (was always hardcoded green)
 - `fmtDelta()` helper handles both positive and negative formatting
 
+### All filter dropdowns now cascade — no phantom options anywhere
+- **CardLedger**: set dropdown scoped to selected year; grade dropdown scoped
+  to selected year + set; changing year auto-clears set + grade; changing
+  set auto-clears grade (all local client-side, no API calls needed)
+- **SetBrowser**: year dropdown now scoped to search term — searching "Upper Deck"
+  only shows years with Upper Deck sets; year resets when search changes
+
 ### Catalog filters scoped to active search — no phantom years/sets
 - `/catalog/filters` API now accepts `search` param; scopes years and sets
   to rows matching that player/set name (ILIKE), so "Connor McDavid" only

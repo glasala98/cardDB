@@ -53,10 +53,13 @@ export default function SetBrowser() {
 
   const debounceRef = useRef(null)
 
-  // Load all years on mount, then re-filter when sport changes
+  // Reload years when sport or search changes — scope to both; reset year on change
   useEffect(() => {
-    getCatalogFilters(sport || null).then(d => setYears(d.years ?? [])).catch(() => {})
-  }, [sport])
+    setYear('')
+    const q = search.length >= 2 ? search : null
+    if (!sport && !q) { setYears([]); return }
+    getCatalogFilters(sport || null, null, q).then(d => setYears(d.years ?? [])).catch(() => {})
+  }, [sport, search]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     clearTimeout(debounceRef.current)
