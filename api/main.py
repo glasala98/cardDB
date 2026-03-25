@@ -148,24 +148,42 @@ def robots_txt():
 
 _SITEMAP_PAGE_SIZE = 45000  # well under Google's 50K limit per file
 
+# In-memory sitemap ID cache — loaded once, shared across all shard requests.
+# Avoids 14 simultaneous DB queries when Google fetches all shards at once.
+_sitemap_ids: list = []
+_sitemap_ids_loaded = False
+_sitemap_lock = threading.Lock()
+
+def _load_sitemap_ids():
+    """Load all priced card IDs into memory (called once, ~2MB for 676K ints)."""
+    global _sitemap_ids, _sitemap_ids_loaded
+    with _sitemap_lock:
+        if _sitemap_ids_loaded:
+            return
+        try:
+            with get_db() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SET statement_timeout = '20s'")
+                    cur.execute("""
+                        SELECT card_catalog_id FROM market_prices
+                        WHERE fair_value > 0
+                        ORDER BY card_catalog_id
+                    """)
+                    _sitemap_ids = [row[0] for row in cur.fetchall()]
+            _sitemap_ids_loaded = True
+        except Exception:
+            _sitemap_ids = []
+
+
 @app.get("/sitemap.xml")
 def sitemap_index():
-    """Sitemap index — points to /sitemap-0.xml, /sitemap-1.xml, etc."""
+    """Sitemap index — points to sitemap-static.xml + sitemap-cards-N.xml shards."""
     from fastapi.responses import Response as FastAPIResponse
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SET statement_timeout = '5s'")
-                cur.execute("SELECT COUNT(*) FROM market_prices WHERE fair_value > 0")
-                total = cur.fetchone()[0]
-    except Exception:
-        total = 0
-
-    num_shards = max(1, math.ceil(total / _SITEMAP_PAGE_SIZE))
+    _load_sitemap_ids()
+    num_shards = max(1, math.ceil(len(_sitemap_ids) / _SITEMAP_PAGE_SIZE))
     parts = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-        # Static pages sitemap always first
         f'  <sitemap><loc>{SITE_URL}/sitemap-static.xml</loc></sitemap>',
     ]
     for i in range(num_shards):
@@ -193,23 +211,11 @@ def sitemap_static():
 
 @app.get("/sitemap-cards-{shard}.xml")
 def sitemap_cards(shard: int):
-    """Sitemap shard for card detail pages."""
+    """Sitemap shard for card detail pages — served from in-memory cache."""
     from fastapi.responses import Response as FastAPIResponse
-    try:
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SET statement_timeout = '15s'")
-                cur.execute("""
-                    SELECT mp.card_catalog_id
-                    FROM market_prices mp
-                    WHERE mp.fair_value > 0
-                    ORDER BY mp.card_catalog_id
-                    LIMIT %s OFFSET %s
-                """, [_SITEMAP_PAGE_SIZE, shard * _SITEMAP_PAGE_SIZE])
-                ids = [row[0] for row in cur.fetchall()]
-    except Exception:
-        ids = []
-
+    _load_sitemap_ids()
+    start = shard * _SITEMAP_PAGE_SIZE
+    ids = _sitemap_ids[start: start + _SITEMAP_PAGE_SIZE]
     parts = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
