@@ -128,6 +128,13 @@ export default function Catalog() {
   const [lightboxAlt,  setLightboxAlt]  = useState('')
 
   useEffect(() => {
+    document.title = 'Sports Card Prices & Market Values | CardDB'
+    const metaDesc = document.querySelector('meta[name="description"]')
+    if (metaDesc) metaDesc.setAttribute('content',
+      'Free sports card price database. Search NHL, NBA, NFL, and MLB card values with recent eBay sales history and market trends.')
+  }, [])
+
+  useEffect(() => {
     if (!isLoggedIn) return
     getOwnedIds().then(d => setOwnedIds(new Set(d.owned_ids || []))).catch(() => {})
     getGrades().then(d => setGrades(d.grades || [])).catch(() => {})

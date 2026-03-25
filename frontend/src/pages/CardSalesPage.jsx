@@ -86,6 +86,13 @@ export default function CardSalesPage() {
       .then(c => {
         setCard(c)
         pushRecentlyViewed(c)
+        // Dynamic SEO: title + meta description for this card
+        const price = c.fair_value ? ` — $${Math.round(c.fair_value)}` : ''
+        const cardTitle = `${c.player_name} ${c.year} ${c.set_name}${c.variant ? ' ' + c.variant : ''}${price} | CardDB`
+        document.title = cardTitle
+        const metaDesc = document.querySelector('meta[name="description"]')
+        if (metaDesc) metaDesc.setAttribute('content',
+          `${c.player_name} ${c.year} ${c.set_name} price history, recent eBay sales, and market trends.${price ? ' Current value: ' + price.trim() + '.' : ''}`)
         // Similar cards: same player, exclude self
         getCatalog({ player_name: c.player_name, sport: c.sport, per_page: 7, sort: 'num_sales', dir: 'desc' })
           .then(d => setSimilar((d.cards ?? []).filter(x => x.id !== catalogId).slice(0, 6)))

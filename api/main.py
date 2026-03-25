@@ -29,7 +29,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from apscheduler.schedulers.background import BackgroundScheduler
 
 
@@ -136,6 +136,40 @@ def health():
     except Exception:
         pass
     return {"status": "ok" if db_ok else "degraded", "db": db_ok}
+
+
+# ── SEO: robots.txt + sitemap.xml ─────────────────────────────────────────────
+SITE_URL = os.environ.get("SITE_URL", "https://southwestsportscards.ca")
+
+@app.get("/robots.txt", response_class=PlainTextResponse)
+def robots_txt():
+    return f"User-agent: *\nAllow: /\nSitemap: {SITE_URL}/sitemap.xml\n"
+
+@app.get("/sitemap.xml")
+def sitemap_xml():
+    """Generate sitemap of all priced catalog cards for Google indexing."""
+    from fastapi.responses import Response as FastAPIResponse
+    try:
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT id FROM card_catalog
+                    WHERE id IN (SELECT card_catalog_id FROM market_prices WHERE fair_value > 0)
+                    ORDER BY id
+                    LIMIT 50000
+                """)
+                ids = [row[0] for row in cur.fetchall()]
+    except Exception:
+        ids = []
+
+    lines = ['<?xml version="1.0" encoding="UTF-8"?>',
+             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    lines.append(f'  <url><loc>{SITE_URL}/catalog</loc><changefreq>daily</changefreq><priority>1.0</priority></url>')
+    lines.append(f'  <url><loc>{SITE_URL}/trending</loc><changefreq>daily</changefreq><priority>0.8</priority></url>')
+    for cid in ids:
+        lines.append(f'  <url><loc>{SITE_URL}/catalog/{cid}</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>')
+    lines.append('</urlset>')
+    return FastAPIResponse('\n'.join(lines), media_type='application/xml')
 
 
 # Serve React frontend for all non-API routes (SPA support)

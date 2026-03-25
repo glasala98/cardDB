@@ -7,6 +7,13 @@ Format: `### [date] — description`
 
 ## 2026-03-25
 
+### Feat: SEO — dynamic titles, sitemap.xml, robots.txt
+- `/robots.txt` endpoint pointing Google at the sitemap
+- `/sitemap.xml` endpoint listing all ~676K priced catalog card URLs (Google-discoverable)
+- `CardSalesPage`: dynamic `<title>` + meta description per card (player, set, year, current price)
+- `Catalog`: page-level title/meta set on mount
+- Set `SITE_URL` env var on Railway to customize domain (default: southwestsportscards.ca)
+
 ### Perf: increase eBay sleep cap 0.3s → 2.0s to reduce bot detection
 The scraper was overriding all internal sleeps to max 0.3s, causing eBay to detect and block GitHub Actions runner IPs after ~300 cards. Increasing to 2.0s extends the fresh-IP window significantly before blocking kicks in.
 
