@@ -52,7 +52,23 @@
 
 ## P3 — Medium-term
 
-- [ ] **Multi-source pricing** — PWCC, Goldin, Heritage, Whatnot, COMC sold data alongside eBay (see `docs/architecture.md`)
+### Multi-source pricing
+- [ ] **PWCC** — public sold results, similar Selenium scrape as eBay. Best starting point.
+- [ ] **Goldin** — high-end auction results publicly listed post-sale
+- [ ] **Heritage Auctions** — same pattern, public results
+- [ ] **MySlabs / Pristine** — graded card marketplaces
+- [ ] **Beckett** — paywalled price guide (subscription + scraping agreement needed)
+- Source column already exists in `market_raw_sales`; UI source filter pills already built
+
+### New sports
+- [ ] **Soccer** — Panini Prizm FIFA, Topps Chrome, huge global market. `scrape_set_info.py` already supports `--sport Soccer` once catalog data exists. Catalog population needed first.
+- [ ] **UFC/MMA** — Panini, Leaf; fast-growing card market
+- [ ] **F1 Racing** — Topps Chrome F1; very hot, large collector base
+- [ ] **Golf** — Upper Deck, limited but high-value cards
+- [ ] **CFL** — niche but relevant for Canadian audience (southwestsportscards.ca)
+- Steps: (1) source card catalog data per sport, (2) run `scrape_set_info.py --sport X`, (3) add sport to scraping workflows, (4) add sport filter to frontend
+
+### Other
 - [ ] **Public API v1** — `GET /api/v1/cards/{id}/price` + `/history`, API key auth, free + paid tiers
 - [ ] **Natural language portfolio queries** — Claude answers "what's my best performing card this month?" from user's data
 - [ ] **Vector search** — pgvector for fuzzy card matching (verify Railway supports it before starting)
