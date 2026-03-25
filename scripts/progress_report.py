@@ -6,7 +6,6 @@ Sends email only at meaningful moments (first hour of scrape, noon digest, miles
 import os
 import math
 import smtplib
-import hashlib
 import psycopg2
 from datetime import datetime, timezone, date, timedelta
 from email.mime.text import MIMEText
@@ -40,16 +39,30 @@ def run(force: bool = False):
     try:
         conn = psycopg2.connect(os.environ["DATABASE_URL"])
         cur  = conn.cursor()
+
         cur.execute("""
             SELECT
               (SELECT reltuples::bigint FROM pg_class WHERE relname = 'card_catalog'),
-              (SELECT COUNT(*) FROM market_prices),
-              (SELECT COUNT(*) FROM market_raw_sales),
+              (SELECT reltuples::bigint FROM pg_class WHERE relname = 'market_prices'),
+              (SELECT reltuples::bigint FROM pg_class WHERE relname = 'market_raw_sales'),
               pg_size_pretty(pg_database_size(current_database()))
         """)
         total_catalog, total_priced, sales_total, db_size = cur.fetchone()
 
-        # Count cards priced that are in the base backfill target (NFL/NBA/MLB 2015+)
+        # Coverage by tier — used for the tier breakdown section
+        cur.execute("""
+            SELECT cc.scrape_tier,
+                   COUNT(cc.id)                                      AS total,
+                   COUNT(mp.id) FILTER (WHERE mp.fair_value > 0)     AS priced
+            FROM card_catalog cc
+            LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
+                AND NOT COALESCE(mp.ignored, FALSE)
+            GROUP BY cc.scrape_tier
+            ORDER BY cc.scrape_tier
+        """)
+        tier_rows = {r[0]: {"total": r[1], "priced": r[2]} for r in cur.fetchall()}
+
+        # Base backfill count — exact count scoped to NFL/NBA/MLB 2015+ base
         cur.execute("""
             SELECT COUNT(*)
             FROM market_prices mp
@@ -98,16 +111,34 @@ def run(force: bool = False):
             status = f"in {(ms_day - today).days}d"
         ms_lines.append(f"  {ms_label:>6}  {ms_day.strftime('%b %d, %Y'):>12}  {ms_cards:>13,.0f}  {status}")
 
+    # Coverage by tier — bar chart in text
+    TIER_ORDER = ["staple", "premium", "stars", "base"]
+    tier_lines = ["Coverage by Tier:"]
+    for tier in TIER_ORDER:
+        t = tier_rows.get(tier)
+        if not t or t["total"] == 0:
+            continue
+        pct = t["priced"] / t["total"] * 100
+        bar_filled = int(pct / 5)
+        bar = "█" * bar_filled + "░" * (20 - bar_filled)
+        tier_lines.append(
+            f"  {tier.upper():<8} [{bar}] {pct:5.1f}%  "
+            f"({t['priced']:,} priced / {t['total']:,} total)"
+        )
+
     now_str = datetime.now(timezone.utc).strftime("%b %d %Y at %H:%M UTC")
-    body = f"""CardDB Backfill Progress — {now_str}
+    body = f"""CardDB Scrape Progress — {now_str}
 {"=" * 60}
 
-PACE  {pace_emoji}  {pace_label}
-      Actual rate:   {actual_daily:,.0f} cards/day
-      Target rate:   {TARGET_DAILY:,} cards/day
-      Projected ETA: {eta_str}
+{chr(10).join(tier_lines)}
 
-ACTIVE BACKFILL — Base tier NFL/NBA/MLB 2015+
+{"─" * 60}
+BASE BACKFILL — NFL/NBA/MLB 2015+
+  PACE  {pace_emoji}  {pace_label}
+  Actual rate:   {actual_daily:,.0f} cards/day
+  Target rate:   {TARGET_DAILY:,} cards/day
+  Projected ETA: {eta_str}
+
   Total priced: {total_base_priced:,} / {TOTAL_BASE_TARGET:,}  ({base_pct:.1f}%)
   Day {days_elapsed} of backfill — expected {int(expected):,} by now
 
@@ -118,13 +149,13 @@ Overall catalog: {total_priced:,} / {total_catalog:,}  ({overall_pct:.1f}%)
 Raw sales:       {sales_total:,}
 DB size:         {db_size}
 """
-    subject = f"CardDB — {base_pct:.1f}% base priced | {pace_emoji} {pace_label[:35]}"
+    subject = f"CardDB — S:{tier_rows.get('staple', {}).get('priced', 0) / max(tier_rows.get('staple', {}).get('total', 1), 1) * 100:.0f}% P:{tier_rows.get('premium', {}).get('priced', 0) / max(tier_rows.get('premium', {}).get('total', 1), 1) * 100:.0f}% St:{tier_rows.get('stars', {}).get('priced', 0) / max(tier_rows.get('stars', {}).get('total', 1), 1) * 100:.0f}% B:{base_pct:.0f}% | {pace_emoji} base"
 
-    # Smart send: first hour of scrape (0/6/12/18 UTC), noon digest, milestones
+    # Smart send: first hour of scrape (0/6/8/10/12/15/18/22 UTC), noon digest, milestones
     now_utc = datetime.now(timezone.utc)
     h, m    = now_utc.hour, now_utc.minute
-    scrape_hours  = {0, 6, 12, 18}
-    is_first_hour = h in scrape_hours or (h % 6 == 1 and m < 15)
+    scrape_hours  = {0, 6, 8, 10, 12, 15, 18, 22}
+    is_first_hour = h in scrape_hours and m < 20
     is_noon       = (h == 12 and m < 20)
 
     milestone_crossed = False
@@ -138,4 +169,4 @@ DB size:         {db_size}
     if force or is_first_hour or is_noon or milestone_crossed:
         _send_email(subject, body)
     else:
-        print(f"[progress_report] skipping send (not first hour/noon/milestone) — {base_pct:.1f}% priced")
+        print(f"[progress_report] skipping send (not first hour/noon/milestone) — {base_pct:.1f}% base priced")

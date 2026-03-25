@@ -15,11 +15,9 @@ name: Catalog Tier — Base (Daily during backfill)
 # → ~270K cards/day → ~6 day backfill ETA from Apr 30 → ~Apr 15.
 
 on:
-  schedule:
-    - cron: '0 0 * * *'    # midnight UTC — run 1 of 2
-    - cron: '0 12 * * *'   # noon     UTC — run 2 of 2
-    # Reduced from 4x to 2x/day to free schedule slots for premium tier (higher ROI).
-    # Premium runs in the freed 6am and 6pm slots. Base takes 5.5h, premium 4.5h — no overlap.
+  # Schedule paused — staple/premium/stars take priority.
+  # Re-enable once staple hits ~100%, premium hits ~80%, stars hits ~100%.
+  # Was: '0 0 * * *' and '0 12 * * *'
   workflow_dispatch:
     inputs:
       sport:

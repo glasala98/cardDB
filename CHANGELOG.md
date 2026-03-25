@@ -10,6 +10,12 @@ Format: `### [date] — description`
 ### Email notifications for staple, premium, stars scrapes
 Added start + completion email notifications to `catalog_tier_staple.yml`, `catalog_tier_premium.yml`, and `catalog_tier_stars.yml`. Each workflow now emails on start and sends a per-sport result summary (success/failure/skipped) when all sports complete. Uses `if: always()` on the done job so you get notified even on failures. Emails fire automatically from dashboard ▶ Run button too since `notify-start` is the first job.
 
+### Pause base scrape schedule — staple/premium/stars have priority
+Disabled base tier cron schedule (`catalog_tier_base.yml`) until staple ~100%, premium ~80%, stars ~100%. Base was eating all GH Actions runner slots (24 parallel shards), starving the higher-value tiers. Re-enable manually when priority tiers are close to complete. Manual dispatch still works.
+
+### Fix: progress email now shows all tiers (staple/premium/stars/base)
+Updated `scripts/progress_report.py` to query tier coverage for all 4 tiers and include a bar-chart breakdown in every email. Subject line now shows all 4 tier percentages at a glance (e.g. `S:80% P:22% St:66% B:16%`). Also switched total_catalog/total_priced to pg_class estimates (instant) instead of COUNT(*) (slow). Smart-send schedule updated to include all scrape start hours (0/6/8/10/12/15/18/22 UTC).
+
 ### Fix: staple scraper hanging daily (root cause)
 `catalog_tier_staple.yml` had `timeout-minutes: 240` but no `--max-hours` flag — scraper defaulted to 5.75h grace period but GitHub hard-killed jobs at 4h before graceful exit. Every single staple run had been cancelled for weeks. Fixed: added `--max-hours 5.5` to all 4 sport jobs and raised `timeout-minutes: 360` to match. NHL specifically hung longest due to `--year-from 2000 --stale-days 1` being the largest card pool.
 
