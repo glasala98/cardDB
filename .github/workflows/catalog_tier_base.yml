@@ -16,10 +16,10 @@ name: Catalog Tier — Base (Daily during backfill)
 
 on:
   schedule:
-    - cron: '0 0 * * *'    # midnight UTC — run 1 of 4
-    - cron: '0 6 * * *'    # 6am     UTC — run 2 of 4
-    - cron: '0 12 * * *'   # noon    UTC — run 3 of 4
-    - cron: '0 18 * * *'   # 6pm     UTC — run 4 of 4
+    - cron: '0 0 * * *'    # midnight UTC — run 1 of 2
+    - cron: '0 12 * * *'   # noon     UTC — run 2 of 2
+    # Reduced from 4x to 2x/day to free schedule slots for premium tier (higher ROI).
+    # Premium runs in the freed 6am and 6pm slots. Base takes 5.5h, premium 4.5h — no overlap.
   workflow_dispatch:
     inputs:
       sport:

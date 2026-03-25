@@ -2,7 +2,13 @@ name: Catalog Tier — Premium (Weekly)
 
 on:
   schedule:
-    - cron: '0 10 * * *'  # 10am UTC daily (backfill mode — revert to weekly after done)
+    # 4x/day during backfill — premium is 22% complete, 417K cards remaining, highest ROI after staple.
+    # Slots chosen to avoid overlapping with base (midnight/noon, runs 5.5h) and stars (3pm, 5h).
+    # Peak budget: base(48) + premium(20) = 68 connections — under Railway limit of 100.
+    - cron: '0 6 * * *'   # 6am  UTC — after base midnight run finishes (5:30am)
+    - cron: '0 10 * * *'  # 10am UTC — overlaps base noon start briefly: 68 connections ✅
+    - cron: '0 18 * * *'  # 6pm  UTC — after base noon run finishes (5:30pm)
+    - cron: '0 22 * * *'  # 10pm UTC — overlaps base midnight start briefly: 68 connections ✅
   workflow_dispatch:
     inputs:
       sport:

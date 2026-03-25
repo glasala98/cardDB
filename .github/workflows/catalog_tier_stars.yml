@@ -2,7 +2,10 @@ name: Catalog Tier — Stars (Weekly)
 
 on:
   schedule:
-    - cron: '0 12 * * *'  # noon UTC daily (backfill mode — revert to weekly after done)
+    # 3pm UTC — only 16,510 cards remaining, finishes in days at 1x/day.
+    # Moved from noon to 3pm to avoid 3-way overlap with base noon (48) + premium 10am (20) + stars (20) = 88 ❌
+    # At 3pm: base noon ends at 5:30pm, premium 10am ends at 2:30pm — stars runs clean: 20 connections ✅
+    - cron: '0 15 * * *'
   workflow_dispatch:
     inputs:
       sport:
