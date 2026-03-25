@@ -737,6 +737,11 @@ export default function Catalog() {
                               ? <span className={styles.ownedBadge}>✓ Owned</span>
                               : <button className={styles.addBtn} onClick={() => handleAdd(row)}>+ Add</button>
                           }
+                          <button
+                            className={styles.viewBtn}
+                            title="Full card page"
+                            onClick={e => { e.stopPropagation(); navigate(`/catalog/${row.id}`) }}
+                          >↗</button>
                         </td>
                       </tr>
                     ))}

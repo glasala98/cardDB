@@ -69,12 +69,52 @@
 - Steps: (1) source card catalog data per sport, (2) run `scrape_set_info.py --sport X`, (3) add sport to scraping workflows, (4) add sport filter to frontend
 
 ### Other
-- [ ] **Public API v1** — `GET /api/v1/cards/{id}/price` + `/history`, API key auth, free + paid tiers
+- [ ] **Public API v1** — structured rollout below
 - [ ] **Natural language portfolio queries** — Claude answers "what's my best performing card this month?" from user's data
 - [ ] **Vector search** — pgvector for fuzzy card matching (verify Railway supports it before starting)
 - [ ] **Caching layer** — Redis for expensive aggregates: portfolio total, releases set grid, catalog count
 
 ---
+
+---
+
+## Public API v1 Rollout Plan
+
+**Goal**: Let third-party devs query card prices programmatically. Free tier for hobbyists, paid for high volume. No new scraping needed — the data is already there.
+
+### Exposed endpoints (read-only, no auth bypasses)
+| Endpoint | Description |
+|---|---|
+| `GET /api/v1/cards/{id}/price` | Current fair_value, confidence, num_sales |
+| `GET /api/v1/cards/{id}/history` | Price history array (date, fair_value, min, max) |
+| `GET /api/v1/cards/{id}/raw-sales` | Individual eBay sold listings |
+| `GET /api/v1/catalog` | Browse catalog with filters (sport, year, set, player) |
+| `GET /api/v1/catalog/{id}` | Single card metadata + price |
+
+### Rate limiting tiers
+| Tier | RPM | Daily | Cost |
+|---|---|---|---|
+| Free | 10 | 500 | $0 |
+| Hobby | 60 | 5,000 | ~$10/mo |
+| Pro | 300 | 50,000 | ~$30/mo |
+
+### Implementation steps
+- [ ] `api_keys` table — `id`, `user_id FK`, `key_hash`, `tier`, `created_at`, `last_used_at`, `disabled`
+- [ ] Migration: `migrate_add_api_keys.py`
+- [ ] `api/middleware/api_key_auth.py` — FastAPI dependency: hash lookup + rate limit check (use `market_raw_sales`-style TTLCache per key)
+- [ ] New router `api/routers/v1.py` — mounts above endpoints with `api_key_auth` dependency
+- [ ] `/api/v1/me` — returns tier + current usage stats for the calling key
+- [ ] Key generation endpoint: `POST /api/keys` (authenticated user, generates key, stores hash)
+- [ ] Key management UI on dashboard: create/revoke, usage meter
+- [ ] Docs page at `/api-docs` or `/developers` — example curl commands, endpoint reference
+- [ ] Add `X-RateLimit-Remaining` + `X-RateLimit-Reset` headers on all v1 responses
+
+### Notes
+- Store key hashes only (SHA-256), never plaintext keys
+- Show the key once at creation time only (like GitHub PATs)
+- Existing `/catalog` endpoints stay public and unmetered — v1 is for programmatic/bulk consumers
+- Railway PostgreSQL is already handling ~5GB; add index on `api_keys(key_hash)` for fast lookup
+- Phase with site launch: announce public API when catalog hits 80%+ base tier coverage
 
 ---
 

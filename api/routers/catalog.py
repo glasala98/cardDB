@@ -6,7 +6,7 @@ import os
 import threading
 from datetime import date, timedelta
 from typing import Optional, List
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from cachetools import TTLCache
 
 from db import get_db
@@ -50,6 +50,7 @@ FEATURED_ORDER = """
 
 @router.get("")
 def browse_catalog(
+    response:    Response,
     search:      Optional[str]  = Query(None),
     fts:         Optional[str]  = Query(None),
     player_name: Optional[str]  = Query(None),
@@ -235,6 +236,14 @@ def browse_catalog(
             r["scraped_at"] = r["scraped_at"].isoformat()
         cards.append(r)
 
+    # Cache browse results in the browser / CDN:
+    # 30s fresh + 5 min stale-while-revalidate for filtered queries,
+    # 60s + 10 min for the default unfiltered view.
+    if where_parts:
+        response.headers["Cache-Control"] = "public, max-age=30, stale-while-revalidate=300"
+    else:
+        response.headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=600"
+
     return {
         "cards":    cards,
         "total":    total,
@@ -245,7 +254,7 @@ def browse_catalog(
 
 
 @router.get("/{catalog_id}/history")
-def catalog_card_history(catalog_id: int):
+def catalog_card_history(catalog_id: int, response: Response):
     """Return price history for a single catalog card."""
     with get_db() as conn:
         cur = conn.cursor()
@@ -288,6 +297,8 @@ def catalog_card_history(catalog_id: int):
             h["scraped_at"] = h["scraped_at"].isoformat() if h["scraped_at"] else None
             history.append(h)
 
+    # History is scraped at most daily — cache for 10 min, stale-while-revalidate 1h
+    response.headers["Cache-Control"] = "public, max-age=600, stale-while-revalidate=3600"
     return {"card": card, "history": history}
 
 

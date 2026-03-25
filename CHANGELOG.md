@@ -7,6 +7,27 @@ Format: `### [date] — description`
 
 ## 2026-03-25
 
+### Perf: parallelize CardSalesPage API calls + add Cache-Control headers
+- `getCatalogCard` and `getCatalogCardHistory` now fire in parallel via `Promise.all` — removes a sequential waterfall that was waiting for card info before fetching history
+- `browse_catalog` endpoint: `Cache-Control: public, max-age=30/60, stale-while-revalidate=300/600` — browsers and CDN can serve cached catalog pages instantly on back-navigation
+- `/catalog/{id}/history` endpoint: `Cache-Control: public, max-age=600, stale-while-revalidate=3600` — history data only changes when scrapers run, safe to cache 10 min
+
+### Feat: CardSalesPage hero layout redesign
+- Card image now shown prominently (90×126px) in the header alongside player name and set info
+- Price stats (Avg/High/Low/Sales) replaced flat stat bar with individual tiles — High in green, Low in red, with rounded borders
+
+### Feat: improved navigation — click card name to open full page
+- Clicking the player name in the catalog detail panel now navigates directly to `/catalog/:id` (shows ↗ icon on hover)
+- Each catalog table row now has a ↗ icon button that opens the full card page without triggering the slide-in panel
+
+
+### Docs: Public API v1 rollout plan added to TODO.md
+Detailed plan for programmatic API access: endpoint list, three-tier rate limiting (Free/Hobby/Pro), implementation checklist (api_keys table, key-hash auth middleware, v1 router, key management UI). Phase with launch when base tier hits ~80% coverage.
+
+### Docs: Multi-source pricing and new sports added to TODO.md
+P3 section now documents PWCC/Goldin/Heritage/MySlabs/Beckett multi-source pricing roadmap and Soccer/UFC/F1/Golf/CFL new sports expansion. `source` column + UI filter pills already exist in the DB/frontend — just need scrapers.
+
+
 ### Feat: SEO — dynamic titles, sitemap.xml, robots.txt
 - `/robots.txt` endpoint pointing Google at the sitemap
 - `/sitemap.xml` endpoint listing all ~676K priced catalog card URLs (Google-discoverable)

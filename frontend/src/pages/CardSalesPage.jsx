@@ -83,32 +83,29 @@ export default function CardSalesPage() {
   const [priceMax,    setPriceMax]    = useState('')
   const [sort,        setSort]        = useState('date_desc')
 
-  // load card info once + save to recently viewed + fetch similar
+  // load card info + history in parallel
   useEffect(() => {
-    getCatalogCard(catalogId)
-      .then(c => {
-        setCard(c)
-        pushRecentlyViewed(c)
-        // Dynamic SEO: title + meta description for this card
-        const price = c.fair_value ? ` — $${Math.round(c.fair_value)}` : ''
-        const cardTitle = `${c.player_name} ${c.year} ${c.set_name}${c.variant ? ' ' + c.variant : ''}${price} | CardDB`
-        document.title = cardTitle
-        const metaDesc = document.querySelector('meta[name="description"]')
-        if (metaDesc) metaDesc.setAttribute('content',
-          `${c.player_name} ${c.year} ${c.set_name} price history, recent eBay sales, and market trends.${price ? ' Current value: ' + price.trim() + '.' : ''}`)
-        // Similar cards: same player, exclude self
-        getCatalog({ player_name: c.player_name, sport: c.sport, per_page: 7, sort: 'num_sales', dir: 'desc' })
-          .then(d => setSimilar((d.cards ?? []).filter(x => x.id !== catalogId).slice(0, 6)))
-          .catch(() => {})
-        // Price history for sparkline
-        getCatalogCardHistory(catalogId)
-          .then(data => {
-            const pts = (data.history ?? []).map(h => h.fair_value).filter(Boolean)
-            if (pts.length >= 2) setTimeout(() => drawSparkline(canvasRef.current, pts), 0)
-          })
-          .catch(() => {})
-      })
-      .catch(() => setError('Card not found'))
+    Promise.all([
+      getCatalogCard(catalogId),
+      getCatalogCardHistory(catalogId),
+    ]).then(([c, histData]) => {
+      setCard(c)
+      pushRecentlyViewed(c)
+      // Dynamic SEO
+      const price = c.fair_value ? ` — $${Math.round(c.fair_value)}` : ''
+      const cardTitle = `${c.player_name} ${c.year} ${c.set_name}${c.variant ? ' ' + c.variant : ''}${price} | CardDB`
+      document.title = cardTitle
+      const metaDesc = document.querySelector('meta[name="description"]')
+      if (metaDesc) metaDesc.setAttribute('content',
+        `${c.player_name} ${c.year} ${c.set_name} price history, recent eBay sales, and market trends.${price ? ' Current value: ' + price.trim() + '.' : ''}`)
+      // Similar cards
+      getCatalog({ player_name: c.player_name, sport: c.sport, per_page: 7, sort: 'num_sales', dir: 'desc' })
+        .then(d => setSimilar((d.cards ?? []).filter(x => x.id !== catalogId).slice(0, 6)))
+        .catch(() => {})
+      // Sparkline from history
+      const pts = (histData.history ?? []).map(h => h.fair_value).filter(Boolean)
+      if (pts.length >= 2) setTimeout(() => drawSparkline(canvasRef.current, pts), 0)
+    }).catch(() => setError('Card not found'))
   }, [catalogId])
 
   // load sales when filters/page change
@@ -164,34 +161,53 @@ export default function CardSalesPage() {
       <div className={styles.header}>
         <Link to="/search" className={styles.back}>← Search</Link>
         {card ? (
-          <div className={styles.cardInfo}>
-            <div className={styles.cardTitle}>
-              <span className={styles.player}>{card.player_name}</span>
-              {card.is_rookie && <span className={styles.rcBadge}>RC</span>}
-              {card.scrape_tier === 'staple' && <span className={`${styles.tierBadge} ${styles.staple}`}>Staple</span>}
-              {card.scrape_tier === 'premium' && <span className={`${styles.tierBadge} ${styles.premium}`}>Premium</span>}
-            </div>
-            <div className={styles.cardMeta}>
-              {card.year} · {' '}
-              <button className={styles.setLink}
-                onClick={() => navigate(`/sets/detail?year=${encodeURIComponent(card.year)}&set_name=${encodeURIComponent(card.set_name)}`)}>
-                {card.set_name}
-              </button>
-              {card.variant ? ` · ${card.variant}` : ''}
-              {card.card_number ? ` #${card.card_number}` : ''}
-            </div>
-            {(stats || total > 0) && (
-              <div className={styles.statsBar}>
-                <div className={styles.stat}><span className={styles.statLabel}>Avg</span><strong>{fmt(avgPrice)}</strong></div>
-                <div className={styles.stat}><span className={styles.statLabel}>High</span><strong className={styles.high}>{fmt(highPrice)}</strong></div>
-                <div className={styles.stat}><span className={styles.statLabel}>Low</span><strong className={styles.low}>{fmt(lowPrice)}</strong></div>
-                <div className={styles.stat}><span className={styles.statLabel}>Sales</span><strong>{total?.toLocaleString()}</strong></div>
-                <canvas ref={canvasRef} className={styles.sparkline} width={160} height={40} />
+          <div className={styles.hero}>
+            {card.image_url && (
+              <div className={styles.heroImage}>
+                <img src={card.image_url} alt={card.player_name} className={styles.heroImg} loading="lazy" />
               </div>
             )}
+            <div className={styles.heroInfo}>
+              <div className={styles.cardTitle}>
+                <span className={styles.player}>{card.player_name}</span>
+                {card.is_rookie && <span className={styles.rcBadge}>RC</span>}
+                {card.scrape_tier === 'staple'  && <span className={`${styles.tierBadge} ${styles.staple}`}>Staple</span>}
+                {card.scrape_tier === 'premium' && <span className={`${styles.tierBadge} ${styles.premium}`}>Premium</span>}
+              </div>
+              <div className={styles.cardMeta}>
+                {card.year} · {' '}
+                <button className={styles.setLink}
+                  onClick={() => navigate(`/sets/detail?year=${encodeURIComponent(card.year)}&set_name=${encodeURIComponent(card.set_name)}`)}>
+                  {card.set_name}
+                </button>
+                {card.variant ? ` · ${card.variant}` : ''}
+                {card.card_number ? ` #${card.card_number}` : ''}
+              </div>
+              {(stats || total > 0) && (
+                <div className={styles.priceTiles}>
+                  <div className={styles.priceTile}>
+                    <span className={styles.tileLabel}>Avg</span>
+                    <span className={styles.tileValue}>{fmt(avgPrice)}</span>
+                  </div>
+                  <div className={`${styles.priceTile} ${styles.tileHigh}`}>
+                    <span className={styles.tileLabel}>High</span>
+                    <span className={styles.tileValue}>{fmt(highPrice)}</span>
+                  </div>
+                  <div className={`${styles.priceTile} ${styles.tileLow}`}>
+                    <span className={styles.tileLabel}>Low</span>
+                    <span className={styles.tileValue}>{fmt(lowPrice)}</span>
+                  </div>
+                  <div className={styles.priceTile}>
+                    <span className={styles.tileLabel}>Sales</span>
+                    <span className={styles.tileValue}>{total?.toLocaleString()}</span>
+                  </div>
+                  <canvas ref={canvasRef} className={styles.sparkline} width={140} height={36} />
+                </div>
+              )}
+            </div>
           </div>
         ) : (
-          <div className={styles.cardInfo}><span className={styles.loadingText}>Loading…</span></div>
+          <div className={styles.hero}><span className={styles.loadingText}>Loading…</span></div>
         )}
       </div>
 

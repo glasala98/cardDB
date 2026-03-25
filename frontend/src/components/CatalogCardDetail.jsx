@@ -50,7 +50,14 @@ export default function CatalogCardDetail({ card, history, loading, isLoggedIn, 
       <div className={styles.panel} ref={panelRef} onClick={e => e.stopPropagation()}>
         <div className={styles.header}>
           <div className={styles.headerInfo}>
-            <div className={styles.playerName}>{card.player_name}</div>
+            <div
+              className={styles.playerName}
+              onClick={() => navigate(`/catalog/${card.id}`)}
+              style={{ cursor: 'pointer' }}
+              title="View full card page"
+            >
+              {card.player_name} <span style={{ fontSize: '0.7em', opacity: 0.6 }}>↗</span>
+            </div>
             <div className={styles.cardMeta}>
               {card.year} · {card.set_name}
               {card.card_number ? ` · #${card.card_number}` : ''}
