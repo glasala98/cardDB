@@ -152,24 +152,30 @@ def sitemap_xml():
     try:
         with get_db() as conn:
             with conn.cursor() as cur:
+                cur.execute("SET statement_timeout = '10s'")
                 cur.execute("""
-                    SELECT id FROM card_catalog
-                    WHERE id IN (SELECT card_catalog_id FROM market_prices WHERE fair_value > 0)
-                    ORDER BY id
+                    SELECT mp.card_catalog_id
+                    FROM market_prices mp
+                    WHERE mp.fair_value > 0
+                    ORDER BY mp.card_catalog_id
                     LIMIT 50000
                 """)
                 ids = [row[0] for row in cur.fetchall()]
     except Exception:
         ids = []
 
-    lines = ['<?xml version="1.0" encoding="UTF-8"?>',
-             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
-    lines.append(f'  <url><loc>{SITE_URL}/catalog</loc><changefreq>daily</changefreq><priority>1.0</priority></url>')
-    lines.append(f'  <url><loc>{SITE_URL}/trending</loc><changefreq>daily</changefreq><priority>0.8</priority></url>')
+    parts = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        f'  <url><loc>{SITE_URL}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>',
+        f'  <url><loc>{SITE_URL}/catalog</loc><changefreq>daily</changefreq><priority>0.9</priority></url>',
+        f'  <url><loc>{SITE_URL}/trending</loc><changefreq>daily</changefreq><priority>0.7</priority></url>',
+        f'  <url><loc>{SITE_URL}/sets</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>',
+    ]
     for cid in ids:
-        lines.append(f'  <url><loc>{SITE_URL}/catalog/{cid}</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>')
-    lines.append('</urlset>')
-    return FastAPIResponse('\n'.join(lines), media_type='application/xml')
+        parts.append(f'  <url><loc>{SITE_URL}/catalog/{cid}</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>')
+    parts.append('</urlset>')
+    return FastAPIResponse('\n'.join(parts), media_type='application/xml')
 
 
 # Serve React frontend for all non-API routes (SPA support)
