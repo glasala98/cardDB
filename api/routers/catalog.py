@@ -6,7 +6,7 @@ import os
 import threading
 from datetime import date, timedelta
 from typing import Optional, List
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from cachetools import TTLCache
 
 from db import get_db
@@ -16,6 +16,14 @@ _releases_cache: TTLCache = TTLCache(maxsize=20,  ttl=300)   # 5 min
 _filters_cache:  TTLCache = TTLCache(maxsize=50,  ttl=600)   # 10 min
 _ai_cache:       TTLCache = TTLCache(maxsize=200, ttl=300)   # 5 min, keyed by query
 _cache_lock = threading.Lock()
+
+# Live-price safety: card result cache + rate limiting
+_live_cache:      TTLCache = TTLCache(maxsize=500, ttl=3600)  # 1h per card_id
+_live_ip_times:   dict     = {}   # ip -> last request timestamp
+_live_global_times: list   = []   # rolling window of all request timestamps
+_live_lock = threading.Lock()
+_LIVE_PER_IP_COOLDOWN  = 10   # seconds between requests from same IP
+_LIVE_GLOBAL_RPM       = 30   # max live-price requests per minute across all users
 
 router = APIRouter()
 
@@ -1286,15 +1294,41 @@ def get_catalog_card(catalog_id: int):
 
 
 @router.get("/{catalog_id}/live-price")
-def live_price(catalog_id: int):
+def live_price(catalog_id: int, request: Request):
     """
     Fallback live eBay scrape for cards with no DB price data yet.
     Uses requests (no Selenium) — lightweight but may be blocked on some IPs.
     Returns recent sold listings so the card page isn't empty.
+
+    Safety: 1h result cache per card, 10s per-IP cooldown, 30 RPM global cap.
     """
-    import re, requests as req
+    import re, time as _time, requests as req
     from datetime import timezone
     from bs4 import BeautifulSoup
+
+    client_ip = request.client.host if request.client else "unknown"
+    now = _time.monotonic()
+
+    with _live_lock:
+        # 1) Serve from cache if available
+        if catalog_id in _live_cache:
+            return {**_live_cache[catalog_id], "cached": True}
+
+        # 2) Per-IP cooldown — prevent a single user from hammering eBay
+        last = _live_ip_times.get(client_ip, 0)
+        if now - last < _LIVE_PER_IP_COOLDOWN:
+            wait = round(_LIVE_PER_IP_COOLDOWN - (now - last))
+            raise HTTPException(status_code=429, detail=f"Please wait {wait}s before another live search.")
+
+        # 3) Global RPM cap — protect Railway's IP from eBay rate limiting
+        cutoff = now - 60
+        _live_global_times[:] = [t for t in _live_global_times if t > cutoff]
+        if len(_live_global_times) >= _LIVE_GLOBAL_RPM:
+            raise HTTPException(status_code=429, detail="Live search is busy — try again in a moment.")
+
+        # Reserve slot
+        _live_ip_times[client_ip] = now
+        _live_global_times.append(now)
 
     # Get card info + check if we already have fresh DB data
     with get_db() as conn:
@@ -1377,7 +1411,7 @@ def live_price(catalog_id: int):
         prices = [s["price"] for s in sales]
         avg    = round(sum(prices) / len(prices), 2) if prices else None
 
-        return {
+        result = {
             "source":    "ebay_live",
             "query":     query,
             "ebay_url":  ebay_url,
@@ -1385,8 +1419,13 @@ def live_price(catalog_id: int):
             "avg_price": avg,
             "count":     len(sales),
         }
+        # Cache successful results (even empty ones) for 1 hour
+        with _live_lock:
+            _live_cache[catalog_id] = result
+        return result
 
     except Exception as e:
+        # Don't cache errors — let user retry
         return {
             "source":    "ebay_live",
             "query":     query,
