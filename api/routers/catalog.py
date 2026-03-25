@@ -1283,3 +1283,116 @@ def get_catalog_card(catalog_id: int):
         if card.get("scraped_at"):
             card["scraped_at"] = card["scraped_at"].isoformat()
     return card
+
+
+@router.get("/{catalog_id}/live-price")
+def live_price(catalog_id: int):
+    """
+    Fallback live eBay scrape for cards with no DB price data yet.
+    Uses requests (no Selenium) — lightweight but may be blocked on some IPs.
+    Returns recent sold listings so the card page isn't empty.
+    """
+    import re, requests as req
+    from datetime import timezone
+    from bs4 import BeautifulSoup
+
+    # Get card info + check if we already have fresh DB data
+    with get_db() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT cc.player_name, cc.year, cc.set_name, cc.variant,
+                   cc.card_number, cc.sport,
+                   mp.fair_value, mp.scraped_at
+            FROM card_catalog cc
+            LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
+            WHERE cc.id = %s
+        """, [catalog_id])
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Card not found")
+
+    player, year, set_name, variant, card_number, sport, fair_value, scraped_at = row
+
+    # Skip live scrape if DB has a fresh price (< 30 days old)
+    if fair_value and scraped_at:
+        from datetime import timedelta
+        age = datetime.now(timezone.utc) - scraped_at.replace(tzinfo=timezone.utc)
+        if age.days < 30:
+            return {"source": "db", "sales": [], "query": None, "skipped": True}
+
+    # Build tight search query
+    parts = [player, year, set_name]
+    if variant and variant.lower() not in ("base", ""):
+        parts.append(variant)
+    if card_number:
+        parts.append(f"#{card_number}")
+    query = " ".join(str(p) for p in parts if p)
+
+    ebay_url = (
+        "https://www.ebay.com/sch/i.html"
+        f"?_nkw={req.utils.quote(query)}"
+        "&LH_Complete=1&LH_Sold=1&_sop=13&_sacat=212&_ipg=25"
+    )
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
+
+    try:
+        resp = req.get(ebay_url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        sales = []
+        for item in soup.select(".s-item")[:20]:
+            title_el = item.select_one(".s-item__title")
+            price_el = item.select_one(".s-item__price")
+            date_el  = item.select_one(".s-item__ended-date, .POSITIVE")
+            link_el  = item.select_one("a.s-item__link")
+            if not title_el or not price_el:
+                continue
+            title = title_el.get_text(strip=True)
+            if title.lower().startswith("shop on ebay"):
+                continue
+            price_text = price_el.get_text(strip=True)
+            price_match = re.search(r"[\d]+\.?\d*", price_text.replace(",", ""))
+            if not price_match:
+                continue
+            try:
+                price = float(price_match.group())
+            except ValueError:
+                continue
+            sales.append({
+                "title": title,
+                "price": price,
+                "date":  date_el.get_text(strip=True) if date_el else None,
+                "url":   link_el["href"].split("?")[0] if link_el else None,
+            })
+
+        prices = [s["price"] for s in sales]
+        avg    = round(sum(prices) / len(prices), 2) if prices else None
+
+        return {
+            "source":    "ebay_live",
+            "query":     query,
+            "ebay_url":  ebay_url,
+            "sales":     sales,
+            "avg_price": avg,
+            "count":     len(sales),
+        }
+
+    except Exception as e:
+        return {
+            "source":    "ebay_live",
+            "query":     query,
+            "ebay_url":  ebay_url,
+            "sales":     [],
+            "avg_price": None,
+            "count":     0,
+            "error":     str(e)[:100],
+        }

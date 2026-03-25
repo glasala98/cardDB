@@ -448,3 +448,98 @@
   .tableRow  :nth-child(6) { display: none; }
   .thumbImg, .thumbEmpty   { width: 36px; height: 50px; }
 }
+
+/* ── Live eBay fallback ── */
+.liveBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 24px;
+  text-align: center;
+}
+.liveBoxTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.liveBoxSub {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  margin: 0;
+  max-width: 360px;
+}
+.liveBtn {
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 22px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.liveBtn:hover:not(:disabled) { background: #6d28d9; }
+.liveBtn:disabled { opacity: 0.6; cursor: default; }
+
+.liveEmpty {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+.liveEmpty a { color: var(--accent, #4f8ef7); }
+
+.liveResults {
+  width: 100%;
+  max-width: 700px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+.liveBadge {
+  font-size: 0.8rem;
+  color: #a78bfa;
+  background: rgba(124,58,237,0.1);
+  border: 1px solid rgba(124,58,237,0.2);
+  border-radius: 6px;
+  padding: 5px 12px;
+  display: inline-block;
+}
+.liveTable {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.liveRow {
+  display: grid;
+  grid-template-columns: 80px 110px 1fr;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: background 0.12s;
+  align-items: center;
+}
+.liveRow:hover { background: rgba(255,255,255,0.04); }
+.livePrice {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+.liveDate {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+.liveTitle {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.liveEbayLink {
+  font-size: 0.82rem;
+  color: var(--accent, #4f8ef7);
+  text-align: right;
+}

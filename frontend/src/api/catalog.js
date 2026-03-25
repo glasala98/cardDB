@@ -57,3 +57,6 @@ export const getTrending = (sport = null, limit = 12) =>
 
 export const getCatalogStats = () =>
   client.get('/catalog/stats')
+
+export const getLivePrice = (catalogId) =>
+  client.get(`/catalog/${catalogId}/live-price`)

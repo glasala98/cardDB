@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { getCatalogCard, getCatalogRawSales, getCatalog, getCatalogCardHistory } from '../api/catalog'
+import { getCatalogCard, getCatalogRawSales, getCatalog, getCatalogCardHistory, getLivePrice } from '../api/catalog'
 import SourceBadge from '../components/SourceBadge'
 import GradeBadge from '../components/GradeBadge'
 import { pushRecentlyViewed } from '../utils/recentlyViewed'
@@ -68,6 +68,9 @@ export default function CardSalesPage() {
   const [page,    setPage]    = useState(1)
   const [stats,   setStats]   = useState(null)
   const [similar, setSimilar] = useState([])
+
+  const [liveData,    setLiveData]    = useState(null)
+  const [liveFetching, setLiveFetching] = useState(false)
 
   const canvasRef = useRef(null)
 
@@ -262,7 +265,62 @@ export default function CardSalesPage() {
             </div>
 
             {sales.length === 0 ? (
-              <div className={styles.empty}>No sales match your filters.</div>
+              <div className={styles.empty}>
+                {!card?.fair_value && total === 0 ? (
+                  /* No DB data yet — offer live eBay fallback */
+                  <div className={styles.liveBox}>
+                    <div className={styles.liveBoxTitle}>No price data in our database yet</div>
+                    <p className={styles.liveBoxSub}>
+                      This card hasn't been scraped yet. We can do a live eBay search right now.
+                    </p>
+                    {!liveData && (
+                      <button
+                        className={styles.liveBtn}
+                        onClick={() => {
+                          setLiveFetching(true)
+                          getLivePrice(catalogId)
+                            .then(setLiveData)
+                            .catch(() => setLiveData({ error: 'Failed to reach eBay', sales: [], count: 0 }))
+                            .finally(() => setLiveFetching(false))
+                        }}
+                        disabled={liveFetching}
+                      >
+                        {liveFetching ? '⏳ Searching eBay…' : '🔍 Fetch live eBay prices'}
+                      </button>
+                    )}
+                    {liveData && liveData.count === 0 && (
+                      <div className={styles.liveEmpty}>
+                        No recent sold listings found.{' '}
+                        <a href={liveData.ebay_url} target="_blank" rel="noopener noreferrer">
+                          Search on eBay ↗
+                        </a>
+                      </div>
+                    )}
+                    {liveData && liveData.count > 0 && (
+                      <div className={styles.liveResults}>
+                        <div className={styles.liveBadge}>
+                          Live from eBay · {liveData.count} recent sales ·{' '}
+                          avg <strong>${liveData.avg_price}</strong>
+                        </div>
+                        <div className={styles.liveTable}>
+                          {liveData.sales.map((s, i) => (
+                            <a key={i} className={styles.liveRow} href={s.url} target="_blank" rel="noopener noreferrer">
+                              <span className={styles.livePrice}>${s.price.toFixed(2)}</span>
+                              <span className={styles.liveDate}>{s.date}</span>
+                              <span className={styles.liveTitle}>{s.title}</span>
+                            </a>
+                          ))}
+                        </div>
+                        <a className={styles.liveEbayLink} href={liveData.ebay_url} target="_blank" rel="noopener noreferrer">
+                          View all on eBay ↗
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  'No sales match your filters.'
+                )}
+              </div>
             ) : (
               <div className={styles.table}>
                 <div className={styles.tableHead}>
