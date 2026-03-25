@@ -5,7 +5,35 @@ Format: `### [date] — description`
 
 ---
 
+## 2026-03-25
+
+### Email notifications for staple, premium, stars scrapes
+Added start + completion email notifications to `catalog_tier_staple.yml`, `catalog_tier_premium.yml`, and `catalog_tier_stars.yml`. Each workflow now emails on start and sends a per-sport result summary (success/failure/skipped) when all sports complete. Uses `if: always()` on the done job so you get notified even on failures. Emails fire automatically from dashboard ▶ Run button too since `notify-start` is the first job.
+
+### Fix: staple scraper hanging daily (root cause)
+`catalog_tier_staple.yml` had `timeout-minutes: 240` but no `--max-hours` flag — scraper defaulted to 5.75h grace period but GitHub hard-killed jobs at 4h before graceful exit. Every single staple run had been cancelled for weeks. Fixed: added `--max-hours 5.5` to all 4 sport jobs and raised `timeout-minutes: 360` to match. NHL specifically hung longest due to `--year-from 2000 --stale-days 1` being the largest card pool.
+
+### Image lightbox — click any card image to enlarge
+- New `ImageLightbox` component: fixed overlay, click-outside or Escape to close, spring scale-in animation
+- Catalog table: clicking a card thumbnail (zoom-in cursor) opens lightbox without opening the detail panel
+- Detail panel: card image shown prominently below header (max 200px), hover scales slightly, click opens lightbox
+- z-index 2000 — sits above the detail panel (z-500) and modals (z-1000)
+
 ## 2026-03-24
+
+### Mobile catalog layout — column collapse + filter drawer
+- Confidence and Sales columns hidden on mobile (≤600px) via `hideMobile` CSS class — table now fits on phone-width screens
+- Column toggle row hidden on mobile (not useful at narrow widths; columns collapse automatically)
+- Pagination page-count info hidden on mobile to save row space
+- Sport tabs and Priced button font/padding compressed at mobile width
+- Filter drawer was already functional; table layout was the remaining broken piece
+
+### Portfolio value over time chart — live on /charts page
+- `AreaChart` added as the first chart on `/charts` using `GET /cards/portfolio-history`
+- Gradient fill, green line, responsive with tooltip showing full date + formatted price
+- Only renders when ≥2 data points exist (empty state: chart simply doesn't show)
+- Dots shown when ≤30 data points, hidden for dense history to avoid clutter
+- Marks **Mobile catalog layout** and **Portfolio value over time chart** P1 items as complete
 
 ### Connection retry resilience — fix "server closed the connection unexpectedly"
 - TCP keepalive added to pool (`keepalives_idle=30s`, `interval=10s`, `count=5`) — prevents Railway from silently killing idle connections during long scrape batches

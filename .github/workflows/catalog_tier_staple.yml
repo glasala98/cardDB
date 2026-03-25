@@ -15,7 +15,28 @@ on:
         default: '0'
 
 jobs:
+  notify-start:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.NOTIFY_GMAIL_USER }}
+          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.NOTIFY_EMAIL_TO }}
+          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
+          subject: "▶️ CardDB — Staple scrape started (NHL/NBA/NFL/MLB)"
+          body: |
+            Staple-tier scrape has started across all 4 sports (parallel).
+
+            Triggered by: ${{ github.event_name }}
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
   assign-tiers:
+    needs: notify-start
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -33,7 +54,7 @@ jobs:
   scrape-staple-nhl:
     needs: assign-tiers
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 360
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NHL' }}
     steps:
       - uses: actions/checkout@v4
@@ -47,14 +68,14 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NHL staple prices
-        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport NHL --workers 5 --stale-days 1 --year-from 2000 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport NHL --workers 5 --stale-days 1 --year-from 2000 --max-hours 5.5 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   scrape-staple-nba:
     needs: assign-tiers
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 360
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NBA' }}
     steps:
       - uses: actions/checkout@v4
@@ -68,14 +89,14 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NBA staple prices
-        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport NBA --workers 5 --stale-days 1 --year-from 2000 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport NBA --workers 5 --stale-days 1 --year-from 2000 --max-hours 5.5 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   scrape-staple-nfl:
     needs: assign-tiers
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 360
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NFL' }}
     steps:
       - uses: actions/checkout@v4
@@ -89,14 +110,14 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NFL staple prices
-        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport NFL --workers 5 --stale-days 1 --year-from 2000 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport NFL --workers 5 --stale-days 1 --year-from 2000 --max-hours 5.5 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   scrape-staple-mlb:
     needs: assign-tiers
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 360
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'MLB' }}
     steps:
       - uses: actions/checkout@v4
@@ -110,6 +131,32 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape MLB staple prices
-        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport MLB --workers 5 --stale-days 1 --year-from 2000 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport MLB --workers 5 --stale-days 1 --year-from 2000 --max-hours 5.5 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  notify-done:
+    needs: [scrape-staple-nhl, scrape-staple-nba, scrape-staple-nfl, scrape-staple-mlb]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.NOTIFY_GMAIL_USER }}
+          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.NOTIFY_EMAIL_TO }}
+          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
+          subject: "✅ CardDB — Staple scrape done (NHL/NBA/NFL/MLB)"
+          body: |
+            Staple-tier scrape has completed.
+
+            NHL: ${{ needs.scrape-staple-nhl.result }}
+            NBA: ${{ needs.scrape-staple-nba.result }}
+            NFL: ${{ needs.scrape-staple-nfl.result }}
+            MLB: ${{ needs.scrape-staple-mlb.result }}
+
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

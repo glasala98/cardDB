@@ -21,7 +21,28 @@ on:
         default: '0'
 
 jobs:
+  notify-start:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.NOTIFY_GMAIL_USER }}
+          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.NOTIFY_EMAIL_TO }}
+          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
+          subject: "▶️ CardDB — Premium scrape started (NHL/NBA/NFL/MLB)"
+          body: |
+            Premium-tier scrape has started across all 4 sports (parallel).
+
+            Triggered by: ${{ github.event_name }}
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
   scrape-premium-nhl:
+    needs: notify-start
     runs-on: ubuntu-latest
     timeout-minutes: 300
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NHL' }}
@@ -42,6 +63,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   scrape-premium-nba:
+    needs: notify-start
     runs-on: ubuntu-latest
     timeout-minutes: 300
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NBA' }}
@@ -62,6 +84,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   scrape-premium-nfl:
+    needs: notify-start
     runs-on: ubuntu-latest
     timeout-minutes: 300
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NFL' }}
@@ -82,6 +105,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   scrape-premium-mlb:
+    needs: notify-start
     runs-on: ubuntu-latest
     timeout-minutes: 300
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'MLB' }}
@@ -100,3 +124,29 @@ jobs:
         run: python -u scraping/scrape_master_db.py --catalog-tier premium --sport MLB --workers 5 --stale-days 7 --max-hours 4.5 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  notify-done:
+    needs: [scrape-premium-nhl, scrape-premium-nba, scrape-premium-nfl, scrape-premium-mlb]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.NOTIFY_GMAIL_USER }}
+          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.NOTIFY_EMAIL_TO }}
+          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
+          subject: "✅ CardDB — Premium scrape done (NHL/NBA/NFL/MLB)"
+          body: |
+            Premium-tier scrape has completed.
+
+            NHL: ${{ needs.scrape-premium-nhl.result }}
+            NBA: ${{ needs.scrape-premium-nba.result }}
+            NFL: ${{ needs.scrape-premium-nfl.result }}
+            MLB: ${{ needs.scrape-premium-mlb.result }}
+
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
