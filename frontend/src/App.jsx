@@ -25,6 +25,7 @@ import SetBrowser from './pages/SetBrowser'
 import SetDetail from './pages/SetDetail'
 import Trending from './pages/Trending'
 import ScanPage from './pages/ScanPage'
+import Home from './pages/Home'
 import { PreferencesProvider } from './context/PreferencesContext'
 import styles from './App.module.css'
 
@@ -40,9 +41,6 @@ function AppShell() {
       <Navbar />
       <main className={styles.main}>
         <Routes>
-          {/* Default: public catalog homepage */}
-          <Route path="/" element={<Navigate to="/catalog" replace />} />
-
           {/* Public pages */}
           <Route path="/search"         element={<Search />} />
           <Route path="/catalog"        element={<Catalog />} />
@@ -93,6 +91,7 @@ export default function App() {
         <CurrencyProvider>
           <PublicModeProvider>
             <Routes>
+              <Route path="/"       element={<Home />} />
               <Route path="/login"  element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               <Route path="/*"      element={<AppShell />} />

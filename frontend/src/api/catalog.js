@@ -54,3 +54,6 @@ export const suggestPlayers = (q, sport = null) =>
 
 export const getTrending = (sport = null, limit = 12) =>
   client.get('/catalog/trending', { params: { ...(sport ? { sport } : {}), limit } })
+
+export const getCatalogStats = () =>
+  client.get('/catalog/stats')
