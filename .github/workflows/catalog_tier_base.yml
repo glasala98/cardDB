@@ -51,11 +51,11 @@ jobs:
     timeout-minutes: 360
     strategy:
       fail-fast: false
-      # CONNECTION BUDGET: max-parallel(4) × db-pool-max(5) = 20 scraper connections per run.
-      # Two runs can overlap (wall time ~15hrs vs 6hr schedule) → max 8 shards × 5 = 40 connections.
-      # + Railway app pool (5) + monitoring (5) = 50 total — stable under Railway PG limit of 100.
-      # DO NOT raise max-parallel without recalculating for 2 overlapping runs. See CLAUDE.md.
-      max-parallel: 4
+      # CONNECTION BUDGET: max-parallel(24) × workers(2) = 48 scraper connections per run.
+      # --max-hours 5.5 ensures each run finishes before the next 6h schedule fires → no overlap.
+      # + Railway app pool (5) + monitoring (5) = 58 total — well under Railway PG limit of 100.
+      # Previous: max-parallel=4 caused 6 sequential rounds × 5.75h = 34.5h per run → queued backlog.
+      max-parallel: 24
       matrix:
         include:
           # NFL — 10 shards (~48K cards each)
@@ -127,13 +127,13 @@ jobs:
           python -u scraping/scrape_master_db.py \
             --catalog-tier base \
             --sport ${{ matrix.sport }} \
-            --workers 4 \
+            --workers 2 \
             --year-from ${{ github.event.inputs.year_from || '2015' }} \
             --stale-days ${{ github.event.inputs.stale_days || '30' }} \
             --limit ${{ github.event.inputs.limit || '0' }} \
             --shard-index ${{ matrix.shard_index }} \
             --shard-count ${{ matrix.shard_count }} \
-            --max-hours 5.75
+            --max-hours 5.5
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
