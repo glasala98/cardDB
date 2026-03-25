@@ -3,6 +3,7 @@ import SourceBadge from './SourceBadge'
 import GradeBadge from './GradeBadge'
 import styles from './SaleDetailModal.module.css'
 import client from '../api/client'
+import { ebayAffiliateUrl } from '../utils/ebayAffiliate'
 
 function fmt(v) {
   if (v == null) return '—'
@@ -146,7 +147,7 @@ export default function SaleDetailModal({ sale, onClose }) {
         )}
 
         {sale.lot_url && (
-          <a href={sale.lot_url} target="_blank" rel="noopener noreferrer" className={styles.viewLink}>
+          <a href={sale.source === 'ebay' ? ebayAffiliateUrl(sale.lot_url) : sale.lot_url} target="_blank" rel="noopener noreferrer" className={styles.viewLink}>
             View original listing →
           </a>
         )}

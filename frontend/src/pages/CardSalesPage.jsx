@@ -4,6 +4,7 @@ import { getCatalogCard, getCatalogRawSales, getCatalog, getCatalogCardHistory, 
 import SourceBadge from '../components/SourceBadge'
 import GradeBadge from '../components/GradeBadge'
 import { pushRecentlyViewed } from '../utils/recentlyViewed'
+import { ebayAffiliateUrl } from '../utils/ebayAffiliate'
 import styles from './CardSalesPage.module.css'
 
 const PAGE_SIZE = 50
@@ -307,7 +308,7 @@ export default function CardSalesPage() {
                     {liveData && liveData.count === 0 && (
                       <div className={styles.liveEmpty}>
                         No recent sold listings found.{' '}
-                        <a href={liveData.ebay_url} target="_blank" rel="noopener noreferrer">
+                        <a href={ebayAffiliateUrl(liveData.ebay_url)} target="_blank" rel="noopener noreferrer">
                           Search on eBay ↗
                         </a>
                       </div>
@@ -320,14 +321,14 @@ export default function CardSalesPage() {
                         </div>
                         <div className={styles.liveTable}>
                           {liveData.sales.map((s, i) => (
-                            <a key={i} className={styles.liveRow} href={s.url} target="_blank" rel="noopener noreferrer">
+                            <a key={i} className={styles.liveRow} href={ebayAffiliateUrl(s.url)} target="_blank" rel="noopener noreferrer">
                               <span className={styles.livePrice}>${s.price.toFixed(2)}</span>
                               <span className={styles.liveDate}>{s.date}</span>
                               <span className={styles.liveTitle}>{s.title}</span>
                             </a>
                           ))}
                         </div>
-                        <a className={styles.liveEbayLink} href={liveData.ebay_url} target="_blank" rel="noopener noreferrer">
+                        <a className={styles.liveEbayLink} href={ebayAffiliateUrl(liveData.ebay_url)} target="_blank" rel="noopener noreferrer">
                           View all on eBay ↗
                         </a>
                       </div>
@@ -352,7 +353,7 @@ export default function CardSalesPage() {
                   <a
                     key={s.id ?? i}
                     className={`${styles.tableRow} ${s.exclusive ? styles.exclusive : ''}`}
-                    href={s.lot_url || undefined}
+                    href={s.source === 'ebay' ? ebayAffiliateUrl(s.lot_url) : (s.lot_url || undefined)}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={s.lot_url ? { cursor: 'pointer' } : { cursor: 'default' }}
