@@ -67,21 +67,42 @@ jobs:
           cur.execute("""
               SELECT cc.scrape_tier, cc.sport,
                 COUNT(*) FILTER (WHERE mp.scraped_at > NOW() - INTERVAL '1 hour') as h1,
-                COUNT(*) FILTER (WHERE mp.scraped_at > NOW() - INTERVAL '6 hours') as h6
+                COUNT(*) FILTER (WHERE mp.scraped_at > NOW() - INTERVAL '6 hours') as h6,
+                COUNT(*) FILTER (WHERE mp.scraped_at > NOW() - INTERVAL '24 hours') as h24
               FROM market_prices mp
               JOIN card_catalog cc ON cc.id = mp.card_catalog_id
               GROUP BY cc.scrape_tier, cc.sport
-              HAVING COUNT(*) FILTER (WHERE mp.scraped_at > NOW() - INTERVAL '6 hours') > 0
+              HAVING COUNT(*) FILTER (WHERE mp.scraped_at > NOW() - INTERVAL '24 hours') > 0
               ORDER BY cc.scrape_tier, cc.sport
           """)
           rows = cur.fetchall()
           if rows:
-              print(f"{'Tier':<9} {'Sport':<6} {'Last 1h':>9} {'Last 6h':>9}")
-              print("-"*37)
-              for tier, sport, h1t, h6t in rows:
-                  print(f"{tier:<9} {sport:<6} {h1t:>9,} {h6t:>9,}")
+              print(f"{'Tier':<9} {'Sport':<6} {'Last 1h':>9} {'Last 6h':>9} {'Last 24h':>10}")
+              print("-"*48)
+              for tier, sport, h1t, h6t, h24t in rows:
+                  print(f"{tier:<9} {sport:<6} {h1t:>9,} {h6t:>9,} {h24t:>10,}")
           else:
-              print("No writes in last 6 hours")
+              print("No scrape activity in last 24 hours")
+
+          print()
+          cur.execute("""
+              SELECT workflow, sport, tier, mode,
+                     cards_processed, cards_found,
+                     started_at AT TIME ZONE 'UTC' as started_at
+              FROM scrape_runs
+              WHERE started_at > NOW() - INTERVAL '6 hours'
+              ORDER BY started_at DESC
+              LIMIT 20
+          """)
+          runs = cur.fetchall()
+          if runs:
+              print(f"{'Workflow':<30} {'Sport':<6} {'Tier':<9} {'Checked':>8} {'Found':>7} {'Started (UTC)':>20}")
+              print("-"*84)
+              for wf, sport, tier, mode, checked, found, started in runs:
+                  wf_short = (wf or 'manual')[:28]
+                  print(f"{wf_short:<30} {(sport or '-'):<6} {(tier or '-'):<9} {(checked or 0):>8,} {(found or 0):>7,} {str(started)[:19]:>20}")
+          else:
+              print("No scrape runs in last 6 hours")
           cur.close(); conn.close()
           PYEOF
         env:

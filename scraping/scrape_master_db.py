@@ -336,15 +336,13 @@ def save_prices_batch(results: list):
         with conn.cursor() as cur:
             from psycopg2.extras import execute_values
 
-            # Only UPDATE market_prices when the value actually changed.
-            # Skipping no-op updates eliminates WAL churn for unchanged prices —
-            # critical post-backfill when most prices are stable day-to-day.
             execute_values(cur, """
                 INSERT INTO market_prices
                     (card_catalog_id, fair_value, trend, confidence, num_sales, scraped_at, image_url)
                 VALUES %s
                 ON CONFLICT (card_catalog_id) DO UPDATE SET
-                    prev_value = market_prices.fair_value,
+                    prev_value = CASE WHEN market_prices.fair_value IS DISTINCT FROM EXCLUDED.fair_value
+                                      THEN market_prices.fair_value ELSE market_prices.prev_value END,
                     fair_value = EXCLUDED.fair_value,
                     trend      = EXCLUDED.trend,
                     confidence = EXCLUDED.confidence,
@@ -353,9 +351,6 @@ def save_prices_batch(results: list):
                     image_url  = CASE WHEN EXCLUDED.image_url != '' THEN EXCLUDED.image_url
                                       ELSE market_prices.image_url END,
                     updated_at = NOW()
-                WHERE market_prices.fair_value IS DISTINCT FROM EXCLUDED.fair_value
-                   OR market_prices.num_sales  IS DISTINCT FROM EXCLUDED.num_sales
-                   OR market_prices.confidence IS DISTINCT FROM EXCLUDED.confidence
             """, mp_rows)
 
             # SCD Type 2: only insert history row when fair_value changed.
