@@ -4,6 +4,10 @@ name: Catalog Tier — Staple (Daily)
 # Connection budget: 4 sports × 5 workers = 20 connections per run.
 # With base paused: staple(20) + premium(20) + stars(20) + app(5) = 65 max ✅
 
+concurrency:
+  group: catalog-tier-staple
+  cancel-in-progress: true
+
 on:
   schedule:
     - cron: '0 0 * * *'   # midnight UTC

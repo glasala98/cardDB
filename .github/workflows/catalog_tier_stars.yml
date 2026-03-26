@@ -3,6 +3,10 @@ name: Catalog Tier — Stars (Daily)
 # Stars = 66% complete, ~16.5K cards remaining. Runs 2x/day.
 # With base paused: stars(20) + staple(20) + premium(20) + app(5) = 65 max ✅
 
+concurrency:
+  group: catalog-tier-stars
+  cancel-in-progress: true
+
 on:
   schedule:
     - cron: '0 4 * * *'   # 4am  UTC

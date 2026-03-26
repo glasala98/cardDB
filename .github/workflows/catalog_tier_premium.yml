@@ -8,6 +8,10 @@ name: Catalog Tier — Premium (Daily)
 # Worst case with staple+stars: 40 + 20 + 20 + 5(app) = 85 — under Railway limit of 100 ✅
 # Expected ETA with 6x/day sharded: ~Apr 8 (down from ~Apr 22 unsharded)
 
+concurrency:
+  group: catalog-tier-premium
+  cancel-in-progress: true
+
 on:
   schedule:
     - cron: '0 0 * * *'   # midnight UTC
