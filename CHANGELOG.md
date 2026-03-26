@@ -5,6 +5,13 @@ Format: `### [date] — description`
 
 ---
 
+## 2026-03-26
+
+### Fix: scraper card ordering + consecutive-miss threshold
+- **Root cause**: sort order put never-scraped cards first (`NULLS FIRST`). For premium/stars with 200K+ never-scraped cards, the first 500 are always low-liquidity — falsely triggering the IP-block early exit on every run since March 25.
+- **Fix 1**: Sort by `num_sales DESC` first so high-activity cards process first, resetting the consecutive-miss counter early. Never-scraped cards moved to last.
+- **Fix 2**: Raise consecutive-miss threshold 500 → 2000. Premium/stars legitimately have low sell-through; 500 was exiting before reaching any liquid cards.
+
 ## 2026-03-25
 
 ### Feat: two-tier smart search autocomplete

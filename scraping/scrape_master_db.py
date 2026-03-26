@@ -223,7 +223,15 @@ def load_cards(args) -> list:
         conditions.append(f"(mp.scraped_at IS NULL OR mp.scraped_at < NOW() - INTERVAL '{stale_days} days')")
         where = " AND ".join(conditions)
         select_extra = "mp.fair_value AS existing_price, mp.scraped_at AS last_scraped"
-        order_clause = "mp.scraped_at NULLS FIRST, COALESCE(mp.num_sales, 0) DESC, cc.is_rookie DESC, cc.year DESC"
+        # High-liquidity cards first (known eBay sellers) so the consecutive-miss
+        # counter resets early and the early-exit doesn't fire on low-liquidity cards.
+        # Never-scraped cards come last; within never-scraped, rookies + recent years first.
+        order_clause = (
+            "COALESCE(mp.num_sales, 0) DESC, "
+            "cc.is_rookie DESC, "
+            "cc.year DESC, "
+            "mp.scraped_at NULLS LAST"
+        )
 
     sql = f"""
         SELECT cc.id, cc.sport, cc.year, cc.brand, cc.set_name,
@@ -854,13 +862,13 @@ def main():
                               f"Next run will resume from card {done_count + 1}.", flush=True)
                         timed_out = True
                         break
-                    # Early exit if eBay is blocking — 500 consecutive not-found means
-                    # the runner IP is blocked. Exit now so the next scheduled trigger
-                    # gets a fresh runner IP rather than wasting 5+ hours on dead requests.
-                    if not args.backfill and _progress['consec_not_found'] >= 500 and done_count >= 500:
+                    # Early exit if eBay is truly blocking — 2000 consecutive not-found
+                    # means the runner IP is blocked. Threshold raised from 500: premium/stars
+                    # cards legitimately have low eBay sell-through so 500 was falsely triggering.
+                    if not args.backfill and _progress['consec_not_found'] >= 2000 and done_count >= 2000:
                         print(f"\n  [IP-BLOCKED] {_progress['consec_not_found']} consecutive cards returned "
-                              f"no eBay results — exiting early to free runner. "
-                              f"Next trigger will get a fresh IP.", flush=True)
+                              f"no eBay results — likely IP blocked. Exiting early, "
+                              f"next trigger gets a fresh IP.", flush=True)
                         timed_out = True
                         break
         executor.shutdown(wait=False, cancel_futures=True)
