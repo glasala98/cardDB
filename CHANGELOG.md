@@ -7,6 +7,10 @@ Format: `### [date] — description`
 
 ## 2026-03-25
 
+### Feat: add ads.txt for Google AdSense
+- Created `frontend/public/ads.txt` with publisher ID `ca-pub-6940240078766118`
+- Fixes "Not found" Ads.txt warning in AdSense — required for full ad auction participation
+
 ### Ops: switch scrape workflows to hourly cron schedules
 - `catalog_tier_premium.yml`, `catalog_tier_staple.yml`, `catalog_tier_stars.yml`: changed from 2-6x/day schedules to `0 * * * *` (hourly)
 - `timeout-minutes` reduced from 300-360 → 90 (matches actual max runtime)
