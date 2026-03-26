@@ -1,0 +1,57 @@
+name: Quick Stats Check
+on:
+  workflow_dispatch:
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Run stats
+        run: |
+          pip install psycopg2-binary -q
+          python - << 'PYEOF'
+          import os, psycopg2
+          conn = psycopg2.connect(os.environ["DATABASE_URL"])
+          cur = conn.cursor()
+
+          # Overall
+          cur.execute("""
+            SELECT
+              (SELECT reltuples::bigint FROM pg_class WHERE relname='card_catalog') as catalog,
+              (SELECT reltuples::bigint FROM pg_class WHERE relname='market_prices') as priced,
+              pg_size_pretty(pg_database_size(current_database())) as db_size
+          """)
+          catalog, priced, db_size = cur.fetchone()
+          print(f"Total catalog:  {catalog:,}")
+          print(f"Total priced:   {priced:,}  ({priced/catalog*100:.1f}%)")
+          print(f"DB size:        {db_size}")
+          print()
+
+          # Per sport+tier priced
+          cur.execute("""
+            SELECT cc.sport, cc.scrape_tier, COUNT(*) as priced
+            FROM market_prices mp
+            JOIN card_catalog cc ON cc.id = mp.card_catalog_id
+            GROUP BY cc.sport, cc.scrape_tier
+            ORDER BY cc.sport, cc.scrape_tier
+          """)
+          print("Sport    Tier      Priced")
+          print("-" * 35)
+          for sport, tier, cnt in cur.fetchall():
+              print(f"{sport:<8} {tier:<10} {cnt:>8,}")
+          print()
+
+          # Recent activity
+          cur.execute("""
+            SELECT
+              COUNT(*) FILTER (WHERE mp.scraped_at > NOW() - INTERVAL '1 hour') as h1,
+              COUNT(*) FILTER (WHERE mp.scraped_at > NOW() - INTERVAL '24 hours') as h24
+            FROM market_prices mp
+          """)
+          h1, h24 = cur.fetchone()
+          print(f"Priced last 1h:   {h1:,}")
+          print(f"Priced last 24h:  {h24:,}")
+          cur.close(); conn.close()
+          PYEOF
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
