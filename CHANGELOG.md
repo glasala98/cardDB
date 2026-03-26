@@ -7,6 +7,13 @@ Format: `### [date] — description`
 
 ## 2026-03-25
 
+### Feat: two-tier smart search autocomplete
+- `/catalog/suggest` now returns player matches + their top 3 cards (RC first, then by sales volume)
+- Direct FTS card search activates for multi-word queries like "McDavid Young Guns" — surfaces specific cards matching all terms
+- Suggestion dropdown shows player names with card count, and card entries indented below with year/set/variant + RC badge + sale count
+- Clicking a card suggestion navigates directly to that card's page; clicking a player name sets the search filter
+- Dropdown max-height increased to 360px to accommodate the richer results
+
 ### Feat: add ads.txt for Google AdSense
 - Created `frontend/public/ads.txt` with publisher ID `ca-pub-6940240078766118`
 - Fixes "Not found" Ads.txt warning in AdSense — required for full ad auction participation

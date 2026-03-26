@@ -1225,46 +1225,116 @@ def suggest(
     sport: Optional[str]= Query(None),
     limit: int          = Query(8, ge=1, le=20),
 ):
-    """Fast player-name typeahead — returns up to `limit` distinct names matching prefix."""
-    cache_key = f"{q}|{sport}|{limit}"
+    """Two-tier typeahead: player names with their top cards, plus FTS card search."""
+    cache_key = f"v2|{q}|{sport}|{limit}"
     with _cache_lock:
         if cache_key in _suggest_cache:
             return _suggest_cache[cache_key]
 
-    conditions = ["player_name ILIKE %s"]
-    params: list = [f"%{q}%"]
-    if sport:
-        conditions.append("sport = %s")
-        params.append(sport.upper())
-
-    where = " AND ".join(conditions)
+    sport_up = sport.upper() if sport else None
+    results: list = []
+    seen_card_ids: set = set()
 
     with get_db() as conn:
         cur = conn.cursor()
-        cur.execute("SET statement_timeout = '2s'")
+        cur.execute("SET statement_timeout = '3s'")
+
+        # ── 1. Player-name matches ──────────────────────────────────────────
+        p_params: list = [f"%{q}%"]
+        p_where = "player_name ILIKE %s"
+        if sport_up:
+            p_where += " AND sport = %s"
+            p_params.append(sport_up)
+
         cur.execute(f"""
             SELECT player_name, sport, COUNT(*) AS cnt
             FROM card_catalog
-            WHERE {where}
+            WHERE {p_where}
             GROUP BY player_name, sport
             ORDER BY cnt DESC
-            LIMIT %s
-        """, params + [limit])
-        rows = cur.fetchall()
+            LIMIT 5
+        """, p_params)
+        player_rows = cur.fetchall()
 
-    result = [{"player_name": r[0], "sport": r[1], "count": r[2]} for r in rows]
+        if player_rows:
+            player_names = [r[0] for r in player_rows]
+            name_ph = ','.join(['%s'] * len(player_names))
+            c_params: list = list(player_names)
+            c_extra = ""
+            if sport_up:
+                c_extra = " AND cc.sport = %s"
+                c_params.append(sport_up)
 
-    # Deduplicate by player_name keeping highest count
-    seen: dict = {}
-    for r in result:
-        if r["player_name"] not in seen:
-            seen[r["player_name"]] = r
+            # Top 3 cards per player ordered by RC status then sales then value
+            cur.execute(f"""
+                WITH ranked AS (
+                    SELECT
+                        cc.id, cc.player_name, cc.sport, cc.year, cc.set_name,
+                        cc.variant, cc.is_rookie, mp.num_sales, mp.fair_value,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY cc.player_name
+                            ORDER BY
+                                cc.is_rookie DESC NULLS LAST,
+                                COALESCE(mp.num_sales, 0) DESC,
+                                COALESCE(mp.fair_value, 0) DESC
+                        ) AS rn
+                    FROM card_catalog cc
+                    LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
+                    WHERE cc.player_name IN ({name_ph}) {c_extra}
+                )
+                SELECT id, player_name, sport, year, set_name, variant,
+                       is_rookie, num_sales, fair_value
+                FROM ranked WHERE rn <= 3
+            """, c_params)
+            card_rows = cur.fetchall()
 
-    deduped = sorted(seen.values(), key=lambda x: -x["count"])[:limit]
+            cards_by_player: dict = {}
+            for r in card_rows:
+                seen_card_ids.add(r[0])
+                cards_by_player.setdefault(r[1], []).append({
+                    "type": "card", "id": r[0], "player_name": r[1], "sport": r[2],
+                    "year": r[3], "set_name": r[4], "variant": r[5],
+                    "is_rookie": bool(r[6]), "num_sales": r[7], "fair_value": float(r[8]) if r[8] else None,
+                })
+
+            for pname, psport, pcnt in player_rows:
+                results.append({"type": "player", "player_name": pname, "sport": psport, "count": pcnt})
+                results.extend(cards_by_player.get(pname, []))
+
+        # ── 2. Direct card FTS search for specific queries ("McDavid Young Guns") ──
+        words = q.strip().split()
+        if len(words) >= 2 or not player_rows:
+            fts_params: list = [q, q]
+            fts_extra = ""
+            if sport_up:
+                fts_extra = " AND cc.sport = %s"
+                fts_params.append(sport_up)
+
+            cur.execute(f"""
+                SELECT cc.id, cc.player_name, cc.sport, cc.year, cc.set_name,
+                       cc.variant, cc.is_rookie, mp.num_sales, mp.fair_value
+                FROM card_catalog cc
+                LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
+                WHERE cc.search_vector @@ plainto_tsquery('english', %s) {fts_extra}
+                ORDER BY
+                    ts_rank(cc.search_vector, plainto_tsquery('english', %s)) DESC,
+                    cc.is_rookie DESC NULLS LAST,
+                    COALESCE(mp.num_sales, 0) DESC
+                LIMIT 5
+            """, fts_params)
+            for r in cur.fetchall():
+                if r[0] not in seen_card_ids:
+                    seen_card_ids.add(r[0])
+                    results.append({
+                        "type": "card", "id": r[0], "player_name": r[1], "sport": r[2],
+                        "year": r[3], "set_name": r[4], "variant": r[5],
+                        "is_rookie": bool(r[6]), "num_sales": r[7],
+                        "fair_value": float(r[8]) if r[8] else None,
+                    })
 
     with _cache_lock:
-        _suggest_cache[cache_key] = deduped
-    return deduped
+        _suggest_cache[cache_key] = results
+    return results
 
 
 # ── Parameterized routes MUST come after all fixed-path routes ──────────────

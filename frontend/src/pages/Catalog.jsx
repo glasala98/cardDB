@@ -384,14 +384,28 @@ export default function Catalog() {
             />
             {showSuggestions && suggestions.length > 0 && (
               <ul className={styles.suggestions}>
-                {suggestions.map(s => (
+                {suggestions.map((s, i) => s.type === 'player' ? (
                   <li
-                    key={s.player_name}
+                    key={`p-${s.player_name}-${i}`}
                     className={styles.suggestionItem}
                     onMouseDown={() => { setSearch(s.player_name); setShowSuggestions(false) }}
                   >
                     <span>{s.player_name}</span>
                     <span className={styles.suggestionCount}>{s.count}</span>
+                  </li>
+                ) : (
+                  <li
+                    key={`c-${s.id}`}
+                    className={`${styles.suggestionItem} ${styles.suggestionCard}`}
+                    onMouseDown={() => { setShowSuggestions(false); navigate(`/catalog/${s.id}`) }}
+                  >
+                    <span className={styles.suggestionCardLabel}>
+                      {s.year} {s.set_name}{s.variant ? ` · ${s.variant}` : ''}
+                      {s.is_rookie && <span className={styles.rcBadge}>RC</span>}
+                    </span>
+                    {s.num_sales != null && (
+                      <span className={styles.suggestionCount}>{s.num_sales} sales</span>
+                    )}
                   </li>
                 ))}
               </ul>

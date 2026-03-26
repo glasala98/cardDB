@@ -95,7 +95,7 @@
   list-style: none;
   z-index: 200;
   box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-  max-height: 220px;
+  max-height: 360px;
   overflow-y: auto;
 }
 .suggestionItem {
@@ -109,10 +109,42 @@
   gap: 8px;
 }
 .suggestionItem:hover { background: var(--bg-hover); }
+.suggestionCard {
+  padding-left: 22px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  border-left: 2px solid var(--border);
+  margin-left: 8px;
+  margin-right: 8px;
+  border-radius: 0;
+}
+.suggestionCard:hover { background: var(--bg-hover); border-radius: 4px; }
+.suggestionCardLabel {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rcBadge {
+  font-size: 9px;
+  font-weight: 700;
+  color: #f59e0b;
+  background: rgba(245,158,11,0.15);
+  border: 1px solid rgba(245,158,11,0.4);
+  border-radius: 3px;
+  padding: 1px 4px;
+  flex-shrink: 0;
+}
 .suggestionCount {
   font-size: 11px;
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
 .sideSelect {
