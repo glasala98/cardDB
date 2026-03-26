@@ -4,7 +4,7 @@ on:
 jobs:
   stats:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - name: Run stats
         run: |
@@ -14,39 +14,50 @@ jobs:
           conn = psycopg2.connect(os.environ["DATABASE_URL"])
           cur = conn.cursor()
 
-          # Overall
           cur.execute("""
-            SELECT
-              (SELECT reltuples::bigint FROM pg_class WHERE relname='card_catalog') as catalog,
-              (SELECT reltuples::bigint FROM pg_class WHERE relname='market_prices') as priced,
-              pg_size_pretty(pg_database_size(current_database())) as db_size
+              SELECT sport, scrape_tier, COUNT(*) as total
+              FROM card_catalog
+              GROUP BY sport, scrape_tier
+              ORDER BY scrape_tier, sport
           """)
-          catalog, priced, db_size = cur.fetchone()
-          print(f"Total catalog:  {catalog:,}")
-          print(f"Total priced:   {priced:,}  ({priced/catalog*100:.1f}%)")
-          print(f"DB size:        {db_size}")
-          print()
+          rows = cur.fetchall()
+          catalog = {(r[0],r[1]): r[2] for r in rows}
 
-          # Per sport+tier priced
           cur.execute("""
-            SELECT cc.sport, cc.scrape_tier, COUNT(*) as priced
-            FROM market_prices mp
-            JOIN card_catalog cc ON cc.id = mp.card_catalog_id
-            GROUP BY cc.sport, cc.scrape_tier
-            ORDER BY cc.sport, cc.scrape_tier
+              SELECT cc.sport, cc.scrape_tier, COUNT(*) as priced
+              FROM market_prices mp
+              JOIN card_catalog cc ON cc.id = mp.card_catalog_id
+              GROUP BY cc.sport, cc.scrape_tier
+              ORDER BY cc.scrape_tier, cc.sport
           """)
-          print("Sport    Tier      Priced")
-          print("-" * 35)
-          for sport, tier, cnt in cur.fetchall():
-              print(f"{sport:<8} {tier:<10} {cnt:>8,}")
-          print()
+          print(f"{'Sport':<6} {'Tier':<9} {'Priced':>8} {'/ Total':>8} {'Pct':>7}")
+          print("-"*44)
+          for sport, tier, priced in cur.fetchall():
+              total = catalog.get((sport,tier), 0)
+              pct = priced/total*100 if total else 0
+              print(f"{sport:<6} {tier:<9} {priced:>8,} {total:>8,} {pct:>6.1f}%")
 
-          # Recent activity
+          print()
           cur.execute("""
-            SELECT
-              COUNT(*) FILTER (WHERE mp.scraped_at > NOW() - INTERVAL '1 hour') as h1,
-              COUNT(*) FILTER (WHERE mp.scraped_at > NOW() - INTERVAL '24 hours') as h24
-            FROM market_prices mp
+              SELECT cc.scrape_tier,
+                COUNT(*) FILTER (WHERE mp.scraped_at < NOW() - INTERVAL '1 day') as stale_1d,
+                COUNT(*) FILTER (WHERE mp.scraped_at < NOW() - INTERVAL '7 days') as stale_7d,
+                COUNT(*) FILTER (WHERE mp.scraped_at < NOW() - INTERVAL '30 days') as stale_30d
+              FROM market_prices mp
+              JOIN card_catalog cc ON cc.id = mp.card_catalog_id
+              GROUP BY cc.scrape_tier ORDER BY cc.scrape_tier
+          """)
+          print(f"{'Tier':<9} {'Stale>1d':>10} {'Stale>7d':>10} {'Stale>30d':>10}")
+          print("-"*43)
+          for tier, s1, s7, s30 in cur.fetchall():
+              print(f"{tier:<9} {s1:>10,} {s7:>10,} {s30:>10,}")
+
+          print()
+          cur.execute("""
+              SELECT
+                COUNT(*) FILTER (WHERE mp.scraped_at > NOW() - INTERVAL '1 hour') as h1,
+                COUNT(*) FILTER (WHERE mp.scraped_at > NOW() - INTERVAL '24 hours') as h24
+              FROM market_prices mp
           """)
           h1, h24 = cur.fetchone()
           print(f"Priced last 1h:   {h1:,}")
