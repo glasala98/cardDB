@@ -7,6 +7,12 @@ Format: `### [date] — description`
 
 ## 2026-03-25
 
+### Ops: switch scrape workflows to hourly cron schedules
+- `catalog_tier_premium.yml`, `catalog_tier_staple.yml`, `catalog_tier_stars.yml`: changed from 2-6x/day schedules to `0 * * * *` (hourly)
+- `timeout-minutes` reduced from 300-360 → 90 (matches actual max runtime)
+- `--max-hours` reduced from 4.5-5.5 → 0.85 so scrapers exit gracefully before the next hourly trigger cancels them
+- Eliminates zombie runs and ensures continuous 100% uptime across all tiers
+
 ### Perf: parallelize CardSalesPage API calls + add Cache-Control headers
 - `getCatalogCard` and `getCatalogCardHistory` now fire in parallel via `Promise.all` — removes a sequential waterfall that was waiting for card info before fetching history
 - `browse_catalog` endpoint: `Cache-Control: public, max-age=30/60, stale-while-revalidate=300/600` — browsers and CDN can serve cached catalog pages instantly on back-navigation

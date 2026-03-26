@@ -10,9 +10,7 @@ concurrency:
 
 on:
   schedule:
-    - cron: '0 0 * * *'   # midnight UTC
-    - cron: '0 8 * * *'   # 8am UTC
-    - cron: '0 16 * * *'  # 4pm UTC
+    - cron: '0 * * * *'   # hourly
   workflow_dispatch:
     inputs:
       sport:
@@ -67,7 +65,7 @@ jobs:
   scrape-staple-nhl:
     needs: assign-tiers
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 90
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NHL' }}
     steps:
       - uses: actions/checkout@v4
@@ -81,14 +79,14 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NHL staple prices
-        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport NHL --workers 5 --stale-days 1 --year-from 2000 --max-hours 5.5 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport NHL --workers 5 --stale-days 1 --year-from 2000 --max-hours 0.85 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   scrape-staple-nba:
     needs: assign-tiers
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 90
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NBA' }}
     steps:
       - uses: actions/checkout@v4
@@ -102,14 +100,14 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NBA staple prices
-        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport NBA --workers 5 --stale-days 1 --year-from 2000 --max-hours 5.5 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport NBA --workers 5 --stale-days 1 --year-from 2000 --max-hours 0.85 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   scrape-staple-nfl:
     needs: assign-tiers
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 90
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NFL' }}
     steps:
       - uses: actions/checkout@v4
@@ -123,14 +121,14 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape NFL staple prices
-        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport NFL --workers 5 --stale-days 1 --year-from 2000 --max-hours 5.5 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport NFL --workers 5 --stale-days 1 --year-from 2000 --max-hours 0.85 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   scrape-staple-mlb:
     needs: assign-tiers
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 90
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'MLB' }}
     steps:
       - uses: actions/checkout@v4
@@ -144,7 +142,7 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
       - name: Scrape MLB staple prices
-        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport MLB --workers 5 --stale-days 1 --year-from 2000 --max-hours 5.5 --limit ${{ github.event.inputs.limit || '0' }}
+        run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport MLB --workers 5 --stale-days 1 --year-from 2000 --max-hours 0.85 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 

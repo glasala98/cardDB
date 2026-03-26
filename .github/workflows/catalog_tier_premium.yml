@@ -14,12 +14,7 @@ concurrency:
 
 on:
   schedule:
-    - cron: '0 0 * * *'   # midnight UTC
-    - cron: '0 4 * * *'   # 4am UTC
-    - cron: '0 8 * * *'   # 8am UTC
-    - cron: '0 12 * * *'  # noon UTC
-    - cron: '0 16 * * *'  # 4pm UTC
-    - cron: '0 20 * * *'  # 8pm UTC
+    - cron: '0 * * * *'   # hourly
   workflow_dispatch:
     inputs:
       sport:
@@ -58,7 +53,7 @@ jobs:
     needs: notify-start
     if: always()
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       max-parallel: 8
@@ -97,7 +92,7 @@ jobs:
             --stale-days 7 \
             --shard-index ${{ matrix.shard_index }} \
             --shard-count ${{ matrix.shard_count }} \
-            --max-hours 4.5 \
+            --max-hours 0.85 \
             --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
