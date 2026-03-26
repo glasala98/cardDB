@@ -7,6 +7,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Cancel any in-progress or queued test run when a new push arrives.
+# Prevents test pile-ups from blocking scrape runner slots.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ── Python unit tests (no DB required) ─────────────────────────────────────
   python-unit:
