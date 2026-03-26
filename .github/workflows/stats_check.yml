@@ -62,6 +62,26 @@ jobs:
           h1, h24 = cur.fetchone()
           print(f"Priced last 1h:   {h1:,}")
           print(f"Priced last 24h:  {h24:,}")
+
+          print()
+          cur.execute("""
+              SELECT cc.scrape_tier, cc.sport,
+                COUNT(*) FILTER (WHERE mp.scraped_at > NOW() - INTERVAL '1 hour') as h1,
+                COUNT(*) FILTER (WHERE mp.scraped_at > NOW() - INTERVAL '6 hours') as h6
+              FROM market_prices mp
+              JOIN card_catalog cc ON cc.id = mp.card_catalog_id
+              GROUP BY cc.scrape_tier, cc.sport
+              HAVING COUNT(*) FILTER (WHERE mp.scraped_at > NOW() - INTERVAL '6 hours') > 0
+              ORDER BY cc.scrape_tier, cc.sport
+          """)
+          rows = cur.fetchall()
+          if rows:
+              print(f"{'Tier':<9} {'Sport':<6} {'Last 1h':>9} {'Last 6h':>9}")
+              print("-"*37)
+              for tier, sport, h1t, h6t in rows:
+                  print(f"{tier:<9} {sport:<6} {h1t:>9,} {h6t:>9,}")
+          else:
+              print("No writes in last 6 hours")
           cur.close(); conn.close()
           PYEOF
         env:
