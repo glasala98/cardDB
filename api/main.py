@@ -32,7 +32,6 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
-from apscheduler.schedulers.background import BackgroundScheduler
 
 
 class RateLimitMiddleware:
@@ -85,16 +84,11 @@ class RateLimitMiddleware:
 
 from api.routers import cards, master_db, stats, auth, scan, admin, catalog, collection, search, ai
 from db import get_db
-from scripts.progress_report import run as _progress_run
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(_progress_run, "cron", minute="0,15,30,45", id="progress_report")
-    scheduler.start()
+    # Progress report emails disabled — running local backfill overnight.
+    # Re-enable by restoring: scheduler.add_job(_progress_run, "cron", minute="0,15,30,45")
     yield
-    scheduler.shutdown(wait=False)
 
 
 app = FastAPI(title="Card Dashboard API", version="0.1.0", lifespan=lifespan)
