@@ -1,0 +1,32 @@
+{
+  "_comment": "backfill=true fetches full 90-day history + derives price in one pass. Use for initial population. raw mode (backfill=false) is for ongoing delta refreshes once history is captured.",
+  "_shard_note": "For overnight local runs, max ~9 subprocesses safely (23GB RAM / ~2.5GB per subprocess). Premium/base: always use --sport filter so shards apply to one sport at a time.",
+  "staple": {
+    "stale_days": 1,
+    "workers": 5,
+    "shard_count": 1,
+    "year_from": 2000,
+    "sports": ["NHL", "NBA", "NFL", "MLB"]
+  },
+  "premium": {
+    "stale_days": 7,
+    "workers": 5,
+    "shard_count": 7,
+    "year_from": null,
+    "sports": ["NHL", "NBA", "NFL", "MLB"]
+  },
+  "stars": {
+    "stale_days": 30,
+    "workers": 5,
+    "shard_count": 2,
+    "year_from": null,
+    "sports": ["NHL", "NBA", "NFL", "MLB"]
+  },
+  "base": {
+    "stale_days": 30,
+    "workers": 5,
+    "shard_count": 7,
+    "year_from": 2015,
+    "sports": ["NFL", "NBA", "MLB"]
+  }
+}

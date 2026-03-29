@@ -1,0 +1,51 @@
+name: Backfill — Premium (90-day history)
+
+# One-time backfill for premium-tier cards. Premium is large (~533k total).
+# Run one sport at a time using the sport input to avoid too many parallel runners.
+# NFL alone (~257k cards) needs ~7 runs of 5.75h. Re-run daily until complete.
+#
+# IMPORTANT: Always specify a sport — running all 4 in parallel = too many GH Actions minutes.
+# Recommended order: NFL → MLB → NBA → NHL
+#
+# Connection budget: 1 sport × pool-max 5 = 5 connections ✅
+
+concurrency:
+  group: backfill-premium
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      sport:
+        description: 'Sport to backfill — REQUIRED (NHL/NBA/NFL/MLB)'
+        required: true
+        default: 'NFL'
+      limit:
+        description: 'Max cards (0=all, use for smoke test)'
+        required: false
+        default: '0'
+
+jobs:
+  backfill-premium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Backfill premium
+        run: |
+          python -u scraping/scrape_master_db.py \
+            --catalog-tier premium --sport ${{ github.event.inputs.sport }} \
+            --workers 3 --stale-days 60 \
+            --backfill --max-hours 5.75 \
+            --limit ${{ github.event.inputs.limit || '0' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

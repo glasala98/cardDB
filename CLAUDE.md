@@ -2,11 +2,12 @@
 
 ## Core Rules
 
-### No local compute
-This is a **cloud-only** project. The local machine is for **code editing and git push only**.
-- Never run `python ...`, `node ...`, or any data/scraping commands locally
-- All script execution runs via **GitHub Actions** (`gh workflow run`)
-- All infrastructure runs on **Railway** (auto-deploys from `main`)
+### Local vs cloud execution
+- **Backfill scraping runs on local hardware** — no 6h kill, no GH Actions connection budget conflict, runs overnight uninterrupted. Use local PC for all bulk backfill work (staple/premium/stars/base).
+- **Delta scraping (post-backfill) runs via GitHub Actions** — once all tiers are priced, daily delta runs are small and fast enough for GH Actions. Switch after backfill is complete.
+- **Infrastructure runs on Railway** (auto-deploys from `main`)
+- When running locally, use a `.env` file or export `DATABASE_URL` before executing scripts
+- **Connection budget for overnight local runs**: 4 sports × 3 workers = 12 local + up to 80 GH Actions (if hourly workflows still active) + 5 app = 97 peak ✅
 
 ### Every change must be documented
 When making any change to the project:
@@ -60,14 +61,17 @@ Current settings (base scrape): `max-parallel: 4` × `pool-max: 5` × `2 overlap
 
 **Rules:**
 - `db.py` pool max is **5** — never raise it without recalculating the budget
-- `--workers N` in scraper args must be ≤ pool-max (workers share the pool)
-- Before increasing `max-parallel` or `--workers`: recalculate `max-parallel × pool-max ≤ 80`
-- Never run two parallel scrape workflows at the same time (e.g. base + staple) — they share the same connection budget
+- `--workers N` controls Selenium threads only — workers never touch the DB pool. Only the main thread uses DB (1 connection at a time during `_flush_batch`). Safe to run `--workers 10` locally.
+- For GH Actions: `max-parallel × pool-max ≤ 80` still applies (each GH Actions job holds its full pool open)
+- For local runs: budget is `processes × 2` (1 active + 1 idle per process) — far below 100
+- Use `run_tier.py` for local runs — it reads `tier_config.json` and launches the right subprocesses
+- Never run two parallel scrape workflows at the same time on GH Actions — they share the same connection budget
 - Never query `market_raw_sales` with a `GROUP BY card_catalog_id` or similar full-scan inside the catalog load path — it blocks all 24 shards simultaneously
 - **Never set `--stale-days` above 60 for any tier** — eBay sold listings expire after 90 days. 60 days gives a 30-day safety buffer. Missing a rescrape window = permanent data loss.
 
 ### GitHub Actions limits
 - Scheduled jobs have a **6-hour hard kill** — always pass `--max-hours 5.75` to scrapers
+- **Never use `--max-hours 0` in any GH Actions workflow file** — `0` means no limit and the job will be killed mid-run at 6h with no clean shutdown. Local `run_tier.py` uses `--max-hours 0` intentionally; GH Actions must always use `--max-hours 5.75`.
 - Job `timeout-minutes` should be set conservatively based on expected runtime
 - Email/notify jobs should complete in <5 minutes
 

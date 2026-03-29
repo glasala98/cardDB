@@ -1,0 +1,127 @@
+name: Backfill — Staple (90-day history)
+
+# One-time backfill: captures full 90-day eBay sold history for staple-tier cards
+# that have no market_raw_sales rows yet. Re-run daily until all cards are covered.
+# Safe to run alongside catalog_tier_staple.yml — different concurrency group,
+# and backfill targets cards with no raw_sales while delta targets stale market_prices.
+#
+# Connection budget: 4 sports × pool-max 5 = 20 connections ✅
+# Workers: 3 per job (GH Actions runners are 2-core/7GB — 5 workers causes tab crashes)
+# Time limit: 5.75h graceful stop (GH Actions hard-kills at 6h)
+
+concurrency:
+  group: backfill-staple
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      sport:
+        description: 'Sport to backfill (NHL/NBA/NFL/MLB, blank=all)'
+        required: false
+        default: ''
+      limit:
+        description: 'Max cards per sport (0=all, use for smoke test)'
+        required: false
+        default: '0'
+
+jobs:
+  backfill-nhl:
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NHL' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Backfill NHL staple
+        run: |
+          python -u scraping/scrape_master_db.py \
+            --catalog-tier staple --sport NHL \
+            --workers 3 --stale-days 60 --year-from 2000 \
+            --backfill --max-hours 5.75 \
+            --limit ${{ github.event.inputs.limit || '0' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  backfill-nba:
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NBA' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Backfill NBA staple
+        run: |
+          python -u scraping/scrape_master_db.py \
+            --catalog-tier staple --sport NBA \
+            --workers 3 --stale-days 60 --year-from 2000 \
+            --backfill --max-hours 5.75 \
+            --limit ${{ github.event.inputs.limit || '0' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  backfill-nfl:
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NFL' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Backfill NFL staple
+        run: |
+          python -u scraping/scrape_master_db.py \
+            --catalog-tier staple --sport NFL \
+            --workers 3 --stale-days 60 --year-from 2000 \
+            --backfill --max-hours 5.75 \
+            --limit ${{ github.event.inputs.limit || '0' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  backfill-mlb:
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'MLB' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 370
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+      - name: Install dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+      - name: Backfill MLB staple
+        run: |
+          python -u scraping/scrape_master_db.py \
+            --catalog-tier staple --sport MLB \
+            --workers 3 --stale-days 60 --year-from 2000 \
+            --backfill --max-hours 5.75 \
+            --limit ${{ github.event.inputs.limit || '0' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
