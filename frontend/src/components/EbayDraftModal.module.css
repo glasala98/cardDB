@@ -91,6 +91,32 @@
 .connectBtn:hover { background: #0052aa; }
 .hint { font-size: 12px; color: #555; max-width: 300px; }
 
+/* ── Listing format toggle ── */
+.formatToggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid #2a2a3d;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.formatBtn {
+  flex: 1;
+  background: none;
+  border: none;
+  color: #666;
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.formatBtn:hover { background: #1a1a2e; color: #aaa; }
+.formatBtnActive {
+  background: #1e1e35 !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+
 /* ── Two-column form layout ── */
 .formLayout {
   display: grid;

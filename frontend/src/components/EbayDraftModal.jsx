@@ -9,23 +9,24 @@ const CONDITIONS = [
   { id: '5000', label: 'Acceptable' },
 ]
 
+const AUCTION_DURATIONS = [3, 5, 7, 10]
+
 function getReadiness(form, cardData) {
   if (!form) return []
+  const price = parseFloat(form.price)
   return [
     {
       key:      'title',
       label:    'Title',
       required: true,
       ok:       form.title?.trim().length > 0,
-      warn:     form.title?.trim().length > 70,
-      warnMsg:  'Getting long — eBay limit is 80 chars',
     },
     {
       key:      'price',
-      label:    'Price',
+      label:    form.listing_format === 'AUCTION' ? 'Starting bid' : 'Buy It Now price',
       required: true,
-      ok:       parseFloat(form.price) > 0,
-      hint:     !parseFloat(form.price) ? 'No market price on file — enter manually' : null,
+      ok:       price > 0,
+      hint:     !price ? 'Enter a price to continue' : null,
     },
     {
       key:      'condition_id',
@@ -38,27 +39,21 @@ function getReadiness(form, cardData) {
       label:    'Description',
       required: false,
       ok:       form.description?.trim().length > 20,
-      hint:     form.description?.trim().length <= 20 ? 'Short description — buyers prefer detail' : null,
+      hint:     form.description?.trim().length <= 20 ? 'Short — buyers prefer detail' : null,
     },
     {
       key:      'image',
       label:    'Card image',
       required: false,
       ok:       !!cardData?.image_url,
-      hint:     !cardData?.image_url ? 'No image fetched — fetch image first for best results' : null,
-    },
-    {
-      key:      'shipping',
-      label:    'Shipping',
-      required: false,
-      ok:       parseFloat(form.shipping) >= 0,
+      hint:     !cardData?.image_url ? 'Fetch image first for best results' : null,
     },
     {
       key:      'player',
       label:    'Player name',
       required: false,
       ok:       !!cardData?.player_name,
-      hint:     !cardData?.player_name ? 'Missing — eBay aspects will be incomplete' : null,
+      hint:     !cardData?.player_name ? 'Missing from card data' : null,
     },
     {
       key:      'year',
@@ -75,7 +70,6 @@ export default function EbayDraftModal({ cardData, onClose }) {
   const [form, setForm]         = useState(null)
   const [result, setResult]     = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
-  const [focused, setFocused]   = useState(null)
   const pollRef                 = useRef(null)
 
   useEffect(() => {
@@ -98,19 +92,23 @@ export default function EbayDraftModal({ cardData, onClose }) {
     try {
       const prefill = await getEbayPrefill(cardData.card_name)
       setForm({
-        title:        prefill.suggested_title || cardData.card_name || '',
-        price:        prefill.suggested_price != null ? String(prefill.suggested_price) : '',
-        condition_id: prefill.condition_id   || (cardData.grade ? '2750' : '3000'),
-        description:  prefill.description    || '',
-        shipping:     '5.00',
+        title:          prefill.suggested_title || cardData.card_name || '',
+        price:          '0.99',
+        listing_format: 'AUCTION',
+        auction_days:   7,
+        condition_id:   prefill.condition_id || (cardData.grade ? '2750' : '3000'),
+        description:    prefill.description  || '',
+        shipping:       '5.00',
       })
     } catch {
       setForm({
-        title:        cardData.card_name || '',
-        price:        cardData.fair_value != null ? String(cardData.fair_value) : '',
-        condition_id: cardData.grade ? '2750' : '3000',
-        description:  '',
-        shipping:     '5.00',
+        title:          cardData.card_name || '',
+        price:          '0.99',
+        listing_format: 'AUCTION',
+        auction_days:   7,
+        condition_id:   cardData.grade ? '2750' : '3000',
+        description:    '',
+        shipping:       '5.00',
       })
     }
     setStep('form')
@@ -144,20 +142,22 @@ export default function EbayDraftModal({ cardData, onClose }) {
     setErrorMsg('')
     try {
       const res = await createEbayDraft({
-        card_name:     cardData.card_name,
-        player_name:   cardData.player_name   || '',
-        year:          String(cardData.year   || ''),
-        brand:         cardData.brand         || '',
-        set_name:      cardData.set_name      || '',
-        card_number:   cardData.card_number   || '',
-        variant:       cardData.variant       || '',
-        grade:         cardData.grade         || '',
-        serial_number: cardData.serial_number || '',
-        sport:         cardData.sport         || '',
-        listing_price: parseFloat(form.price),
-        condition_id:  form.condition_id,
-        description:   form.description,
-        image_url:     cardData.image_url     || '',
+        card_name:      cardData.card_name,
+        player_name:    cardData.player_name   || '',
+        year:           String(cardData.year   || ''),
+        brand:          cardData.brand         || '',
+        set_name:       cardData.set_name      || '',
+        card_number:    cardData.card_number   || '',
+        variant:        cardData.variant       || '',
+        grade:          cardData.grade         || '',
+        serial_number:  cardData.serial_number || '',
+        sport:          cardData.sport         || '',
+        price:          parseFloat(form.price),
+        listing_format: form.listing_format,
+        auction_days:   form.listing_format === 'AUCTION' ? form.auction_days : 7,
+        condition_id:   form.condition_id,
+        description:    form.description,
+        image_url:      cardData.image_url     || '',
       })
       setResult(res)
       setStep('success')
@@ -167,14 +167,15 @@ export default function EbayDraftModal({ cardData, onClose }) {
     }
   }
 
-  const readiness     = getReadiness(form, cardData)
-  const required      = readiness.filter(r => r.required)
-  const optional      = readiness.filter(r => !r.required)
-  const requiredDone  = required.filter(r => r.ok).length
-  const optionalDone  = optional.filter(r => r.ok).length
-  const allRequired   = requiredDone === required.length
-  const totalPct      = Math.round(((requiredDone + optionalDone) / readiness.length) * 100)
+  const readiness    = getReadiness(form, cardData)
+  const required     = readiness.filter(r => r.required)
+  const optional     = readiness.filter(r => !r.required)
+  const requiredDone = required.filter(r => r.ok).length
+  const optionalDone = optional.filter(r => r.ok).length
+  const allRequired  = requiredDone === required.length
+  const totalPct     = Math.round(((requiredDone + optionalDone) / readiness.length) * 100)
   const titleCharsLeft = 80 - (form?.title?.length || 0)
+  const isAuction    = form?.listing_format === 'AUCTION'
 
   return (
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
@@ -186,7 +187,6 @@ export default function EbayDraftModal({ cardData, onClose }) {
           <h2>Draft Listing</h2>
         </div>
 
-        {/* CHECKING */}
         {step === 'checking' && (
           <div className={styles.center}>
             <div className={styles.spinner} />
@@ -194,21 +194,36 @@ export default function EbayDraftModal({ cardData, onClose }) {
           </div>
         )}
 
-        {/* CONNECTING */}
         {step === 'connecting' && (
           <div className={styles.center}>
-            <p className={styles.connectMsg}>Connect your eBay seller account to create draft listings.</p>
+            <p className={styles.connectMsg}>Connect your eBay seller account to create listings.</p>
             <button className={styles.connectBtn} onClick={openOAuthPopup}>Connect eBay Account</button>
             <p className={styles.hint}>A popup will open to authorize. The form loads automatically once connected.</p>
           </div>
         )}
 
-        {/* FORM */}
         {step === 'form' && form && (
           <div className={styles.formLayout}>
 
-            {/* ── Left: form fields ── */}
             <form onSubmit={handleSubmit} className={styles.form}>
+
+              {/* ── Listing type toggle ── */}
+              <div className={styles.formatToggle}>
+                <button
+                  type="button"
+                  className={`${styles.formatBtn} ${isAuction ? styles.formatBtnActive : ''}`}
+                  onClick={() => setField('listing_format', 'AUCTION')}
+                >
+                  🔨 Auction
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.formatBtn} ${!isAuction ? styles.formatBtnActive : ''}`}
+                  onClick={() => setField('listing_format', 'FIXED_PRICE')}
+                >
+                  🏷️ Buy It Now
+                </button>
+              </div>
 
               <div className={styles.fieldGroup}>
                 <label className={styles.label}>
@@ -218,11 +233,9 @@ export default function EbayDraftModal({ cardData, onClose }) {
                   </span>
                 </label>
                 <input
-                  className={`${styles.input} ${focused === 'title' ? styles.inputFocused : ''} ${!form.title ? styles.inputMissing : ''}`}
+                  className={`${styles.input} ${!form.title ? styles.inputMissing : ''}`}
                   value={form.title}
                   onChange={e => setField('title', e.target.value.slice(0, 80))}
-                  onFocus={() => setFocused('title')}
-                  onBlur={() => setFocused(null)}
                   maxLength={80}
                   required
                 />
@@ -231,7 +244,7 @@ export default function EbayDraftModal({ cardData, onClose }) {
               <div className={styles.row}>
                 <div className={styles.col}>
                   <label className={styles.label}>
-                    Price (CAD)
+                    {isAuction ? 'Starting Bid (CAD)' : 'Price (CAD)'}
                     {!form.price && <span className={styles.requiredBadge}>required</span>}
                   </label>
                   <input
@@ -241,13 +254,44 @@ export default function EbayDraftModal({ cardData, onClose }) {
                     step="0.01"
                     value={form.price}
                     onChange={e => setField('price', e.target.value)}
-                    onFocus={() => setFocused('price')}
-                    onBlur={() => setFocused(null)}
-                    placeholder="Enter price"
+                    placeholder={isAuction ? '0.99' : 'Enter price'}
                     required
                   />
                 </div>
                 <div className={styles.col}>
+                  {isAuction ? (
+                    <>
+                      <label className={styles.label}>Duration</label>
+                      <select
+                        className={styles.select}
+                        value={form.auction_days}
+                        onChange={e => setField('auction_days', parseInt(e.target.value))}
+                      >
+                        {AUCTION_DURATIONS.map(d => (
+                          <option key={d} value={d}>{d} days</option>
+                        ))}
+                      </select>
+                    </>
+                  ) : (
+                    <>
+                      <label className={styles.label}>Condition</label>
+                      <select
+                        className={styles.select}
+                        value={form.condition_id}
+                        onChange={e => setField('condition_id', e.target.value)}
+                      >
+                        {CONDITIONS.map(c => (
+                          <option key={c.id} value={c.id}>{c.label}</option>
+                        ))}
+                      </select>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Show condition on its own row for auctions */}
+              {isAuction && (
+                <div className={styles.fieldGroup}>
                   <label className={styles.label}>Condition</label>
                   <select
                     className={styles.select}
@@ -259,7 +303,7 @@ export default function EbayDraftModal({ cardData, onClose }) {
                     ))}
                   </select>
                 </div>
-              </div>
+              )}
 
               <div className={styles.fieldGroup}>
                 <label className={styles.label}>Description</label>
@@ -267,8 +311,6 @@ export default function EbayDraftModal({ cardData, onClose }) {
                   className={`${styles.textarea} ${form.description?.trim().length < 20 ? styles.inputWarn : ''}`}
                   value={form.description}
                   onChange={e => setField('description', e.target.value)}
-                  onFocus={() => setFocused('description')}
-                  onBlur={() => setFocused(null)}
                   rows={4}
                 />
               </div>
@@ -292,19 +334,20 @@ export default function EbayDraftModal({ cardData, onClose }) {
                 className={`${styles.submitBtn} ${!allRequired ? styles.submitBtnDisabled : ''}`}
                 disabled={!allRequired}
               >
-                {allRequired ? 'Create Draft on eBay' : `Complete required fields (${requiredDone}/${required.length})`}
+                {allRequired
+                  ? `Create ${isAuction ? 'Auction' : 'Buy It Now'} Draft`
+                  : `Complete required fields (${requiredDone}/${required.length})`}
               </button>
             </form>
 
-            {/* ── Right: readiness panel ── */}
+            {/* ── Readiness panel ── */}
             <div className={styles.readinessPanel}>
               <div className={styles.readinessHeader}>
-                <span className={styles.readinessTitle}>Listing Readiness</span>
+                <span className={styles.readinessTitle}>Readiness</span>
                 <span className={`${styles.readinessPct} ${totalPct >= 80 ? styles.pctGood : totalPct >= 50 ? styles.pctMed : styles.pctLow}`}>
                   {totalPct}%
                 </span>
               </div>
-
               <div className={styles.progressBar}>
                 <div
                   className={`${styles.progressFill} ${totalPct >= 80 ? styles.fillGood : totalPct >= 50 ? styles.fillMed : styles.fillLow}`}
@@ -314,19 +357,13 @@ export default function EbayDraftModal({ cardData, onClose }) {
 
               <div className={styles.checkSection}>
                 <p className={styles.sectionLabel}>Required</p>
-                {required.map(r => (
-                  <ReadinessRow key={r.key} item={r} />
-                ))}
+                {required.map(r => <ReadinessRow key={r.key} item={r} />)}
               </div>
-
               <div className={styles.checkSection}>
-                <p className={styles.sectionLabel}>Optional (improves listing)</p>
-                {optional.map(r => (
-                  <ReadinessRow key={r.key} item={r} />
-                ))}
+                <p className={styles.sectionLabel}>Optional</p>
+                {optional.map(r => <ReadinessRow key={r.key} item={r} />)}
               </div>
 
-              {/* Card metadata summary */}
               <div className={styles.metaSummary}>
                 <p className={styles.sectionLabel}>Card Data</p>
                 <MetaRow label="Player"  value={cardData.player_name} />
@@ -342,15 +379,13 @@ export default function EbayDraftModal({ cardData, onClose }) {
           </div>
         )}
 
-        {/* SUBMITTING */}
         {step === 'submitting' && (
           <div className={styles.center}>
             <div className={styles.spinner} />
-            <p>Creating draft listing on eBay…</p>
+            <p>Creating draft on eBay…</p>
           </div>
         )}
 
-        {/* SUCCESS */}
         {step === 'success' && result && (
           <div className={styles.success}>
             <div className={styles.checkmark}>✓</div>
@@ -373,15 +408,12 @@ function ReadinessRow({ item }) {
     : item.required
       ? <span className={styles.iconMissing}>✗</span>
       : <span className={styles.iconWarn}>!</span>
-
   return (
     <div className={styles.readinessRow}>
       {icon}
       <div className={styles.readinessRowText}>
         <span className={item.ok ? styles.rowLabelOk : styles.rowLabel}>{item.label}</span>
-        {!item.ok && (item.hint || item.warnMsg) && (
-          <span className={styles.rowHint}>{item.hint || item.warnMsg}</span>
-        )}
+        {!item.ok && item.hint && <span className={styles.rowHint}>{item.hint}</span>}
       </div>
     </div>
   )
@@ -391,9 +423,7 @@ function MetaRow({ label, value }) {
   return (
     <div className={styles.metaRow}>
       <span className={styles.metaLabel}>{label}</span>
-      <span className={value ? styles.metaValue : styles.metaEmpty}>
-        {value || '—'}
-      </span>
+      <span className={value ? styles.metaValue : styles.metaEmpty}>{value || '—'}</span>
     </div>
   )
 }

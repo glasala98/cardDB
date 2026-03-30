@@ -388,19 +388,27 @@ def build_draft(user_id: str, card: dict) -> dict:
         env_return      = env_return      or fetched.get("return_policy")
         env_location    = env_location    or get_or_create_merchant_location(access_token)
 
-    price = float(card.get("listing_price", 0))
-    currency = "CAD" if EBAY_MARKETPLACE == "EBAY_CA" else "USD"
+    listing_format = card.get("listing_format", "AUCTION")  # AUCTION or FIXED_PRICE
+    price          = float(card.get("price", 0.99))
+    auction_days   = int(card.get("auction_days", 7))
+    currency       = "CAD" if EBAY_MARKETPLACE == "EBAY_CA" else "USD"
+
+    if listing_format == "AUCTION":
+        pricing = {"auctionStartPrice": {"value": f"{price:.2f}", "currency": currency}}
+        duration = f"DAYS_{auction_days}"
+    else:
+        pricing  = {"price": {"value": f"{price:.2f}", "currency": currency}}
+        duration = "GTC"  # Good Till Cancelled — standard for fixed price
 
     offer_payload = {
         "sku":                sku,
         "marketplaceId":      EBAY_MARKETPLACE,
-        "format":             "FIXED_PRICE",
+        "format":             listing_format,
         "availableQuantity":  1,
         "categoryId":         "261328",
         "listingDescription": description,
-        "pricingSummary": {
-            "price": {"value": f"{price:.2f}", "currency": currency}
-        },
+        "pricingSummary":     pricing,
+        "listingDuration":    duration,
     }
 
     listing_policies = {}
@@ -425,7 +433,7 @@ def build_draft(user_id: str, card: dict) -> dict:
                 INSERT INTO ebay_drafts
                     (user_id, sku, offer_id, card_name, listing_price, status, ebay_draft_url)
                 VALUES (%s, %s, %s, %s, %s, 'draft', %s)
-            """, (user_id, sku, offer_id, card["card_name"], price, draft_url))
+            """, (user_id, sku, offer_id, card["card_name"], starting_bid, draft_url))
         conn.commit()
 
     return {"offer_id": offer_id, "sku": sku, "draft_url": draft_url}

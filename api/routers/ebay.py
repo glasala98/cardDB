@@ -200,20 +200,22 @@ def ebay_prefill(
 # ── Create draft ──────────────────────────────────────────────────────────────
 
 class DraftRequest(BaseModel):
-    card_name:     str
-    player_name:   Optional[str] = ""
-    year:          Optional[str] = ""
-    brand:         Optional[str] = ""
-    set_name:      Optional[str] = ""
-    card_number:   Optional[str] = ""
-    variant:       Optional[str] = ""
-    grade:         Optional[str] = ""
-    serial_number: Optional[str] = ""
-    sport:         Optional[str] = ""
-    listing_price: float
-    condition_id:  Optional[str] = "3000"
-    description:   Optional[str] = ""
-    image_url:     Optional[str] = ""
+    card_name:      str
+    player_name:    Optional[str] = ""
+    year:           Optional[str] = ""
+    brand:          Optional[str] = ""
+    set_name:       Optional[str] = ""
+    card_number:    Optional[str] = ""
+    variant:        Optional[str] = ""
+    grade:          Optional[str] = ""
+    serial_number:  Optional[str] = ""
+    sport:          Optional[str] = ""
+    price:          float = 0.99
+    listing_format: Optional[str] = "AUCTION"   # AUCTION or FIXED_PRICE
+    auction_days:   Optional[int] = 7
+    condition_id:   Optional[str] = "3000"
+    description:    Optional[str] = ""
+    image_url:      Optional[str] = ""
 
 
 @router.post("/create-draft")
