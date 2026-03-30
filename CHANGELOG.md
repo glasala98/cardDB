@@ -5,7 +5,49 @@ Format: `### [date] — description`
 
 ---
 
+## 2026-03-30
+
+### Feat: eBay draft listing integration
+- New `api/ebay_client.py` — eBay HTTP wrapper: OAuth token management (Fernet encryption), inventory item creation, offer (draft listing) creation, seller policy auto-fetch
+- New `api/routers/ebay.py` — endpoints: `/api/ebay/status`, `/connect`, `/callback`, `/prefill`, `/create-draft`, `/drafts`, `/disconnect`
+- New DB migration `migrations/migrate_add_ebay_tables.py` — adds `ebay_tokens` + `ebay_drafts` tables
+- New `frontend/src/components/EbayDraftModal.jsx` — 4-step modal: checking → connect (OAuth popup) → form (pre-filled title/price/condition) → success
+- New `frontend/src/pages/EbayConnected.jsx` — OAuth callback landing page (auto-closes popup)
+- Added "+ Draft Listing" button to `CardInspect.jsx` header actions
+- Added "+ Draft eBay Listing" button to `ScanCardModal.jsx` post-save state
+- Added `/ebay-connected` route to `App.jsx`
+- eBay credentials added to `.env` (production keys for TCGDB app)
+
+---
+
+## 2026-03-28
+
+### Feat: run_tier.py + tier_config.json — unified local tier launcher
+Single command runs a full tier until completion with 10 workers and checkpointing.
+`python scraping/run_tier.py staple` launches 4 parallel subprocesses (one per sport),
+each running until all cards in that sport/tier are priced. Crash recovery is automatic
+via the stale-days gate — restart and already-priced cards are skipped.
+Tier settings (workers, stale_days, shards, year_from, sports) are in `tier_config.json`.
+
+### Fix: --max-hours 0 now means no time limit
+Previously `--max-hours 0` caused immediate exit (max_seconds=0). Now sets `float('inf')`.
+`run_tier.py` always passes `--max-hours 0` so local runs never hit the GH Actions time cap.
+
 ## 2026-03-26
+
+### Feat: scrape_master_db.py --output-file + import_results.py
+Adds a buffer-to-disk mode that decouples scraping from DB writes entirely.
+`--output-file results.json` scrapes eBay with zero ongoing DB connections,
+buffers all results to a JSON file, then `scraping/import_results.py` bulk-inserts
+everything in one shot. Enables running 20+ parallel scrapers locally without
+any Railway connection budget concern.
+
+### Fix: _sale_hash not imported in scrape_master_db.py
+`save_prices_batch` called `_sale_hash` from db.py but it was never imported,
+causing raw_sales to silently fail to write on every run.
+
+### Fix: scrape_master_db.py — load root .env when scraping/.env not found
+When running from the repo root the scraper failed to find DATABASE_URL because it only looked for `.env` relative to the `scraping/` directory. Now falls back to the repo root `.env`.
 
 ### Fix: scraper card ordering + consecutive-miss threshold
 - **Root cause**: sort order put never-scraped cards first (`NULLS FIRST`). For premium/stars with 200K+ never-scraped cards, the first 500 are always low-liquidity — falsely triggering the IP-block early exit on every run since March 25.

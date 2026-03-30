@@ -82,7 +82,7 @@ class RateLimitMiddleware:
         bucket.append(now)
         await self.app(scope, receive, send)
 
-from api.routers import cards, master_db, stats, auth, scan, admin, catalog, collection, search, ai
+from api.routers import cards, master_db, stats, auth, scan, admin, catalog, collection, search, ai, ebay
 from db import get_db
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -119,6 +119,7 @@ app.include_router(catalog.router,     prefix="/api/catalog",     tags=["catalog
 app.include_router(collection.router,  prefix="/api/collection",  tags=["collection"])
 app.include_router(search.router,      prefix="/api/search",      tags=["search"])
 app.include_router(ai.router,          prefix="/api/ai",           tags=["ai"])
+app.include_router(ebay.router,        prefix="/api/ebay",          tags=["ebay"])
 
 
 @app.get("/api/health")

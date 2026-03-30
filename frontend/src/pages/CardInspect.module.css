@@ -190,6 +190,20 @@
 }
 .ebayLink:hover { background: rgba(29,191,191,0.1); }
 
+.ebayDraftBtn {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border: 1px solid #6c63ff;
+  border-radius: 8px;
+  color: #6c63ff;
+  background: none;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.ebayDraftBtn:hover { background: rgba(108,99,255,0.12); }
+
 .lastScraped {
   font-size: 11px;
   color: var(--text-secondary);

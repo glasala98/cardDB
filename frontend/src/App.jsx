@@ -23,6 +23,7 @@ import Search from './pages/Search'
 import CardSalesPage from './pages/CardSalesPage'
 import SetBrowser from './pages/SetBrowser'
 import SetDetail from './pages/SetDetail'
+import EbayConnected from './pages/EbayConnected'
 import Trending from './pages/Trending'
 import ScanPage from './pages/ScanPage'
 import Home from './pages/Home'
@@ -92,9 +93,10 @@ export default function App() {
           <PublicModeProvider>
             <Routes>
               <Route path="/"       element={<Home />} />
-              <Route path="/login"  element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route path="/*"      element={<AppShell />} />
+              <Route path="/login"          element={<Login />} />
+              <Route path="/signup"         element={<Signup />} />
+              <Route path="/ebay-connected" element={<EbayConnected />} />
+              <Route path="/*"              element={<AppShell />} />
             </Routes>
           </PublicModeProvider>
         </CurrencyProvider>

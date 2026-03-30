@@ -270,6 +270,12 @@
   gap: 12px;
 }
 
+.savedActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .addAnotherBtn {
   background: none;
   border: 1px solid var(--success);
@@ -279,6 +285,17 @@
   font-size: 12px;
   cursor: pointer;
 }
+
+.ebayDraftBtn {
+  background: none;
+  border: 1px solid #6c63ff;
+  border-radius: 6px;
+  padding: 4px 12px;
+  color: #6c63ff;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ebayDraftBtn:hover { background: rgba(108,99,255,0.12); }
 
 /* ── Compact analyzed thumbnails ─────────────────────────────── */
 .analyzedRow {

@@ -31,4 +31,4 @@ EXPOSE 8000
 #   migrate_clean_boilerplate_titles — DELETE market_raw_sales ILIKE scan
 # Schema is fully applied — migrations skipped to unblock startup.
 # Re-add new migrations here only when adding new columns/tables.
-CMD ["sh", "-c", "python migrations/migrate_add_raw_sales_created_at.py && python migrations/migrate_autovacuum_tuning.py && uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "python migrations/migrate_add_raw_sales_created_at.py && python migrations/migrate_autovacuum_tuning.py && python migrations/migrate_add_ebay_tables.py && uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
