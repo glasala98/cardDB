@@ -1,0 +1,89 @@
+name: Backfill — Staple Progress Report
+
+# Emails a progress report every 12 hours while the staple backfill is running.
+# Queries market_raw_sales to count scraped cards per sport vs total staple cards.
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'   # every 12h: 00:00 and 12:00 UTC
+  workflow_dispatch:
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install psycopg2-binary python-dotenv
+      - name: Build progress report
+        id: report
+        run: |
+          python - <<'EOF'
+          import os, psycopg2
+
+          conn = psycopg2.connect(os.environ["DATABASE_URL"])
+          cur = conn.cursor()
+
+          cur.execute("""
+              SELECT cc.sport,
+                     COUNT(DISTINCT mrs.card_catalog_id) AS scraped
+              FROM market_raw_sales mrs
+              JOIN card_catalog cc ON cc.id = mrs.card_catalog_id
+              WHERE cc.scrape_tier = 'staple'
+              GROUP BY cc.sport
+          """)
+          scraped = {r[0]: r[1] for r in cur.fetchall()}
+
+          cur.execute("""
+              SELECT sport, COUNT(*) AS total
+              FROM card_catalog
+              WHERE scrape_tier = 'staple'
+              GROUP BY sport
+          """)
+          totals = {r[0]: r[1] for r in cur.fetchall()}
+          conn.close()
+
+          lines = []
+          grand_done = grand_total = 0
+          for sport in ["NHL", "NBA", "NFL", "MLB"]:
+              done  = scraped.get(sport, 0)
+              total = totals.get(sport, 0)
+              pct   = done / total * 100 if total else 0
+              rem   = total - done
+              bar   = "█" * int(pct // 10) + "░" * (10 - int(pct // 10))
+              lines.append(f"{sport:<4}  {bar}  {pct:5.1f}%  {done:,}/{total:,}  ({rem:,} remaining)")
+              grand_done  += done
+              grand_total += total
+
+          grand_pct = grand_done / grand_total * 100 if grand_total else 0
+          summary = "\n".join(lines)
+          summary += f"\n\nTotal: {grand_done:,}/{grand_total:,} ({grand_pct:.1f}%)"
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"summary<<ENDSUMMARY\n{summary}\nENDSUMMARY\n")
+              f.write(f"grand_pct={grand_pct:.1f}\n")
+          EOF
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Send email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.NOTIFY_GMAIL_USER }}
+          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.NOTIFY_EMAIL_TO }}
+          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
+          subject: "📊 Staple backfill — ${{ steps.report.outputs.grand_pct }}% complete"
+          body: |
+            Staple backfill progress report
+
+            ${{ steps.report.outputs.summary }}
+
+            Run logs: https://github.com/${{ github.repository }}/actions/workflows/backfill_staple.yml
