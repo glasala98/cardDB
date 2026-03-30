@@ -1,12 +1,10 @@
 name: Backfill — Staple (90-day history)
 
-# One-time backfill: captures full 90-day eBay sold history for staple-tier cards
-# that have no market_raw_sales rows yet. Re-run daily until all cards are covered.
-# Safe to run alongside catalog_tier_staple.yml — different concurrency group,
-# and backfill targets cards with no raw_sales while delta targets stale market_prices.
+# Runs every 6h so it auto-restarts after the 5.75h graceful stop.
+# Skips already-scraped cards automatically — safe to run forever until done.
+# Workers reduced to 2 for stability on 2-core GH Actions VMs.
 #
 # Connection budget: 4 sports × pool-max 5 = 20 connections ✅
-# Workers: 3 per job (GH Actions runners are 2-core/7GB — 5 workers causes tab crashes)
 # Time limit: 5.75h graceful stop (GH Actions hard-kills at 6h)
 
 concurrency:
@@ -14,20 +12,18 @@ concurrency:
   cancel-in-progress: false
 
 on:
+  schedule:
+    - cron: '0 */6 * * *'   # every 6h: 00:00, 06:00, 12:00, 18:00 UTC
   workflow_dispatch:
     inputs:
       sport:
         description: 'Sport to backfill (NHL/NBA/NFL/MLB, blank=all)'
         required: false
         default: ''
-      limit:
-        description: 'Max cards per sport (0=all, use for smoke test)'
-        required: false
-        default: '0'
 
 jobs:
   backfill-nhl:
-    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NHL' }}
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NHL' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 370
     steps:
@@ -45,14 +41,13 @@ jobs:
         run: |
           python -u scraping/scrape_master_db.py \
             --catalog-tier staple --sport NHL \
-            --workers 3 --stale-days 60 --year-from 2000 \
-            --backfill --max-hours 5.75 \
-            --limit ${{ github.event.inputs.limit || '0' }}
+            --workers 2 --stale-days 60 --year-from 2000 \
+            --backfill --max-hours 5.75
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   backfill-nba:
-    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NBA' }}
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NBA' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 370
     steps:
@@ -70,14 +65,13 @@ jobs:
         run: |
           python -u scraping/scrape_master_db.py \
             --catalog-tier staple --sport NBA \
-            --workers 3 --stale-days 60 --year-from 2000 \
-            --backfill --max-hours 5.75 \
-            --limit ${{ github.event.inputs.limit || '0' }}
+            --workers 2 --stale-days 60 --year-from 2000 \
+            --backfill --max-hours 5.75
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   backfill-nfl:
-    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NFL' }}
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NFL' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 370
     steps:
@@ -95,14 +89,13 @@ jobs:
         run: |
           python -u scraping/scrape_master_db.py \
             --catalog-tier staple --sport NFL \
-            --workers 3 --stale-days 60 --year-from 2000 \
-            --backfill --max-hours 5.75 \
-            --limit ${{ github.event.inputs.limit || '0' }}
+            --workers 2 --stale-days 60 --year-from 2000 \
+            --backfill --max-hours 5.75
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   backfill-mlb:
-    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'MLB' }}
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'MLB' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 370
     steps:
@@ -120,8 +113,7 @@ jobs:
         run: |
           python -u scraping/scrape_master_db.py \
             --catalog-tier staple --sport MLB \
-            --workers 3 --stale-days 60 --year-from 2000 \
-            --backfill --max-hours 5.75 \
-            --limit ${{ github.event.inputs.limit || '0' }}
+            --workers 2 --stale-days 60 --year-from 2000 \
+            --backfill --max-hours 5.75
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

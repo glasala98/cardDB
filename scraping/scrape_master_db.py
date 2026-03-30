@@ -32,7 +32,10 @@ sys.path.insert(0, ROOT)
 
 try:
     from dotenv import load_dotenv
-    load_dotenv(os.path.join(ROOT, '.env'))
+    # Try scraping/.env first, then repo root .env
+    _env_loaded = load_dotenv(os.path.join(ROOT, '.env'))
+    if not _env_loaded:
+        load_dotenv(os.path.join(os.path.dirname(ROOT), '.env'))
 except ImportError:
     pass
 
@@ -40,7 +43,7 @@ import os as _os, sys as _sys
 _ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
 if _ROOT not in _sys.path:
     _sys.path.insert(0, _ROOT)
-from db import get_db, save_raw_sales
+from db import get_db, save_raw_sales, _sale_hash
 from scrape_card_prices import process_card, search_ebay_sold_paginated
 import scrape_card_prices
 from auction_title_parser import parse_title as _parse_sale_title
@@ -429,6 +432,64 @@ def save_no_market_batch(catalog_ids: list) -> None:
         conn.commit()
 
 
+# ── Output-file writer (buffer mode) ─────────────────────────────────────────
+
+def _write_output_file(path: str, batch: list, no_market_batch: list,
+                       backfill_batch: list, args, progress: dict) -> None:
+    """Serialize buffered scrape results to a JSON file for deferred DB import.
+
+    Called only when --output-file is set. Use import_results.py to bulk-insert.
+    """
+    import json as _json
+
+    def _default(obj):
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+    payload = {
+        "schema_version": 1,
+        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "args": {
+            "sport":        getattr(args, 'sport', None),
+            "year":         getattr(args, 'year', None),
+            "catalog_tier": getattr(args, 'catalog_tier', None),
+            "tier":         getattr(args, 'tier', None),
+            "backfill":     getattr(args, 'backfill', False),
+            "graded":       getattr(args, 'graded', False),
+            "force":        getattr(args, 'force', False),
+            "stale_days":   getattr(args, 'stale_days', 7),
+            "shard_index":  getattr(args, 'shard_index', 0),
+            "shard_count":  getattr(args, 'shard_count', 1),
+        },
+        "progress": {k: v for k, v in progress.items() if k != 'error_log'},
+        "batch": [
+            {
+                "catalog_id": entry[0],
+                "stats":      entry[1],
+                "image_url":  entry[2] if len(entry) > 2 else "",
+                "raw_sales":  entry[3] if len(entry) > 3 else [],
+            }
+            for entry in batch
+        ],
+        "no_market_batch": no_market_batch,
+        "backfill_batch": [
+            {"catalog_id": cid, "raw_sales": rs}
+            for cid, rs in backfill_batch
+        ],
+    }
+
+    with open(path, 'w', encoding='utf-8') as fh:
+        _json.dump(payload, fh, default=_default)
+
+    total_sales = sum(len(e["raw_sales"]) for e in payload["batch"])
+    total_sales += sum(len(e["raw_sales"]) for e in payload["backfill_batch"])
+    print(f"  Output file:   {path}")
+    print(f"    batch:       {len(payload['batch'])} cards with prices")
+    print(f"    no_market:   {len(payload['no_market_batch'])} cards")
+    print(f"    raw_sales:   {total_sales} individual sale records")
+
+
 # ── Scrape run tracking ───────────────────────────────────────────────────────
 
 def create_scrape_run(workflow: str, sport: str | None, tier: str | None,
@@ -665,7 +726,11 @@ def main():
                         help="0-based shard index for parallel runners (used with --shard-count).")
     parser.add_argument('--shard-count',  type=int,   default=1,    dest='shard_count',
                         help="Total number of shards. Each runner handles cc.id %% shard_count = shard_index. "
-                             "Each runner gets a different GH Actions IP → independent eBay rate limit.")
+                             "Each runner gets a different GH Actions IP -> independent eBay rate limit.")
+    parser.add_argument('--output-file',  type=str,   default=None, dest='output_file',
+                        help="Buffer all results to memory and write a single JSON file at the end "
+                             "instead of writing to the DB during scraping. "
+                             "Use import_results.py to bulk-insert later.")
     args = parser.parse_args()
 
     if args.graded:
@@ -696,9 +761,9 @@ def main():
     if not args.force:  print(f"  Stale days: {args.stale_days} (skip cards priced within {args.stale_days}d)")
     if args.graded:     print(f"  Grades:     {grades}")
     print(f"  Est. time:  ~{total * 5 / args.workers / 60:.0f} min")
-    print(f"  Time limit: {args.max_hours}h (graceful exit before GitHub's 6h kill)")
+    print(f"  Time limit: {'none (run until done)' if args.max_hours == 0 else str(args.max_hours) + 'h'}")
     print(f"{'='*60}\n")
-    max_seconds = args.max_hours * 3600
+    max_seconds = float('inf') if args.max_hours == 0 else args.max_hours * 3600
 
     # Record this run in scrape_runs for the delta ingestion monitor
     import os as _os
@@ -706,7 +771,7 @@ def main():
     _mode     = 'graded' if args.graded else 'raw'
     _tier     = getattr(args, 'catalog_tier', None)
     _sport    = getattr(args, 'sport', None)
-    run_id = create_scrape_run(_workflow, _sport, _tier, _mode, total)
+    run_id = None if args.output_file else create_scrape_run(_workflow, _sport, _tier, _mode, total)
 
     start = time.time()
     batch: list = []
@@ -718,6 +783,9 @@ def main():
 
     def _flush_batch():
         nonlocal batch, no_market_batch, raw_sales_backfill_batch
+        if args.output_file:
+            # Buffer mode: accumulate in lists, write to JSON at end — no DB writes here
+            return
         if raw_sales_backfill_batch:
             try:
                 with get_db() as conn:
@@ -823,10 +891,14 @@ def main():
                 stats = result.get('stats', {})
 
                 if args.backfill:
-                    # Backfill: store raw_sales only — price is already current
+                    # Backfill: store full 90-day raw_sales AND derive price from them.
+                    # No need for a separate raw pass — the data is already here.
                     raw_sales = result.get('raw_sales') or []
                     if raw_sales:
                         raw_sales_backfill_batch.append((catalog_id, raw_sales))
+                    if stats.get('num_sales', 0) > 0:
+                        batch.append((catalog_id, stats, result.get('image_url') or '',
+                                      []))  # raw_sales written separately above
                 elif stats.get('num_sales', 0) > 0:
                     batch.append((catalog_id, stats, result.get('image_url') or '',
                                   result.get('raw_sales') or []))
@@ -844,6 +916,7 @@ def main():
                     if args.backfill:
                         print(f"  [{done_count}/{total}] Stored: {_progress['found']} | "
                               f"Errors: {_progress['errors']} | "
+                              f"{rate*3600:.0f} cards/hr | "
                               f"~{remaining:.1f}m remaining", flush=True)
                     else:
                         print(f"  [{done_count}/{total}] Found: {_progress['found']} | "
@@ -869,6 +942,9 @@ def main():
         executor.shutdown(wait=False, cancel_futures=True)
 
     _flush_batch()
+    if args.output_file:
+        _write_output_file(args.output_file, batch, no_market_batch,
+                           raw_sales_backfill_batch, args, _progress)
     elapsed = time.time() - start
     finish_scrape_run(run_id, _progress, status='timed_out' if timed_out else 'completed')
 
@@ -876,10 +952,13 @@ def main():
     print(f"DONE in {elapsed/60:.1f} minutes")
     print(f"  Scraped:    {_progress['done']:,}")
     print(f"  Found:      {_progress['found']:,}")
-    print(f"  Deltas:     {_progress['deltas']:,}  (price changed → history row written)")
+    print(f"  Deltas:     {_progress['deltas']:,}  (price changed -> history row written)")
     print(f"  Not found:  {_progress['not_found']:,}")
     print(f"  Errors:     {_progress['errors']:,}")
-    print(f"  Written to: market_prices + market_price_history (PostgreSQL)")
+    if args.output_file:
+        print(f"  Written to: {args.output_file}  (run import_results.py to push to DB)")
+    else:
+        print(f"  Written to: market_prices + market_price_history (PostgreSQL)")
     print(f"{'='*60}")
 
 
