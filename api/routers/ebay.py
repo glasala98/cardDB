@@ -146,7 +146,7 @@ def ebay_prefill(
             cur.execute("""
                 SELECT cc.player_name, cc.year, cc.brand, cc.set_name,
                        cc.card_number, cc.variant, cc.sport,
-                       mp.fair_value
+                       mp.fair_value, cc.is_rookie
                 FROM cards c
                 JOIN card_catalog cc ON cc.id = c.card_catalog_id
                 LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
@@ -160,6 +160,7 @@ def ebay_prefill(
             "player_name": row[0], "year": row[1], "brand": row[2],
             "set_name": row[3], "card_number": row[4], "variant": row[5],
             "sport": row[6], "fair_value": float(row[7]) if row[7] else None,
+            "is_rookie": bool(row[8]),
         }
 
     grade = ""
@@ -175,6 +176,7 @@ def ebay_prefill(
         grade=grade,
         serial_number="",
         sport=card_data.get("sport", ""),
+        is_rookie=card_data.get("is_rookie", False),
     )
 
     description = build_description(
@@ -193,6 +195,8 @@ def ebay_prefill(
         "condition_id":      condition_id,
         "condition_label":   CONDITION_LABELS.get(condition_id, "Very Good"),
         "description":       description,
+        "sport":             card_data.get("sport", ""),
+        "is_rookie":         card_data.get("is_rookie", False),
         "category_id":       "261328",
     }
 
@@ -216,6 +220,8 @@ class DraftRequest(BaseModel):
     condition_id:   Optional[str] = "3000"
     description:    Optional[str] = ""
     image_url:      Optional[str] = ""
+    image_url_back: Optional[str] = ""
+    is_rookie:      Optional[bool] = False
 
 
 @router.post("/create-draft")

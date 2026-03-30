@@ -425,16 +425,17 @@ export default function ScanCardModal({ onClose, onAdded, pageMode = false }) {
           cardData={{
             card_name:    cardName,
             player_name:  result?.player_name || '',
-            year:         result?.year || '',
-            brand:        result?.brand || '',
-            set_name:     result?.subset || '',
-            card_number:  result?.card_number || '',
-            variant:      result?.parallel || '',
-            grade:        result?.grade || '',
-            serial_number: result?.serial_number || '',
-            sport:        result?.sport || '',
-            fair_value:   null,
-            image_url:    frontPreview || '',
+            year:           result?.year || '',
+            brand:          result?.brand || '',
+            set_name:       result?.subset || '',
+            card_number:    result?.card_number || '',
+            variant:        result?.parallel || '',
+            grade:          result?.grade || '',
+            serial_number:  result?.serial_number || '',
+            sport:          result?.sport || '',
+            is_rookie:      false,
+            image_url:      frontPreview || '',
+            image_url_back: backPreview  || '',
           }}
           onClose={() => setShowEbayDraft(false)}
         />

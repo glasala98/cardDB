@@ -43,10 +43,24 @@ function getReadiness(form, cardData) {
     },
     {
       key:      'image',
-      label:    'Card image',
+      label:    'Front photo',
       required: false,
       ok:       !!cardData?.image_url,
-      hint:     !cardData?.image_url ? 'Fetch image first for best results' : null,
+      hint:     !cardData?.image_url ? 'No front photo attached' : null,
+    },
+    {
+      key:      'image_back',
+      label:    'Back photo',
+      required: false,
+      ok:       !!cardData?.image_url_back,
+      hint:     !cardData?.image_url_back ? 'Upload back of card for better listings' : null,
+    },
+    {
+      key:      'rookie',
+      label:    'Rookie flag',
+      required: false,
+      ok:       cardData?.is_rookie === true,
+      hint:     !cardData?.is_rookie ? 'RC not detected — check if applicable' : null,
     },
     {
       key:      'player',
@@ -91,6 +105,9 @@ export default function EbayDraftModal({ cardData, onClose }) {
     setStep('checking')
     try {
       const prefill = await getEbayPrefill(cardData.card_name)
+      // Merge DB-sourced sport/is_rookie into cardData for the session
+      if (prefill.sport)     cardData.sport     = prefill.sport
+      if (prefill.is_rookie) cardData.is_rookie = prefill.is_rookie
       setForm({
         title:          prefill.suggested_title || cardData.card_name || '',
         price:          '0.99',
@@ -157,7 +174,9 @@ export default function EbayDraftModal({ cardData, onClose }) {
         auction_days:   form.listing_format === 'AUCTION' ? form.auction_days : 7,
         condition_id:   form.condition_id,
         description:    form.description,
-        image_url:      cardData.image_url     || '',
+        image_url:      cardData.image_url      || '',
+        image_url_back: cardData.image_url_back || '',
+        is_rookie:      cardData.is_rookie      || false,
       })
       setResult(res)
       setStep('success')
@@ -372,8 +391,10 @@ export default function EbayDraftModal({ cardData, onClose }) {
                 <MetaRow label="Set"     value={cardData.set_name} />
                 <MetaRow label="Variant" value={cardData.variant} />
                 <MetaRow label="Grade"   value={cardData.grade} />
-                <MetaRow label="Sport"   value={cardData.sport} />
-                <MetaRow label="Image"   value={cardData.image_url ? 'Yes' : null} />
+                <MetaRow label="Sport"      value={cardData.sport} />
+                <MetaRow label="Rookie"     value={cardData.is_rookie ? 'Yes (RC)' : null} />
+                <MetaRow label="Front photo" value={cardData.image_url ? '✓' : null} />
+                <MetaRow label="Back photo"  value={cardData.image_url_back ? '✓' : null} />
               </div>
             </div>
           </div>

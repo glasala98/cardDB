@@ -206,16 +206,18 @@ def _check_ebay_response(resp: requests.Response):
 
 def build_ebay_title(year: str, brand: str, set_name: str, card_number: str,
                      player_name: str, variant: str, grade: str,
-                     serial_number: str, sport: str) -> str:
+                     serial_number: str, sport: str,
+                     is_rookie: bool = False) -> str:
     parts = []
-    if year:       parts.append(str(year))
-    if brand:      parts.append(brand)
+    if year:        parts.append(str(year))
+    if brand:       parts.append(brand)
     if set_name and set_name != brand:
         parts.append(set_name)
-    if variant:    parts.append(variant)
+    if variant:     parts.append(variant)
     if card_number: parts.append(f"#{card_number}")
     if player_name: parts.append(player_name)
-    if grade:      parts.append(grade)
+    if is_rookie:   parts.append("RC")
+    if grade:       parts.append(grade)
     if serial_number and "/" in str(serial_number):
         parts.append(f"/{serial_number.split('/')[-1]}")
     sport_word = SPORT_LABELS.get(sport, "Sports")
@@ -323,6 +325,8 @@ def build_draft(user_id: str, card: dict) -> dict:
     sport       = card.get("sport", "") or ""
     condition_id = CONDITION_MAP.get(grade, "3000")
 
+    is_rookie = bool(card.get("is_rookie", False))
+
     title = build_ebay_title(
         year=str(card.get("year", "")),
         brand=card.get("brand", ""),
@@ -333,6 +337,7 @@ def build_draft(user_id: str, card: dict) -> dict:
         grade=grade,
         serial_number=card.get("serial_number", ""),
         sport=sport,
+        is_rookie=is_rookie,
     )
 
     description = card.get("description") or build_description(
@@ -355,6 +360,7 @@ def build_draft(user_id: str, card: dict) -> dict:
     if card.get("card_number"): aspects["Card Number"]     = [card["card_number"]]
     if grade:                   aspects["Grade"]           = [grade]
     if card.get("brand"):       aspects["Manufacturer"]    = [card["brand"]]
+    if is_rookie:               aspects["Rookie"]          = ["Yes"]
     aspects["Type"] = ["Sports Trading Card"]
 
     inv_payload = {
@@ -369,9 +375,9 @@ def build_draft(user_id: str, card: dict) -> dict:
             "shipToLocationAvailability": {"quantity": 1}
         },
     }
-    image_url = card.get("image_url", "")
-    if image_url:
-        inv_payload["product"]["imageUrls"] = [image_url]
+    image_urls = [u for u in [card.get("image_url", ""), card.get("image_url_back", "")] if u]
+    if image_urls:
+        inv_payload["product"]["imageUrls"] = image_urls
 
     create_inventory_item(access_token, sku, inv_payload)
 
