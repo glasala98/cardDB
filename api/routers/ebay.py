@@ -7,17 +7,11 @@ import jwt
 import requests
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import RedirectResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import Optional
 
 from api.routers.auth import get_current_user, JWT_SECRET, JWT_ALGORITHM
-from fastapi import Security
-
-
-def require_admin(current_user: dict = Depends(get_current_user)):
-    if current_user.get("role") != "admin":
-        raise HTTPException(403, detail="Admin access required")
-    return current_user
 from api.ebay_client import (
     EBAY_AUTH_URL, EBAY_BASE_URL, EBAY_CLIENT_ID, EBAY_CLIENT_SECRET,
     EBAY_REDIRECT_URI, EBAY_RUNAME, EBAY_SCOPES, EBAY_MARKETPLACE,
@@ -31,6 +25,20 @@ from db import get_db
 router = APIRouter()
 
 _OAUTH_STATE_EXPIRY_MIN = 10
+_bearer = HTTPBearer(auto_error=False)
+
+
+def require_admin(username: str = Depends(get_current_user)) -> str:
+    """Enforce admin role — same pattern as admin.py _require_admin."""
+    if username == "admin":
+        return username
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT role FROM users WHERE username = %s", (username,))
+            row = cur.fetchone()
+    if not row or row[0] != "admin":
+        raise HTTPException(403, detail="Admin access required")
+    return username
 
 
 def _make_state_token(username: str) -> str:
@@ -52,11 +60,31 @@ def _decode_state_token(state: str) -> Optional[str]:
         return None
 
 
+def _admin_from_token_param(token: str) -> str:
+    """Validate a raw JWT string (from ?token= query param) and confirm admin."""
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        username = payload.get("sub")
+        if not username:
+            raise HTTPException(401, detail="Invalid token")
+    except jwt.PyJWTError:
+        raise HTTPException(401, detail="Invalid token")
+    if username == "admin":
+        return username
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT role FROM users WHERE username = %s", (username,))
+            row = cur.fetchone()
+    if not row or row[0] != "admin":
+        raise HTTPException(403, detail="Admin access required")
+    return username
+
+
 # ── Status ────────────────────────────────────────────────────────────────────
 
 @router.get("/status")
-def ebay_status(current_user: dict = Depends(require_admin)):
-    row = get_token_row(current_user["username"])
+def ebay_status(username: str = Depends(require_admin)):
+    row = get_token_row(username)
     if not row:
         return {"connected": False, "expires_at": None}
     from datetime import timezone
@@ -74,39 +102,33 @@ def ebay_status(current_user: dict = Depends(require_admin)):
 @router.get("/connect")
 def ebay_connect(
     token: Optional[str] = Query(None),
-    current_user: dict = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
 ):
     """Redirect user to eBay OAuth consent page.
 
-    Accepts the JWT as a ?token= query param so the OAuth popup (which cannot
-    send Authorization headers) can still authenticate.
+    Accepts either a bearer Authorization header or a ?token= query param
+    so the OAuth popup window (which cannot send headers) can authenticate.
     """
-    # If no bearer header but a ?token= param was provided, validate that
-    if current_user is None:
-        if not token:
-            raise HTTPException(401, detail="Not authenticated")
+    if credentials:
+        # Normal API call with Authorization header
         try:
-            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
             username = payload.get("sub")
             if not username:
                 raise HTTPException(401, detail="Invalid token")
         except jwt.PyJWTError:
             raise HTTPException(401, detail="Invalid token")
-        # Check admin role from DB
-        with get_db() as conn:
-            with conn.cursor() as cur:
-                cur.execute("SELECT role FROM users WHERE username = %s", (username,))
-                row = cur.fetchone()
-        if not row or row[0] != "admin":
-            raise HTTPException(403, detail="Admin access required")
-        current_user = {"username": username, "role": row[0]}
-    elif current_user.get("role") != "admin":
-        raise HTTPException(403, detail="Admin access required")
+        username = _admin_from_token_param(credentials.credentials)
+    elif token:
+        # Popup window passing token as query param
+        username = _admin_from_token_param(token)
+    else:
+        raise HTTPException(401, detail="Not authenticated")
 
     if not EBAY_CLIENT_ID or not EBAY_RUNAME:
         raise HTTPException(503, "eBay credentials not configured")
 
-    state = _make_state_token(current_user["username"])
+    state = _make_state_token(username)
     params = "&".join([
         f"client_id={EBAY_CLIENT_ID}",
         f"redirect_uri={EBAY_RUNAME}",
@@ -172,10 +194,9 @@ def ebay_callback(
 @router.get("/prefill")
 def ebay_prefill(
     card_name: str = Query(...),
-    current_user: dict = Depends(require_admin),
+    username: str = Depends(require_admin),
 ):
     """Return suggested title, price, condition for the draft listing form."""
-    # Look up card details + fair_value
     card_data = {}
     with get_db() as conn:
         with conn.cursor() as cur:
@@ -188,7 +209,7 @@ def ebay_prefill(
                 LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
                 WHERE c.card_name = %s AND c.user_id = %s
                 LIMIT 1
-            """, (card_name, current_user["username"]))
+            """, (card_name, username))
             row = cur.fetchone()
 
     if row:
@@ -263,19 +284,17 @@ class DraftRequest(BaseModel):
 @router.post("/create-draft")
 def create_draft(
     req: DraftRequest,
-    current_user: dict = Depends(require_admin),
+    username: str = Depends(require_admin),
 ):
-    user_id = current_user["username"]
-
-    row = get_token_row(user_id)
+    row = get_token_row(username)
     if not row:
         raise HTTPException(401, detail="eBay account not connected")
 
     card = req.dict()
-    card["user_id"] = user_id
+    card["user_id"] = username
 
     try:
-        result = build_draft(user_id, card)
+        result = build_draft(username, card)
     except EbayAuthError as e:
         raise HTTPException(401, detail=str(e))
     except EbayAPIError as e:
@@ -295,7 +314,7 @@ def create_draft(
 # ── List drafts ───────────────────────────────────────────────────────────────
 
 @router.get("/drafts")
-def list_drafts(current_user: dict = Depends(require_admin)):
+def list_drafts(username: str = Depends(require_admin)):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
@@ -305,7 +324,7 @@ def list_drafts(current_user: dict = Depends(require_admin)):
                 WHERE user_id = %s
                 ORDER BY created_at DESC
                 LIMIT 50
-            """, (current_user["username"],))
+            """, (username,))
             rows = cur.fetchall()
     return {"drafts": [
         {
@@ -320,6 +339,6 @@ def list_drafts(current_user: dict = Depends(require_admin)):
 # ── Disconnect ────────────────────────────────────────────────────────────────
 
 @router.post("/disconnect")
-def ebay_disconnect(current_user: dict = Depends(require_admin)):
-    delete_tokens(current_user["username"])
+def ebay_disconnect(username: str = Depends(require_admin)):
+    delete_tokens(username)
     return {"status": "disconnected"}
