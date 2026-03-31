@@ -2,7 +2,6 @@ import { useState, useRef } from 'react'
 import { analyzeCard } from '../api/scan'
 import { addCard, scrapeCard } from '../api/cards'
 import { useIsGuest } from '../context/AuthContext'
-import EbayDraftModal from './EbayDraftModal'
 import styles from './ScanCardModal.module.css'
 
 // Build structured card name: "YEAR BRAND - SUBSET PARALLEL #NUM - PLAYER [GRADE] #SERIAL"
@@ -43,7 +42,6 @@ export default function ScanCardModal({ onClose, onAdded, pageMode = false }) {
   const [saving,     setSaving]     = useState(false)
   const [saved,      setSaved]      = useState(false)
   const [scraping,   setScraping]   = useState(false)
-  const [showEbayDraft, setShowEbayDraft] = useState(false)
 
   const frontRef = useRef()
   const backRef  = useRef()
@@ -373,10 +371,7 @@ export default function ScanCardModal({ onClose, onAdded, pageMode = false }) {
             {saved ? (
               <div className={styles.savedMsg}>
                 ✅ Card added!{scraping ? ' Scraping eBay…' : ' Scrape complete.'}
-                <div className={styles.savedActions}>
-                  <button className={styles.addAnotherBtn} onClick={resetAll}>Add another</button>
-                  <button className={styles.ebayDraftBtn} onClick={() => setShowEbayDraft(true)}>+ Draft eBay Listing</button>
-                </div>
+                <button className={styles.addAnotherBtn} onClick={resetAll}>Add another</button>
               </div>
             ) : (
               <button
@@ -408,38 +403,16 @@ export default function ScanCardModal({ onClose, onAdded, pageMode = false }) {
   }
 
   return (
-    <>
-      <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
-        <div className={styles.modal}>
-          <div className={styles.header}>
-            <h2 className={styles.title}>Scan Card</h2>
-            <button className={styles.closeBtn} onClick={onClose}>✕</button>
-          </div>
-          <div className={styles.body}>
-            {bodyContent}
-          </div>
+    <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className={styles.modal}>
+        <div className={styles.header}>
+          <h2 className={styles.title}>Scan Card</h2>
+          <button className={styles.closeBtn} onClick={onClose}>✕</button>
+        </div>
+        <div className={styles.body}>
+          {bodyContent}
         </div>
       </div>
-      {showEbayDraft && (
-        <EbayDraftModal
-          cardData={{
-            card_name:    cardName,
-            player_name:  result?.player_name || '',
-            year:           result?.year || '',
-            brand:          result?.brand || '',
-            set_name:       result?.subset || '',
-            card_number:    result?.card_number || '',
-            variant:        result?.parallel || '',
-            grade:          result?.grade || '',
-            serial_number:  result?.serial_number || '',
-            sport:          result?.sport || '',
-            is_rookie:      false,
-            image_url:      frontPreview || '',
-            image_url_back: backPreview  || '',
-          }}
-          onClose={() => setShowEbayDraft(false)}
-        />
-      )}
-    </>
+    </div>
   )
 }

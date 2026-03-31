@@ -11,6 +11,13 @@ from pydantic import BaseModel
 from typing import Optional
 
 from api.routers.auth import get_current_user, JWT_SECRET, JWT_ALGORITHM
+from fastapi import Security
+
+
+def require_admin(current_user: dict = Depends(get_current_user)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(403, detail="Admin access required")
+    return current_user
 from api.ebay_client import (
     EBAY_AUTH_URL, EBAY_BASE_URL, EBAY_CLIENT_ID, EBAY_CLIENT_SECRET,
     EBAY_REDIRECT_URI, EBAY_RUNAME, EBAY_SCOPES, EBAY_MARKETPLACE,
@@ -48,7 +55,7 @@ def _decode_state_token(state: str) -> Optional[str]:
 # ── Status ────────────────────────────────────────────────────────────────────
 
 @router.get("/status")
-def ebay_status(current_user: dict = Depends(get_current_user)):
+def ebay_status(current_user: dict = Depends(require_admin)):
     row = get_token_row(current_user["username"])
     if not row:
         return {"connected": False, "expires_at": None}
@@ -65,7 +72,7 @@ def ebay_status(current_user: dict = Depends(get_current_user)):
 # ── OAuth connect ─────────────────────────────────────────────────────────────
 
 @router.get("/connect")
-def ebay_connect(current_user: dict = Depends(get_current_user)):
+def ebay_connect(current_user: dict = Depends(require_admin)):
     """Redirect user to eBay OAuth consent page."""
     if not EBAY_CLIENT_ID or not EBAY_RUNAME:
         raise HTTPException(503, "eBay credentials not configured")
@@ -136,7 +143,7 @@ def ebay_callback(
 @router.get("/prefill")
 def ebay_prefill(
     card_name: str = Query(...),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_admin),
 ):
     """Return suggested title, price, condition for the draft listing form."""
     # Look up card details + fair_value
@@ -227,7 +234,7 @@ class DraftRequest(BaseModel):
 @router.post("/create-draft")
 def create_draft(
     req: DraftRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_admin),
 ):
     user_id = current_user["username"]
 
@@ -259,7 +266,7 @@ def create_draft(
 # ── List drafts ───────────────────────────────────────────────────────────────
 
 @router.get("/drafts")
-def list_drafts(current_user: dict = Depends(get_current_user)):
+def list_drafts(current_user: dict = Depends(require_admin)):
     with get_db() as conn:
         with conn.cursor() as cur:
             cur.execute("""
@@ -284,6 +291,6 @@ def list_drafts(current_user: dict = Depends(get_current_user)):
 # ── Disconnect ────────────────────────────────────────────────────────────────
 
 @router.post("/disconnect")
-def ebay_disconnect(current_user: dict = Depends(get_current_user)):
+def ebay_disconnect(current_user: dict = Depends(require_admin)):
     delete_tokens(current_user["username"])
     return {"status": "disconnected"}

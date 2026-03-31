@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import EbayDraftModal from '../components/EbayDraftModal'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid,
   LineChart, Line, ReferenceLine,
@@ -15,7 +16,7 @@ import { useAuth } from '../context/AuthContext'
 import pageStyles from './Page.module.css'
 import styles from './Admin.module.css'
 
-const TABS = ['Users', 'Pipeline', 'Quality', 'Runs', 'Outliers', 'Sealed']
+const TABS = ['Users', 'Pipeline', 'Quality', 'Runs', 'Outliers', 'Sealed', 'eBay Upload']
 
 const WF_COLORS = ['#00d4aa', '#4a9eff', '#ff6b35', '#ffb332', '#a07ff0', '#e05555', '#3dba5e', '#ff9ff3']
 
@@ -62,12 +63,70 @@ export default function Admin() {
         ))}
       </div>
 
-      {tab === 'Users'    && <UsersTab />}
-      {tab === 'Pipeline' && <PipelineTab />}
-      {tab === 'Quality'  && <QualityTab />}
-      {tab === 'Runs'     && <RunsTab />}
-      {tab === 'Outliers' && <OutliersTab />}
-      {tab === 'Sealed'   && <SealedTab />}
+      {tab === 'Users'       && <UsersTab />}
+      {tab === 'Pipeline'    && <PipelineTab />}
+      {tab === 'Quality'     && <QualityTab />}
+      {tab === 'Runs'        && <RunsTab />}
+      {tab === 'Outliers'    && <OutliersTab />}
+      {tab === 'Sealed'      && <SealedTab />}
+      {tab === 'eBay Upload' && <EbayUploadTab />}
+    </div>
+  )
+}
+
+/* ── eBay Upload tab ────────────────────────────────────────────────────────── */
+
+function EbayUploadTab() {
+  const [cardName,     setCardName]     = useState('')
+  const [submitted,    setSubmitted]    = useState('')
+  const [showDraft,    setShowDraft]    = useState(false)
+  const [draftCardData, setDraftCardData] = useState(null)
+
+  function handleOpen(e) {
+    e.preventDefault()
+    if (!cardName.trim()) return
+    setDraftCardData({ card_name: cardName.trim() })
+    setSubmitted(cardName.trim())
+    setShowDraft(true)
+  }
+
+  function handleClose() {
+    setShowDraft(false)
+    setDraftCardData(null)
+  }
+
+  return (
+    <div style={{ padding: '24px 0', maxWidth: 480 }}>
+      <h2 style={{ marginBottom: 8, fontSize: 18 }}>eBay Upload</h2>
+      <p style={{ color: '#888', marginBottom: 20, fontSize: 14 }}>
+        Enter a card name from your ledger to create an eBay draft listing.
+      </p>
+      <form onSubmit={handleOpen} style={{ display: 'flex', gap: 8 }}>
+        <input
+          style={{
+            flex: 1, padding: '8px 12px', borderRadius: 6,
+            border: '1px solid #333', background: '#1a1a1a', color: '#fff', fontSize: 14,
+          }}
+          value={cardName}
+          onChange={e => setCardName(e.target.value)}
+          placeholder="e.g. 2015-16 Upper Deck - Young Guns #201 - Connor McDavid"
+        />
+        <button
+          type="submit"
+          disabled={!cardName.trim()}
+          style={{
+            padding: '8px 16px', borderRadius: 6, border: 'none',
+            background: cardName.trim() ? '#e53500' : '#333',
+            color: '#fff', cursor: cardName.trim() ? 'pointer' : 'default',
+            fontWeight: 600, fontSize: 14,
+          }}
+        >
+          Draft Listing
+        </button>
+      </form>
+      {showDraft && draftCardData && (
+        <EbayDraftModal cardData={draftCardData} onClose={handleClose} />
+      )}
     </div>
   )
 }

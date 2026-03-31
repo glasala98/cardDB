@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import EbayDraftModal from '../components/EbayDraftModal'
 import { useParams, Link } from 'react-router-dom'
 import PriceChart from '../components/PriceChart'
 import ConfidenceBadge from '../components/ConfidenceBadge'
@@ -37,7 +36,6 @@ export default function CardInspect() {
 
   const [imageUrl,     setImageUrl]     = useState(null)
   const [imageUrlBack, setImageUrlBack] = useState(null)
-  const [showEbayDraft, setShowEbayDraft] = useState(false)
   const [flipped,      setFlipped]      = useState(false)
   const [fetchingImg,  setFetchingImg]  = useState(false)
   const [lightbox,     setLightbox]     = useState(false)   // true = open
@@ -227,12 +225,6 @@ export default function CardInspect() {
                   View on eBay ↗
                 </a>
               )}
-              <button
-                className={styles.ebayDraftBtn}
-                onClick={() => setShowEbayDraft(true)}
-              >
-                + Draft Listing
-              </button>
             </div>
           </div>
           {card.last_scraped && (
@@ -484,26 +476,7 @@ export default function CardInspect() {
       </div>
     </div>
 
-    {showEbayDraft && card && (
-      <EbayDraftModal
-        cardData={{
-          card_name:    name,
-          player_name:  card.player,
-          year:         card.year,
-          brand:        card.brand,
-          set_name:     card.set_name,
-          card_number:  card.card_number,
-          variant:      card.variant,
-          grade:        card.grade,
-          serial_number: card.serial_number,
-          sport:        card.sport,
-          fair_value:   card.fair_value,
-          image_url:    imageUrl,
-        }}
-        onClose={() => setShowEbayDraft(false)}
-      />
-    )}
-    </>
+</>
   )
 }
 
