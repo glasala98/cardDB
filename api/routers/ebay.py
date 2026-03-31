@@ -72,8 +72,37 @@ def ebay_status(current_user: dict = Depends(require_admin)):
 # ── OAuth connect ─────────────────────────────────────────────────────────────
 
 @router.get("/connect")
-def ebay_connect(current_user: dict = Depends(require_admin)):
-    """Redirect user to eBay OAuth consent page."""
+def ebay_connect(
+    token: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
+):
+    """Redirect user to eBay OAuth consent page.
+
+    Accepts the JWT as a ?token= query param so the OAuth popup (which cannot
+    send Authorization headers) can still authenticate.
+    """
+    # If no bearer header but a ?token= param was provided, validate that
+    if current_user is None:
+        if not token:
+            raise HTTPException(401, detail="Not authenticated")
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            username = payload.get("sub")
+            if not username:
+                raise HTTPException(401, detail="Invalid token")
+        except jwt.PyJWTError:
+            raise HTTPException(401, detail="Invalid token")
+        # Check admin role from DB
+        with get_db() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT role FROM users WHERE username = %s", (username,))
+                row = cur.fetchone()
+        if not row or row[0] != "admin":
+            raise HTTPException(403, detail="Admin access required")
+        current_user = {"username": username, "role": row[0]}
+    elif current_user.get("role") != "admin":
+        raise HTTPException(403, detail="Admin access required")
+
     if not EBAY_CLIENT_ID or not EBAY_RUNAME:
         raise HTTPException(503, "eBay credentials not configured")
 

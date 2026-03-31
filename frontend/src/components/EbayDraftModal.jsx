@@ -132,8 +132,10 @@ export default function EbayDraftModal({ cardData, onClose }) {
   }
 
   function openOAuthPopup() {
-    const popup = window.open('/api/ebay/connect', 'ebay_oauth', 'width=620,height=720,scrollbars=yes')
-    if (!popup) { window.location.href = '/api/ebay/connect'; return }
+    const token = localStorage.getItem('auth_token') || ''
+    const connectUrl = `/api/ebay/connect${token ? `?token=${encodeURIComponent(token)}` : ''}`
+    const popup = window.open(connectUrl, 'ebay_oauth', 'width=620,height=720,scrollbars=yes')
+    if (!popup) { window.location.href = connectUrl; return }
     pollRef.current = setInterval(async () => {
       if (popup.closed) {
         clearInterval(pollRef.current)
