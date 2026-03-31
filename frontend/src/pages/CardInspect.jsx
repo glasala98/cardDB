@@ -138,6 +138,7 @@ export default function CardInspect() {
   })()
 
   return (
+    <>
     <div className={pageStyles.page}>
 
       {toast && <div className={`${styles.toast} ${styles[toast.type]}`}>{toast.msg}</div>}
@@ -502,6 +503,7 @@ export default function CardInspect() {
         onClose={() => setShowEbayDraft(false)}
       />
     )}
+    </>
   )
 }
 
