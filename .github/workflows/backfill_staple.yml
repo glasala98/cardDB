@@ -1,10 +1,12 @@
 name: Backfill — Staple (90-day history)
 
 # Runs every 6h so it auto-restarts after the 5.75h graceful stop.
-# Skips already-scraped cards automatically — safe to run forever until done.
-# Workers reduced to 2 for stability on 2-core GH Actions VMs.
+# Sharded across 16 parallel runners (4 per sport × 4 sports) for ~4x throughput.
+# Each shard gets a different GH Actions IP → independent eBay rate limit.
 #
-# Connection budget: 4 sports × pool-max 5 = 20 connections ✅
+# Connection budget: 16 shards, each uses 1 DB connection at a time during flush.
+# Peak: ~16 connections → well under Railway limit of 100.
+#
 # Time limit: 5.75h graceful stop (GH Actions hard-kills at 6h)
 
 concurrency:
@@ -22,98 +24,61 @@ on:
         default: ''
 
 jobs:
-  backfill-nhl:
-    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NHL' || github.event_name == 'schedule' }}
+  backfill:
     runs-on: ubuntu-latest
     timeout-minutes: 370
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install Chrome
-        run: |
-          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
-      - name: Install dependencies
-        run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Backfill NHL staple
-        run: |
-          python -u scraping/scrape_master_db.py \
-            --catalog-tier staple --sport NHL \
-            --workers 2 --stale-days 60 --year-from 2000 \
-            --backfill --max-hours 5.75
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    strategy:
+      fail-fast: false
+      max-parallel: 16
+      matrix:
+        include:
+          # NHL — 4 shards
+          - { sport: NHL, shard_index: 0, shard_count: 4 }
+          - { sport: NHL, shard_index: 1, shard_count: 4 }
+          - { sport: NHL, shard_index: 2, shard_count: 4 }
+          - { sport: NHL, shard_index: 3, shard_count: 4 }
+          # NBA — 4 shards
+          - { sport: NBA, shard_index: 0, shard_count: 4 }
+          - { sport: NBA, shard_index: 1, shard_count: 4 }
+          - { sport: NBA, shard_index: 2, shard_count: 4 }
+          - { sport: NBA, shard_index: 3, shard_count: 4 }
+          # NFL — 4 shards
+          - { sport: NFL, shard_index: 0, shard_count: 4 }
+          - { sport: NFL, shard_index: 1, shard_count: 4 }
+          - { sport: NFL, shard_index: 2, shard_count: 4 }
+          - { sport: NFL, shard_index: 3, shard_count: 4 }
+          # MLB — 4 shards
+          - { sport: MLB, shard_index: 0, shard_count: 4 }
+          - { sport: MLB, shard_index: 1, shard_count: 4 }
+          - { sport: MLB, shard_index: 2, shard_count: 4 }
+          - { sport: MLB, shard_index: 3, shard_count: 4 }
 
-  backfill-nba:
-    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NBA' || github.event_name == 'schedule' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 370
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Install Chrome
-        run: |
-          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
-      - name: Install dependencies
-        run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Backfill NBA staple
-        run: |
-          python -u scraping/scrape_master_db.py \
-            --catalog-tier staple --sport NBA \
-            --workers 2 --stale-days 60 --year-from 2000 \
-            --backfill --max-hours 5.75
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-  backfill-nfl:
-    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NFL' || github.event_name == 'schedule' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 370
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
       - name: Install Chrome
         run: |
           wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
-      - name: Install dependencies
-        run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Backfill NFL staple
-        run: |
-          python -u scraping/scrape_master_db.py \
-            --catalog-tier staple --sport NFL \
-            --workers 2 --stale-days 60 --year-from 2000 \
-            --backfill --max-hours 5.75
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-  backfill-mlb:
-    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'MLB' || github.event_name == 'schedule' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 370
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install Chrome
-        run: |
-          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Backfill MLB staple
+
+      - name: Backfill ${{ matrix.sport }} staple (shard ${{ matrix.shard_index }}/${{ matrix.shard_count }})
+        if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == matrix.sport || github.event_name == 'schedule' }}
         run: |
           python -u scraping/scrape_master_db.py \
-            --catalog-tier staple --sport MLB \
-            --workers 2 --stale-days 60 --year-from 2000 \
-            --backfill --max-hours 5.75
+            --catalog-tier staple \
+            --sport ${{ matrix.sport }} \
+            --workers 2 \
+            --stale-days 60 \
+            --year-from 2000 \
+            --shard-index ${{ matrix.shard_index }} \
+            --shard-count ${{ matrix.shard_count }} \
+            --backfill \
+            --max-hours 5.75
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
