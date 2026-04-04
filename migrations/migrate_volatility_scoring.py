@@ -286,6 +286,40 @@ BEGIN
 END;
 $$;
 
+-- ── 5b. Replace fn_trg_rescore_player with a batch UPDATE version ─────────────
+-- The original called fn_score_card(id) per card — for a player with 50k cards
+-- (LeBron, Jordan) that means 50k individual function calls in one transaction.
+-- This version does a single UPDATE for all of a player's cards.
+CREATE OR REPLACE FUNCTION fn_trg_rescore_player() RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+DECLARE
+    p_score SMALLINT;
+BEGIN
+    IF TG_OP = 'UPDATE' AND NEW.player_tier = OLD.player_tier THEN
+        RETURN NEW;
+    END IF;
+
+    p_score := CASE NEW.player_tier
+        WHEN 'S' THEN 50 WHEN 'A' THEN 30 WHEN 'B' THEN 10 ELSE 0
+    END;
+
+    UPDATE card_catalog
+    SET player_score     = p_score,
+        volatility_score = p_score + attr_score + set_score,
+        scrape_tier = CASE
+            WHEN (p_score + attr_score + set_score) >= 100 THEN 'elite'
+            WHEN (p_score + attr_score + set_score) >= 70  THEN 'staple'
+            WHEN (p_score + attr_score + set_score) >= 40  THEN 'premium'
+            WHEN (p_score + attr_score + set_score) >= 10  THEN 'stars'
+            ELSE 'base'
+        END
+    WHERE player_name = NEW.player_name
+      AND (sport = NEW.sport OR NEW.sport = 'ALL');
+
+    RETURN NEW;
+END;
+$$;
+
 DROP TRIGGER IF EXISTS trg_rescore_on_player ON players;
 CREATE TRIGGER trg_rescore_on_player
 AFTER INSERT OR UPDATE OF player_tier ON players

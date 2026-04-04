@@ -153,10 +153,43 @@ PLAYERS = [
     ("Barry Bonds",        "MLB", "A", "HR record, polarising but high demand"),
     ("Frank Thomas",       "MLB", "A", "Big Hurt, HOF"),
 
-    # ── Cross-sport / Golf ────────────────────────────────────────────────────
-    ("Tiger Woods",        "ALL", "S", "Golf GOAT, appears in multi-sport sets"),
-    ("Deion Sanders",      "ALL", "A", "2-sport star NFL/MLB — ALL catches both"),
-    ("Bo Jackson",         "ALL", "A", "2-sport icon NFL/MLB"),
+    # ── Golf ─────────────────────────────────────────────────────────────────
+    ("Tiger Woods",        "Golf", "S", "Golf GOAT, most valuable golf RC"),
+    ("Jack Nicklaus",      "Golf", "S", "18 majors, all-time record"),
+    ("Rory McIlroy",       "Golf", "A", "4 majors, current world #1 contender"),
+    ("Scottie Scheffler",  "Golf", "A", "Current world #1, 2x Masters"),
+    ("Jon Rahm",           "Golf", "A", "US Open + Masters winner"),
+    ("Jordan Spieth",      "Golf", "A", "3 majors, popular in hobby"),
+    ("Bryson DeChambeau",  "Golf", "A", "US Open winner, LIV Golf"),
+    ("Phil Mickelson",     "Golf", "A", "6 majors, Lefty fanbase"),
+    ("Justin Thomas",      "Golf", "A", "2x PGA Champion"),
+    ("Xander Schauffele",  "Golf", "A", "2024 Masters + PGA winner"),
+    ("Nelly Korda",        "Golf", "A", "World #1 women's, Olympic gold"),
+    ("Collin Morikawa",    "Golf", "A", "2 majors, top modern player"),
+    ("Viktor Hovland",     "Golf", "A", "FedEx Cup, European star"),
+
+    # ── Soccer / Football ─────────────────────────────────────────────────────
+    ("Lionel Messi",       "Soccer", "S", "GOAT, 8 Ballon d'Or, World Cup winner"),
+    ("Cristiano Ronaldo",  "Soccer", "S", "GOAT contender, 5x Ballon d'Or"),
+    ("Pelé",               "Soccer", "S", "3x World Cup, all-time legend"),
+    ("Diego Maradona",     "Soccer", "S", "1986 World Cup GOAT"),
+    ("Kylian Mbappé",      "Soccer", "S", "World Cup winner, current GOAT successor"),
+    ("Erling Haaland",     "Soccer", "A", "Most prolific current striker"),
+    ("Vinicius Jr.",       "Soccer", "A", "UCL winner, Ballon d'Or contender"),
+    ("Jude Bellingham",    "Soccer", "A", "Generational young star"),
+    ("Lamine Yamal",       "Soccer", "A", "Euro 2024 winner, generational prospect"),
+    ("Pedri",              "Soccer", "A", "Elite Barcelona midfielder"),
+    ("Rodri",              "Soccer", "A", "2024 Ballon d'Or winner"),
+    ("Mohamed Salah",      "Soccer", "A", "Liverpool icon, huge collector base"),
+    ("Neymar Jr.",         "Soccer", "A", "Massive collector base globally"),
+    ("Kevin De Bruyne",    "Soccer", "A", "Best midfielder of his era"),
+    ("Ronaldinho",         "Soccer", "A", "2x Ballon d'Or, beloved in hobby"),
+    ("Zinedine Zidane",    "Soccer", "A", "World Cup + UCL legend"),
+    ("Thierry Henry",      "Soccer", "A", "Arsenal icon, French GOAT"),
+
+    # ── Cross-sport ───────────────────────────────────────────────────────────
+    ("Deion Sanders",      "ALL",    "A", "2-sport star NFL/MLB"),
+    ("Bo Jackson",         "ALL",    "A", "2-sport icon NFL/MLB"),
 ]
 
 

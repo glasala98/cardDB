@@ -1,0 +1,51 @@
+name: Reclassify All Card Tiers
+
+# One-shot workflow to migrate to the volatility scoring system and
+# re-score every card in card_catalog.
+#
+# Run order:
+#   1. migrate_volatility_scoring  — creates players table, scoring columns, DB triggers
+#   2. seed_player_tiers           — seeds S/A tier players; trigger auto-rescores their cards
+#   3. score_all_cards             — batch-scores remaining 3M cards via scoring matrix
+#
+# After this runs once, new cards are scored automatically by the DB trigger on insert.
+# Re-run with mode=score_only to re-score without re-running the migration.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'full = migrate+seed+score | score_only = skip migration+seed'
+        required: false
+        default: 'full'
+
+jobs:
+  reclassify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install psycopg2-binary python-dotenv
+
+      - name: Run migration (players table + scoring columns + DB triggers)
+        if: ${{ github.event.inputs.mode != 'score_only' }}
+        run: python migrations/migrate_volatility_scoring.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Seed player tiers (S/A tier players — triggers auto-rescore their cards)
+        if: ${{ github.event.inputs.mode != 'score_only' }}
+        run: python scripts/seed_player_tiers.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Batch score all cards via volatility scoring matrix
+        run: python scripts/assign_catalog_tiers.py --score-mode
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
