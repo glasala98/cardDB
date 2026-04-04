@@ -68,9 +68,25 @@ STAPLE_CONDITIONS = [
     ("NFL", "set_name ILIKE '%Contenders%' AND is_rookie = TRUE",
      "NFL Contenders Rookie Tickets"),
 
-    # MLB — Chrome and flagship rookies
+    # MLB — Topps chrome and flagship rookies
     ("MLB", "set_name ILIKE '%Topps Chrome%' AND is_rookie = TRUE",
      "MLB Topps Chrome Rookies"),
+    ("MLB", "set_name ILIKE '%Topps%' AND variant ILIKE '%Chrome%' AND is_rookie = TRUE",
+     "MLB Topps Chrome Rookie Variations"),
+    # Topps Update Series — many iconic RCs (Trout 2011, etc.)
+    ("MLB", "set_name ILIKE '%Topps Update%' AND is_rookie = TRUE",
+     "MLB Topps Update Series Rookies"),
+    # Topps Series 1 & 2 (includes 1st Edition variants like "2022 Topps Series 1 Baseball 1st Edition")
+    ("MLB", "set_name ILIKE '%Topps Series%' AND is_rookie = TRUE",
+     "MLB Topps Series 1/2 Rookies"),
+    # Topps flagship base set RCs ("2022 Topps", "2022 Topps Baseball")
+    ("MLB", "set_name ~ '^[0-9]{4} Topps( Baseball)?$' AND is_rookie = TRUE",
+     "MLB Topps Flagship Rookies"),
+    # Topps Heritage — vintage-style, widely collected
+    ("MLB", "set_name ILIKE '%Topps Heritage%' AND is_rookie = TRUE",
+     "MLB Topps Heritage Rookies"),
+
+    # MLB — Bowman rookies and prospects
     ("MLB", "set_name ILIKE '%Bowman Chrome%' AND is_rookie = TRUE",
      "MLB Bowman Chrome Prospects/Rookies"),
     # Bowman 1st Edition / Bowman Draft 1st Edition — most valuable prospect cards.
@@ -78,14 +94,21 @@ STAPLE_CONDITIONS = [
     # NOT in variant — previous rule was checking the wrong column.
     ("MLB", "set_name ILIKE '%Bowman%' AND set_name ILIKE '%1st%'",
      "MLB Bowman 1st Edition / Draft 1st Edition"),
-    # Topps Update Series — many iconic RCs (Trout 2011, etc.)
-    ("MLB", "set_name ILIKE '%Topps Update%' AND is_rookie = TRUE",
-     "MLB Topps Update Series Rookies"),
-    # Topps flagship base set RCs — the official MLB rookie card each year
-    ("MLB", "set_name ~ '^[0-9]{4} Topps( Baseball)?$' AND is_rookie = TRUE",
-     "MLB Topps Flagship Rookies"),
-    ("MLB", "set_name ILIKE '%Topps%' AND variant ILIKE '%Chrome%' AND is_rookie = TRUE",
-     "MLB Topps Chrome Rookie Variations"),
+    # All other Bowman rookies (Bowman base prospects)
+    ("MLB", "set_name ILIKE '%Bowman%' AND is_rookie = TRUE",
+     "MLB Bowman Rookies"),
+
+    # MLB — Panini brands (parallel to NBA/NFL staple structure)
+    ("MLB", "set_name ILIKE '%Prizm%' AND is_rookie = TRUE",
+     "MLB Prizm Rookies"),
+    ("MLB", "set_name ILIKE '%Select%' AND is_rookie = TRUE",
+     "MLB Select Rookies"),
+    ("MLB", "set_name ILIKE '%Mosaic%' AND is_rookie = TRUE",
+     "MLB Mosaic Rookies"),
+    ("MLB", "set_name ILIKE '%Contenders%' AND is_rookie = TRUE",
+     "MLB Contenders Rookies"),
+    ("MLB", "set_name ILIKE '%Donruss Optic%' AND is_rookie = TRUE",
+     "MLB Donruss Optic Rookies"),
 ]
 
 PREMIUM_CONDITIONS = [
