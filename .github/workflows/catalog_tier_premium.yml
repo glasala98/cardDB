@@ -1,12 +1,8 @@
-name: Catalog Tier — Premium (Daily)
+name: Catalog Tier — Premium (Hourly)
 
-# Premium = 22% complete, 417K cards remaining — highest priority.
-# SHARDED: 2 shards per sport = 8 parallel runners per trigger.
-# Each shard finishes in ~2-2.5h vs 4.5h unsharded → run 6x/day without overlap.
-#
-# Connection budget: 8 jobs × 5 workers = 40 connections per run.
-# Worst case with staple+stars: 40 + 20 + 20 + 5(app) = 85 — under Railway limit of 100 ✅
-# Expected ETA with 6x/day sharded: ~Apr 8 (down from ~Apr 22 unsharded)
+# Premium tier — 2 shards per sport = 8 parallel runners per trigger.
+# stale-days 7 so most triggers exit quickly once backfill is complete.
+# Connection budget: 8 flush-conns peak, well under Railway limit ✅
 
 concurrency:
   group: catalog-tier-premium
@@ -27,31 +23,7 @@ on:
         default: '0'
 
 jobs:
-  notify-start:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    continue-on-error: true
-    steps:
-      - uses: dawidd6/action-send-mail@v3
-        continue-on-error: true
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          secure: true
-          username: ${{ secrets.NOTIFY_GMAIL_USER }}
-          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
-          to: ${{ secrets.NOTIFY_EMAIL_TO }}
-          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
-          subject: "▶️ CardDB — Premium scrape started (8 shards)"
-          body: |
-            Premium-tier scrape has started (2 shards × 4 sports = 8 parallel runners).
-
-            Triggered by: ${{ github.event_name }}
-            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
   scrape:
-    needs: notify-start
-    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -96,27 +68,3 @@ jobs:
             --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-  notify-done:
-    needs: scrape
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: dawidd6/action-send-mail@v3
-        continue-on-error: true
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          secure: true
-          username: ${{ secrets.NOTIFY_GMAIL_USER }}
-          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
-          to: ${{ secrets.NOTIFY_EMAIL_TO }}
-          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
-          subject: "✅ CardDB — Premium scrape done (8 shards)"
-          body: |
-            Premium-tier sharded scrape has completed.
-
-            Result: ${{ needs.scrape.result }}
-
-            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

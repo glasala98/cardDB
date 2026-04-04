@@ -1,8 +1,9 @@
-name: Catalog Tier — Staple (Daily)
+name: Catalog Tier — Staple (Hourly)
 
-# Staple = highest-value cards. Runs 3x/day now that base is paused.
-# Connection budget: 4 sports × 5 workers = 20 connections per run.
-# With base paused: staple(20) + premium(20) + stars(20) + app(5) = 65 max ✅
+# Staple = highest-value cards scraped hourly. stale-days 1 means only cards
+# not scraped in the last 24h are picked up — most hours this exits in seconds.
+# assign_catalog_tiers runs in db_health_check daily, not here.
+# Connection budget: 4 sports × 1 flush-conn = 4 peak connections ✅
 
 concurrency:
   group: catalog-tier-staple
@@ -23,47 +24,7 @@ on:
         default: '0'
 
 jobs:
-  notify-start:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    continue-on-error: true
-    steps:
-      - uses: dawidd6/action-send-mail@v3
-        continue-on-error: true
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          secure: true
-          username: ${{ secrets.NOTIFY_GMAIL_USER }}
-          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
-          to: ${{ secrets.NOTIFY_EMAIL_TO }}
-          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
-          subject: "▶️ CardDB — Staple scrape started (NHL/NBA/NFL/MLB)"
-          body: |
-            Staple-tier scrape has started across all 4 sports (parallel).
-
-            Triggered by: ${{ github.event_name }}
-            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-  assign-tiers:
-    needs: notify-start
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt
-      - name: Assign/refresh catalog tiers
-        run: python scripts/assign_catalog_tiers.py
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
   scrape-staple-nhl:
-    needs: assign-tiers
     runs-on: ubuntu-latest
     timeout-minutes: 90
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NHL' }}
@@ -84,7 +45,6 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   scrape-staple-nba:
-    needs: assign-tiers
     runs-on: ubuntu-latest
     timeout-minutes: 90
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NBA' }}
@@ -105,7 +65,6 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   scrape-staple-nfl:
-    needs: assign-tiers
     runs-on: ubuntu-latest
     timeout-minutes: 90
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NFL' }}
@@ -126,7 +85,6 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   scrape-staple-mlb:
-    needs: assign-tiers
     runs-on: ubuntu-latest
     timeout-minutes: 90
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'MLB' }}
@@ -145,30 +103,3 @@ jobs:
         run: python -u scraping/scrape_master_db.py --catalog-tier staple --sport MLB --workers 5 --stale-days 1 --year-from 2000 --max-hours 0.85 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-  notify-done:
-    needs: [scrape-staple-nhl, scrape-staple-nba, scrape-staple-nfl, scrape-staple-mlb]
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: dawidd6/action-send-mail@v3
-        continue-on-error: true
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          secure: true
-          username: ${{ secrets.NOTIFY_GMAIL_USER }}
-          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
-          to: ${{ secrets.NOTIFY_EMAIL_TO }}
-          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
-          subject: "✅ CardDB — Staple scrape done (NHL/NBA/NFL/MLB)"
-          body: |
-            Staple-tier scrape has completed.
-
-            NHL: ${{ needs.scrape-staple-nhl.result }}
-            NBA: ${{ needs.scrape-staple-nba.result }}
-            NFL: ${{ needs.scrape-staple-nfl.result }}
-            MLB: ${{ needs.scrape-staple-mlb.result }}
-
-            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

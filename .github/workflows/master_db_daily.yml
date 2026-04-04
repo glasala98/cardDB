@@ -2,7 +2,7 @@ name: Master DB Daily Scrape
 
 on:
   schedule:
-    - cron: '0 6 * * *'  # 6am UTC daily (1am EST)
+    - cron: '30 6 * * *'  # 6:30am UTC daily (1:30am EST) — offset from backfill_staple 6am trigger
   workflow_dispatch:
     inputs:
       sport:
@@ -45,23 +45,6 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Notify — NHL scrape started
-        continue-on-error: true
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          secure: true
-          username: ${{ secrets.NOTIFY_GMAIL_USER }}
-          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
-          to: ${{ secrets.NOTIFY_EMAIL_TO }}
-          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
-          subject: "▶️ CardDB — Master DB scrape started: NHL"
-          body: |
-            NHL master DB scrape has started successfully.
-
-            Triggered by: ${{ github.event_name }}
-            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       - name: Scrape NHL prices
         run: python -u scraping/scrape_master_db.py --sport NHL --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '1000' }}
         env:
@@ -129,23 +112,6 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Notify — NBA scrape started
-        continue-on-error: true
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          secure: true
-          username: ${{ secrets.NOTIFY_GMAIL_USER }}
-          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
-          to: ${{ secrets.NOTIFY_EMAIL_TO }}
-          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
-          subject: "▶️ CardDB — Master DB scrape started: NBA"
-          body: |
-            NBA master DB scrape has started successfully.
-
-            Triggered by: ${{ github.event_name }}
-            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       - name: Scrape NBA prices
         run: python -u scraping/scrape_master_db.py --sport NBA --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '1000' }}
         env:
@@ -209,23 +175,6 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Notify — NFL scrape started
-        continue-on-error: true
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          secure: true
-          username: ${{ secrets.NOTIFY_GMAIL_USER }}
-          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
-          to: ${{ secrets.NOTIFY_EMAIL_TO }}
-          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
-          subject: "▶️ CardDB — Master DB scrape started: NFL"
-          body: |
-            NFL master DB scrape has started successfully.
-
-            Triggered by: ${{ github.event_name }}
-            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       - name: Scrape NFL prices
         run: python -u scraping/scrape_master_db.py --sport NFL --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '1000' }}
         env:
@@ -289,23 +238,6 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Notify — MLB scrape started
-        continue-on-error: true
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 465
-          secure: true
-          username: ${{ secrets.NOTIFY_GMAIL_USER }}
-          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
-          to: ${{ secrets.NOTIFY_EMAIL_TO }}
-          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
-          subject: "▶️ CardDB — Master DB scrape started: MLB"
-          body: |
-            MLB master DB scrape has started successfully.
-
-            Triggered by: ${{ github.event_name }}
-            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       - name: Scrape MLB prices
         run: python -u scraping/scrape_master_db.py --sport MLB --workers 5 --stale-days 7 --limit ${{ github.event.inputs.limit || '1000' }}
         env:
