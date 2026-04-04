@@ -74,8 +74,9 @@ BEGIN
     IF NOT FOUND THEN RETURN; END IF;
 
     -- ── Player score ──────────────────────────────────────────────────────────
-    -- Match by exact name + sport, or name + ALL (for cross-sport players like
-    -- Bo Jackson, Deion Sanders, or Tiger Woods in multi-sport sets).
+    -- Case-insensitive name match — catalog sources (TCDB, CLI, CBC) vary in
+    -- capitalisation (e.g. "LeBron James" vs "Lebron James").
+    -- ORDER BY player_tier so S-tier wins when a player appears in multiple rows.
     SELECT COALESCE(
         CASE player_tier
             WHEN 'S' THEN 50
@@ -85,9 +86,9 @@ BEGIN
         END, 0)
     INTO p_score
     FROM players
-    WHERE player_name = c.player_name
+    WHERE LOWER(player_name) = LOWER(c.player_name)
       AND (sport = c.sport OR sport = 'ALL')
-    ORDER BY player_tier  -- S < A < B < C alphabetically, but S wins because 50>30
+    ORDER BY player_tier
     LIMIT 1;
     IF p_score IS NULL THEN p_score := 0; END IF;
 
@@ -187,12 +188,13 @@ BEGIN
     -- UPDATE which is not allowed in a BEFORE trigger on the same row).
     -- We replicate the logic so NEW is mutated before the row is written.
 
-    -- Player score
+    -- Player score — case-insensitive to handle source variation
     SELECT COALESCE(CASE player_tier WHEN 'S' THEN 50 WHEN 'A' THEN 30 WHEN 'B' THEN 10 ELSE 0 END, 0)
     INTO NEW.player_score
     FROM players
-    WHERE player_name = NEW.player_name
+    WHERE LOWER(player_name) = LOWER(NEW.player_name)
       AND (sport = NEW.sport OR sport = 'ALL')
+    ORDER BY player_tier
     LIMIT 1;
     IF NEW.player_score IS NULL THEN NEW.player_score := 0; END IF;
 
@@ -313,7 +315,7 @@ BEGIN
             WHEN (p_score + attr_score + set_score) >= 10  THEN 'stars'
             ELSE 'base'
         END
-    WHERE player_name = NEW.player_name
+    WHERE LOWER(player_name) = LOWER(NEW.player_name)
       AND (sport = NEW.sport OR NEW.sport = 'ALL');
 
     RETURN NEW;
@@ -325,12 +327,14 @@ CREATE TRIGGER trg_rescore_on_player
 AFTER INSERT OR UPDATE OF player_tier ON players
 FOR EACH ROW EXECUTE FUNCTION fn_trg_rescore_player();
 
--- ── 6. Index for player name lookups ─────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_card_catalog_player_name
-    ON card_catalog (player_name);
+-- ── 6. Indexes for player name lookups ───────────────────────────────────────
+-- All lookups use LOWER(player_name) for case-insensitive matching.
+-- Functional indexes allow the planner to use index scans on LOWER() expressions.
+CREATE INDEX IF NOT EXISTS idx_card_catalog_player_lower
+    ON card_catalog (LOWER(player_name));
 
-CREATE INDEX IF NOT EXISTS idx_players_name_sport
-    ON players (player_name, sport);
+CREATE INDEX IF NOT EXISTS idx_players_lower_sport
+    ON players (LOWER(player_name), sport);
 """
 
 

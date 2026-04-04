@@ -282,8 +282,9 @@ def score_all_cards():
                             WHEN 'S' THEN 50 WHEN 'A' THEN 30 WHEN 'B' THEN 10 ELSE 0
                         END
                         FROM players p
-                        WHERE p.player_name = cc.player_name
+                        WHERE LOWER(p.player_name) = LOWER(cc.player_name)
                           AND (p.sport = cc.sport OR p.sport = 'ALL')
+                        ORDER BY p.player_tier
                         LIMIT 1
                     ), 0),
                     attr_score = CASE

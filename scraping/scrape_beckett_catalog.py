@@ -72,14 +72,21 @@ SPORT_SLUG_BECKETT = {"NHL": "hockey",     "NBA": "basketball", "NFL": "football
 SPORT_ID_BECKETT   = {"NHL": 185225,       "NBA": 185226,       "NFL": 185227,      "MLB": 185228}
 
 # cardboardconnection uses full 4-digit years in the index URL path
+# Golf and Soccer are not covered by CBC — TCDB only for those sports
 SPORT_PATH_CBC   = {"NHL": "nhl-hockey-cards",    "NBA": "nba-basketball-cards",
-                    "NFL": "nfl-football-cards",   "MLB": "mlb-baseball-cards"}
+                    "NFL": "nfl-football-cards",   "MLB": "mlb-baseball-cards",
+                    "Soccer": "soccer-cards"}
 SPORT_SUFFIX_CBC = {"NHL": "hockey-cards",         "NBA": "basketball-cards",
-                    "NFL": "football-cards",        "MLB": "baseball-cards"}
+                    "NFL": "football-cards",        "MLB": "baseball-cards",
+                    "Soccer": "soccer-cards"}
 
-# TCDB uses the sport's display name in the URL
+# TCDB uses the sport's display name in the URL — covers Golf and Soccer
 TCDB_BASE       = "https://www.tcdb.com"
-SPORT_SLUG_TCDB = {"NHL": "Hockey", "NBA": "Basketball", "NFL": "Football", "MLB": "Baseball"}
+SPORT_SLUG_TCDB = {"NHL": "Hockey", "NBA": "Basketball", "NFL": "Football", "MLB": "Baseball",
+                   "Golf": "Golf",   "Soccer": "Soccer"}
+
+# Sports that always use calendar years (never "2024-25" season format)
+CALENDAR_YEAR_SPORTS_ALL = {"MLB", "NFL", "Golf", "Soccer"}
 
 CHECKPOINT_FILE = "catalog_checkpoint.json"
 DEBUG_DIR       = Path("catalog_debug")
@@ -894,7 +901,7 @@ def main():
     ap = argparse.ArgumentParser(description="Populate card_catalog from checklistinsider or Beckett")
     ap.add_argument("--source",     default="cli", choices=["cli", "cbc", "tcdb", "beckett"],
                     help="cli = checklistinsider.com (no login, 2022+); cbc = cardboardconnection.com (no login, 2009+); tcdb = tradingcarddatabase.com (no login, all eras); beckett = Beckett OPG (login required)")
-    ap.add_argument("--sport",      default="NHL", choices=["NHL","NBA","NFL","MLB"])
+    ap.add_argument("--sport",      default="NHL", choices=["NHL","NBA","NFL","MLB","Golf","Soccer"])
     ap.add_argument("--year",       help="Single year e.g. 2024-25")
     ap.add_argument("--year-from",  type=int, help="Start year (default: 5 years ago)")
     ap.add_argument("--year-to",    type=int, help="End year (inclusive), for splitting parallel runs")
@@ -911,16 +918,15 @@ def main():
         log.info("Checkpoint cleared.")
 
     # Build year list
-    # MLB/NFL use calendar years on CBC/CLI (e.g. "2024")
-    # NHL/NBA use season format (e.g. "2024-25") — NBA confirmed on CLI
-    CALENDAR_YEAR_SPORTS = {"MLB", "NFL"}
+    # MLB/NFL/Golf/Soccer always use calendar years ("2024")
+    # NHL/NBA use season format ("2024-25") on CLI/CBC; TCDB also accepts calendar years
     if args.year:
         years = [args.year]
     else:
         cur   = datetime.now().year
         start = args.year_from or (cur - 5)
         end   = (args.year_to or cur) + 1
-        if args.sport in CALENDAR_YEAR_SPORTS and args.source in ("cli", "cbc"):
+        if args.sport in CALENDAR_YEAR_SPORTS_ALL or args.source == "tcdb":
             years = [str(y) for y in range(start, end)]
         else:
             years = [f"{y}-{str(y+1)[-2:]}" for y in range(start, end)]
