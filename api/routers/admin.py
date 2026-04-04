@@ -995,7 +995,8 @@ def pricing_progress(_admin: str = Depends(_require_admin)):
         with conn.cursor() as cur:
             cur.execute("SET statement_timeout = '15s'")
 
-            # Daily counts of cards that received a price (scraped_at) in last 30 days, by tier
+            # Daily counts of cards that received a price (scraped_at) in last 30 days, by tier.
+            # fair_value > 0 only — cards with 0 sales (no-market stamps) don't count as priced.
             cur.execute("""
                 SELECT
                     DATE(mp.scraped_at AT TIME ZONE 'UTC') AS day,
@@ -1004,7 +1005,7 @@ def pricing_progress(_admin: str = Depends(_require_admin)):
                 FROM market_prices mp
                 JOIN card_catalog cc ON cc.id = mp.card_catalog_id
                 WHERE mp.scraped_at >= NOW() - INTERVAL '30 days'
-                  AND mp.fair_value >= 0
+                  AND mp.fair_value > 0
                   AND NOT COALESCE(mp.ignored, FALSE)
                 GROUP BY day, cc.scrape_tier
                 ORDER BY day
@@ -1018,7 +1019,7 @@ def pricing_progress(_admin: str = Depends(_require_admin)):
                     COUNT(*) AS daily_total
                 FROM market_prices mp
                 WHERE mp.scraped_at >= NOW() - INTERVAL '30 days'
-                  AND mp.fair_value >= 0
+                  AND mp.fair_value > 0
                   AND NOT COALESCE(mp.ignored, FALSE)
                 GROUP BY day
                 ORDER BY day
@@ -1031,7 +1032,7 @@ def pricing_progress(_admin: str = Depends(_require_admin)):
                 FROM card_catalog cc
                 LEFT JOIN market_prices mp
                     ON mp.card_catalog_id = cc.id
-                    AND mp.fair_value >= 0
+                    AND mp.fair_value > 0
                     AND NOT COALESCE(mp.ignored, FALSE)
                 GROUP BY cc.scrape_tier
                 ORDER BY cc.scrape_tier
