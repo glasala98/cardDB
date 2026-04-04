@@ -257,15 +257,128 @@ def classify(dry_run: bool, reclassify_all: bool, year_from: int):
     return counts
 
 
+def score_all_cards():
+    """
+    Batch-score every card in card_catalog using fn_score_card() (installed by
+    migrate_volatility_scoring.py).  Called after the migration + player seed to
+    backfill scores on existing rows — new inserts are handled automatically by
+    the DB trigger.
+
+    Runs in batches of 10,000 to avoid long-running transactions.
+    """
+    print("Scoring all cards via volatility scoring system...")
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM card_catalog")
+            total = cur.fetchone()[0]
+            print(f"  Total cards: {total:,}")
+
+            # Batch UPDATE using the same logic as the trigger (avoids 2M fn calls)
+            cur.execute("""
+                UPDATE card_catalog cc
+                SET
+                    player_score = COALESCE((
+                        SELECT CASE p.player_tier
+                            WHEN 'S' THEN 50 WHEN 'A' THEN 30 WHEN 'B' THEN 10 ELSE 0
+                        END
+                        FROM players p
+                        WHERE p.player_name = cc.player_name
+                          AND (p.sport = cc.sport OR p.sport = 'ALL')
+                        LIMIT 1
+                    ), 0),
+                    attr_score = CASE
+                        WHEN cc.print_run = 1 THEN 50
+                        WHEN cc.variant ILIKE '%logoman%' THEN 50
+                        WHEN cc.is_rookie
+                             AND (cc.variant ILIKE '%auto%' OR cc.variant ILIKE '%rpa%')
+                             AND cc.variant ILIKE '%patch%' THEN 50
+                        WHEN cc.print_run IS NOT NULL AND cc.print_run <= 99 THEN 30
+                        WHEN cc.variant ILIKE '%auto%'
+                          OR cc.variant ILIKE '%autograph%'
+                          OR cc.variant ILIKE '%rpa%'
+                          OR cc.variant ILIKE '%patch%'
+                          OR cc.variant ILIKE '%relic%'
+                          OR cc.variant ILIKE '%jersey%'
+                          OR cc.variant ILIKE '%signature%'
+                          OR cc.variant ILIKE '%signed%'
+                          OR cc.variant ILIKE '%booklet%' THEN 30
+                        WHEN cc.print_run IS NOT NULL AND cc.print_run <= 499 THEN 10
+                        WHEN cc.is_rookie   THEN 10
+                        WHEN cc.is_parallel THEN 10
+                        ELSE 0
+                    END,
+                    set_score = CASE
+                        WHEN cc.set_name ILIKE '%National Treasures%'
+                          OR cc.set_name ILIKE '%Flawless%'
+                          OR cc.set_name ILIKE '%Prizm%'
+                          OR cc.set_name ILIKE '%Topps Chrome%'
+                          OR cc.set_name ILIKE '%Bowman Chrome%'
+                          OR cc.set_name ILIKE '%Topps Chrome Black%'
+                          OR cc.variant  ILIKE '%Young Guns%'
+                          OR cc.set_name ILIKE '%The Cup%'
+                          OR cc.set_name ILIKE '%Ultimate Collection%'
+                          OR cc.set_name ILIKE '%Immaculate%'
+                          OR cc.set_name ILIKE '%SP Authentic%' THEN 20
+                        WHEN cc.set_name ILIKE '%Select%'
+                          OR cc.set_name ILIKE '%Mosaic%'
+                          OR cc.set_name ILIKE '%Optic%'
+                          OR cc.set_name ILIKE '%Contenders%'
+                          OR cc.set_name ILIKE '%Bowman Draft%'
+                          OR cc.set_name ILIKE '%Bowman 1st%'
+                          OR cc.set_name ILIKE '%Bowman%'
+                          OR cc.set_name ILIKE '%Topps Update%'
+                          OR cc.set_name ILIKE '%Topps Series%'
+                          OR cc.set_name ILIKE '%Topps Finest%'
+                          OR cc.set_name ILIKE '%Stadium Club%'
+                          OR cc.set_name ILIKE '%Heritage%'
+                          OR cc.set_name ILIKE '%Donruss Optic%' THEN 10
+                        ELSE 0
+                    END
+            """)
+            print(f"  Scores updated: {cur.rowcount:,} cards")
+
+            # Derive volatility_score and scrape_tier from the three components
+            cur.execute("""
+                UPDATE card_catalog
+                SET volatility_score = player_score + attr_score + set_score,
+                    scrape_tier = CASE
+                        WHEN (player_score + attr_score + set_score) >= 100 THEN 'elite'
+                        WHEN (player_score + attr_score + set_score) >= 70  THEN 'staple'
+                        WHEN (player_score + attr_score + set_score) >= 40  THEN 'premium'
+                        WHEN (player_score + attr_score + set_score) >= 10  THEN 'stars'
+                        ELSE 'base'
+                    END
+            """)
+            print(f"  Tiers assigned: {cur.rowcount:,} cards")
+
+            # Print distribution
+            cur.execute("""
+                SELECT scrape_tier, COUNT(*) FROM card_catalog
+                GROUP BY scrape_tier ORDER BY scrape_tier
+            """)
+            print("\n  Tier distribution:")
+            for tier, count in cur.fetchall():
+                print(f"    {tier:<10} {count:>10,}")
+
+        conn.commit()
+
+
 def main():
     parser = argparse.ArgumentParser(description="Assign scrape tiers to card_catalog")
     parser.add_argument('--all',      action='store_true', dest='reclassify_all',
                         help="Reclassify all cards (default: only unclassified base cards)")
     parser.add_argument('--dry-run',  action='store_true',
                         help="Print counts without writing")
+    parser.add_argument('--score-mode', action='store_true', dest='score_mode',
+                        help="Use volatility scoring system instead of rule-based (requires migration_volatility_scoring to have run)")
     parser.add_argument('--year-from', type=int, default=2000, dest='year_from',
                         help="Modern era cutoff for stars tier (default: 2000)")
     args = parser.parse_args()
+
+    if args.score_mode:
+        # New volatility scoring path — requires migrate_volatility_scoring.py to have run
+        score_all_cards()
+        return
 
     print(f"{'DRY RUN — ' if args.dry_run else ''}Assigning catalog tiers (year >= {args.year_from} for stars)...")
     if args.reclassify_all:
