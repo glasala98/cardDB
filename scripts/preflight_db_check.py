@@ -13,7 +13,7 @@ import psycopg2
 
 def _build_dsn() -> str:
     url = os.environ["DATABASE_URL"]
-    if "sslmode=" not in url:
+    if "proxy.rlwy.net" in url and "sslmode=" not in url:
         sep = "&" if "?" in url else "?"
         url = f"{url}{sep}sslmode=require"
     return url
