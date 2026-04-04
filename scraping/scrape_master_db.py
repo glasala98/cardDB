@@ -111,12 +111,11 @@ def _get_fast_driver():
     return _thread_local.driver
 
 
-# Patch scraper to use fast driver + minimal delays
+# Patch scraper to use fast driver
 scrape_card_prices._thread_local = _thread_local
 scrape_card_prices.get_driver = _get_fast_driver
-_orig_sleep = time.sleep
 scrape_card_prices.time = type(time)('time')
-scrape_card_prices.time.sleep = lambda s: _orig_sleep(min(s, 2.0))  # was 0.3 — increased to reduce eBay bot detection
+scrape_card_prices.time.sleep = time.sleep
 scrape_card_prices.time.time = time.time
 
 
@@ -780,7 +779,7 @@ def main():
     start = time.time()
     batch: list = []
     no_market_batch: list = []
-    BATCH_SIZE = 50
+    BATCH_SIZE = 100
     timed_out = False
 
     raw_sales_backfill_batch: list = []  # forward-declare so _flush_batch can see it

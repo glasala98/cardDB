@@ -107,6 +107,16 @@ def _extract_player_name(last_segment):
     return last.strip()
 
 
+# Lot/bundle listing filter — compiled once at module level, applied per item in search_ebay_sold.
+_LOT_RE = re.compile(
+    r'\byou\s*pick\b|\byour\s*pick\b|\bu\s*pick\b'
+    r'|buy\s*\d+\s*get|\blot\s*of\b|\blot\b(?!\s*\d)'
+    r'|\bbundle\b|\bwith\s+young\s+guns\b|\binserts?\s+&'
+    r'|\bcanvas.*outburst|\boutburst.*canvas'
+    r'|\b\d{3}-\d{3}\b',   # card number ranges like 251-500
+    re.IGNORECASE,
+)
+
 # Canonical list of variant/parallel keywords that materially affect card value.
 # Order matters — more specific multi-word variants should appear before single-word ones.
 _VARIANT_KEYWORDS = [
@@ -784,14 +794,6 @@ def search_ebay_sold(driver, card_name, max_results=240, search_query=None, page
                     continue
 
                 # Filter: skip lot/bundle listings — they distort single-card prices
-                _LOT_RE = re.compile(
-                    r'\byou\s*pick\b|\byour\s*pick\b|\bu\s*pick\b'
-                    r'|buy\s*\d+\s*get|\blot\s*of\b|\blot\b(?!\s*\d)'
-                    r'|\bbundle\b|\bwith\s+young\s+guns\b|\binserts?\s+&'
-                    r'|\bcanvas.*outburst|\boutburst.*canvas'
-                    r'|\b\d{3}-\d{3}\b',   # card number ranges like 251-500
-                    re.IGNORECASE,
-                )
                 if _LOT_RE.search(title):
                     continue
 
@@ -1464,7 +1466,7 @@ def process_card(card, since_date=None):
         $5.00 and confidence is 'none'.
     """
     driver = get_driver()
-    time.sleep(random.uniform(0.5, 1.5))
+    time.sleep(random.uniform(0.2, 0.6))
 
     target_serial = extract_serial_run(card)
     confidence = 'high'
@@ -1485,14 +1487,14 @@ def process_card(card, since_date=None):
 
     if not pricing_sales:
         # Stage 2: drop parallel/subset name, keep serial + set
-        time.sleep(random.uniform(0.5, 1.0))
+        time.sleep(random.uniform(0.2, 0.5))
         confidence = 'medium'
         pricing_sales = search_ebay_sold(driver, card, search_query=build_set_query(card))
         pricing_sales = _apply_variant_filter(card, pricing_sales)
 
     if not pricing_sales:
         # Stage 3: drop set — player + card# + serial + year only
-        time.sleep(random.uniform(0.5, 1.0))
+        time.sleep(random.uniform(0.2, 0.5))
         confidence = 'low'
         pricing_sales = search_ebay_sold(driver, card, search_query=build_simplified_query(card))
         pricing_sales = _apply_variant_filter(card, pricing_sales)
@@ -1518,7 +1520,7 @@ def process_card(card, since_date=None):
         # Stage 5: player + card# only — absolute last resort for any card type.
         # Catches unusual/descriptive card names and un-numbered cards with no comps.
         # Pricing fallback only — NOT stored historically in raw_sales.
-        time.sleep(random.uniform(0.5, 1.0))
+        time.sleep(random.uniform(0.2, 0.5))
         confidence = 'low'
         pricing_sales = search_ebay_sold(driver, card, search_query=build_player_card_query(card))
 
