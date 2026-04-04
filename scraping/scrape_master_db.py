@@ -72,15 +72,19 @@ def _create_fast_driver():
     from selenium.webdriver.chrome.options import Options
     opts = Options()
     for arg in [
-        '--headless', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
+        '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
         '--window-size=1280,720', '--disable-extensions',
         '--blink-settings=imagesEnabled=false', '--ignore-certificate-errors',
+        '--allow-running-insecure-content',
         '--disable-blink-features=AutomationControlled',
         '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-        '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        '--no-zygote', '--disable-background-networking', '--disable-sync',
+        '--disable-translate', '--disable-default-apps', '--disable-software-rasterizer',
+        '--disable-crash-reporter', '--mute-audio', '--log-level=3',
     ]:
         opts.add_argument(arg)
-    opts.add_experimental_option('excludeSwitches', ['enable-automation'])
+    opts.add_experimental_option('excludeSwitches', ['enable-automation', 'enable-logging'])
     opts.page_load_strategy = 'eager'
     from selenium import webdriver
     try:

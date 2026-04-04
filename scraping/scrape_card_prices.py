@@ -494,17 +494,7 @@ def clean_card_name_for_search(card_name):
 
 
 def create_driver():
-    """Create a headless Chrome WebDriver with memory-saving and anti-detection flags.
-
-    Launches Chrome in headless mode with flags that reduce RAM usage on
-    low-resource servers (--no-zygote, --disable-background-networking, etc.)
-    and spoof the user-agent to avoid bot-detection. Uses webdriver-manager
-    to auto-download ChromeDriver when available, otherwise falls back to the
-    system-installed driver.
-
-    Returns:
-        A configured selenium.webdriver.Chrome instance ready for use.
-    """
+    """Create a headless Chrome WebDriver with memory-saving and anti-detection flags."""
     options = Options()
     options.add_argument('--headless=new')
     options.add_argument('--disable-gpu')
@@ -515,7 +505,9 @@ def create_driver():
     options.add_argument('--ignore-certificate-errors')
     options.add_argument('--allow-running-insecure-content')
     options.add_argument('--disable-blink-features=AutomationControlled')
-    options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+    options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
+    # Block images — not needed for price scraping, saves bandwidth + memory
+    options.add_argument('--blink-settings=imagesEnabled=false')
     # Memory-saving flags for low-RAM servers
     options.add_argument('--no-zygote')
     options.add_argument('--disable-background-networking')
@@ -525,11 +517,18 @@ def create_driver():
     options.add_argument('--disable-software-rasterizer')
     options.add_argument('--disable-crash-reporter')
     options.add_argument('--mute-audio')
-    options.add_experimental_option('excludeSwitches', ['enable-automation'])
+    options.add_argument('--log-level=3')
+    options.add_experimental_option('excludeSwitches', ['enable-automation', 'enable-logging'])
+    # Don't wait for all resources — DOM ready is enough for eBay price scraping
+    options.page_load_strategy = 'eager'
     if _use_webdriver_manager:
         service = Service(ChromeDriverManager().install())
-        return webdriver.Chrome(service=service, options=options)
-    return webdriver.Chrome(options=options)
+        driver = webdriver.Chrome(service=service, options=options)
+    else:
+        driver = webdriver.Chrome(options=options)
+    driver.set_page_load_timeout(20)
+    driver.set_script_timeout(10)
+    return driver
 
 
 def title_matches_grade(title, grade_str, grade_num):

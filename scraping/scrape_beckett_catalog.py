@@ -647,14 +647,27 @@ def _make_driver(headless=True):
     opts = Options()
     if headless:
         opts.add_argument("--headless=new")
+    opts.add_argument("--disable-gpu")
     opts.add_argument("--no-sandbox")
     opts.add_argument("--disable-dev-shm-usage")
     opts.add_argument("--disable-blink-features=AutomationControlled")
-    opts.add_experimental_option("excludeSwitches", ["enable-automation"])
-    opts.add_experimental_option("useAutomationExtension", False)
+    opts.add_argument("--disable-extensions")
+    opts.add_argument("--ignore-certificate-errors")
+    opts.add_argument("--blink-settings=imagesEnabled=false")
+    opts.add_argument("--no-zygote")
+    opts.add_argument("--disable-background-networking")
+    opts.add_argument("--disable-sync")
+    opts.add_argument("--disable-crash-reporter")
+    opts.add_argument("--mute-audio")
+    opts.add_argument("--log-level=3")
     opts.add_argument("--window-size=1280,900")
     opts.add_argument(f"user-agent={HEADERS['User-Agent']}")
+    opts.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
+    opts.add_experimental_option("useAutomationExtension", False)
+    opts.page_load_strategy = 'eager'
     driver = webdriver.Chrome(service=svc, options=opts)
+    driver.set_page_load_timeout(20)
+    driver.set_script_timeout(10)
     driver.execute_cdp_cmd(
         "Page.addScriptToEvaluateOnNewDocument",
         {"source": "Object.defineProperty(navigator,'webdriver',{get:()=>undefined})"}
