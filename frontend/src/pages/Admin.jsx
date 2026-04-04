@@ -1060,7 +1060,6 @@ function RunsTab() {
           </div>
         )
       })()}
-      )}
 
       {/* Filter bar */}
       <div className={styles.runsFilterBar}>

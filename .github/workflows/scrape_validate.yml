@@ -11,7 +11,7 @@ on:
         required: false
         default: '7'
   workflow_run:
-    workflows: ["Catalog Tier — Base (Daily during backfill)"]
+    workflows: ["Catalog Tier — Base (Manual / Backfill)"]
     types: [completed]
 
 jobs:
