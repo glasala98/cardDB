@@ -32,14 +32,14 @@ _CONN_ERRORS = (psycopg2.OperationalError, psycopg2.InterfaceError)
 
 
 def _build_dsn() -> str:
-    """Append sslmode=require to DATABASE_URL if not already set.
+    """Append sslmode=require to DATABASE_URL for external Railway proxy connections.
 
-    Railway's external proxy enforces SSL on all connections.
-    Without this, psycopg2 may attempt a plaintext handshake and get
-    'server closed the connection unexpectedly'.
+    Railway's external proxy (*.proxy.rlwy.net) enforces SSL.
+    Railway's internal network (*.railway.internal) does not support SSL —
+    skip appending sslmode for those to avoid crashing the deployed app.
     """
     url = os.environ["DATABASE_URL"]
-    if "sslmode=" not in url:
+    if "sslmode=" not in url and "railway.internal" not in url:
         sep = "&" if "?" in url else "?"
         url = f"{url}{sep}sslmode=require"
     return url
