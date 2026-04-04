@@ -11,7 +11,12 @@ Usage:
 import os, sys, argparse
 import psycopg2
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+def _build_dsn() -> str:
+    url = os.environ["DATABASE_URL"]
+    if "sslmode=" not in url:
+        sep = "&" if "?" in url else "?"
+        url = f"{url}{sep}sslmode=require"
+    return url
 
 
 def main():
@@ -22,7 +27,7 @@ def main():
                         help="Fail if DB exceeds this size in GB (default: 70)")
     args = parser.parse_args()
 
-    conn = psycopg2.connect(DATABASE_URL)
+    conn = psycopg2.connect(_build_dsn())
     cur  = conn.cursor()
 
     cur.execute("SELECT pg_database_size(current_database())")

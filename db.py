@@ -31,11 +31,25 @@ _KEEPALIVE_OPTS = {
 _CONN_ERRORS = (psycopg2.OperationalError, psycopg2.InterfaceError)
 
 
+def _build_dsn() -> str:
+    """Append sslmode=require to DATABASE_URL if not already set.
+
+    Railway's external proxy enforces SSL on all connections.
+    Without this, psycopg2 may attempt a plaintext handshake and get
+    'server closed the connection unexpectedly'.
+    """
+    url = os.environ["DATABASE_URL"]
+    if "sslmode=" not in url:
+        sep = "&" if "?" in url else "?"
+        url = f"{url}{sep}sslmode=require"
+    return url
+
+
 def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
     global _pool
     if _pool is None:
         _pool = psycopg2.pool.ThreadedConnectionPool(
-            1, 5, os.environ["DATABASE_URL"], **_KEEPALIVE_OPTS
+            1, 5, _build_dsn(), **_KEEPALIVE_OPTS
         )
     return _pool
 

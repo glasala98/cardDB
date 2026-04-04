@@ -24,6 +24,11 @@ if not DATABASE_URL:
     print("quarantine_outliers: DATABASE_URL not set, skipping")
     sys.exit(0)
 
+# Railway's external proxy requires SSL — append sslmode=require if not set.
+if "sslmode=" not in DATABASE_URL:
+    _sep = "&" if "?" in DATABASE_URL else "?"
+    DATABASE_URL = f"{DATABASE_URL}{_sep}sslmode=require"
+
 
 def parse_args():
     p = argparse.ArgumentParser()
