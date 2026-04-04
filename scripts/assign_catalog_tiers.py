@@ -68,13 +68,22 @@ STAPLE_CONDITIONS = [
     ("NFL", "set_name ILIKE '%Contenders%' AND is_rookie = TRUE",
      "NFL Contenders Rookie Tickets"),
 
-    # MLB — Topps Chrome / Bowman Chrome rookies
+    # MLB — Chrome and flagship rookies
     ("MLB", "set_name ILIKE '%Topps Chrome%' AND is_rookie = TRUE",
      "MLB Topps Chrome Rookies"),
     ("MLB", "set_name ILIKE '%Bowman Chrome%' AND is_rookie = TRUE",
      "MLB Bowman Chrome Prospects/Rookies"),
-    ("MLB", "set_name ILIKE '%Bowman%' AND variant ILIKE '%1st%'",
-     "MLB Bowman 1st Edition"),
+    # Bowman 1st Edition / Bowman Draft 1st Edition — most valuable prospect cards.
+    # '1st' is in the set_name (e.g. '2022 Bowman Draft 1st Edition Baseball'),
+    # NOT in variant — previous rule was checking the wrong column.
+    ("MLB", "set_name ILIKE '%Bowman%' AND set_name ILIKE '%1st%'",
+     "MLB Bowman 1st Edition / Draft 1st Edition"),
+    # Topps Update Series — many iconic RCs (Trout 2011, etc.)
+    ("MLB", "set_name ILIKE '%Topps Update%' AND is_rookie = TRUE",
+     "MLB Topps Update Series Rookies"),
+    # Topps flagship base set RCs — the official MLB rookie card each year
+    ("MLB", "set_name ~ '^[0-9]{4} Topps( Baseball)?$' AND is_rookie = TRUE",
+     "MLB Topps Flagship Rookies"),
     ("MLB", "set_name ILIKE '%Topps%' AND variant ILIKE '%Chrome%' AND is_rookie = TRUE",
      "MLB Topps Chrome Rookie Variations"),
 ]

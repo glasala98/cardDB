@@ -11,55 +11,7 @@ jobs:
           pip install psycopg2-binary -q
           python - << 'PYEOF'
           import os, psycopg2
-          url = os.environ["DATABASE_URL"]
-          if "proxy.rlwy.net" in url and "sslmode=" not in url:
-              url += ("&" if "?" in url else "?") + "sslmode=require"
-          conn = psycopg2.connect(url)
-          cur = conn.cursor()
-
-          # MLB-specific diagnostics
-          print("=== MLB is_rookie counts ===")
-          cur.execute("SELECT is_rookie, COUNT(*) FROM card_catalog WHERE sport='MLB' GROUP BY is_rookie ORDER BY is_rookie")
-          for r in cur.fetchall(): print(f"  is_rookie={r[0]}: {r[1]:,}")
-
-          print("\n=== Top 20 MLB set_names by count ===")
-          cur.execute("SELECT set_name, COUNT(*) as n FROM card_catalog WHERE sport='MLB' GROUP BY set_name ORDER BY n DESC LIMIT 20")
-          for r in cur.fetchall(): print(f"  {r[1]:>7,}  {r[0]}")
-
-          print("\n=== MLB set_names with 'Chrome' and is_rookie=TRUE ===")
-          cur.execute("SELECT set_name, COUNT(*) FROM card_catalog WHERE sport='MLB' AND set_name ILIKE '%Chrome%' AND is_rookie=TRUE GROUP BY set_name ORDER BY COUNT(*) DESC LIMIT 15")
-          for r in cur.fetchall(): print(f"  {r[1]:>6,}  {r[0]}")
-
-          print("\n=== MLB set_names with 'Bowman' and is_rookie=TRUE ===")
-          cur.execute("SELECT set_name, COUNT(*) FROM card_catalog WHERE sport='MLB' AND set_name ILIKE '%Bowman%' AND is_rookie=TRUE GROUP BY set_name ORDER BY COUNT(*) DESC LIMIT 15")
-          for r in cur.fetchall(): print(f"  {r[1]:>6,}  {r[0]}")
-
-          print("\n=== MLB variants containing '1st' ===")
-          cur.execute("SELECT variant, COUNT(*) FROM card_catalog WHERE sport='MLB' AND variant ILIKE '%1st%' GROUP BY variant ORDER BY COUNT(*) DESC LIMIT 15")
-          for r in cur.fetchall(): print(f"  {r[1]:>6,}  {r[0]}")
-
-          print("\n=== Top MLB set_names with is_rookie=TRUE ===")
-          cur.execute("SELECT set_name, COUNT(*) FROM card_catalog WHERE sport='MLB' AND is_rookie=TRUE GROUP BY set_name ORDER BY COUNT(*) DESC LIMIT 20")
-          for r in cur.fetchall(): print(f"  {r[1]:>6,}  {r[0]}")
-
-          print("\n=== Current MLB staple breakdown by set ===")
-          cur.execute("SELECT set_name, COUNT(*) FROM card_catalog WHERE sport='MLB' AND scrape_tier='staple' GROUP BY set_name ORDER BY COUNT(*) DESC LIMIT 20")
-          for r in cur.fetchall(): print(f"  {r[1]:>6,}  {r[0]}")
-
-          cur.close(); conn.close()
-          PYEOF
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-      - name: Run full stats
-        run: |
-          pip install psycopg2-binary -q
-          python - << 'PYEOF'
-          import os, psycopg2
-          url = os.environ["DATABASE_URL"]
-          if "proxy.rlwy.net" in url and "sslmode=" not in url:
-              url += ("&" if "?" in url else "?") + "sslmode=require"
-          conn = psycopg2.connect(url)
+          conn = psycopg2.connect(os.environ["DATABASE_URL"])
           cur = conn.cursor()
 
           cur.execute("""
