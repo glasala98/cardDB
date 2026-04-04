@@ -979,66 +979,87 @@ function RunsTab() {
     <div className={styles.runsWrap}>
 
       {/* Active jobs banner */}
-      {runningJobs.length > 0 && (
-        <div className={styles.activeJobsBanner}>
-          <div className={styles.liveHeader}>
-            <div className={styles.liveIndicator}>
-              <span className={styles.liveDot} />
-              <span className={styles.liveText}>
-                Live — {runningJobs.length} job{runningJobs.length > 1 ? 's' : ''} running · auto-refreshing every 30s
+      {runningJobs.length > 0 && (() => {
+        // Group shards by workflow+sport, summing their stats
+        const grouped = {}
+        runningJobs.forEach(r => {
+          const key = `${r.workflow}||${r.sport || ''}||${r.tier || ''}`
+          if (!grouped[key]) grouped[key] = { workflow: r.workflow, sport: r.sport, tier: r.tier, processed: 0, total: 0, found: 0, errors: 0, shards: 0, startedAt: r.started_at }
+          const g = grouped[key]
+          g.processed += r.cards_processed ?? 0
+          g.total     += r.cards_total ?? 0
+          g.found     += r.cards_found ?? 0
+          g.errors    += r.errors ?? 0
+          g.shards    += 1
+          if (r.started_at && (!g.startedAt || r.started_at < g.startedAt)) g.startedAt = r.started_at
+        })
+        // Group rows by workflow for display
+        const byWorkflow = {}
+        Object.values(grouped).forEach(g => {
+          if (!byWorkflow[g.workflow]) byWorkflow[g.workflow] = []
+          byWorkflow[g.workflow].push(g)
+        })
+        const SPORT_ORDER = ['NHL', 'NBA', 'NFL', 'MLB']
+        return (
+          <div className={styles.activeJobsBanner}>
+            <div className={styles.liveHeader}>
+              <div className={styles.liveIndicator}>
+                <span className={styles.liveDot} />
+                <span className={styles.liveText}>
+                  Live — {runningJobs.length} shard{runningJobs.length > 1 ? 's' : ''} running · auto-refreshing every 30s
+                </span>
+              </div>
+              <span className={styles.muted} style={{ fontSize: 11 }}>
+                Last updated: {new Date(lastRefresh).toLocaleTimeString()}
               </span>
             </div>
-            <span className={styles.muted} style={{ fontSize: 11 }}>
-              Last updated: {new Date(lastRefresh).toLocaleTimeString()}
-            </span>
-          </div>
-          <div className={styles.activeJobsGrid}>
-            {runningJobs.map(r => {
-              const elapsed = r.started_at
-                ? Math.round((Date.now() - new Date(r.started_at)) / 60000)
-                : null
-              const processed = r.cards_processed ?? 0
-              const total     = r.cards_total ?? 0
-              const found     = r.cards_found ?? 0
-              const progress  = total > 0 ? Math.round(processed / total * 100) : 0
-              const hitRate   = processed > 0 ? Math.round(found / processed * 100) : null
-              const rate      = (elapsed != null && elapsed > 0 && processed > 0)
-                ? Math.round(processed / elapsed * 60) : null
-              const eta = (elapsed != null && rate > 0 && processed < total)
-                ? Math.round((total - processed) / rate)
-                : null
-              return (
-                <div key={r.id} className={styles.activeJobCard}>
-                  <div className={styles.activeJobHeader}>
-                    <span className={styles.running}>⬤</span>
-                    <span className={styles.activeJobWf}>{r.workflow}</span>
-                    {r.sport && <span className={styles.activeJobSport}>{r.sport}</span>}
-                    {r.tier  && <span className={`${styles.tierBadge} ${styles['tier_' + r.tier]}`}>{r.tier}</span>}
-                  </div>
-                  <div className={styles.activeJobStats}>
-                    <span><strong>{processed.toLocaleString()}</strong> / {total.toLocaleString()} processed</span>
-                    <span><strong>{found.toLocaleString()}</strong> found</span>
-                    {hitRate != null && (
-                      <span className={hitRate < 10 ? styles.textDanger : hitRate < 30 ? styles.textWarn : styles.textSuccess}>
-                        {hitRate}% hit
-                      </span>
-                    )}
-                    {r.errors > 0 && <span className={styles.textDanger}>{r.errors} err</span>}
-                    {rate != null && <span className={styles.muted}>{rate.toLocaleString()}/hr</span>}
-                    {elapsed != null && <span className={styles.muted}>{elapsed}m elapsed</span>}
-                    {eta != null && <span className={styles.muted}>~{eta}m left</span>}
-                  </div>
-                  {total > 0 && (
-                    <div className={styles.progressBar}>
-                      <div className={styles.progressFill} style={{ width: `${Math.min(progress, 100)}%` }} />
-                      <span className={styles.progressLabel}>{progress}%</span>
+            <div className={styles.activeJobsList}>
+              {Object.entries(byWorkflow).map(([wf, groups]) => {
+                const sorted = [...groups].sort((a, b) => SPORT_ORDER.indexOf(a.sport) - SPORT_ORDER.indexOf(b.sport))
+                const wfTier = sorted[0]?.tier
+                return (
+                  <div key={wf} className={styles.activeJobGroup}>
+                    <div className={styles.activeJobGroupHeader}>
+                      <span className={styles.running}>⬤</span>
+                      <span className={styles.activeJobWf}>{wf}</span>
+                      {wfTier && <span className={`${styles.tierBadge} ${styles['tier_' + wfTier]}`}>{wfTier}</span>}
+                      <span className={styles.muted} style={{ fontSize: 11 }}>{sorted[0]?.shards * sorted.length} shards</span>
                     </div>
-                  )}
-                </div>
-              )
-            })}
+                    <div className={styles.activeJobRows}>
+                      {sorted.map(g => {
+                        const elapsed = g.startedAt ? Math.round((Date.now() - new Date(g.startedAt)) / 60000) : null
+                        const progress = g.total > 0 ? Math.round(g.processed / g.total * 100) : 0
+                        const hitRate  = g.processed > 0 ? Math.round(g.found / g.processed * 100) : null
+                        const rate     = (elapsed > 0 && g.processed > 0) ? Math.round(g.processed / elapsed * 60) : null
+                        const eta      = (rate > 0 && g.processed < g.total) ? Math.round((g.total - g.processed) / rate) : null
+                        const hitClass = hitRate == null ? '' : hitRate < 10 ? styles.textDanger : hitRate < 30 ? styles.textWarn : styles.textSuccess
+                        return (
+                          <div key={`${g.sport}-${g.tier}`} className={styles.activeJobRow}>
+                            <span className={styles.activeJobSport}>{g.sport || '—'}</span>
+                            <div className={styles.activeJobRowBar}>
+                              <div className={styles.activeJobBarBg}>
+                                <div className={styles.activeJobBarFill} style={{ width: `${Math.min(progress, 100)}%` }} />
+                              </div>
+                              <span className={styles.activeJobPct}>{progress}%</span>
+                            </div>
+                            <span className={styles.activeJobMeta}>
+                              {g.processed.toLocaleString()}/{g.total.toLocaleString()}
+                            </span>
+                            {hitRate != null && <span className={`${styles.activeJobMeta} ${hitClass}`}>{hitRate}% hit</span>}
+                            {rate != null && <span className={styles.activeJobMeta}>{rate.toLocaleString()}/hr</span>}
+                            {eta != null && <span className={styles.activeJobMeta}>~{eta}m left</span>}
+                            {g.errors > 0 && <span className={`${styles.activeJobMeta} ${styles.textDanger}`}>{g.errors} err</span>}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
-        </div>
+        )
+      })()}
       )}
 
       {/* Filter bar */}
