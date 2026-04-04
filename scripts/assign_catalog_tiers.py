@@ -117,6 +117,12 @@ PREMIUM_CONDITIONS = [
      "Autographs (any sport/set)"),
     ("ALL", "variant ILIKE '%autograph%'",
      "Autographs (any sport/set)"),
+    ("ALL", "variant ILIKE '%signature%'",
+     "Signatures (any sport/set)"),
+    ("ALL", "variant ILIKE '%signed%'",
+     "Signed cards (any sport/set)"),
+    ("ALL", "variant ILIKE '%RPA%'",
+     "Rookie Patch Autos (any sport/set)"),
     # Patches / memorabilia
     ("ALL", "variant ILIKE '%patch%'",
      "Patches (any sport/set)"),
@@ -124,6 +130,14 @@ PREMIUM_CONDITIONS = [
      "Relics/Memorabilia (any sport/set)"),
     ("ALL", "variant ILIKE '%jersey%'",
      "Jersey cards (any sport/set)"),
+    ("ALL", "variant ILIKE '%game used%'",
+     "Game-used memorabilia (any sport/set)"),
+    ("ALL", "variant ILIKE '% GU %' OR variant ILIKE '%-GU%'",
+     "GU memorabilia (any sport/set)"),
+    ("ALL", "variant ILIKE '%logoman%'",
+     "Logoman 1/1 (any sport/set)"),
+    ("ALL", "variant ILIKE '%booklet%'",
+     "Booklets (any sport/set)"),
     # Serialised parallels (any print run)
     ("ALL", "print_run IS NOT NULL",
      "Serialised (any /print_run)"),
@@ -146,11 +160,17 @@ PREMIUM_CONDITIONS = [
      "MLB National Treasures"),
 ]
 
-# Stars = any major-league rookie card from a recognised brand, modern era
+# Stars = rookie cards from recognised brands, modern era only (1990+).
+# Pre-1990 vintage cards are left as 'base' — they trade sporadically and
+# don't benefit from monthly scraping cycles.
 STARS_CONDITIONS = [
-    ("ALL", "is_rookie = TRUE AND brand IN ('Upper Deck','Topps','Panini','Donruss','Fleer','O-Pee-Chee','Score','Bowman','Stadium Club')",
-     "Rookies from major brands"),
+    ("ALL", "is_rookie = TRUE AND brand IN ('Upper Deck','Topps','Panini','Donruss','Fleer','O-Pee-Chee','Score','Bowman','Stadium Club','Leaf','Pacific','Press Pass','SP')",
+     "Rookies from major brands (1990+)"),
 ]
+
+# Year floor applied to stars (but not staple — staple sets like Young Guns
+# are valuable across all eras and handled by explicit rules above).
+STARS_YEAR_FROM = 1990
 
 
 def _year_condition(year_from: int) -> str:
@@ -209,18 +229,20 @@ def classify(dry_run: bool, reclassify_all: bool, year_from: int):
                     cur.execute(sql)
                     counts['premium'] += cur.rowcount
 
-            # ── Stars — rookies from major brands, not already staple/premium ──
+            # ── Stars — rookies from major brands, 1990+, not already staple/premium ──
+            year_cond = _year_condition(STARS_YEAR_FROM)
             for sport, cond, desc in STARS_CONDITIONS:
                 sport_cond = "" if sport == "ALL" else f"AND sport = '{sport}'"
                 sql = f"""
                     UPDATE card_catalog
                     SET scrape_tier = 'stars'
                     WHERE {cond}
+                      AND {year_cond}
                       {sport_cond}
                       AND scrape_tier NOT IN ('staple', 'premium')
                 """
                 if dry_run:
-                    count_sql = f"SELECT COUNT(*) FROM card_catalog WHERE {cond} {sport_cond} AND scrape_tier NOT IN ('staple','premium')"
+                    count_sql = f"SELECT COUNT(*) FROM card_catalog WHERE {cond} AND {year_cond} {sport_cond} AND scrape_tier NOT IN ('staple','premium')"
                     cur.execute(count_sql)
                     n = cur.fetchone()[0]
                     if n: print(f"  [stars]   {desc}: {n:,}")
