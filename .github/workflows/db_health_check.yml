@@ -8,6 +8,11 @@ on:
   schedule:
     - cron: '0 5 * * *'  # 5am UTC — 1hr before scrapes at 6am
   workflow_dispatch:
+    inputs:
+      reclassify_all:
+        description: 'Reclassify ALL cards from scratch (use after adding new tier rules)'
+        required: false
+        default: 'false'
 
 jobs:
   check:
@@ -24,6 +29,11 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Assign/refresh catalog tiers
-        run: python scripts/assign_catalog_tiers.py
+        run: |
+          if [ "${{ github.event.inputs.reclassify_all }}" = "true" ]; then
+            python scripts/assign_catalog_tiers.py --all
+          else
+            python scripts/assign_catalog_tiers.py
+          fi
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
