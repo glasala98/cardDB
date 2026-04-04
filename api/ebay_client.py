@@ -439,7 +439,7 @@ def build_draft(user_id: str, card: dict) -> dict:
                 INSERT INTO ebay_drafts
                     (user_id, sku, offer_id, card_name, listing_price, status, ebay_draft_url)
                 VALUES (%s, %s, %s, %s, %s, 'draft', %s)
-            """, (user_id, sku, offer_id, card["card_name"], starting_bid, draft_url))
+            """, (user_id, sku, offer_id, card["card_name"], price, draft_url))
         conn.commit()
 
     return {"offer_id": offer_id, "sku": sku, "draft_url": draft_url}
