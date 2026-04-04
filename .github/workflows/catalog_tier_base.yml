@@ -1,4 +1,4 @@
-name: Catalog Tier — Base (Daily during backfill)
+name: Catalog Tier — Base (Manual / Backfill)
 
 # Scrapes price data for base-tier cards (modern era only — 2015+).
 # Pre-2015 base cards have very low eBay sold activity so are skipped to reduce

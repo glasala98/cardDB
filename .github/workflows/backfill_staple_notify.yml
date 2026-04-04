@@ -30,9 +30,9 @@ jobs:
 
           cur.execute("""
               SELECT cc.sport,
-                     COUNT(DISTINCT mrs.card_catalog_id) AS scraped
-              FROM market_raw_sales mrs
-              JOIN card_catalog cc ON cc.id = mrs.card_catalog_id
+                     COUNT(DISTINCT mp.card_catalog_id) AS scraped
+              FROM market_prices mp
+              JOIN card_catalog cc ON cc.id = mp.card_catalog_id
               WHERE cc.scrape_tier = 'staple'
               GROUP BY cc.sport
           """)

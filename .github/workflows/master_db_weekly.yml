@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       sport:
-        description: 'Sport (NHL/NBA/NFL/MLB)'
+        description: 'Sport (NHL/NBA/NFL/MLB, blank=all)'
         required: false
-        default: 'NHL'
+        default: ''
       limit:
         description: 'Max cards for graded scrape (0=all)'
         required: false
