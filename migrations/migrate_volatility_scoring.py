@@ -327,14 +327,13 @@ CREATE TRIGGER trg_rescore_on_player
 AFTER INSERT OR UPDATE OF player_tier ON players
 FOR EACH ROW EXECUTE FUNCTION fn_trg_rescore_player();
 
--- ── 6. Indexes for player name lookups ───────────────────────────────────────
--- All lookups use LOWER(player_name) for case-insensitive matching.
--- Functional indexes allow the planner to use index scans on LOWER() expressions.
-CREATE INDEX IF NOT EXISTS idx_card_catalog_player_lower
-    ON card_catalog (LOWER(player_name));
-
+-- ── 6. Index on players table (small — safe at deploy time) ─────────────────
 CREATE INDEX IF NOT EXISTS idx_players_lower_sport
     ON players (LOWER(player_name), sport);
+
+-- NOTE: idx_card_catalog_player_lower is created separately via
+-- create_indexes() below, using CREATE INDEX CONCURRENTLY so it does
+-- not lock the 3M-row card_catalog table during Railway deploys.
 """
 
 
@@ -357,5 +356,36 @@ def run():
     print("  3. Create .github/workflows/catalog_tier_elite.yml for 6h elite scraping")
 
 
+def create_indexes():
+    """
+    Build the functional index on card_catalog(LOWER(player_name)) using
+    CONCURRENTLY so it does not take an exclusive lock on the 3M-row table.
+    Must run outside a transaction (autocommit=True).  Called as a separate
+    step in reclassify_tiers.yml — NOT at Railway deploy time.
+    """
+    import psycopg2
+    dsn = os.environ["DATABASE_URL"]
+    conn = psycopg2.connect(dsn)
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            print("Building idx_card_catalog_player_lower CONCURRENTLY …")
+            cur.execute("""
+                CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_card_catalog_player_lower
+                ON card_catalog (LOWER(player_name));
+            """)
+            print("  ✓ idx_card_catalog_player_lower ready")
+    finally:
+        conn.close()
+
+
 if __name__ == '__main__':
-    run()
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--indexes-only', action='store_true',
+                    help='Only build the CONCURRENTLY indexes (skips main DDL)')
+    args = ap.parse_args()
+    if args.indexes_only:
+        create_indexes()
+    else:
+        run()

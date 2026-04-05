@@ -39,6 +39,12 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+      - name: Build functional indexes CONCURRENTLY (no table lock)
+        if: ${{ github.event.inputs.mode != 'score_only' }}
+        run: python migrations/migrate_volatility_scoring.py --indexes-only
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Seed player tiers (S/A tier players — triggers auto-rescore their cards)
         if: ${{ github.event.inputs.mode != 'score_only' }}
         run: python scripts/seed_player_tiers.py
