@@ -273,6 +273,13 @@ def score_all_cards():
             total = cur.fetchone()[0]
             print(f"  Total cards: {total:,}")
 
+            # Disable the per-row scoring trigger during the batch update.
+            # The trigger fires on every UPDATE row and does a players lookup,
+            # which creates row-lock contention with the app's connections and
+            # can deadlock on a 3.6M-row table.  We're computing the same scores
+            # manually below, so the trigger would be redundant and harmful here.
+            cur.execute("ALTER TABLE card_catalog DISABLE TRIGGER trg_score_on_insert")
+
             # Batch UPDATE using the same logic as the trigger (avoids 2M fn calls)
             cur.execute("""
                 UPDATE card_catalog cc
@@ -351,6 +358,9 @@ def score_all_cards():
                     END
             """)
             print(f"  Tiers assigned: {cur.rowcount:,} cards")
+
+            # Re-enable trigger now that batch scoring is done
+            cur.execute("ALTER TABLE card_catalog ENABLE TRIGGER trg_score_on_insert")
 
             # Print distribution
             cur.execute("""
