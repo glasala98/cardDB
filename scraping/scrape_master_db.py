@@ -245,7 +245,9 @@ def load_cards(args) -> list:
                cc.variant, cc.print_run, cc.is_rookie, cc.search_query,
                cc.scrape_tier,
                {select_extra},
-               NULL::text AS last_sale_date
+               (SELECT MAX(sold_date)::text
+                FROM market_raw_sales
+                WHERE card_catalog_id = cc.id) AS last_sale_date
         FROM card_catalog cc
         {join_clause}
         WHERE {where}
