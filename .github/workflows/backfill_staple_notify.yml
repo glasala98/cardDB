@@ -4,9 +4,7 @@ name: Backfill — Staple Progress Report
 # Queries market_raw_sales to count scraped cards per sport vs total staple cards.
 
 on:
-  schedule:
-    - cron: '0 */12 * * *'   # every 12h: 00:00 and 12:00 UTC
-  workflow_dispatch:
+  workflow_dispatch:  # manual only — email disabled until Gmail credentials are updated
 
 jobs:
   send-report:

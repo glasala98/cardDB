@@ -109,6 +109,7 @@ New raw sales:      {new_sales:,}
 
       - name: Send validation email
         if: always()
+        continue-on-error: true
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: smtp.gmail.com
