@@ -104,6 +104,7 @@
   border-radius: 4px;
   letter-spacing: 0.4px;
 }
+.tier_elite   { background: rgba(255, 77, 106, 0.12); color: #ff4d6a; border: 1px solid rgba(255, 77, 106, 0.3); }
 .tier_staple  { background: rgba(0, 212, 170, 0.15); color: var(--accent); border: 1px solid rgba(0, 212, 170, 0.3); }
 .tier_premium { background: rgba(255, 179, 50, 0.12); color: #ffb332; border: 1px solid rgba(255, 179, 50, 0.3); }
 .tier_stars   { background: rgba(160, 120, 255, 0.12); color: #a07ff0; border: 1px solid rgba(160, 120, 255, 0.3); }

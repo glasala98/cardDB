@@ -552,7 +552,7 @@ function UsersTab() {
 }
 
 /* ── Pipeline tab ──────────────────────────────────────────────────────────── */
-const TIER_COLORS = { staple: '#00d4aa', premium: '#ffb332', stars: '#a07ff0', base: '#4a9eff' }
+const TIER_COLORS = { elite: '#ff4d6a', staple: '#00d4aa', premium: '#ffb332', stars: '#a07ff0', base: '#4a9eff' }
 
 function PricingProgressChart() {
   const [data, setData] = useState(null)
@@ -564,7 +564,7 @@ function PricingProgressChart() {
   if (!data) return <p className={pageStyles.status}>Loading progress data…</p>
 
   const { daily_by_tier, daily_totals, tier_totals } = data
-  const tiers = ['staple', 'premium', 'stars', 'base']
+  const tiers = ['elite', 'staple', 'premium', 'stars', 'base']
 
   const grandTotal  = tier_totals.reduce((s, t) => s + t.total,  0)
   const totalPriced = tier_totals.reduce((s, t) => s + t.priced, 0)
