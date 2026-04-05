@@ -1076,6 +1076,66 @@ def bulk_ignore_outliers(
     return {"ignored": count}
 
 
+# ── Player tier management ────────────────────────────────────────────────────
+
+class PlayerUpsert(BaseModel):
+    player_name: str
+    sport: str
+    player_tier: str
+    notes: Optional[str] = ''
+
+@router.get("/players")
+def list_players(_admin: str = Depends(_require_admin)):
+    """Return all players ordered by tier then name."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, player_name, sport, player_tier, notes, updated_at
+                FROM players
+                ORDER BY player_tier, sport, player_name
+            """)
+            rows = cur.fetchall()
+    return [
+        {"id": r[0], "player_name": r[1], "sport": r[2],
+         "player_tier": r[3], "notes": r[4], "updated_at": str(r[5])}
+        for r in rows
+    ]
+
+@router.post("/players")
+def upsert_player(body: PlayerUpsert, _admin: str = Depends(_require_admin)):
+    """Insert or update a player. Triggers auto-rescore of their cards."""
+    if body.player_tier not in ('S', 'A', 'B', 'C'):
+        raise HTTPException(status_code=400, detail="player_tier must be S, A, B, or C")
+    if not body.player_name.strip():
+        raise HTTPException(status_code=400, detail="player_name is required")
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO players (player_name, sport, player_tier, notes, updated_at)
+                VALUES (%s, %s, %s, %s, NOW())
+                ON CONFLICT (player_name, sport) DO UPDATE
+                    SET player_tier = EXCLUDED.player_tier,
+                        notes       = EXCLUDED.notes,
+                        updated_at  = NOW()
+                RETURNING id
+            """, (body.player_name.strip(), body.sport, body.player_tier, body.notes or ''))
+            pid = cur.fetchone()[0]
+        conn.commit()
+    return {"id": pid}
+
+@router.delete("/players/{player_id}")
+def delete_player(player_id: int, _admin: str = Depends(_require_admin)):
+    """Delete a player record. Cards will be rescored on next classify run."""
+    with get_db() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM players WHERE id = %s RETURNING id", (player_id,))
+            deleted = cur.fetchone()
+        conn.commit()
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Player not found")
+    return {"deleted": player_id}
+
+
 @router.post("/send-progress-email")
 def send_progress_email(_admin: str = Depends(_require_admin)):
     """Force-send a progress report email immediately via Railway SMTP."""

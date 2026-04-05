@@ -27,3 +27,7 @@ export const triggerWorkflow    = (workflowFile, inputs = {}) => client.post('/a
 export const bulkIgnoreOutliers = (ids)                       => client.post('/admin/outliers/bulk-ignore', { ids })
 export const getPricingProgress = ()                          => client.get('/admin/pricing-progress')
 export const sendProgressEmail  = ()                          => client.post('/admin/send-progress-email')
+
+export const getPlayers    = ()           => client.get('/admin/players')
+export const upsertPlayer  = (data)       => client.post('/admin/players', data)
+export const deletePlayer  = (id)         => client.delete(`/admin/players/${id}`)

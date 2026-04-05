@@ -11,12 +11,13 @@ import {
   getScrapeRunErrors,
   getSealedProductsAdmin, updateSealedProduct, getSealedQuality, deleteSealedMismatches,
   triggerWorkflow, bulkIgnoreOutliers, getPricingProgress, sendProgressEmail,
+  getPlayers, upsertPlayer, deletePlayer,
 } from '../api/admin'
 import { useAuth } from '../context/AuthContext'
 import pageStyles from './Page.module.css'
 import styles from './Admin.module.css'
 
-const TABS = ['Users', 'Pipeline', 'Quality', 'Runs']
+const TABS = ['Users', 'Pipeline', 'Players', 'Quality', 'Runs']
 
 const WF_COLORS = ['#00d4aa', '#4a9eff', '#ff6b35', '#ffb332', '#a07ff0', '#e05555', '#3dba5e', '#ff9ff3']
 
@@ -65,6 +66,7 @@ export default function Admin() {
 
       {tab === 'Users'    && <UsersTab />}
       {tab === 'Pipeline' && <PipelineTab />}
+      {tab === 'Players'  && <PlayersTab />}
       {tab === 'Quality'  && <QualityTab />}
       {tab === 'Runs'     && <RunsTab />}
     </div>
@@ -1776,6 +1778,183 @@ function OutliersTab() {
           </table>
         </div>
       )}
+    </>
+  )
+}
+
+/* ── Players tab ───────────────────────────────────────────────────────────── */
+const TIER_ORDER = ['S', 'A', 'B', 'C']
+const SPORTS_LIST = ['ALL', 'NHL', 'NBA', 'NFL', 'MLB', 'Golf', 'Soccer']
+
+function PlayersTab() {
+  const [players, setPlayers]       = useState(null)
+  const [filter, setFilter]         = useState('')
+  const [sportFilter, setSportFilter] = useState('ALL')
+  const [tierFilter, setTierFilter] = useState('')
+  const [editing, setEditing]       = useState(null)   // player object being edited
+  const [adding, setAdding]         = useState(false)
+  const [form, setForm]             = useState({ player_name: '', sport: 'ALL', player_tier: 'A', notes: '' })
+  const [saving, setSaving]         = useState(false)
+  const [error, setError]           = useState('')
+
+  const load = useCallback(() => {
+    getPlayers().then(d => setPlayers(d.data)).catch(() => setPlayers([]))
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const openAdd = () => {
+    setForm({ player_name: '', sport: 'ALL', player_tier: 'A', notes: '' })
+    setEditing(null)
+    setAdding(true)
+    setError('')
+  }
+
+  const openEdit = (p) => {
+    setForm({ player_name: p.player_name, sport: p.sport, player_tier: p.player_tier, notes: p.notes || '' })
+    setEditing(p)
+    setAdding(true)
+    setError('')
+  }
+
+  const closeForm = () => { setAdding(false); setEditing(null); setError('') }
+
+  const save = async () => {
+    if (!form.player_name.trim()) { setError('Name is required'); return }
+    setSaving(true); setError('')
+    try {
+      await upsertPlayer(form)
+      closeForm()
+      load()
+    } catch (e) {
+      setError(e?.response?.data?.detail || 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const remove = async (p) => {
+    if (!window.confirm(`Delete ${p.player_name} (${p.sport})?`)) return
+    try {
+      await deletePlayer(p.id)
+      load()
+    } catch (e) {
+      alert('Delete failed: ' + (e?.response?.data?.detail || e.message))
+    }
+  }
+
+  const filtered = (players || []).filter(p => {
+    if (filter && !p.player_name.toLowerCase().includes(filter.toLowerCase())) return false
+    if (sportFilter !== 'ALL' && p.sport !== sportFilter) return false
+    if (tierFilter && p.player_tier !== tierFilter) return false
+    return true
+  })
+
+  const grouped = TIER_ORDER.reduce((acc, t) => {
+    const rows = filtered.filter(p => p.player_tier === t)
+    if (rows.length) acc[t] = rows
+    return acc
+  }, {})
+
+  return (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <h2 className={styles.sectionTitle} style={{ margin: 0 }}>Player Tiers</h2>
+        <button className={styles.triggerBtn} onClick={openAdd}>+ Add Player</button>
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+        <input
+          className={styles.searchInput}
+          placeholder="Search name…"
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+          style={{ flex: '1 1 200px', minWidth: 160 }}
+        />
+        <select className={styles.searchInput} value={sportFilter} onChange={e => setSportFilter(e.target.value)}>
+          {SPORTS_LIST.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select className={styles.searchInput} value={tierFilter} onChange={e => setTierFilter(e.target.value)}>
+          <option value=''>All tiers</option>
+          {TIER_ORDER.map(t => <option key={t} value={t}>Tier {t}</option>)}
+        </select>
+      </div>
+
+      {/* Add / Edit form */}
+      {adding && (
+        <div className={styles.formCard}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 10 }}>
+            <input
+              className={styles.searchInput}
+              placeholder="Player name"
+              value={form.player_name}
+              onChange={e => setForm(f => ({ ...f, player_name: e.target.value }))}
+              style={{ flex: '2 1 200px' }}
+              disabled={!!editing}
+            />
+            <select className={styles.searchInput} value={form.sport} onChange={e => setForm(f => ({ ...f, sport: e.target.value }))} disabled={!!editing}>
+              {SPORTS_LIST.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <select className={styles.searchInput} value={form.player_tier} onChange={e => setForm(f => ({ ...f, player_tier: e.target.value }))}>
+              {TIER_ORDER.map(t => <option key={t} value={t}>Tier {t}</option>)}
+            </select>
+            <input
+              className={styles.searchInput}
+              placeholder="Notes (optional)"
+              value={form.notes}
+              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+              style={{ flex: '3 1 200px' }}
+            />
+          </div>
+          {error && <p style={{ color: '#ff4d6a', fontSize: 12, margin: '4px 0 8px' }}>{error}</p>}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className={styles.triggerBtn} onClick={save} disabled={saving}>
+              {saving ? 'Saving…' : editing ? 'Update' : 'Add'}
+            </button>
+            <button className={styles.showMoreBtn} onClick={closeForm}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {!players && <p className={pageStyles.status}>Loading…</p>}
+      {players && filtered.length === 0 && <p className={pageStyles.status}>No players match filters.</p>}
+
+      {Object.entries(grouped).map(([tier, rows]) => (
+        <div key={tier} style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span className={`${styles.tierBadge} ${styles['tier_' + (tier === 'S' ? 'elite' : tier === 'A' ? 'staple' : tier === 'B' ? 'premium' : 'base')]}`}>
+              Tier {tier}
+            </span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{rows.length} players</span>
+          </div>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Sport</th>
+                <th>Notes</th>
+                <th>Updated</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(p => (
+                <tr key={p.id}>
+                  <td style={{ fontWeight: 600 }}>{p.player_name}</td>
+                  <td>{p.sport}</td>
+                  <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{p.notes}</td>
+                  <td style={{ color: 'var(--text-muted)', fontSize: 11 }}>{p.updated_at?.slice(0, 10)}</td>
+                  <td style={{ display: 'flex', gap: 6 }}>
+                    <button className={styles.triggerBtn} onClick={() => openEdit(p)} style={{ fontSize: 11, padding: '2px 8px' }}>Edit</button>
+                    <button className={styles.showMoreBtn} onClick={() => remove(p)} style={{ fontSize: 11, padding: '2px 8px' }}>Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
     </>
   )
 }
