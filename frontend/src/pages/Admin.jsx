@@ -16,7 +16,7 @@ import { useAuth } from '../context/AuthContext'
 import pageStyles from './Page.module.css'
 import styles from './Admin.module.css'
 
-const TABS = ['Users', 'Pipeline', 'Quality', 'Runs', 'Outliers', 'Sealed', 'eBay Upload']
+const TABS = ['Users', 'Pipeline', 'Quality', 'Runs']
 
 const WF_COLORS = ['#00d4aa', '#4a9eff', '#ff6b35', '#ffb332', '#a07ff0', '#e05555', '#3dba5e', '#ff9ff3']
 
@@ -63,13 +63,10 @@ export default function Admin() {
         ))}
       </div>
 
-      {tab === 'Users'       && <UsersTab />}
-      {tab === 'Pipeline'    && <PipelineTab />}
-      {tab === 'Quality'     && <QualityTab />}
-      {tab === 'Runs'        && <RunsTab />}
-      {tab === 'Outliers'    && <OutliersTab />}
-      {tab === 'Sealed'      && <SealedTab />}
-      {tab === 'eBay Upload' && <EbayUploadTab />}
+      {tab === 'Users'    && <UsersTab />}
+      {tab === 'Pipeline' && <PipelineTab />}
+      {tab === 'Quality'  && <QualityTab />}
+      {tab === 'Runs'     && <RunsTab />}
     </div>
   )
 }
@@ -616,70 +613,46 @@ function PricingProgressChart() {
         })}
       </div>
 
-      {/* Cumulative coverage % line chart */}
-      {lineData.length > 0 && (
-        <>
-          <h3 className={styles.sectionTitle}>
-            Cumulative Coverage — Last 30 Days
-            <span className={styles.coveragePill}>
-              {grandTotal > 0 ? (totalPriced / grandTotal * 100).toFixed(1) : 0}% of {grandTotal.toLocaleString()} cards
-            </span>
-          </h3>
-          <div style={{ height: 220 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={lineData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e2d3d" />
-                <XAxis dataKey="label" tick={{ fill: '#8899aa', fontSize: 11 }} interval="preserveStartEnd" />
-                <YAxis
-                  yAxisId="pct"
-                  domain={[0, 100]}
-                  tick={{ fill: '#8899aa', fontSize: 11 }}
-                  width={40}
-                  tickFormatter={v => `${v}%`}
-                />
-                <YAxis
-                  yAxisId="count"
-                  orientation="right"
-                  tick={{ fill: '#8899aa', fontSize: 11 }}
-                  width={50}
-                  tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}
-                />
-                <Tooltip
-                  contentStyle={{ background: '#0a141e', border: '1px solid #1e2d3d', borderRadius: 6 }}
-                  labelStyle={{ color: '#fff', fontWeight: 600 }}
-                  formatter={(val, name) => name === 'pct' ? [`${val}%`, 'Coverage'] : [val.toLocaleString(), 'Cards priced']}
-                />
-                <ReferenceLine yAxisId="pct" y={100} stroke="#00d4aa22" strokeDasharray="4 4" label={{ value: '100%', fill: '#00d4aa88', fontSize: 10 }} />
-                <Line yAxisId="count" type="monotone" dataKey="priced" stroke="#4a9eff" strokeWidth={2} dot={false} name="priced" />
-                <Line yAxisId="pct"   type="monotone" dataKey="pct"    stroke="#00d4aa" strokeWidth={2} dot={false} name="pct" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </>
-      )}
-
-      {/* Daily cards priced per tier (last 30d) */}
-      {barData.length > 0 && (
-        <>
-          <h3 className={styles.sectionTitle}>Cards Priced Per Day — Last 30 Days</h3>
-          <div style={{ height: 200 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e2d3d" />
-                <XAxis dataKey="label" tick={{ fill: '#8899aa', fontSize: 11 }} interval="preserveStartEnd" />
-                <YAxis tick={{ fill: '#8899aa', fontSize: 11 }} width={45} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
-                <Tooltip
-                  contentStyle={{ background: '#0a141e', border: '1px solid #1e2d3d', borderRadius: 6 }}
-                  labelStyle={{ color: '#fff', fontWeight: 600 }}
-                  itemStyle={{ color: '#8899aa' }}
-                />
-                {tiers.map(tier => (
-                  <Bar key={tier} dataKey={tier} stackId="a" fill={TIER_COLORS[tier]} name={tier} />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </>
+      {/* Two charts side by side */}
+      {(lineData.length > 0 || barData.length > 0) && (
+        <div className={styles.chartsRow}>
+          {lineData.length > 0 && (
+            <div className={styles.chartBox}>
+              <div className={styles.chartTitle}>
+                Cumulative Coverage
+                <span className={styles.coveragePill} style={{ marginLeft: 8 }}>
+                  {grandTotal > 0 ? (totalPriced / grandTotal * 100).toFixed(1) : 0}% of {grandTotal.toLocaleString()}
+                </span>
+              </div>
+              <ResponsiveContainer width="100%" height={180}>
+                <LineChart data={lineData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2d3d" />
+                  <XAxis dataKey="label" tick={{ fill: '#8899aa', fontSize: 10 }} interval="preserveStartEnd" />
+                  <YAxis yAxisId="pct" domain={[0, 100]} tick={{ fill: '#8899aa', fontSize: 10 }} width={36} tickFormatter={v => `${v}%`} />
+                  <YAxis yAxisId="count" orientation="right" tick={{ fill: '#8899aa', fontSize: 10 }} width={44} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+                  <Tooltip contentStyle={{ background: '#0a141e', border: '1px solid #1e2d3d', borderRadius: 6 }} labelStyle={{ color: '#fff', fontWeight: 600 }} formatter={(val, name) => name === 'pct' ? [`${val}%`, 'Coverage'] : [val.toLocaleString(), 'Cards priced']} />
+                  <ReferenceLine yAxisId="pct" y={100} stroke="#00d4aa22" strokeDasharray="4 4" />
+                  <Line yAxisId="count" type="monotone" dataKey="priced" stroke="#4a9eff" strokeWidth={2} dot={false} name="priced" />
+                  <Line yAxisId="pct"   type="monotone" dataKey="pct"    stroke="#00d4aa" strokeWidth={2} dot={false} name="pct" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+          {barData.length > 0 && (
+            <div className={styles.chartBox}>
+              <div className={styles.chartTitle}>Cards Priced Per Day — 30d</div>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={barData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e2d3d" />
+                  <XAxis dataKey="label" tick={{ fill: '#8899aa', fontSize: 10 }} interval="preserveStartEnd" />
+                  <YAxis tick={{ fill: '#8899aa', fontSize: 10 }} width={40} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+                  <Tooltip contentStyle={{ background: '#0a141e', border: '1px solid #1e2d3d', borderRadius: 6 }} labelStyle={{ color: '#fff', fontWeight: 600 }} itemStyle={{ color: '#8899aa' }} />
+                  {tiers.map(tier => <Bar key={tier} dataKey={tier} stackId="a" fill={TIER_COLORS[tier]} name={tier} />)}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
@@ -753,21 +726,18 @@ function PipelineTab() {
 
       <div className={styles.sectionHeaderRow}>
         <div className={styles.statCards} style={{ flex: 1 }}>
-          <StatCard label="Catalog Size"    value={health.total_cards.toLocaleString()} />
-          <StatCard label="Priced Cards"    value={health.priced_cards.toLocaleString()} />
-          <StatCard label="Price Coverage"  value={`${health.coverage_pct}%`} accent={health.coverage_pct > 50} />
+          <StatCard label="Catalog"         value={health.total_cards.toLocaleString()} />
+          <StatCard label="Priced"          value={health.priced_cards.toLocaleString()} />
+          <StatCard label="Coverage"        value={`${health.coverage_pct}%`} accent={health.coverage_pct > 50} />
           <StatCard label="Priced (7d)"     value={(health.newly_priced_7d ?? 0).toLocaleString()} accent={(health.newly_priced_7d ?? 0) > 0} />
           <StatCard label="Sales Stored"    value={(health.raw_sales_total ?? 0).toLocaleString()} accent={(health.raw_sales_total ?? 0) > 0} />
-          <StatCard label="History Coverage" value={`${health.raw_sales_coverage_pct ?? 0}%`} accent={(health.raw_sales_coverage_pct ?? 0) > 50} />
-          <StatCard label="Exclusive Sales" value={(health.exclusive_sales ?? 0).toLocaleString()} accent={(health.exclusive_sales ?? 0) > 0} title="Sales >90 days old — data eBay no longer shows" />
-          <StatCard label="Ignored Prices"  value={health.ignored_count.toLocaleString()} warn={health.ignored_count > 0} />
+          <StatCard label="Exclusive"       value={(health.exclusive_sales ?? 0).toLocaleString()} accent={(health.exclusive_sales ?? 0) > 0} title="Sales >90 days old — data eBay no longer shows" />
+          <StatCard label="Ignored"         value={health.ignored_count.toLocaleString()} warn={health.ignored_count > 0} />
           <StatCard label="Outlier Flags"   value={health.outlier_count.toLocaleString()} warn={health.outlier_count > 0} />
         </div>
-        <button className={styles.refreshBtn} onClick={() => load(true)} disabled={refreshing}>
-          {refreshing ? '↻' : '↻'} Refresh
-        </button>
-        <button className={styles.refreshBtn} onClick={handleSendEmail} disabled={emailSending} title="Force-send a progress report email now via Railway">
-          {emailSending ? 'Sending…' : '✉ Email Report'}
+        <button className={styles.refreshBtn} onClick={() => load(true)} disabled={refreshing}>↻ Refresh</button>
+        <button className={styles.refreshBtn} onClick={handleSendEmail} disabled={emailSending} title="Force-send a progress report email now">
+          {emailSending ? 'Sending…' : '✉ Email'}
         </button>
       </div>
 
@@ -899,6 +869,7 @@ function RunsTab() {
   const [errorRunId,  setErrorRunId]  = useState(null)
   const [runErrors,   setRunErrors]   = useState([])
   const [errLoading,  setErrLoading]  = useState(false)
+  const [showAllAnomalies, setShowAllAnomalies] = useState(false)
 
   const load = useCallback((isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
@@ -1222,7 +1193,7 @@ function RunsTab() {
         <>
           <h3 className={styles.sectionTitle}>Anomalies Detected ({visibleAnomalies.length})</h3>
           <div className={styles.anomalyFeed}>
-            {visibleAnomalies.slice(0, 15).map(a => (
+            {visibleAnomalies.slice(0, showAllAnomalies ? undefined : 10).map(a => (
               <div key={a.id} className={`${styles.anomalyRow} ${styles['anomaly_' + a.reason]}`}>
                 <span className={styles.anomalyLabel}>{ANOMALY_LABELS[a.reason] || a.reason}</span>
                 <span className={styles.anomalyDetail}>
@@ -1235,6 +1206,11 @@ function RunsTab() {
               </div>
             ))}
           </div>
+          {visibleAnomalies.length > 10 && (
+            <button className={styles.showMoreBtn} onClick={() => setShowAllAnomalies(v => !v)}>
+              {showAllAnomalies ? '▲ Show less' : `▼ Show ${visibleAnomalies.length - 10} more`}
+            </button>
+          )}
         </>
       )}
 
@@ -1452,7 +1428,7 @@ function QualityTab() {
         </table>
       </div>
 
-      {/* Sub-view toggle */}
+      {/* Sub-view toggle — only show tabs with data */}
       <div className={styles.qualityToggle}>
         <button
           className={`${styles.qualityPill} ${view === 'stale' ? styles.qualityPillActive : ''}`}
@@ -1462,10 +1438,6 @@ function QualityTab() {
           className={`${styles.qualityPill} ${view === 'lowconf' ? styles.qualityPillActive : ''}`}
           onClick={() => setView('lowconf')}
         >Low Confidence ({low_confidence_cards.length})</button>
-        <button
-          className={`${styles.qualityPill} ${view === 'snapshot' ? styles.qualityPillActive : ''}`}
-          onClick={() => setView('snapshot')}
-        >Snapshot Audit</button>
       </div>
 
       {/* Stale cards table */}

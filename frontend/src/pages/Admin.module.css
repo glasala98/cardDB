@@ -953,3 +953,20 @@
   color: var(--text-primary);
   line-height: 1.5;
 }
+
+.showMoreBtn {
+  display: block;
+  margin: 8px auto 0;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 4px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.showMoreBtn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
