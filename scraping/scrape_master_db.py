@@ -708,7 +708,7 @@ def main():
                         choices=['rookies','recent','rookie_recent','serialized'],
                         help="Scrape tier: rookies=RC only, recent=2015+, rookie_recent=RC 2015+, serialized=print_run set")
     parser.add_argument('--catalog-tier', type=str,   default=None, dest='catalog_tier',
-                        choices=['staple','premium','stars','base'],
+                        choices=['elite','staple','premium','stars','base'],
                         help="Filter by assigned scrape_tier (set by assign_catalog_tiers.py)")
     parser.add_argument('--rookies',       action='store_true',      help="Rookies only (alias for --tier rookies)")
     parser.add_argument('--force',         action='store_true',      help="Re-scrape already-scraped cards")

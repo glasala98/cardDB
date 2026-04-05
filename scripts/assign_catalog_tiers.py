@@ -184,6 +184,9 @@ def classify(dry_run: bool, reclassify_all: bool, year_from: int):
 
     with get_db() as conn:
         with conn.cursor() as cur:
+            # Disable the per-row scoring trigger — it fires on every UPDATE row
+            # and does a players SELECT, causing deadlocks on bulk classify runs.
+            cur.execute("ALTER TABLE card_catalog DISABLE TRIGGER trg_score_on_insert")
 
             # ── Staple ──
             for sport, cond, desc in STAPLE_CONDITIONS:
@@ -252,6 +255,7 @@ def classify(dry_run: bool, reclassify_all: bool, year_from: int):
                     counts['stars'] += cur.rowcount
 
         if not dry_run:
+            cur.execute("ALTER TABLE card_catalog ENABLE TRIGGER trg_score_on_insert")
             conn.commit()
 
     return counts
