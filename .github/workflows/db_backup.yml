@@ -30,8 +30,7 @@ jobs:
 
       - name: Run pg_dump
         run: |
-          # Parse connection string into pg_dump args
-          pg_dump "$DATABASE_URL" \
+          /usr/lib/postgresql/17/bin/pg_dump "$DATABASE_URL" \
             --no-password \
             --format=custom \
             --compress=9 \
