@@ -28,6 +28,23 @@ jobs:
         run: python scripts/preflight_db_check.py
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      - name: Clean known data quality issues
+        run: |
+          python - <<'EOF'
+          import os, psycopg2
+          conn = psycopg2.connect(os.environ["DATABASE_URL"])
+          cur = conn.cursor()
+          cur.execute("""
+              DELETE FROM market_raw_sales
+              WHERE title ILIKE '%opens in a new window%'
+                 OR title ILIKE '%new window or tab%'
+          """)
+          if cur.rowcount:
+              print(f"  Deleted {cur.rowcount} eBay boilerplate rows from market_raw_sales")
+          conn.commit(); conn.close()
+          EOF
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Assign/refresh catalog tiers
         run: |
           if [ "${{ github.event.inputs.reclassify_all }}" = "true" ]; then

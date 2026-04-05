@@ -1,19 +1,18 @@
-name: Catalog Tier — Stars (Monthly)
+name: Elite Tier — 6h Scrape
 
-# Stars = notable rookies + parallels. stale-days 30 — repriced once a month.
+# Elite = score ≥100 (S-tier player + apex/scarce card + flagship set).
+# These are the most valuable and most volatile cards — repriced every 6h.
+# stale-days 1 ensures we reprice anything older than 24h each run.
+#
 # Connection budget: 4 sports × 1 flush-conn = 4 peak connections ✅
-
-concurrency:
-  group: catalog-tier-stars
-  cancel-in-progress: true
 
 on:
   schedule:
-    - cron: '0 8 1 * *'   # monthly — 1st of month 8am UTC
+    - cron: '0 0,6,12,18 * * *'  # 00:00, 06:00, 12:00, 18:00 UTC
   workflow_dispatch:
     inputs:
       sport:
-        description: 'Sport (NHL/NBA/NFL/MLB, blank=all)'
+        description: 'Sport to scrape (NHL/NBA/NFL/MLB — blank = all)'
         required: false
         default: ''
       limit:
@@ -21,10 +20,14 @@ on:
         required: false
         default: '0'
 
+concurrency:
+  group: catalog-tier-elite
+  cancel-in-progress: true
+
 jobs:
-  scrape-stars-nhl:
+  scrape-nhl:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 340
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NHL' }}
     steps:
       - uses: actions/checkout@v4
@@ -37,14 +40,14 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Scrape NHL stars prices
-        run: python -u scraping/scrape_master_db.py --catalog-tier stars --sport NHL --workers 5 --stale-days 30 --max-hours 0.85 --limit ${{ github.event.inputs.limit || '0' }}
+      - name: Scrape NHL elite prices
+        run: python -u scraping/scrape_master_db.py --catalog-tier elite --sport NHL --workers 5 --stale-days 1 --max-hours 5.75 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-  scrape-stars-nba:
+  scrape-nba:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 340
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NBA' }}
     steps:
       - uses: actions/checkout@v4
@@ -57,14 +60,14 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Scrape NBA stars prices
-        run: python -u scraping/scrape_master_db.py --catalog-tier stars --sport NBA --workers 5 --stale-days 30 --max-hours 0.85 --limit ${{ github.event.inputs.limit || '0' }}
+      - name: Scrape NBA elite prices
+        run: python -u scraping/scrape_master_db.py --catalog-tier elite --sport NBA --workers 5 --stale-days 1 --max-hours 5.75 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-  scrape-stars-nfl:
+  scrape-nfl:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 340
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NFL' }}
     steps:
       - uses: actions/checkout@v4
@@ -77,14 +80,14 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Scrape NFL stars prices
-        run: python -u scraping/scrape_master_db.py --catalog-tier stars --sport NFL --workers 5 --stale-days 30 --max-hours 0.85 --limit ${{ github.event.inputs.limit || '0' }}
+      - name: Scrape NFL elite prices
+        run: python -u scraping/scrape_master_db.py --catalog-tier elite --sport NFL --workers 5 --stale-days 1 --max-hours 5.75 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-  scrape-stars-mlb:
+  scrape-mlb:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 340
     if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'MLB' }}
     steps:
       - uses: actions/checkout@v4
@@ -97,7 +100,7 @@ jobs:
           sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
       - name: Install Python dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
-      - name: Scrape MLB stars prices
-        run: python -u scraping/scrape_master_db.py --catalog-tier stars --sport MLB --workers 5 --stale-days 30 --max-hours 0.85 --limit ${{ github.event.inputs.limit || '0' }}
+      - name: Scrape MLB elite prices
+        run: python -u scraping/scrape_master_db.py --catalog-tier elite --sport MLB --workers 5 --stale-days 1 --max-hours 5.75 --limit ${{ github.event.inputs.limit || '0' }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

@@ -1,8 +1,10 @@
 name: Base Tier — Daily Scrape
 
+# RETIRED: tier workflows (catalog_tier_elite/staple/premium/stars/base) now
+# handle all scraping by volatility score. This workflow is kept for manual
+# one-off use only — scheduled run disabled to avoid connection budget conflicts.
+
 on:
-  schedule:
-    - cron: '30 6 * * *'  # 6:30am UTC daily (1:30am EST) — offset from backfill_staple 6am trigger
   workflow_dispatch:
     inputs:
       sport:

@@ -1,7 +1,7 @@
-name: Catalog Tier — Premium (Hourly)
+name: Catalog Tier — Premium (Weekly)
 
 # Premium tier — 2 shards per sport = 8 parallel runners per trigger.
-# stale-days 7 so most triggers exit quickly once backfill is complete.
+# stale-days 7 — reprices cards not seen in the last week.
 # Connection budget: 8 flush-conns peak, well under Railway limit ✅
 
 concurrency:
@@ -10,7 +10,7 @@ concurrency:
 
 on:
   schedule:
-    - cron: '0 * * * *'   # hourly
+    - cron: '0 8 * * 1'   # weekly — Mondays 8am UTC
   workflow_dispatch:
     inputs:
       sport:
