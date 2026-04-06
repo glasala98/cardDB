@@ -1,0 +1,30 @@
+# Runtime dependencies for the Railway API container.
+# Scraper-only deps (curl_cffi, webdriver-manager, apscheduler, pytest, httpx)
+# are intentionally excluded to keep the image lean.
+
+# Scraper deps also used by the API (dashboard_utils / cards.py)
+pandas
+selenium
+requests
+beautifulsoup4
+scipy
+
+# API
+fastapi
+uvicorn
+python-multipart
+PyJWT
+passlib[bcrypt]
+PyYAML
+python-dotenv
+
+# AI scanning
+anthropic
+
+# Misc
+bcrypt
+cachetools
+cryptography
+
+# Database
+psycopg2-binary>=2.9

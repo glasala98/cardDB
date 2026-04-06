@@ -1,23 +1,26 @@
-FROM python:3.11-slim
+# Stage 1: Build the React frontend
+FROM node:20-slim AS frontend-build
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm install
+COPY frontend/ ./
+RUN npm run build
 
-# Install Node.js 20
-RUN apt-get update && apt-get install -y curl && \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
-    rm -rf /var/lib/apt/lists/*
+# Stage 2: Runtime — Python only, no Node.js
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies (API-only subset — excludes curl_cffi, webdriver-manager,
+# apscheduler, pytest, httpx which are scraper/test-only and not needed at runtime)
+COPY requirements-api.txt .
+RUN pip install --no-cache-dir -r requirements-api.txt
 
-# Install and build frontend
-COPY frontend/package*.json ./frontend/
-RUN cd frontend && npm install
-
+# Copy application code
 COPY . .
-RUN cd frontend && npm run build
+
+# Copy built frontend from stage 1 (replaces any local build artifacts)
+COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
 EXPOSE 8000
 # MIGRATION RULES: Only fast DDL here (ALTER TABLE ADD COLUMN, CREATE TABLE IF NOT EXISTS,
