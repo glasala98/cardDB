@@ -1,23 +1,21 @@
-name: Catalog Tier — Base (Manual / Backfill)
+name: Catalog Tier — Base (Backfill)
 
-# Scrapes price data for base-tier cards (modern era only — 2015+).
-# Pre-2015 base cards have very low eBay sold activity so are skipped to reduce
-# time wasted on dead cards. Override with year_from=2010 for older card coverage.
-# Running daily during initial backfill. Once all base cards have been priced
-# once, stale-days=30 means each run is tiny (only repricing month-old cards).
-# Switch back to weekly (0 6 * * 3) after backfill is complete.
+# Scrapes price data for base-tier cards (2015+), running every 6h 24/7.
+# Goal: get all base cards priced as fast as possible → flip to delta mode.
 #
-# Sharding: each sport is split across N parallel runners (each with a different
-# GH Actions IP → independent eBay rate limit). Shard counts:
-#   NFL: 10 shards (~48K cards each)   NBA: 8 shards (~37K cards each)
-#   MLB:  6 shards (~128K cards each)  NHL: skipped (89%+ miss rate on base cards)
-# = 24 parallel runners. 4 runs/day (midnight/6am/noon/6pm UTC)
-# → ~270K cards/day → ~6 day backfill ETA from Apr 30 → ~Apr 15.
+# Sharding — each shard processes ~2,700 cards per 5.5h window (eBay rate limit):
+#   NFL: 10 shards (479k total → ~48k/shard → ~18 runs → ~4.5 days)
+#   NBA:  8 shards (299k total → ~37k/shard → ~14 runs → ~3.5 days)
+#   MLB: 16 shards (765k total → ~48k/shard → ~18 runs → ~4.5 days) ← biggest
+#   NHL:  skipped  (89%+ miss rate on base tier, revisit post-backfill)
+# = 34 parallel runners, connection budget: 34 + 20 staple + 10 app = 64 ✅
+#
+# Staggered 3h from staple (runs at 3/9/15/21 UTC, staple at 0/6/12/18 UTC)
+# so they don't compete for DB connections at startup.
 
 on:
-  # Schedule paused — staple/premium/stars take priority.
-  # Re-enable once staple hits ~100%, premium hits ~80%, stars hits ~100%.
-  # Was: '0 0 * * *' and '0 12 * * *'
+  schedule:
+    - cron: '0 3,9,15,21 * * *'   # every 6h, offset 3h from staple
   workflow_dispatch:
     inputs:
       sport:
@@ -49,14 +47,12 @@ jobs:
     timeout-minutes: 360
     strategy:
       fail-fast: false
-      # CONNECTION BUDGET: max-parallel(24) × workers(2) = 48 scraper connections per run.
-      # --max-hours 5.5 ensures each run finishes before the next 6h schedule fires → no overlap.
-      # + Railway app pool (5) + monitoring (5) = 58 total — well under Railway PG limit of 100.
-      # Previous: max-parallel=4 caused 6 sequential rounds × 5.75h = 34.5h per run → queued backlog.
-      max-parallel: 24
+      # CONNECTION BUDGET: 34 base shards + 20 staple shards + 10 app = 64 peak ✅
+      # Each shard uses 1 DB connection at flush time (not sustained).
+      max-parallel: 34
       matrix:
         include:
-          # NFL — 10 shards (~48K cards each)
+          # NFL — 10 shards (~48K cards each, ~18 runs to clear)
           - { sport: NFL, shard_index: 0, shard_count: 10 }
           - { sport: NFL, shard_index: 1, shard_count: 10 }
           - { sport: NFL, shard_index: 2, shard_count: 10 }
@@ -67,7 +63,7 @@ jobs:
           - { sport: NFL, shard_index: 7, shard_count: 10 }
           - { sport: NFL, shard_index: 8, shard_count: 10 }
           - { sport: NFL, shard_index: 9, shard_count: 10 }
-          # NBA — 8 shards (~37K cards each)
+          # NBA — 8 shards (~37K cards each, ~14 runs to clear)
           - { sport: NBA, shard_index: 0, shard_count: 8 }
           - { sport: NBA, shard_index: 1, shard_count: 8 }
           - { sport: NBA, shard_index: 2, shard_count: 8 }
@@ -76,14 +72,24 @@ jobs:
           - { sport: NBA, shard_index: 5, shard_count: 8 }
           - { sport: NBA, shard_index: 6, shard_count: 8 }
           - { sport: NBA, shard_index: 7, shard_count: 8 }
-          # MLB — 6 shards (~128K cards each)
-          - { sport: MLB, shard_index: 0, shard_count: 6 }
-          - { sport: MLB, shard_index: 1, shard_count: 6 }
-          - { sport: MLB, shard_index: 2, shard_count: 6 }
-          - { sport: MLB, shard_index: 3, shard_count: 6 }
-          - { sport: MLB, shard_index: 4, shard_count: 6 }
-          - { sport: MLB, shard_index: 5, shard_count: 6 }
-          # NHL — skipped from base backfill (89%+ miss rate; revisit after other sports done)
+          # MLB — 16 shards (~48K cards each, ~18 runs to clear) — was 6, too slow
+          - { sport: MLB, shard_index: 0, shard_count: 16 }
+          - { sport: MLB, shard_index: 1, shard_count: 16 }
+          - { sport: MLB, shard_index: 2, shard_count: 16 }
+          - { sport: MLB, shard_index: 3, shard_count: 16 }
+          - { sport: MLB, shard_index: 4, shard_count: 16 }
+          - { sport: MLB, shard_index: 5, shard_count: 16 }
+          - { sport: MLB, shard_index: 6, shard_count: 16 }
+          - { sport: MLB, shard_index: 7, shard_count: 16 }
+          - { sport: MLB, shard_index: 8, shard_count: 16 }
+          - { sport: MLB, shard_index: 9, shard_count: 16 }
+          - { sport: MLB, shard_index: 10, shard_count: 16 }
+          - { sport: MLB, shard_index: 11, shard_count: 16 }
+          - { sport: MLB, shard_index: 12, shard_count: 16 }
+          - { sport: MLB, shard_index: 13, shard_count: 16 }
+          - { sport: MLB, shard_index: 14, shard_count: 16 }
+          - { sport: MLB, shard_index: 15, shard_count: 16 }
+          # NHL — skipped (89%+ miss rate on base tier; revisit post-backfill)
 
     steps:
       - uses: actions/checkout@v4
