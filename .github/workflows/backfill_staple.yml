@@ -1,11 +1,12 @@
 name: Backfill — Staple (90-day history)
 
 # Runs every 6h so it auto-restarts after the 5.75h graceful stop.
-# Sharded across 16 parallel runners (4 per sport × 4 sports) for ~4x throughput.
+# Sharded across 20 parallel runners (4×NHL, 4×NBA, 8×NFL, 4×MLB) for throughput.
+# NFL uses 8 shards because it has ~10k cards — 4 shards always hit the 6h kill.
 # Each shard gets a different GH Actions IP → independent eBay rate limit.
 #
-# Connection budget: 16 shards, each uses 1 DB connection at a time during flush.
-# Peak: ~16 connections → well under Railway limit of 100.
+# Connection budget: 20 shards, each uses 1 DB connection at a time during flush.
+# Peak: ~20 connections → well under Railway limit of 100.
 #
 # Time limit: 5.75h graceful stop (GH Actions hard-kills at 6h)
 
@@ -29,25 +30,29 @@ jobs:
     timeout-minutes: 370
     strategy:
       fail-fast: false
-      max-parallel: 16
+      max-parallel: 20
       matrix:
         include:
-          # NHL — 4 shards
+          # NHL — 4 shards (~650 cards each, ~75min)
           - { sport: NHL, shard_index: 0, shard_count: 4 }
           - { sport: NHL, shard_index: 1, shard_count: 4 }
           - { sport: NHL, shard_index: 2, shard_count: 4 }
           - { sport: NHL, shard_index: 3, shard_count: 4 }
-          # NBA — 4 shards
+          # NBA — 4 shards (~1,450 cards each, ~220min)
           - { sport: NBA, shard_index: 0, shard_count: 4 }
           - { sport: NBA, shard_index: 1, shard_count: 4 }
           - { sport: NBA, shard_index: 2, shard_count: 4 }
           - { sport: NBA, shard_index: 3, shard_count: 4 }
-          # NFL — 4 shards
-          - { sport: NFL, shard_index: 0, shard_count: 4 }
-          - { sport: NFL, shard_index: 1, shard_count: 4 }
-          - { sport: NFL, shard_index: 2, shard_count: 4 }
-          - { sport: NFL, shard_index: 3, shard_count: 4 }
-          # MLB — 4 shards
+          # NFL — 8 shards (~1,350 cards each, ~180min) — was 4 shards, hit 6h kill
+          - { sport: NFL, shard_index: 0, shard_count: 8 }
+          - { sport: NFL, shard_index: 1, shard_count: 8 }
+          - { sport: NFL, shard_index: 2, shard_count: 8 }
+          - { sport: NFL, shard_index: 3, shard_count: 8 }
+          - { sport: NFL, shard_index: 4, shard_count: 8 }
+          - { sport: NFL, shard_index: 5, shard_count: 8 }
+          - { sport: NFL, shard_index: 6, shard_count: 8 }
+          - { sport: NFL, shard_index: 7, shard_count: 8 }
+          # MLB — 4 shards (~1,150 cards each, ~160min)
           - { sport: MLB, shard_index: 0, shard_count: 4 }
           - { sport: MLB, shard_index: 1, shard_count: 4 }
           - { sport: MLB, shard_index: 2, shard_count: 4 }
