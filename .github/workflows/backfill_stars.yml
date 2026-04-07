@@ -10,6 +10,8 @@ concurrency:
   cancel-in-progress: false
 
 on:
+  # schedule disabled — enable after premium backfill completes (~Apr 9)
+  # cron: '0 2,8,14,20 * * *'
   workflow_dispatch:
     inputs:
       sport:

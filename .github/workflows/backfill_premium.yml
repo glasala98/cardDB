@@ -10,6 +10,8 @@ concurrency:
   cancel-in-progress: false
 
 on:
+  schedule:
+    - cron: '0 2,8,14,20 * * *'  # every 6h — offset 2h from staple, 1h from elite
   workflow_dispatch:
     inputs:
       sport:
