@@ -82,3 +82,73 @@ jobs:
             --max-hours 5.75
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: backfill
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install psycopg2-binary
+      - name: Build progress report
+        id: report
+        run: |
+          python - <<'EOF'
+          import os, psycopg2, hashlib
+
+          conn = psycopg2.connect(os.environ["DATABASE_URL"])
+          cur = conn.cursor()
+
+          cur.execute("""
+              SELECT cc.sport,
+                     COUNT(DISTINCT mp.card_catalog_id) AS priced,
+                     COUNT(DISTINCT cc.id)              AS total
+              FROM card_catalog cc
+              LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id AND mp.fair_value > 0
+              WHERE cc.scrape_tier = 'stars'
+              GROUP BY cc.sport ORDER BY cc.sport
+          """)
+          rows = cur.fetchall()
+          conn.close()
+
+          lines = []
+          grand_done = grand_total = 0
+          for sport, done, total in rows:
+              pct = done / total * 100 if total else 0
+              bar = "█" * int(pct // 10) + "░" * (10 - int(pct // 10))
+              lines.append(f"{sport:<4}  {bar}  {pct:5.1f}%  {done:,}/{total:,}")
+              grand_done += done; grand_total += total
+
+          grand_pct = grand_done / grand_total * 100 if grand_total else 0
+          summary = "\n".join(lines)
+          summary += f"\n\nTotal: {grand_done:,}/{grand_total:,} ({grand_pct:.1f}%)"
+
+          subject = f"📊 CardDB — Stars backfill {grand_pct:.1f}% complete"
+          body = f"Stars backfill run complete\n\n{summary}\n\nRun: https://github.com/${{os.environ['GITHUB_REPOSITORY']}}/actions/runs/${{os.environ['GITHUB_RUN_ID']}}"
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              delim = "EOF_" + hashlib.md5(body.encode()).hexdigest()[:8]
+              f.write(f"body<<{delim}\n{body}\n{delim}\n")
+              f.write(f"subject={subject}\n")
+          EOF
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+      - name: Send email
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.NOTIFY_GMAIL_USER }}
+          password: ${{ secrets.NOTIFY_GMAIL_APP_PASSWORD }}
+          to: ${{ secrets.NOTIFY_EMAIL_TO }}
+          from: "CardDB Monitor <${{ secrets.NOTIFY_GMAIL_USER }}>"
+          subject: ${{ steps.report.outputs.subject }}
+          body: ${{ steps.report.outputs.body }}
