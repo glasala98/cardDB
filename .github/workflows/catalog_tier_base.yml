@@ -47,9 +47,11 @@ jobs:
     timeout-minutes: 360
     strategy:
       fail-fast: false
-      # CONNECTION BUDGET: 34 base shards + 20 staple shards + 10 app = 64 peak ✅
-      # Each shard uses 1 DB connection at flush time (not sustained).
-      max-parallel: 34
+      # CONNECTION BUDGET: 20 base + 20 staple + 10 app = 50 peak ✅
+      # GH free plan limit: 20 concurrent jobs. max-parallel=20 means GH runs
+      # 20 at a time and queues the remaining 14 shards internally — they start
+      # as slots free up within the same workflow run. No external queuing.
+      max-parallel: 20
       matrix:
         include:
           # NFL — 10 shards (~48K cards each, ~18 runs to clear)
