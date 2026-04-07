@@ -1,0 +1,78 @@
+name: Backfill — Premium
+
+# One-time backfill for premium tier (295,795 cards).
+# 16 shards across 4 sports, max-parallel 16 (under GH 20-job limit).
+# Each shard: ~18,500 cards, ~3h per run → clears in ~2 days at 4 runs/day.
+# Manual only — trigger after elite backfill is complete.
+
+concurrency:
+  group: backfill-premium
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      sport:
+        description: 'Sport to backfill (NHL/NBA/NFL/MLB, blank=all)'
+        required: false
+        default: ''
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 370
+    strategy:
+      fail-fast: false
+      max-parallel: 16
+      matrix:
+        include:
+          # NHL — 4 shards
+          - { sport: NHL, shard_index: 0, shard_count: 4 }
+          - { sport: NHL, shard_index: 1, shard_count: 4 }
+          - { sport: NHL, shard_index: 2, shard_count: 4 }
+          - { sport: NHL, shard_index: 3, shard_count: 4 }
+          # NBA — 4 shards
+          - { sport: NBA, shard_index: 0, shard_count: 4 }
+          - { sport: NBA, shard_index: 1, shard_count: 4 }
+          - { sport: NBA, shard_index: 2, shard_count: 4 }
+          - { sport: NBA, shard_index: 3, shard_count: 4 }
+          # NFL — 4 shards
+          - { sport: NFL, shard_index: 0, shard_count: 4 }
+          - { sport: NFL, shard_index: 1, shard_count: 4 }
+          - { sport: NFL, shard_index: 2, shard_count: 4 }
+          - { sport: NFL, shard_index: 3, shard_count: 4 }
+          # MLB — 4 shards
+          - { sport: MLB, shard_index: 0, shard_count: 4 }
+          - { sport: MLB, shard_index: 1, shard_count: 4 }
+          - { sport: MLB, shard_index: 2, shard_count: 4 }
+          - { sport: MLB, shard_index: 3, shard_count: 4 }
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Chrome
+        run: |
+          wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          sudo apt-get install -y /tmp/chrome.deb || sudo apt-get -f install -y
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt webdriver-manager scipy
+
+      - name: Backfill ${{ matrix.sport }} premium (shard ${{ matrix.shard_index }}/${{ matrix.shard_count }})
+        if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == matrix.sport }}
+        run: |
+          python -u scraping/scrape_master_db.py \
+            --catalog-tier premium \
+            --sport ${{ matrix.sport }} \
+            --workers 2 \
+            --stale-days 60 \
+            --year-from 2000 \
+            --shard-index ${{ matrix.shard_index }} \
+            --shard-count ${{ matrix.shard_count }} \
+            --backfill \
+            --max-hours 5.75
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
