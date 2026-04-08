@@ -128,7 +128,9 @@ jobs:
           summary += f"\n\nTotal: {grand_done:,}/{grand_total:,} ({grand_pct:.1f}%)"
 
           subject = f"📊 CardDB — Stars backfill {grand_pct:.1f}% complete"
-          body = f"Stars backfill run complete\n\n{summary}\n\nRun: https://github.com/${{os.environ['GITHUB_REPOSITORY']}}/actions/runs/${{os.environ['GITHUB_RUN_ID']}}"
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+          run_id = os.environ.get("GITHUB_RUN_ID", "")
+          body = f"Stars backfill run complete\n\n{summary}\n\nRun: https://github.com/{repo}/actions/runs/{run_id}"
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               delim = "EOF_" + hashlib.md5(body.encode()).hexdigest()[:8]

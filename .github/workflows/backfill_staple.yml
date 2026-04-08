@@ -1,13 +1,11 @@
-name: Backfill — Staple (90-day history)
+name: Staple Tier — Delta Scrape
 
-# Runs every 6h so it auto-restarts after the 5.75h graceful stop.
+# Delta mode: reprices all staple cards not seen in the last 1 day.
+# Staple backfill is complete — this is now a recurring delta workflow.
 # Sharded across 20 parallel runners (4×NHL, 4×NBA, 8×NFL, 4×MLB) for throughput.
-# NFL uses 8 shards because it has ~10k cards — 4 shards always hit the 6h kill.
-# Each shard gets a different GH Actions IP → independent eBay rate limit.
+# Each shard should clear in well under 5.75h at delta volume.
 #
-# Connection budget: 20 shards, each uses 1 DB connection at a time during flush.
-# Peak: ~20 connections → well under Railway limit of 100.
-#
+# Connection budget: 20 shards × 1 flush-conn = 20 peak ✅
 # Time limit: 5.75h graceful stop (GH Actions hard-kills at 6h)
 
 concurrency:
@@ -72,18 +70,17 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
 
-      - name: Backfill ${{ matrix.sport }} staple (shard ${{ matrix.shard_index }}/${{ matrix.shard_count }})
+      - name: Scrape ${{ matrix.sport }} staple delta (shard ${{ matrix.shard_index }}/${{ matrix.shard_count }})
         if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == matrix.sport || github.event_name == 'schedule' }}
         run: |
           python -u scraping/scrape_master_db.py \
             --catalog-tier staple \
             --sport ${{ matrix.sport }} \
             --workers 2 \
-            --stale-days 60 \
+            --stale-days 1 \
             --year-from 2000 \
             --shard-index ${{ matrix.shard_index }} \
             --shard-count ${{ matrix.shard_count }} \
-            --backfill \
             --max-hours 5.75
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
