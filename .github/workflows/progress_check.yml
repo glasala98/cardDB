@@ -1,0 +1,47 @@
+name: Progress Check (Manual)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install psycopg2-binary -q
+      - name: Backfill progress by tier
+        run: |
+          python - <<'EOF'
+          import os, psycopg2
+          conn = psycopg2.connect(os.environ["DATABASE_URL"])
+          cur = conn.cursor()
+          cur.execute("""
+              SELECT cc.scrape_tier,
+                     COUNT(DISTINCT cc.id) AS total,
+                     COUNT(DISTINCT mp.card_catalog_id) AS priced
+              FROM card_catalog cc
+              LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id AND mp.fair_value > 0
+              GROUP BY cc.scrape_tier
+              ORDER BY CASE cc.scrape_tier
+                WHEN 'elite'   THEN 1
+                WHEN 'staple'  THEN 2
+                WHEN 'premium' THEN 3
+                WHEN 'stars'   THEN 4
+                WHEN 'base'    THEN 5
+                ELSE 6 END
+          """)
+          rows = cur.fetchall()
+          conn.close()
+          print(f"\n{'Tier':<10} {'Priced':>10} {'Total':>10} {'%':>7}")
+          print("-" * 42)
+          for tier, total, priced in rows:
+              pct = priced / total * 100 if total else 0
+              bar = "█" * int(pct // 10) + "░" * (10 - int(pct // 10))
+              print(f"{tier:<10} {priced:>10,} {total:>10,}  {bar}  {pct:5.1f}%")
+          EOF
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
