@@ -30,6 +30,7 @@ import pathlib
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 
@@ -93,6 +94,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Card Dashboard API", version="0.1.0", lifespan=lifespan)
 
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(RateLimitMiddleware)
 
 # CORS: allow Vite dev server in development + production domains

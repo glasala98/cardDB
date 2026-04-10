@@ -15,6 +15,7 @@ from db import get_db
 _releases_cache: TTLCache = TTLCache(maxsize=20,  ttl=300)   # 5 min
 _filters_cache:  TTLCache = TTLCache(maxsize=50,  ttl=600)   # 10 min
 _ai_cache:       TTLCache = TTLCache(maxsize=200, ttl=300)   # 5 min, keyed by query
+_browse_cache:   TTLCache = TTLCache(maxsize=500, ttl=60)    # 60s — keyed by full query string
 _cache_lock = threading.Lock()
 
 # Live-price safety: card result cache + rate limiting
@@ -88,6 +89,13 @@ def browse_catalog(
     Returns:
         Dict with keys: cards (list), total (int), page (int), pages (int), per_page (int).
     """
+    # Server-side cache — keyed by all query params. Skipped for authenticated
+    # or highly-specific queries (search/fts/player) since those are less repeated.
+    _browse_key = f"{search}|{fts}|{player_name}|{sport}|{year}|{set_name}|{variant}|{is_rookie}|{card_number}|{tier}|{has_price}|{sort}|{dir}|{page}|{per_page}"
+    with _cache_lock:
+        if _browse_key in _browse_cache:
+            return _browse_cache[_browse_key]
+
     use_featured = (sort == "featured")
     sort_col = SORT_COLS.get(sort, "cc.year") if not use_featured else None
     sort_dir = "DESC" if dir.lower() == "desc" else "ASC"
@@ -244,13 +252,16 @@ def browse_catalog(
     else:
         response.headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=600"
 
-    return {
+    result = {
         "cards":    cards,
         "total":    total,
         "page":     page,
         "pages":    math.ceil(total / per_page) if per_page else 1,
         "per_page": per_page,
     }
+    with _cache_lock:
+        _browse_cache[_browse_key] = result
+    return result
 
 
 @router.get("/{catalog_id}/history")
