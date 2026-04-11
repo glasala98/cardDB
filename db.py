@@ -49,7 +49,7 @@ def _get_pool() -> psycopg2.pool.ThreadedConnectionPool:
     global _pool
     if _pool is None:
         _pool = psycopg2.pool.ThreadedConnectionPool(
-            1, 5, _build_dsn(), **_KEEPALIVE_OPTS
+            1, 2, _build_dsn(), **_KEEPALIVE_OPTS
         )
     return _pool
 
