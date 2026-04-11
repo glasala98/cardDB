@@ -9,7 +9,6 @@ data logic is duplicated.
 
 import sys
 import os
-import math
 import time
 import threading
 from collections import defaultdict, deque
@@ -137,91 +136,10 @@ def health():
     return {"status": "ok" if db_ok else "degraded", "db": db_ok}
 
 
-# ── SEO: robots.txt + sitemap.xml ─────────────────────────────────────────────
-SITE_URL = os.environ.get("SITE_URL", "https://southwestsportscards.ca")
-
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots_txt():
-    return f"User-agent: *\nAllow: /\nSitemap: {SITE_URL}/sitemap.xml\n"
+    return "User-agent: *\nDisallow: /\n"
 
-_SITEMAP_PAGE_SIZE = 45000  # well under Google's 50K limit per file
-
-# In-memory sitemap ID cache — loaded once, shared across all shard requests.
-# Avoids 14 simultaneous DB queries when Google fetches all shards at once.
-_sitemap_ids: list = []
-_sitemap_ids_loaded = False
-_sitemap_lock = threading.Lock()
-
-def _load_sitemap_ids():
-    """Load all priced card IDs into memory (called once, ~2MB for 676K ints)."""
-    global _sitemap_ids, _sitemap_ids_loaded
-    with _sitemap_lock:
-        if _sitemap_ids_loaded:
-            return
-        try:
-            with get_db() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SET statement_timeout = '20s'")
-                    cur.execute("""
-                        SELECT card_catalog_id FROM market_prices
-                        WHERE fair_value > 0
-                        ORDER BY card_catalog_id
-                    """)
-                    _sitemap_ids = [row[0] for row in cur.fetchall()]
-            _sitemap_ids_loaded = True
-        except Exception:
-            _sitemap_ids = []
-
-
-@app.get("/sitemap.xml")
-def sitemap_index():
-    """Sitemap index — points to sitemap-static.xml + sitemap-cards-N.xml shards."""
-    from fastapi.responses import Response as FastAPIResponse
-    _load_sitemap_ids()
-    num_shards = max(1, math.ceil(len(_sitemap_ids) / _SITEMAP_PAGE_SIZE))
-    parts = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-        f'  <sitemap><loc>{SITE_URL}/sitemap-static.xml</loc></sitemap>',
-    ]
-    for i in range(num_shards):
-        parts.append(f'  <sitemap><loc>{SITE_URL}/sitemap-cards-{i}.xml</loc></sitemap>')
-    parts.append('</sitemapindex>')
-    return FastAPIResponse('\n'.join(parts), media_type='application/xml')
-
-
-@app.get("/sitemap-static.xml")
-def sitemap_static():
-    """Sitemap for main site pages."""
-    from fastapi.responses import Response as FastAPIResponse
-    parts = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-        f'  <url><loc>{SITE_URL}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>',
-        f'  <url><loc>{SITE_URL}/catalog</loc><changefreq>daily</changefreq><priority>0.9</priority></url>',
-        f'  <url><loc>{SITE_URL}/trending</loc><changefreq>daily</changefreq><priority>0.8</priority></url>',
-        f'  <url><loc>{SITE_URL}/sets</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>',
-        f'  <url><loc>{SITE_URL}/releases</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>',
-        '</urlset>',
-    ]
-    return FastAPIResponse('\n'.join(parts), media_type='application/xml')
-
-
-@app.get("/sitemap-cards-{shard}.xml")
-def sitemap_cards(shard: int):
-    """Sitemap shard for card detail pages — served from in-memory cache."""
-    from fastapi.responses import Response as FastAPIResponse
-    _load_sitemap_ids()
-    start = shard * _SITEMAP_PAGE_SIZE
-    ids = _sitemap_ids[start: start + _SITEMAP_PAGE_SIZE]
-    parts = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-    ]
-    for cid in ids:
-        parts.append(f'  <url><loc>{SITE_URL}/catalog/{cid}</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>')
-    parts.append('</urlset>')
-    return FastAPIResponse('\n'.join(parts), media_type='application/xml')
 
 
 # Serve React frontend for all non-API routes (SPA support)

@@ -25,16 +25,23 @@ export default function Admin() {
   const [tab, setTab] = useState('Users')
   const [activeCount, setActiveCount] = useState(0)
 
-  // Poll for running scrapes every 30s to keep the badge current
+  // Check for running scrapes once on mount — only poll if active jobs found
   useEffect(() => {
+    let id = null
     const check = () => {
       getScrapeRuns(50).then(d => {
-        setActiveCount((d.runs || []).filter(r => r.status === 'running').length)
+        const count = (d.runs || []).filter(r => r.status === 'running').length
+        setActiveCount(count)
+        if (count > 0 && !id) {
+          id = setInterval(check, 30000)
+        } else if (count === 0 && id) {
+          clearInterval(id)
+          id = null
+        }
       }).catch(() => {})
     }
     check()
-    const id = setInterval(check, 30000)
-    return () => clearInterval(id)
+    return () => { if (id) clearInterval(id) }
   }, [])
 
   return (
@@ -1369,23 +1376,35 @@ function QualityTab() {
 
   const { stats, freshness_by_tier, stale_cards, low_confidence_cards } = data
 
+  // Total priced cards = sum of all market_prices rows (non-ignored)
+  const totalPriced = (stats.stale_30 + stats.stale_60 === undefined ? 0 :
+    (stats.single_sale + stats.zero_price + (stats.stale_30 - stats.stale_90))) || 1
+  // Use freshness_by_tier total as the authoritative count
+  const totalMp = freshness_by_tier.reduce((s, t) => s + t.total, 0) || 1
+  const singleSalePct  = Math.round(stats.single_sale   / totalMp * 100)
+  const lowConfPct     = Math.round(stats.low_confidence / totalMp * 100)
+
   return (
     <div className={styles.qualityWrap}>
 
       {/* KPI strip */}
       <div className={styles.sectionHeaderRow}>
       <div className={styles.kpiStrip} style={{ flex: 1 }}>
-        <KpiCard label="Stale >30d"      value={stats.stale_30.toLocaleString()}      warn={stats.stale_30 > 100} />
-        <KpiCard label="Stale >90d"      value={stats.stale_90.toLocaleString()}      warn={stats.stale_90 > 50} />
+        <KpiCard label="Stale >30d"      value={stats.stale_30.toLocaleString()}      warn={stats.stale_30 > 10000} />
+        <KpiCard label="Stale >90d"      value={stats.stale_90.toLocaleString()}      warn={stats.stale_90 > 1000} />
         <KpiCard label="Never Scraped"   value={stats.never_scraped.toLocaleString()} warn={stats.never_scraped > 0} />
-        <KpiCard label="Single Sale"     value={stats.single_sale.toLocaleString()}   warn={stats.single_sale > 50} />
-        <KpiCard label="Low Confidence"  value={stats.low_confidence.toLocaleString()} warn={stats.low_confidence > 100} />
+        <KpiCard label="Single Sale"     value={`${stats.single_sale.toLocaleString()} (${singleSalePct}%)`} warn={singleSalePct > 30} />
+        <KpiCard label="Low Confidence"  value={`${stats.low_confidence.toLocaleString()} (${lowConfPct}%)`} warn={lowConfPct > 50} />
         <KpiCard label="Zero Price"      value={stats.zero_price.toLocaleString()}    warn={stats.zero_price > 0} />
       </div>
       <button className={styles.refreshBtn} onClick={() => load(true)} disabled={refreshing}>
         {refreshing ? '↻' : '↻'} Refresh
       </button>
       </div>
+      <p className={styles.helpText} style={{ marginTop: 0, marginBottom: 16 }}>
+        Single sale and low confidence counts are normal during backfill — most cards are seen for the first time.
+        As the pipeline re-scrapes, these numbers will drop. Percentages shown are of {totalMp.toLocaleString()} total priced cards.
+      </p>
 
       {/* Freshness by tier */}
       <h3 className={styles.sectionTitle}>Price Freshness by Tier</h3>
@@ -1798,7 +1817,7 @@ function PlayersTab() {
   const [error, setError]           = useState('')
 
   const load = useCallback(() => {
-    getPlayers().then(d => setPlayers(d.data)).catch(() => setPlayers([]))
+    getPlayers().then(d => setPlayers(d)).catch(() => setPlayers([]))
   }, [])
 
   useEffect(() => { load() }, [load])
