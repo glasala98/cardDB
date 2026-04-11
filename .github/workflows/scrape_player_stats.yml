@@ -1,0 +1,94 @@
+name: Player Stats (Weekly)
+
+# Scrapes current season player stats for all 4 sports.
+# NBA: Ball Don't Lie API (requires BALLDONTLIE_API_KEY — free)
+# NFL: ESPN public API (no auth)
+# MLB: MLB Stats API (no auth, official)
+# NHL: scrape_nhl_stats.py (existing, NHL API — no auth)
+# Runs weekly — stats don't change minute-to-minute.
+
+on:
+  schedule:
+    - cron: '0 7 * * 1'   # Mondays 7am UTC (after PSA pop at 6am)
+  workflow_dispatch:
+    inputs:
+      sport:
+        description: 'Sport to scrape (NHL/NBA/NFL/MLB, blank=all)'
+        required: false
+        default: ''
+      season:
+        description: 'Season year (e.g. 2024, blank=current)'
+        required: false
+        default: ''
+
+concurrency:
+  group: scrape-player-stats
+  cancel-in-progress: true
+
+jobs:
+  nhl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NHL' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install psycopg2-binary python-dotenv
+      - name: Scrape NHL stats
+        run: python -u scraping/scrape_nhl_stats.py
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  nba:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NBA' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install psycopg2-binary python-dotenv
+      - name: Scrape NBA stats
+        run: |
+          python -u scraping/scrape_nba_stats.py \
+            ${{ github.event.inputs.season != '' && format('--season {0}', github.event.inputs.season) || '' }}
+        env:
+          DATABASE_URL:        ${{ secrets.DATABASE_URL }}
+          BALLDONTLIE_API_KEY: ${{ secrets.BALLDONTLIE_API_KEY }}
+
+  nfl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'NFL' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install psycopg2-binary python-dotenv
+      - name: Scrape NFL stats
+        run: |
+          python -u scraping/scrape_nfl_stats.py \
+            ${{ github.event.inputs.season != '' && format('--season {0}', github.event.inputs.season) || '' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  mlb:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == 'MLB' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install psycopg2-binary python-dotenv
+      - name: Scrape MLB stats
+        run: |
+          python -u scraping/scrape_mlb_stats.py \
+            ${{ github.event.inputs.season != '' && format('--season {0}', github.event.inputs.season) || '' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

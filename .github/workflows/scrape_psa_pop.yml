@@ -1,0 +1,53 @@
+name: PSA Population Reports (Weekly)
+
+# Scrapes PSA graded card population counts for elite + staple tier cards.
+# Supply-side signal: a PSA 10 with 50 copies is worth far more than one with 5,000.
+# Requires PSA_API_KEY secret — free key at https://api.psacard.com/
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'   # Mondays 6am UTC (weekly)
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: 'Tiers to scrape (elite,staple,premium)'
+        required: false
+        default: 'elite,staple'
+      sport:
+        description: 'Sport (NHL/NBA/NFL/MLB, blank=all)'
+        required: false
+        default: ''
+      limit:
+        description: 'Max cards to process (0=all)'
+        required: false
+        default: '0'
+      stale_days:
+        description: 'Skip cards scraped within N days'
+        required: false
+        default: '7'
+
+concurrency:
+  group: scrape-psa-pop
+  cancel-in-progress: true
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install psycopg2-binary python-dotenv requests
+      - name: Run PSA pop scraper
+        run: |
+          python -u scraping/scrape_psa_pop.py \
+            --tier "${{ github.event.inputs.tier || 'elite,staple' }}" \
+            ${{ github.event.inputs.sport != '' && format('--sport {0}', github.event.inputs.sport) || '' }} \
+            --limit ${{ github.event.inputs.limit || '0' }} \
+            --stale-days ${{ github.event.inputs.stale_days || '7' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PSA_API_KEY:  ${{ secrets.PSA_API_KEY }}
