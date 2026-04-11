@@ -56,8 +56,7 @@ jobs:
           python -u scraping/scrape_nba_stats.py \
             ${{ github.event.inputs.season != '' && format('--season {0}', github.event.inputs.season) || '' }}
         env:
-          DATABASE_URL:        ${{ secrets.DATABASE_URL }}
-          BALLDONTLIE_API_KEY: ${{ secrets.BALLDONTLIE_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
   nfl:
     runs-on: ubuntu-latest

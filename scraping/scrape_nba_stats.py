@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
 """
-Scrape NBA player stats from the Ball Don't Lie API and store in player_stats.
+Scrape NBA player stats from ESPN's public API and store in player_stats.
 
-Uses the free Ball Don't Lie API (https://api.balldontlie.io).
-Requires BALLDONTLIE_API_KEY env var — free key at https://api.balldontlie.io
-
-Writes to player_stats + standings tables (same schema as scrape_nhl_stats.py).
+Uses ESPN's unofficial public API (no auth required) — same approach as scrape_nfl_stats.py.
 
 Usage:
-    python scrape_nba_stats.py                  # scrape all NBA players
-    python scrape_nba_stats.py --season 2024    # specific season (default: current)
-    python scrape_nba_stats.py --dry-run        # print without saving
-    python scrape_nba_stats.py --verbose        # detailed output
+    python scrape_nba_stats.py                  # current season
+    python scrape_nba_stats.py --season 2024    # specific season year
+    python scrape_nba_stats.py --dry-run
+    python scrape_nba_stats.py --verbose
 """
 
 import argparse
@@ -24,7 +21,6 @@ from datetime import datetime, date
 from difflib import get_close_matches
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
-from urllib.parse import urlencode
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(SCRIPT_DIR)
@@ -39,15 +35,19 @@ except ImportError:
 
 from db import get_db
 
-BDL_BASE = "https://api.balldontlie.io/v1"
+ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"
+ESPN_CORE = "https://sports.core.api.espn.com/v2/sports/basketball/leagues/nba"
 
-# Current NBA season start year (2024 = 2024-25 season)
 CURRENT_SEASON = datetime.now().year if datetime.now().month >= 10 else datetime.now().year - 1
 
 
-# ── API helpers ───────────────────────────────────────────────────────────────
+# ── HTTP helpers ──────────────────────────────────────────────────────────────
 
-def fetch_json(url, headers, retries=3):
+def fetch_json(url, retries=3):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json",
+    }
     for attempt in range(retries + 1):
         try:
             req = Request(url, headers=headers)
@@ -55,87 +55,87 @@ def fetch_json(url, headers, retries=3):
                 return json.loads(resp.read().decode())
         except HTTPError as e:
             if e.code == 429:
-                wait = 2 ** attempt
-                print(f"  Rate limited — sleeping {wait}s")
-                time.sleep(wait)
+                time.sleep(2 ** attempt)
                 continue
-            print(f"  HTTP {e.code}: {url}")
+            if attempt < retries:
+                time.sleep(1)
+                continue
             return None
-        except (URLError, OSError) as e:
+        except (URLError, OSError):
             if attempt < retries:
                 time.sleep(2 ** attempt)
                 continue
-            print(f"  ERROR: {e}")
             return None
     return None
 
 
-def fetch_all_pages(url, headers, page_size=100):
-    """Fetch all pages from a paginated BDL endpoint."""
-    results = []
-    cursor = None
-    while True:
-        sep = "&" if "?" in url else "?"
-        page_url = f"{url}{sep}per_page={page_size}"
-        if cursor:
-            page_url += f"&cursor={cursor}"
-        data = fetch_json(page_url, headers)
-        if not data:
-            break
-        results.extend(data.get("data", []))
-        meta = data.get("meta", {})
-        cursor = meta.get("next_cursor")
-        if not cursor:
-            break
-        time.sleep(0.3)
-    return results
-
-
-def bdl_headers(api_key):
-    return {"Authorization": api_key, "User-Agent": "CardDB/1.0"}
-
-
 # ── Data fetching ─────────────────────────────────────────────────────────────
 
-def fetch_season_averages(api_key, season):
-    """Fetch all player season averages for a given season."""
-    headers = bdl_headers(api_key)
-    url = f"{BDL_BASE}/season_averages?season={season}&season_type=regular"
-    averages = fetch_all_pages(url, headers)
-    print(f"  {len(averages)} player season averages fetched")
-    return {a["player_id"]: a for a in averages}
+def fetch_team_list():
+    data = fetch_json(f"{ESPN_BASE}/teams?limit=40")
+    if not data:
+        return []
+    return [t for t in data.get("sports", [{}])[0]
+            .get("leagues", [{}])[0]
+            .get("teams", [])]
 
 
-def fetch_all_players(api_key):
-    """Fetch all active NBA players."""
-    headers = bdl_headers(api_key)
-    players = fetch_all_pages(f"{BDL_BASE}/players/active", headers)
-    print(f"  {len(players)} active NBA players fetched")
-    return players
+def fetch_team_roster(team_id):
+    data = fetch_json(f"{ESPN_BASE}/teams/{team_id}/roster")
+    if not data:
+        return []
+    athletes = []
+    for group in data.get("athletes", []):
+        athletes.extend(group.get("items", []))
+    return athletes
 
 
-def fetch_standings(api_key, season):
-    """Fetch NBA standings (team wins/losses)."""
-    headers = bdl_headers(api_key)
-    data = fetch_json(f"{BDL_BASE}/standings?season={season}", headers)
+def fetch_player_stats(player_id, season):
+    url = f"{ESPN_BASE}/athletes/{player_id}/stats?season={season}"
+    data = fetch_json(url)
+    if not data:
+        return {}
+    stats = {}
+    # Parse splitCategories for cleaner season totals/averages
+    for split in data.get("splitCategories", []):
+        if split.get("name") in ("Season", "Regular Season"):
+            for cat in split.get("categories", []):
+                cat_label = cat.get("displayName", cat.get("name", "")).lower()
+                labels = cat.get("labels", [])
+                values = cat.get("values", [])
+                for label, value in zip(labels, values):
+                    key = f"{cat_label}_{label}".lower().replace(" ", "_")
+                    stats[key] = value
+    # Fallback: flat categories
+    if not stats:
+        for cat in data.get("categories", []):
+            for stat in cat.get("stats", []):
+                key = stat.get("name", "").lower().replace(" ", "_")
+                stats[key] = stat.get("value", 0)
+    return stats
+
+
+def fetch_standings(season):
+    url = f"{ESPN_BASE}/standings?season={season}"
+    data = fetch_json(url)
     if not data:
         return {}
     standings = {}
-    entries = data.get("data", [])
-    for e in entries:
-        team = e.get("team", {})
-        abbrev = team.get("abbreviation", "")
-        if not abbrev:
-            continue
-        standings[abbrev] = {
-            "team_name":      team.get("full_name", ""),
-            "wins":           e.get("wins", 0),
-            "losses":         e.get("losses", 0),
-            "win_pct":        round(e.get("wins", 0) / max(e.get("wins", 0) + e.get("losses", 0), 1), 3),
-            "conference":     e.get("conference", ""),
-            "conference_rank": e.get("conference_rank", 0),
-            "division":       e.get("division", ""),
-        }
+    for group in data.get("standings", []):
+        for entry in group.get("entries", []):
+            team = entry.get("team", {})
+            abbrev = team.get("abbreviation", "")
+            if not abbrev:
+                continue
+            stats_map = {s["name"]: s["value"] for s in entry.get("stats", [])}
+            standings[abbrev] = {
+                "team_name":       team.get("displayName", ""),
+                "wins":            int(stats_map.get("wins", 0)),
+                "losses":          int(stats_map.get("losses", 0)),
+                "win_pct":         round(float(stats_map.get("winPercent", 0)), 3),
+                "conference":      group.get("name", ""),
+                "conference_rank": int(stats_map.get("playoffSeed", 0)),
+            }
     return standings
 
 
@@ -146,15 +146,17 @@ def normalize_name(name):
     return "".join(c for c in nfkd if not unicodedata.combining(c)).lower().strip()
 
 
-def build_player_index(players):
-    """Build {full_name: player_dict} lookup."""
+def build_roster_index(rosters):
     idx = {}
-    for p in players:
-        first = p.get("first_name", "")
-        last  = p.get("last_name", "")
-        name  = f"{first} {last}".strip()
-        if name:
-            idx[name] = p
+    for team_abbrev, athletes in rosters.items():
+        for a in athletes:
+            name = a.get("fullName", "")
+            if name:
+                idx[name] = {
+                    "id":       a.get("id"),
+                    "position": a.get("position", {}).get("abbreviation", ""),
+                    "team":     team_abbrev,
+                }
     return idx
 
 
@@ -165,29 +167,34 @@ def match_player(player_name, player_idx):
     for name, data in player_idx.items():
         if normalize_name(name) == norm:
             return data
-    all_names = list(player_idx.keys())
-    matches = get_close_matches(player_name, all_names, n=1, cutoff=0.85)
+    matches = get_close_matches(player_name, list(player_idx.keys()), n=1, cutoff=0.85)
     return player_idx[matches[0]] if matches else None
 
 
 # ── Entry building ────────────────────────────────────────────────────────────
 
-def build_entry(player, avg, standings, existing=None):
+def build_entry(player_info, raw_stats, standings, existing=None):
     today = date.today().isoformat()
-    team_abbrev = (player.get("team", {}) or {}).get("abbreviation", "")
+    team = player_info.get("team", "")
+
+    # ESPN NBA stat keys vary — try common patterns
+    def _get(*keys):
+        for k in keys:
+            if k in raw_stats:
+                return raw_stats[k]
+        return 0
 
     season_stats = {
-        "games_played":  avg.get("games_played", 0),
-        "points":        round(avg.get("pts", 0), 1),
-        "rebounds":      round(avg.get("reb", 0), 1),
-        "assists":       round(avg.get("ast", 0), 1),
-        "steals":        round(avg.get("stl", 0), 1),
-        "blocks":        round(avg.get("blk", 0), 1),
-        "turnovers":     round(avg.get("turnover", 0), 1),
-        "fg_pct":        round(avg.get("fg_pct", 0), 3),
-        "fg3_pct":       round(avg.get("fg3_pct", 0), 3),
-        "ft_pct":        round(avg.get("ft_pct", 0), 3),
-        "minutes":       avg.get("min", ""),
+        "games_played":  int(_get("general_gp", "general_games", "gp")),
+        "points":        round(float(_get("scoring_pts", "general_pts", "pts")), 1),
+        "rebounds":      round(float(_get("rebounds_reb", "general_reb", "reb")), 1),
+        "assists":       round(float(_get("assists_ast", "general_ast", "ast")), 1),
+        "steals":        round(float(_get("general_stl", "stl")), 1),
+        "blocks":        round(float(_get("general_blk", "blk")), 1),
+        "turnovers":     round(float(_get("general_to", "to")), 1),
+        "fg_pct":        round(float(_get("shooting_fg%", "general_fg%", "fg_pct")), 3),
+        "fg3_pct":       round(float(_get("shooting_3p%", "general_3p%", "fg3_pct")), 3),
+        "ft_pct":        round(float(_get("shooting_ft%", "general_ft%", "ft_pct")), 3),
     }
 
     snapshot = {
@@ -204,14 +211,12 @@ def build_entry(player, avg, standings, existing=None):
     history.append(snapshot)
     history.sort(key=lambda x: x["date"])
 
-    team_standing = standings.get(team_abbrev, {})
-
     return {
-        "current_team":    team_abbrev,
-        "position":        player.get("position", ""),
-        "current_season":  season_stats,
-        "team_standings":  team_standing,
-        "history":         history,
+        "current_team":   team,
+        "position":       player_info.get("position", ""),
+        "current_season": season_stats,
+        "team_standings": standings.get(team, {}),
+        "history":        history,
     }
 
 
@@ -264,75 +269,83 @@ def save_to_db(matched, standings, dry_run=False):
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description="Scrape NBA stats → player_stats")
+    parser = argparse.ArgumentParser(description="Scrape NBA stats → player_stats (ESPN)")
     parser.add_argument("--season",  type=int, default=CURRENT_SEASON)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
-    api_key = os.environ.get("BALLDONTLIE_API_KEY", "")
-    if not api_key:
-        print("ERROR: BALLDONTLIE_API_KEY not set.")
-        print("Get a free key at https://api.balldontlie.io")
-        sys.exit(1)
-
     print("=" * 60)
-    print("NBA PLAYER STATS SCRAPER")
-    print(f"Season: {args.season}-{args.season+1}")
+    print("NBA PLAYER STATS SCRAPER (ESPN)")
+    print(f"Season: {args.season}-{args.season + 1}")
     print("=" * 60)
 
-    print("\nFetching active NBA players...")
-    players = fetch_all_players(api_key)
-    player_idx = build_player_index(players)
+    print("\nFetching NBA teams...")
+    teams_data = fetch_team_list()
+    teams = [(t.get("team", {}).get("id"), t.get("team", {}).get("abbreviation", ""))
+             for t in teams_data if t.get("team", {}).get("id")]
+    print(f"  {len(teams)} teams")
 
-    print(f"\nFetching season averages ({args.season})...")
-    averages = fetch_season_averages(api_key, args.season)
+    print("\nFetching team rosters...")
+    rosters = {}
+    for team_id, abbrev in teams:
+        athletes = fetch_team_roster(team_id)
+        rosters[abbrev] = athletes
+        if args.verbose:
+            print(f"  {abbrev}: {len(athletes)} players")
+        time.sleep(0.3)
 
-    print(f"\nFetching standings...")
-    standings = fetch_standings(api_key, args.season)
+    player_idx = build_roster_index(rosters)
+    print(f"  {len(player_idx)} players indexed")
+
+    print(f"\nFetching standings ({args.season})...")
+    standings = fetch_standings(args.season)
     print(f"  {len(standings)} teams")
 
-    print(f"\nLoading NBA players from card_catalog...")
+    print("\nLoading NBA players from card_catalog...")
     catalog_players = load_nba_players_from_catalog()
     print(f"  {len(catalog_players):,} distinct players")
 
     existing = load_existing_stats()
     print(f"  {len(existing)} already in player_stats")
 
-    print("\nMatching players...")
+    print("\nMatching players and fetching stats...")
     matched = {}
     unmatched = []
     seen = set()
 
-    for row in catalog_players:
+    for i, row in enumerate(catalog_players):
         name = row["player_name"]
         if name in seen:
             continue
         seen.add(name)
 
-        player = match_player(name, player_idx)
-        if not player:
+        player_info = match_player(name, player_idx)
+        if not player_info:
             unmatched.append(name)
             if args.verbose:
                 print(f"  MISS:  {name}")
             continue
 
-        player_id = player.get("id")
-        avg = averages.get(player_id, {})
-        if not avg:
-            # Player matched but no stats this season (injured/inactive)
+        raw_stats = fetch_player_stats(player_info["id"], args.season)
+        time.sleep(0.25)
+
+        if not raw_stats:
             if args.verbose:
-                print(f"  NO STATS: {name} (matched but no averages)")
+                print(f"  NO STATS: {name}")
             continue
 
-        entry = build_entry(player, avg, standings, existing=existing.get(name))
+        entry = build_entry(player_info, raw_stats, standings, existing.get(name))
         matched[name] = entry
 
         if args.verbose:
             cs = entry["current_season"]
-            print(f"  MATCH: {name} — {cs['points']}pts {cs['rebounds']}reb {cs['assists']}ast")
+            print(f"  MATCH: {name} ({player_info['position']}/{player_info['team']}) "
+                  f"— {cs['points']}pts {cs['rebounds']}reb {cs['assists']}ast")
 
-    # Preserve existing players not in current catalog
+        if (i + 1) % 50 == 0:
+            print(f"  [{i+1}/{len(catalog_players)}] matched={len(matched)} missed={len(unmatched)}")
+
     for name, data in existing.items():
         if name not in matched:
             matched[name] = data
