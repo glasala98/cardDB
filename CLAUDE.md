@@ -1,5 +1,19 @@
 # CardDB — Claude Code Rules
 
+## Project Goal
+
+**Build the best predictive card pricing tool in the hobby.**
+
+Every decision — data collection, scraping strategy, DB schema, ML features, UI — should serve this goal. The eBay sales data being collected is the foundation. The end state is a model that can predict where a card's price is going, not just where it has been.
+
+Key principles for this goal:
+- **Data depth beats data breadth** — 90 days of clean sales history on 500k cards is more valuable than 1 sale on 3M cards. Prioritize re-scraping over expanding catalog.
+- **Time-series matters** — always preserve `scraped_at`, `sale_date`, and price history. Never overwrite, only append. The trend is the signal.
+- **Features to build toward**: sale velocity, price momentum, rookie year seasonality, population report changes, set release cycles, player performance correlation.
+- **Every new DB column or table should have a clear ML feature justification** — don't collect data you can't use.
+
+---
+
 ## Core Rules
 
 ### Local vs cloud execution
