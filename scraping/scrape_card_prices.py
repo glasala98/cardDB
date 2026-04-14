@@ -503,6 +503,150 @@ def clean_card_name_for_search(card_name):
     return search_term.strip()
 
 
+# ── Fast HTTP path (curl_cffi + BeautifulSoup) ────────────────────────────────
+# Uses curl_cffi to impersonate Chrome's TLS fingerprint — eBay can't distinguish
+# this from a real browser at the network level. No Chrome process needed.
+# Falls back to Selenium automatically if eBay blocks or the parse fails.
+
+_http_local = threading.local()
+
+
+def _get_http_session():
+    """Thread-local curl_cffi session impersonating Chrome 131."""
+    if not hasattr(_http_local, 'session'):
+        try:
+            from curl_cffi import requests as cffi_requests
+            _http_local.session = cffi_requests.Session(impersonate="chrome131")
+        except Exception:
+            _http_local.session = None
+    return _http_local.session
+
+
+def _fetch_ebay_html(url, timeout=12):
+    """Fetch eBay page HTML via curl_cffi. Returns HTML string or None on failure."""
+    session = _get_http_session()
+    if session is None:
+        return None
+    try:
+        resp = session.get(url, timeout=timeout)
+        if resp.status_code == 200:
+            return resp.text
+    except Exception:
+        pass
+    return None
+
+
+def _parse_ebay_items(html, url, card_name, max_results=240):
+    """Parse eBay sold listing items from raw HTML using BeautifulSoup.
+
+    Uses eBay's standard SSR list-view classes (.s-item) which are always
+    present in the server-rendered HTML.
+
+    Returns:
+        list  — sale dicts (same shape as Selenium path), may be empty
+        None  — HTML doesn't contain expected elements → trigger Selenium fallback
+    """
+    try:
+        from bs4 import BeautifulSoup
+    except ImportError:
+        return None
+
+    soup = BeautifulSoup(html, 'html.parser')
+    grade_str, grade_num = get_grade_info(card_name)
+
+    # No-results page
+    if soup.select_one('.srp-save-null-search__heading'):
+        return []
+
+    items = soup.select('li.s-item')
+    if not items:
+        return None  # Blocked / captcha / unexpected layout → Selenium fallback
+
+    sales = []
+    for item in items:
+        if 's-item--placeholder' in (item.get('class') or []):
+            continue
+
+        title_elem = item.select_one('.s-item__title')
+        if not title_elem:
+            continue
+        title = re.sub(r'^New [Ll]isting\s*', '', title_elem.get_text(' ', strip=True)).strip()
+        if not title or 'Shop on eBay' in title:
+            continue
+        if not title_matches_grade(title, grade_str, grade_num):
+            continue
+        if _LOT_RE.search(title):
+            continue
+
+        price_elem = item.select_one('.s-item__price')
+        if not price_elem:
+            continue
+        price_match = re.search(r'\$([\d,]+\.?\d*)', price_elem.get_text())
+        if not price_match:
+            continue
+        price_str = price_match.group(0)
+        price_val = float(price_match.group(1).replace(',', ''))
+
+        shipping_val = 0.0
+        ship_elem = item.select_one('.s-item__shipping, .s-item__logisticsCost')
+        if ship_elem:
+            st = ship_elem.get_text(strip=True).lower()
+            if 'free' not in st:
+                sm = re.search(r'\$([\d,]+\.?\d*)', st)
+                if sm:
+                    shipping_val = float(sm.group(1).replace(',', ''))
+        total_val = round(price_val + shipping_val, 2)
+
+        sold_date = None
+        for sel in ('.s-item__ended-date', '.s-item__caption--signal', '.POSITIVE'):
+            d = item.select_one(sel)
+            if d:
+                m = re.search(r'(\w{3}\s+\d{1,2},?\s*\d{4})', d.get_text())
+                if m:
+                    try:
+                        sold_date = datetime.strptime(m.group(1).replace(',', ''), '%b %d %Y')
+                        break
+                    except ValueError:
+                        pass
+
+        listing_url = ''
+        a = item.select_one('a.s-item__link')
+        if a:
+            listing_url = a.get('href', '')
+            for param in ['epid', 'itmprp', '_skw']:
+                listing_url = re.sub(rf'[&?]{param}=[^&]*', '', listing_url)
+
+        item_image_url = ''
+        img = item.select_one('img')
+        if img:
+            for attr in ('src', 'data-src', 'data-defer-img'):
+                v = img.get(attr, '')
+                if v and 'ebayimg.com' in v and '.gif' not in v:
+                    item_image_url = v
+                    break
+
+        cond_elem = item.select_one('.SECONDARY_INFO, .s-item__subtitle')
+        item_condition = cond_elem.get_text(strip=True) if cond_elem else None
+
+        sales.append({
+            'title': title,
+            'item_price': price_str,
+            'shipping': f"${shipping_val}" if shipping_val > 0 else 'Free',
+            'price_val': total_val,
+            'sold_date': sold_date.strftime('%Y-%m-%d') if sold_date else None,
+            'days_ago': (datetime.now() - sold_date).days if sold_date else None,
+            'listing_url': listing_url,
+            'search_url': url,
+            'image_url': item_image_url,
+            'condition': item_condition,
+        })
+
+        if len(sales) >= max_results:
+            break
+
+    return sales
+
+
 def create_driver():
     """Create a headless Chrome WebDriver with memory-saving and anti-detection flags."""
     options = Options()
@@ -757,6 +901,15 @@ def search_ebay_sold(driver, card_name, max_results=240, search_query=None, page
     # eBay sold listings URL, sorted by most recent; _pgn for pagination
     url = f"https://www.ebay.com/sch/i.html?_nkw={encoded_query}&_sacat=0&LH_Complete=1&LH_Sold=1&_sop=13&_ipg=240&_pgn={page}"
 
+    # Fast path: curl_cffi + BeautifulSoup — no Chrome overhead (~200-500ms vs 3-8s)
+    html = _fetch_ebay_html(url)
+    if html is not None:
+        result = _parse_ebay_items(html, url, card_name, max_results)
+        if result is not None:
+            return result
+        # result=None means parse found no .s-item elements → fall through to Selenium
+
+    # Selenium fallback: used when curl_cffi is blocked or layout is unrecognised
     try:
         driver.get(url)
 
