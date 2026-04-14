@@ -52,7 +52,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Update NHL player stats (daily incremental; bios updated weekly in master_db_weekly)
-        run: python -u scrape_nhl_stats.py
+        run: python -u scraping/scrape_nhl_stats.py
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Generate cancellation report
