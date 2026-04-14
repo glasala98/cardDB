@@ -10,7 +10,7 @@ concurrency:
 
 on:
   schedule:
-    - cron: '0 2,8,14,20 * * *'  # every 6h — offset 2h from staple, 1h from elite
+    - cron: '0 10,22 * * *'  # 2x/day — 10am and 10pm UTC, non-overlapping with stars
   workflow_dispatch:
     inputs:
       sport:

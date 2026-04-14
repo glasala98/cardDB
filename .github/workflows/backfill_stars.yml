@@ -11,7 +11,7 @@ concurrency:
 
 on:
   schedule:
-    - cron: '0 3,9,15,21 * * *'  # every 6h — offset 3h from elite, 1h from premium
+    - cron: '0 0,16 * * *'  # 2x/day — midnight and 4pm UTC, non-overlapping with premium
   workflow_dispatch:
     inputs:
       sport:
