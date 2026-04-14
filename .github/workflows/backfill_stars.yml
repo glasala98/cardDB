@@ -1,17 +1,17 @@
-name: Backfill — Stars
+name: Stars Tier — Delta Scrape
 
-# One-time backfill for stars tier (1,118,454 cards).
+# Delta mode: all stars tier cards have been touched (Untouched=0 confirmed Apr 8).
+# --backfill removed — was finding 0 cards. Now runs delta with stale-days 60
+# to reprice cards not scraped in 60 days.
 # 20 shards across 4 sports, max-parallel 20 (GH limit).
-# Each shard: ~56,000 cards, ~21 runs to clear → ~5 days at 4 runs/day.
-# Manual only — trigger after premium backfill is complete.
 
 concurrency:
   group: backfill-stars
   cancel-in-progress: false
 
 on:
-  # schedule disabled — enable after premium backfill completes (~Apr 9)
-  # cron: '0 2,8,14,20 * * *'
+  schedule:
+    - cron: '0 3,9,15,21 * * *'  # every 6h — offset 3h from elite, 1h from premium
   workflow_dispatch:
     inputs:
       sport:
@@ -67,7 +67,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
 
-      - name: Backfill ${{ matrix.sport }} stars (shard ${{ matrix.shard_index }}/${{ matrix.shard_count }})
+      - name: Scrape ${{ matrix.sport }} stars delta (shard ${{ matrix.shard_index }}/${{ matrix.shard_count }})
         if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == matrix.sport }}
         run: |
           python -u scraping/scrape_master_db.py \
@@ -78,7 +78,6 @@ jobs:
             --year-from 2000 \
             --shard-index ${{ matrix.shard_index }} \
             --shard-count ${{ matrix.shard_count }} \
-            --backfill \
             --max-hours 5.75
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
