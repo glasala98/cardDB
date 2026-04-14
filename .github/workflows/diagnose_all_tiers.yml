@@ -1,0 +1,73 @@
+name: Diagnose All Tiers (Manual)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install psycopg2-binary -q
+      - name: Full tier diagnosis
+        run: |
+          python - <<'EOF'
+          import os, psycopg2
+          conn = psycopg2.connect(os.environ["DATABASE_URL"])
+          cur = conn.cursor()
+
+          tiers = ['elite', 'staple', 'premium', 'stars', 'base']
+
+          print(f"\n{'Tier':<10} {'Total':>8} {'Untouched':>10} {'Has Raw':>10} {'Priced':>8} {'no_market':>10}")
+          print("-" * 62)
+
+          for tier in tiers:
+              cur.execute("""
+                  SELECT
+                      COUNT(*) as total,
+                      COUNT(CASE WHEN rs.cnt = 0 AND mp.id IS NULL THEN 1 END) as untouched,
+                      COUNT(CASE WHEN rs.cnt > 0 THEN 1 END) as has_raw_sales,
+                      COUNT(CASE WHEN mp.fair_value > 0 THEN 1 END) as priced,
+                      COUNT(CASE WHEN mp.confidence = 'no_market' THEN 1 END) as no_market
+                  FROM card_catalog cc
+                  LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
+                  LEFT JOIN (
+                      SELECT card_catalog_id, COUNT(*) as cnt
+                      FROM market_raw_sales GROUP BY card_catalog_id
+                  ) rs ON rs.card_catalog_id = cc.id
+                  WHERE cc.scrape_tier = %s
+              """, [tier])
+              r = cur.fetchone()
+              total, untouched, has_raw, priced, no_mkt = r
+              print(f"{tier:<10} {total:>8,} {untouched:>10,} {has_raw:>10,} {priced:>8,} {no_mkt:>10,}")
+
+          print("\n** Untouched = backfill target (0 raw_sales AND no market_prices row)")
+          print("** If Untouched=0, --backfill flag finds nothing — switch to delta mode")
+
+          # Also check for cards stuck with raw_sales but never priced (stale scrape)
+          print("\n--- Cards with raw_sales but no fair_value (by tier) ---")
+          cur.execute("""
+              SELECT cc.scrape_tier,
+                     COUNT(*) as has_raw_no_price
+              FROM card_catalog cc
+              JOIN (SELECT DISTINCT card_catalog_id FROM market_raw_sales) rs
+                   ON rs.card_catalog_id = cc.id
+              LEFT JOIN market_prices mp ON mp.card_catalog_id = cc.id
+              WHERE (mp.id IS NULL OR mp.fair_value IS NULL OR mp.fair_value = 0)
+              GROUP BY cc.scrape_tier
+              ORDER BY CASE cc.scrape_tier
+                WHEN 'elite' THEN 1 WHEN 'staple' THEN 2
+                WHEN 'premium' THEN 3 WHEN 'stars' THEN 4
+                WHEN 'base' THEN 5 ELSE 6 END
+          """)
+          for row in cur.fetchall():
+              print(f"  {row[0]:<10} {row[1]:>8,} cards have raw_sales but no fair_value")
+
+          conn.close()
+          EOF
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
