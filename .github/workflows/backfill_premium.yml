@@ -1,9 +1,8 @@
-name: Backfill — Premium
+name: Premium Tier — Delta Scrape
 
-# One-time backfill for premium tier (295,795 cards).
-# 16 shards across 4 sports, max-parallel 16 (under GH 20-job limit).
-# Each shard: ~18,500 cards, ~3h per run → clears in ~2 days at 4 runs/day.
-# Manual only — trigger after elite backfill is complete.
+# Delta mode: all 299k premium cards have been touched (0 untouched as of Apr 14).
+# --backfill flag removed — was finding 0 cards. Now runs delta with stale-days 60
+# to reprice cards not scraped in 60 days and compute fair_values for the 69% unpriced.
 
 concurrency:
   group: backfill-premium
@@ -63,7 +62,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt webdriver-manager scipy
 
-      - name: Backfill ${{ matrix.sport }} premium (shard ${{ matrix.shard_index }}/${{ matrix.shard_count }})
+      - name: Scrape ${{ matrix.sport }} premium delta (shard ${{ matrix.shard_index }}/${{ matrix.shard_count }})
         if: ${{ github.event.inputs.sport == '' || github.event.inputs.sport == matrix.sport }}
         run: |
           python -u scraping/scrape_master_db.py \
@@ -74,7 +73,6 @@ jobs:
             --year-from 2000 \
             --shard-index ${{ matrix.shard_index }} \
             --shard-count ${{ matrix.shard_count }} \
-            --backfill \
             --max-hours 5.75
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
