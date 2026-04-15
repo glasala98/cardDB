@@ -9,30 +9,6 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, date, timedelta
 
-try:
-    from selenium import webdriver
-    from selenium.webdriver.chrome.options import Options
-    from selenium.webdriver.chrome.service import Service
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.webdriver.support import expected_conditions as EC
-except ImportError:
-    print("Installing selenium...")
-    import subprocess
-    subprocess.check_call(['pip', 'install', 'selenium'])
-    from selenium import webdriver
-    from selenium.webdriver.chrome.options import Options
-    from selenium.webdriver.chrome.service import Service
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.webdriver.support import expected_conditions as EC
-
-try:
-    from webdriver_manager.chrome import ChromeDriverManager
-    _use_webdriver_manager = True
-except ImportError:
-    _use_webdriver_manager = False
-
 
 def is_graded_card(card_name):
     """Return True if the card name contains a PSA or BGS grade marker.
@@ -654,44 +630,6 @@ def _parse_ebay_items(html, url, card_name, max_results=240):
     return sales
 
 
-def create_driver():
-    """Create a headless Chrome WebDriver with memory-saving and anti-detection flags."""
-    options = Options()
-    options.add_argument('--headless=new')
-    options.add_argument('--disable-gpu')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
-    options.add_argument('--window-size=1280,720')
-    options.add_argument('--disable-extensions')
-    options.add_argument('--ignore-certificate-errors')
-    options.add_argument('--allow-running-insecure-content')
-    options.add_argument('--disable-blink-features=AutomationControlled')
-    options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
-    # Block images — not needed for price scraping, saves bandwidth + memory
-    options.add_argument('--blink-settings=imagesEnabled=false')
-    # Memory-saving flags for low-RAM servers
-    options.add_argument('--no-zygote')
-    options.add_argument('--disable-background-networking')
-    options.add_argument('--disable-sync')
-    options.add_argument('--disable-translate')
-    options.add_argument('--disable-default-apps')
-    options.add_argument('--disable-software-rasterizer')
-    options.add_argument('--disable-crash-reporter')
-    options.add_argument('--mute-audio')
-    options.add_argument('--log-level=3')
-    options.add_experimental_option('excludeSwitches', ['enable-automation', 'enable-logging'])
-    # Don't wait for all resources — DOM ready is enough for eBay price scraping
-    options.page_load_strategy = 'eager'
-    if _use_webdriver_manager:
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=options)
-    else:
-        driver = webdriver.Chrome(options=options)
-    driver.set_page_load_timeout(20)
-    driver.set_script_timeout(10)
-    return driver
-
-
 def title_matches_grade(title, grade_str, grade_num):
     """Verify that a listing title matches the expected grade exactly.
 
@@ -868,237 +806,42 @@ def build_set_query(card_name):
     return search_term.strip()
 
 
-def search_ebay_sold(driver, card_name, max_results=240, search_query=None, page=1):
-    """Scrape one page of eBay completed/sold listings for a card.
+def search_ebay_sold(card_name, max_results=240, search_query=None, page=1):
+    """Fetch one page of eBay sold listings via curl_cffi + BeautifulSoup.
 
-    Navigates to eBay's sold-listing search page sorted by most recent, waits
-    for the card-based result layout to load, then iterates over each listing
-    to extract title, item price, shipping cost (added to total), sold date,
-    listing URL, and thumbnail image URL. Applies title_matches_grade() to
-    filter out listings that do not match the target grade.
+    Uses _fetch_ebay_html + _parse_ebay_items. No Selenium or Chrome.
 
-    Args:
-        driver: A Selenium WebDriver instance (should already be created via
-            get_driver() or create_driver()).
-        card_name: Full card name string used to extract grade info for filtering.
-        max_results: Maximum number of sale records to return. Defaults to 240
-            (one full eBay results page).
-        search_query: Pre-built eBay query string. If None, one is generated via
-            clean_card_name_for_search(card_name).
-        page: eBay results page number (1-based). Defaults to 1.
-
-    Returns:
-        A list of dicts, each containing:
-            - title (str): listing title.
-            - item_price (str): formatted item price, e.g. "$12.99".
-            - shipping (str): "Free" or formatted shipping cost.
-            - price_val (float): total price (item + shipping).
-            - sold_date (str or None): ISO date string "YYYY-MM-DD" or None.
-            - days_ago (int or None): days since sold, or None if date unknown.
-            - listing_url (str): direct URL to the eBay listing.
-            - image_url (str): thumbnail image URL, or empty string.
-        Returns an empty list on error or if no results are found.
+    Returns a list of sale dicts (title, price_val, sold_date, listing_url,
+    image_url, etc.) or an empty list if no results found.
     """
-
     if search_query is None:
         search_query = clean_card_name_for_search(card_name)
-    grade_str, grade_num = get_grade_info(card_name)
     encoded_query = urllib.parse.quote(search_query)
-
-    # eBay sold listings URL, sorted by most recent; _pgn for pagination
     url = f"https://www.ebay.com/sch/i.html?_nkw={encoded_query}&_sacat=0&LH_Complete=1&LH_Sold=1&_sop=13&_ipg=240&_pgn={page}"
 
-    # Fast path: curl_cffi + BeautifulSoup — no Chrome overhead (~200-500ms vs 3-8s)
     html = _fetch_ebay_html(url)
-    if html is not None:
-        result = _parse_ebay_items(html, url, card_name, max_results)
-        if result is not None:
-            return result
-        # result=None means parse found no .s-item elements → fall through to Selenium
-
-    # Selenium fallback: used when curl_cffi is blocked or layout is unrecognised
-    try:
-        driver.get(url)
-
-        # Wait for card-based results OR eBay's "no results" message — whichever comes first.
-        # 8s timeout (down from 15s); dead cards bail in ~2s when no-results renders.
-        try:
-            WebDriverWait(driver, 8).until(
-                EC.any_of(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, '.s-card')),
-                    EC.presence_of_element_located((By.CSS_SELECTOR, '.srp-save-null-search__heading')),
-                    EC.presence_of_element_located((By.CSS_SELECTOR, 'h1.srp-controls__count-heading')),
-                )
-            )
-        except Exception:
-            return []
-
-        # If eBay showed a no-results page, bail immediately
-        if driver.find_elements(By.CSS_SELECTOR, '.srp-save-null-search__heading'):
-            return []
-
-        sales = []
-        items = driver.find_elements(By.CSS_SELECTOR, '.s-card')
-
-        for item in items:
-            try:
-                title_elem = item.find_element(By.CSS_SELECTOR, '.s-card__title')
-                title = title_elem.text.split('\n')[0].strip()
-
-                # Skip empty placeholders
-                if not title:
-                    continue
-
-                # Filter: must match the exact grade (or be raw if ungraded)
-                if not title_matches_grade(title, grade_str, grade_num):
-                    continue
-
-                # Filter: skip lot/bundle listings — they distort single-card prices
-                if _LOT_RE.search(title):
-                    continue
-
-                # Get listing URL — use the title's parent anchor (s-card__link)
-                listing_url = ''
-                try:
-                    link_elem = title_elem.find_element(By.XPATH, './ancestor::a[@class="s-card__link"]')
-                    listing_url = link_elem.get_attribute('href') or ''
-                except Exception:
-                    try:
-                        link_elem = item.find_element(By.CSS_SELECTOR, 'a.s-card__link[href*="/itm/"]')
-                        listing_url = link_elem.get_attribute('href') or ''
-                    except Exception:
-                        pass
-                # Strip params that cause eBay to redirect to product catalog page
-                if listing_url:
-                    for param in ['epid', 'itmprp', '_skw']:
-                        listing_url = re.sub(rf'[&?]{param}=[^&]*', '', listing_url)
-
-                price_elem = item.find_element(By.CSS_SELECTOR, '.s-card__price')
-                price_text = price_elem.text.strip()
-
-                # Clean price - keep just the dollar amount
-                price_text = price_text.replace('Opens in a new window', '').strip()
-                price_match = re.search(r'\$([\d,]+\.?\d*)', price_text)
-                if not price_match:
-                    continue
-
-                price_str = price_match.group(0)
-                price_val = float(price_match.group(1).replace(',', ''))
-
-                # Get shipping cost and add to total
-                shipping_val = 0.0
-                try:
-                    shipping_elems = item.find_elements(By.XPATH,
-                        './/*[contains(text(),"delivery") or contains(text(),"shipping")]')
-                    for se in shipping_elems:
-                        se_text = se.text.strip().lower()
-                        if 'free' in se_text:
-                            shipping_val = 0.0
-                            break
-                        ship_match = re.search(r'\$([\d,]+\.?\d*)', se_text)
-                        if ship_match:
-                            shipping_val = float(ship_match.group(1).replace(',', ''))
-                            break
-                except Exception:
-                    pass
-
-                total_val = round(price_val + shipping_val, 2)
-
-                # Get sold date from caption
-                sold_date = None
-                try:
-                    caption = item.find_element(By.CSS_SELECTOR, '.s-card__caption')
-                    caption_text = caption.text.strip()
-                    date_match = re.search(r'Sold\s+(\w+\s+\d+,?\s*\d*)', caption_text)
-                    if date_match:
-                        date_str = date_match.group(1)
-                        # Try parsing with year
-                        try:
-                            sold_date = datetime.strptime(date_str, '%b %d, %Y')
-                        except ValueError:
-                            # If no year, assume current year
-                            try:
-                                sold_date = datetime.strptime(date_str + f', {datetime.now().year}', '%b %d, %Y')
-                            except ValueError:
-                                pass
-                except Exception:
-                    pass
-
-                # Grab thumbnail image — best-effort, eBay lazy-loads some images
-                item_image_url = ''
-                try:
-                    img_elem = item.find_element(By.CSS_SELECTOR, 'img')
-                    for attr in ('src', 'data-src', 'data-defer-img'):
-                        val = img_elem.get_attribute(attr) or ''
-                        if val and 'ebayimg.com' in val and '.gif' not in val:
-                            item_image_url = val
-                            break
-                except Exception:
-                    pass
-
-                # Condition — eBay shows e.g. "Pre-Owned", "Brand New", "Near Mint or Better"
-                item_condition = None
-                try:
-                    cond_elem = item.find_element(By.CSS_SELECTOR, '.s-item__subtitle, .SECONDARY_INFO')
-                    item_condition = cond_elem.text.strip() or None
-                except Exception:
-                    pass
-
-                sales.append({
-                    'title': title,
-                    'item_price': price_str,
-                    'shipping': f"${shipping_val}" if shipping_val > 0 else 'Free',
-                    'price_val': total_val,  # item + shipping
-                    'sold_date': sold_date.strftime('%Y-%m-%d') if sold_date else None,
-                    'days_ago': (datetime.now() - sold_date).days if sold_date else None,
-                    'listing_url': listing_url,
-                    'search_url': url,
-                    'image_url': item_image_url,
-                    'condition': item_condition,
-                })
-
-                if len(sales) >= max_results:
-                    break
-            except Exception:
-                continue
-
-        return sales
-
-    except Exception as e:
-        print(f"  Error fetching data: {e}")
+    if html is None:
         return []
+    result = _parse_ebay_items(html, url, card_name, max_results)
+    return result if result is not None else []
 
 
-def search_ebay_sold_paginated(driver, card_name, since_date=None, max_pages=15, search_query=None):
+def search_ebay_sold_paginated(card_name, since_date=None, max_pages=15, search_query=None):
     """Paginate eBay sold listings, returning all sales across multiple pages.
 
-    On first run (since_date=None), collects every sale going back up to 90 days
-    or until pages run out.  On subsequent delta runs (since_date set), stops as
-    soon as a full page contains no sales newer than since_date — typically 1–2
-    pages for most cards.
-
-    Args:
-        driver: Selenium WebDriver instance.
-        card_name: Full card name string (used for grade filtering + query building).
-        since_date: 'YYYY-MM-DD' string or None.
-            None      → first run / backfill — collect until 90 days back.
-            date str  → delta run — stop when oldest dated sale on a page ≤ this date.
-        max_pages: Safety cap on pages fetched (default 15 = up to 3,600 results).
-        search_query: Pre-built eBay query string (passed through to search_ebay_sold).
-
-    Returns:
-        Combined list of sale dicts across all pages, same shape as search_ebay_sold().
-        Sorted newest-first (eBay's natural order is preserved across pages).
+    On first run (since_date=None), collects every sale going back up to 90 days.
+    On delta runs (since_date set), stops as soon as a page contains no sales
+    newer than since_date — typically 1-2 pages for most cards.
     """
     from datetime import date, timedelta
     cutoff_90 = (date.today() - timedelta(days=90)).isoformat()
-    stop_date = since_date or cutoff_90   # delta cutoff or 90-day window
+    stop_date = since_date or cutoff_90
 
     all_sales = []
 
     for page_num in range(1, max_pages + 1):
         page_sales = search_ebay_sold(
-            driver, card_name,
+            card_name,
             max_results=240,
             search_query=search_query,
             page=page_num,
@@ -1625,7 +1368,6 @@ def process_card(card, since_date=None):
         When no sales are found at any stage, estimated_value defaults to
         $5.00 and confidence is 'none'.
     """
-    driver = get_driver()
     time.sleep(random.uniform(0.2, 0.6))
 
     target_serial = extract_serial_run(card)
@@ -1634,7 +1376,7 @@ def process_card(card, since_date=None):
     direct_sales = []    # stored historically (stage-1 paginated results only)
 
     # Stage 1: paginated full query — captures all pages since last run
-    _stage1 = search_ebay_sold_paginated(driver, card, since_date=since_date)
+    _stage1 = search_ebay_sold_paginated(card, since_date=since_date)
     _stage1 = _apply_variant_filter(card, _stage1)
 
     if _stage1:
@@ -1649,14 +1391,14 @@ def process_card(card, since_date=None):
         # Stage 2: drop parallel/subset name, keep serial + set
         time.sleep(random.uniform(0.2, 0.5))
         confidence = 'medium'
-        pricing_sales = search_ebay_sold(driver, card, search_query=build_set_query(card))
+        pricing_sales = search_ebay_sold(card, search_query=build_set_query(card))
         pricing_sales = _apply_variant_filter(card, pricing_sales)
 
     if not pricing_sales:
         # Stage 3: drop set — player + card# + serial + year only
         time.sleep(random.uniform(0.2, 0.5))
         confidence = 'low'
-        pricing_sales = search_ebay_sold(driver, card, search_query=build_simplified_query(card))
+        pricing_sales = search_ebay_sold(card, search_query=build_simplified_query(card))
         pricing_sales = _apply_variant_filter(card, pricing_sales)
 
     if not pricing_sales and target_serial:
@@ -1665,7 +1407,7 @@ def process_card(card, since_date=None):
         nearby = get_nearby_serials(target_serial)
         for comp_serial in nearby:
             comp_query = build_serial_comp_query(card, comp_serial)
-            comp_raw = search_ebay_sold(driver, card, search_query=comp_query)
+            comp_raw = search_ebay_sold(card, search_query=comp_query)
             if comp_raw:
                 for s in comp_raw:
                     adj = dict(s)
@@ -1673,16 +1415,14 @@ def process_card(card, since_date=None):
                     adj['_serial_adjusted'] = True
                     adj['_original_serial'] = comp_serial
                     pricing_sales.append(adj)
-                break  # Use first nearby serial that has results
+                break
         # direct_sales stays empty — stage 4 comps are NOT stored historically
 
     if not pricing_sales:
-        # Stage 5: player + card# only — absolute last resort for any card type.
-        # Catches unusual/descriptive card names and un-numbered cards with no comps.
-        # Pricing fallback only — NOT stored historically in raw_sales.
+        # Stage 5: player + card# only — absolute last resort
         time.sleep(random.uniform(0.2, 0.5))
         confidence = 'low'
-        pricing_sales = search_ebay_sold(driver, card, search_query=build_player_card_query(card))
+        pricing_sales = search_ebay_sold(card, search_query=build_player_card_query(card))
 
     if pricing_sales:
         pricing_sales = _normalize_shipping(pricing_sales)

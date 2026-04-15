@@ -53,70 +53,16 @@ PSA_PROBE_ORDER = ['PSA 10', 'PSA 9', 'PSA 8']
 BGS_PROBE_ORDER = ['BGS 10', 'BGS 9.5', 'BGS 9']
 ALL_GRADES = PSA_PROBE_ORDER + BGS_PROBE_ORDER
 
-# Thread-local Chrome drivers + shared progress counters
-_thread_local = threading.local()
+# Shared progress counters
 _lock = threading.Lock()
 _progress = {
     "done": 0, "found": 0, "not_found": 0, "errors": 0, "deltas": 0,
-    "consec_errors": 0,   # consecutive failures — triggers rate-limit backoff
-    "consec_not_found": 0, # consecutive not-found — triggers IP-block early exit
-    "error_log": [],      # list of (card_catalog_id, card_name, error_type, error_msg)
+    "consec_errors": 0,
+    "consec_not_found": 0,
+    "error_log": [],
 }
 # Backoff thresholds: after N consecutive errors, sleep this many seconds
 _BACKOFF = [(5, 10), (10, 30), (20, 90)]
-
-
-# ── Chrome driver ─────────────────────────────────────────────────────────────
-
-def _create_fast_driver():
-    from selenium.webdriver.chrome.options import Options
-    opts = Options()
-    for arg in [
-        '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage',
-        '--window-size=1280,720', '--disable-extensions',
-        '--blink-settings=imagesEnabled=false', '--ignore-certificate-errors',
-        '--allow-running-insecure-content',
-        '--disable-blink-features=AutomationControlled',
-        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
-        '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        '--no-zygote', '--disable-background-networking', '--disable-sync',
-        '--disable-translate', '--disable-default-apps', '--disable-software-rasterizer',
-        '--disable-crash-reporter', '--mute-audio', '--log-level=3',
-    ]:
-        opts.add_argument(arg)
-    opts.add_experimental_option('excludeSwitches', ['enable-automation', 'enable-logging'])
-    opts.page_load_strategy = 'eager'
-    from selenium import webdriver
-    try:
-        from webdriver_manager.chrome import ChromeDriverManager
-        from selenium.webdriver.chrome.service import Service
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=opts)
-    except Exception:
-        driver = webdriver.Chrome(options=opts)
-    driver.set_page_load_timeout(15)
-    driver.set_script_timeout(10)
-    return driver
-
-
-def _get_fast_driver():
-    if hasattr(_thread_local, 'driver'):
-        try:
-            _thread_local.driver.title
-        except Exception:
-            try: _thread_local.driver.quit()
-            except Exception: pass
-            del _thread_local.driver
-    if not hasattr(_thread_local, 'driver'):
-        _thread_local.driver = _create_fast_driver()
-    return _thread_local.driver
-
-
-# Patch scraper to use fast driver
-scrape_card_prices._thread_local = _thread_local
-scrape_card_prices.get_driver = _get_fast_driver
-scrape_card_prices.time = type(time)('time')
-scrape_card_prices.time.sleep = time.sleep
-scrape_card_prices.time.time = time.time
 
 
 # ── Card name builder ─────────────────────────────────────────────────────────
@@ -621,10 +567,6 @@ def scrape_one(card: dict) -> tuple:
         except Exception as exc:
             last_exc = exc
             if attempt == 0:
-                try:
-                    if hasattr(_thread_local, 'driver'): _thread_local.driver.quit()
-                except Exception: pass
-                if hasattr(_thread_local, 'driver'): del _thread_local.driver
                 continue
             # Both attempts failed — log and apply consecutive-failure backoff
             err_type = type(last_exc).__name__
@@ -682,10 +624,6 @@ def scrape_one_graded(card: dict, grades: list) -> tuple:
                     break
                 except Exception:
                     if attempt == 0:
-                        try:
-                            if hasattr(_thread_local, 'driver'): _thread_local.driver.quit()
-                        except Exception: pass
-                        if hasattr(_thread_local, 'driver'): del _thread_local.driver
                         continue
                     with _lock:
                         _progress['done'] += 1
@@ -699,7 +637,7 @@ def scrape_one_graded(card: dict, grades: list) -> tuple:
 
 def main():
     parser = argparse.ArgumentParser(description="Scrape eBay prices for card_catalog")
-    parser.add_argument('--workers',       type=int,   default=5,    help="Parallel Chrome instances")
+    parser.add_argument('--workers',       type=int,   default=5,    help="Parallel scrape workers")
     parser.add_argument('--sport',         type=str,   default=None, help="NHL|NBA|NFL|MLB")
     parser.add_argument('--year',          type=str,   default=None, help="Exact year e.g. 2024-25")
     parser.add_argument('--year-from',     type=int,   default=None, dest='year_from', help="Start year e.g. 2015")
