@@ -558,59 +558,66 @@ def _parse_ebay_items(html, url, card_name, max_results=240):
     if soup.select_one('.srp-save-null-search__heading'):
         return []
 
-    items = soup.select('li.s-item')
+    # eBay serves card/grid layout (.s-card) in SSR HTML — same classes as Selenium path
+    items = soup.select('.s-card')
     if not items:
         return None  # Blocked / captcha / unexpected layout → Selenium fallback
 
     sales = []
     for item in items:
-        if 's-item--placeholder' in (item.get('class') or []):
-            continue
-
-        title_elem = item.select_one('.s-item__title')
+        title_elem = item.select_one('.s-card__title')
         if not title_elem:
             continue
-        title = re.sub(r'^New [Ll]isting\s*', '', title_elem.get_text(' ', strip=True)).strip()
-        if not title or 'Shop on eBay' in title:
+        title = title_elem.get_text('\n', strip=True).split('\n')[0].strip()
+        if not title:
             continue
         if not title_matches_grade(title, grade_str, grade_num):
             continue
         if _LOT_RE.search(title):
             continue
 
-        price_elem = item.select_one('.s-item__price')
+        price_elem = item.select_one('.s-card__price')
         if not price_elem:
             continue
-        price_match = re.search(r'\$([\d,]+\.?\d*)', price_elem.get_text())
+        price_text = price_elem.get_text(strip=True).replace('Opens in a new window', '')
+        price_match = re.search(r'\$([\d,]+\.?\d*)', price_text)
         if not price_match:
             continue
         price_str = price_match.group(0)
         price_val = float(price_match.group(1).replace(',', ''))
 
         shipping_val = 0.0
-        ship_elem = item.select_one('.s-item__shipping, .s-item__logisticsCost')
-        if ship_elem:
-            st = ship_elem.get_text(strip=True).lower()
-            if 'free' not in st:
-                sm = re.search(r'\$([\d,]+\.?\d*)', st)
-                if sm:
-                    shipping_val = float(sm.group(1).replace(',', ''))
+        for se in item.find_all(string=re.compile(r'delivery|shipping', re.I)):
+            st = se.strip().lower()
+            if 'free' in st:
+                shipping_val = 0.0
+                break
+            sm = re.search(r'\$([\d,]+\.?\d*)', st)
+            if sm:
+                shipping_val = float(sm.group(1).replace(',', ''))
+                break
         total_val = round(price_val + shipping_val, 2)
 
         sold_date = None
-        for sel in ('.s-item__ended-date', '.s-item__caption--signal', '.POSITIVE'):
-            d = item.select_one(sel)
-            if d:
-                m = re.search(r'(\w{3}\s+\d{1,2},?\s*\d{4})', d.get_text())
-                if m:
+        caption = item.select_one('.s-card__caption')
+        if caption:
+            m = re.search(r'Sold\s+(\w+\s+\d+,?\s*\d*)', caption.get_text())
+            if m:
+                date_str = m.group(1)
+                for fmt in ('%b %d, %Y', '%b %d %Y'):
                     try:
-                        sold_date = datetime.strptime(m.group(1).replace(',', ''), '%b %d %Y')
+                        sold_date = datetime.strptime(date_str, fmt)
                         break
+                    except ValueError:
+                        pass
+                if not sold_date:
+                    try:
+                        sold_date = datetime.strptime(date_str + f', {datetime.now().year}', '%b %d, %Y')
                     except ValueError:
                         pass
 
         listing_url = ''
-        a = item.select_one('a.s-item__link')
+        a = item.select_one('a.s-card__link')
         if a:
             listing_url = a.get('href', '')
             for param in ['epid', 'itmprp', '_skw']:
@@ -625,9 +632,6 @@ def _parse_ebay_items(html, url, card_name, max_results=240):
                     item_image_url = v
                     break
 
-        cond_elem = item.select_one('.SECONDARY_INFO, .s-item__subtitle')
-        item_condition = cond_elem.get_text(strip=True) if cond_elem else None
-
         sales.append({
             'title': title,
             'item_price': price_str,
@@ -638,7 +642,7 @@ def _parse_ebay_items(html, url, card_name, max_results=240):
             'listing_url': listing_url,
             'search_url': url,
             'image_url': item_image_url,
-            'condition': item_condition,
+            'condition': None,
         })
 
         if len(sales) >= max_results:
