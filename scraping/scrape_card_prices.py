@@ -551,7 +551,10 @@ def _parse_ebay_items(html, url, card_name, max_results=240):
     except ImportError:
         return None
 
-    soup = BeautifulSoup(html, 'html.parser')
+    try:
+        soup = BeautifulSoup(html, 'lxml')
+    except Exception:
+        soup = BeautifulSoup(html, 'html.parser')
     grade_str, grade_num = get_grade_info(card_name)
 
     # No-results page
@@ -569,7 +572,7 @@ def _parse_ebay_items(html, url, card_name, max_results=240):
         if not title_elem:
             continue
         title = title_elem.get_text('\n', strip=True).split('\n')[0].strip()
-        if not title:
+        if not title or 'Shop on eBay' in title:
             continue
         if not title_matches_grade(title, grade_str, grade_num):
             continue

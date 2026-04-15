@@ -5,6 +5,7 @@ requests
 beautifulsoup4
 webdriver-manager
 curl_cffi
+lxml
 
 # API
 fastapi
