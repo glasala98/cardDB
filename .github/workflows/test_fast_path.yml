@@ -1,0 +1,46 @@
+name: Test Fast Path (Manual)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install curl_cffi beautifulsoup4 -q
+      - name: Test eBay HTML structure
+        run: |
+          python3 - <<'EOF'
+          from curl_cffi import requests as cffi
+          import urllib.parse, re
+          from bs4 import BeautifulSoup
+
+          s = cffi.Session(impersonate="chrome131")
+          q = urllib.parse.quote("2021 upper deck young guns")
+          url = f"https://www.ebay.com/sch/i.html?_nkw={q}&_sacat=0&LH_Complete=1&LH_Sold=1&_sop=13&_ipg=240"
+          r = s.get(url, timeout=15)
+          html = r.text
+          print(f"Status: {r.status_code}, Length: {len(html)}")
+
+          for cls in ['li.s-item', '.s-card', '.srp-results', '.b-list__items_nofooter', 'srp-save-null']:
+              soup = BeautifulSoup(html, 'html.parser')
+              found = soup.select(cls)
+              print(f"  '{cls}': {len(found)} elements")
+
+          # Print first 300 chars of body to see what eBay returned
+          soup = BeautifulSoup(html, 'html.parser')
+          body = soup.find('body')
+          if body:
+              print("\nBody start:", body.get_text()[:300])
+
+          # Check for any price-looking elements
+          prices = re.findall(r'\$[\d,]+\.?\d*', html)
+          print(f"\nPrice patterns found: {len(prices)}")
+          if prices:
+              print("Sample prices:", prices[:5])
+          EOF
