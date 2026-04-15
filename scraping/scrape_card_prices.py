@@ -515,12 +515,13 @@ def _fetch_ebay_html(url, timeout=12):
 def _parse_ebay_items(html, url, card_name, max_results=240):
     """Parse eBay sold listing items from raw HTML using BeautifulSoup.
 
-    Uses eBay's standard SSR list-view classes (.s-item) which are always
-    present in the server-rendered HTML.
+    Handles both eBay layout variants:
+      - Grid view: .s-card  (many results)
+      - List view: li.s-item (sparse results)
 
     Returns:
-        list  — sale dicts (same shape as Selenium path), may be empty
-        None  — HTML doesn't contain expected elements → trigger Selenium fallback
+        list  -- sale dicts, may be empty
+        None  -- neither layout found (blocked / captcha)
     """
     try:
         from bs4 import BeautifulSoup
@@ -533,18 +534,56 @@ def _parse_ebay_items(html, url, card_name, max_results=240):
         soup = BeautifulSoup(html, 'html.parser')
     grade_str, grade_num = get_grade_info(card_name)
 
-    # No-results page
+    # Explicit no-results page
     if soup.select_one('.srp-save-null-search__heading'):
         return []
 
-    # eBay serves card/grid layout (.s-card) in SSR HTML — same classes as Selenium path
+    # Try grid layout first, fall back to list layout
     items = soup.select('.s-card')
+    use_grid = bool(items)
     if not items:
-        return None  # Blocked / captcha / unexpected layout → Selenium fallback
+        items = soup.select('li.s-item')
+    if not items:
+        return None  # Blocked / captcha / unexpected layout
+
+    def _extract_shipping(item):
+        for se in item.find_all(string=re.compile(r'delivery|shipping', re.I)):
+            st = se.strip().lower()
+            if 'free' in st:
+                return 0.0
+            sm = re.search(r'\$([\d,]+\.?\d*)', st)
+            if sm:
+                return float(sm.group(1).replace(',', ''))
+        return 0.0
+
+    def _extract_date(text):
+        m = re.search(r'Sold\s+(\w+\s+\d+,?\s*\d*)', text)
+        if not m:
+            return None
+        date_str = m.group(1)
+        for fmt in ('%b %d, %Y', '%b %d %Y'):
+            try:
+                return datetime.strptime(date_str, fmt)
+            except ValueError:
+                pass
+        try:
+            return datetime.strptime(date_str + f', {datetime.now().year}', '%b %d, %Y')
+        except ValueError:
+            return None
 
     sales = []
     for item in items:
-        title_elem = item.select_one('.s-card__title')
+        if use_grid:
+            title_elem = item.select_one('.s-card__title')
+            price_elem = item.select_one('.s-card__price')
+            caption_elem = item.select_one('.s-card__caption')
+            link_elem = item.select_one('a.s-card__link')
+        else:
+            title_elem = item.select_one('.s-item__title')
+            price_elem = item.select_one('.s-item__price')
+            caption_elem = item.select_one('.s-item__subtitle') or item.select_one('.s-item__info')
+            link_elem = item.select_one('a.s-item__link')
+
         if not title_elem:
             continue
         title = title_elem.get_text('\n', strip=True).split('\n')[0].strip()
@@ -555,7 +594,6 @@ def _parse_ebay_items(html, url, card_name, max_results=240):
         if _LOT_RE.search(title):
             continue
 
-        price_elem = item.select_one('.s-card__price')
         if not price_elem:
             continue
         price_text = price_elem.get_text(strip=True).replace('Opens in a new window', '')
@@ -565,40 +603,14 @@ def _parse_ebay_items(html, url, card_name, max_results=240):
         price_str = price_match.group(0)
         price_val = float(price_match.group(1).replace(',', ''))
 
-        shipping_val = 0.0
-        for se in item.find_all(string=re.compile(r'delivery|shipping', re.I)):
-            st = se.strip().lower()
-            if 'free' in st:
-                shipping_val = 0.0
-                break
-            sm = re.search(r'\$([\d,]+\.?\d*)', st)
-            if sm:
-                shipping_val = float(sm.group(1).replace(',', ''))
-                break
+        shipping_val = _extract_shipping(item)
         total_val = round(price_val + shipping_val, 2)
 
-        sold_date = None
-        caption = item.select_one('.s-card__caption')
-        if caption:
-            m = re.search(r'Sold\s+(\w+\s+\d+,?\s*\d*)', caption.get_text())
-            if m:
-                date_str = m.group(1)
-                for fmt in ('%b %d, %Y', '%b %d %Y'):
-                    try:
-                        sold_date = datetime.strptime(date_str, fmt)
-                        break
-                    except ValueError:
-                        pass
-                if not sold_date:
-                    try:
-                        sold_date = datetime.strptime(date_str + f', {datetime.now().year}', '%b %d, %Y')
-                    except ValueError:
-                        pass
+        sold_date = _extract_date(caption_elem.get_text() if caption_elem else '')
 
         listing_url = ''
-        a = item.select_one('a.s-card__link')
-        if a:
-            listing_url = a.get('href', '')
+        if link_elem:
+            listing_url = link_elem.get('href', '')
             for param in ['epid', 'itmprp', '_skw']:
                 listing_url = re.sub(rf'[&?]{param}=[^&]*', '', listing_url)
 
@@ -628,7 +640,6 @@ def _parse_ebay_items(html, url, card_name, max_results=240):
             break
 
     return sales
-
 
 def title_matches_grade(title, grade_str, grade_num):
     """Verify that a listing title matches the expected grade exactly.
