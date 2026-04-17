@@ -64,7 +64,7 @@ jobs:
           python -u scraping/scrape_master_db.py \
             --catalog-tier premium \
             --sport ${{ matrix.sport }} \
-            --workers 3 \
+            --workers 4 \
             --stale-days 60 \
             --year-from 2000 \
             --shard-index ${{ matrix.shard_index }} \

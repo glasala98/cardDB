@@ -1400,14 +1400,12 @@ def process_card(card, since_date=None):
 
     if not pricing_sales:
         # Stage 2: drop parallel/subset name, keep serial + set
-        time.sleep(random.uniform(0.2, 0.5))
         confidence = 'medium'
         pricing_sales = search_ebay_sold(card, search_query=build_set_query(card))
         pricing_sales = _apply_variant_filter(card, pricing_sales)
 
     if not pricing_sales:
         # Stage 3: drop set — player + card# + serial + year only
-        time.sleep(random.uniform(0.2, 0.5))
         confidence = 'low'
         pricing_sales = search_ebay_sold(card, search_query=build_simplified_query(card))
         pricing_sales = _apply_variant_filter(card, pricing_sales)
@@ -1431,7 +1429,6 @@ def process_card(card, since_date=None):
 
     if not pricing_sales:
         # Stage 5: player + card# only — absolute last resort
-        time.sleep(random.uniform(0.2, 0.5))
         confidence = 'low'
         pricing_sales = search_ebay_sold(card, search_query=build_player_card_query(card))
 

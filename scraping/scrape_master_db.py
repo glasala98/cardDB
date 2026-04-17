@@ -845,9 +845,9 @@ def main():
                 elif stats.get('num_sales', 0) > 0:
                     batch.append((catalog_id, stats, result.get('image_url') or '',
                                   result.get('raw_sales') or []))
-                elif card.get('scrape_tier') == 'base':
-                    # Base cards with 0 sales are confirmed no-market, not unknowns.
-                    # Stamp them so the stale-days gate skips them on the next run.
+                else:
+                    # All tiers: 0-sale cards are confirmed no-market.
+                    # Stamp them so stale-days gate skips re-scraping for 60 days.
                     no_market_batch.append(catalog_id)
 
                 if done_count % BATCH_SIZE == 0 or done_count == total:
