@@ -1,0 +1,142 @@
+name: Test Optimizations
+
+on:
+  workflow_dispatch:
+
+jobs:
+  # ── stale-days 60 vs 14 ──────────────────────────────────────────────────
+  stale-60:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install psycopg2-binary requests beautifulsoup4 curl_cffi lxml
+      - name: stale-days 60 (baseline)
+        run: |
+          python -u scraping/scrape_master_db.py \
+            --catalog-tier premium \
+            --sport NFL \
+            --workers 4 \
+            --stale-days 60 \
+            --limit 500
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  stale-14:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install psycopg2-binary requests beautifulsoup4 curl_cffi lxml
+      - name: stale-days 14
+        run: |
+          python -u scraping/scrape_master_db.py \
+            --catalog-tier premium \
+            --sport NFL \
+            --workers 4 \
+            --stale-days 14 \
+            --limit 500
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  # ── workers 4 vs 5 ───────────────────────────────────────────────────────
+  workers-4:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install psycopg2-binary requests beautifulsoup4 curl_cffi lxml
+      - name: workers 4 (baseline)
+        run: |
+          python -u scraping/scrape_master_db.py \
+            --catalog-tier premium \
+            --sport NHL \
+            --workers 4 \
+            --stale-days 1 \
+            --limit 500 \
+            --force
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  workers-5:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install psycopg2-binary requests beautifulsoup4 curl_cffi lxml
+      - name: workers 5
+        run: |
+          python -u scraping/scrape_master_db.py \
+            --catalog-tier premium \
+            --sport NHL \
+            --workers 5 \
+            --stale-days 1 \
+            --limit 500 \
+            --force
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  # ── NFL shards 4 vs 8 ────────────────────────────────────────────────────
+  nfl-shards-4:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install psycopg2-binary requests beautifulsoup4 curl_cffi lxml
+      - name: NFL 4 shards shard 0/4 (baseline)
+        run: |
+          python -u scraping/scrape_master_db.py \
+            --catalog-tier premium \
+            --sport NFL \
+            --workers 4 \
+            --stale-days 1 \
+            --shard-index 0 \
+            --shard-count 4 \
+            --force \
+            --limit 2000
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  nfl-shards-8:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install psycopg2-binary requests beautifulsoup4 curl_cffi lxml
+      - name: NFL 8 shards shard 0/8
+        run: |
+          python -u scraping/scrape_master_db.py \
+            --catalog-tier premium \
+            --sport NFL \
+            --workers 4 \
+            --stale-days 1 \
+            --shard-index 0 \
+            --shard-count 8 \
+            --force \
+            --limit 2000
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
