@@ -1,0 +1,63 @@
+name: Fix no_market damage (one-time)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install psycopg2-binary
+      - name: Restore overwritten prices
+        run: |
+          python - <<'PYEOF'
+          import os, psycopg2
+
+          conn = psycopg2.connect(os.environ["DATABASE_URL"])
+          cur = conn.cursor()
+
+          # Find cards that were wrongly stamped no_market but have price history
+          # (market_price_history has their real prices)
+          cur.execute("""
+              UPDATE market_prices mp
+              SET fair_value  = mph.fair_value,
+                  prev_value  = mph.prev_value,
+                  trend       = mph.trend,
+                  confidence  = mph.confidence,
+                  num_sales   = mph.num_sales,
+                  updated_at  = NOW()
+              FROM (
+                  SELECT DISTINCT ON (card_catalog_id)
+                      card_catalog_id,
+                      fair_value,
+                      prev_value,
+                      trend,
+                      confidence,
+                      num_sales
+                  FROM market_price_history
+                  WHERE fair_value > 0
+                  ORDER BY card_catalog_id, recorded_at DESC
+              ) mph
+              WHERE mp.card_catalog_id = mph.card_catalog_id
+                AND mp.confidence = 'no_market'
+                AND mp.fair_value = 0
+          """)
+          fixed = cur.rowcount
+          conn.commit()
+
+          cur.execute("SELECT COUNT(*) FROM market_prices WHERE confidence = 'no_market' AND fair_value = 0")
+          remaining = cur.fetchone()[0]
+
+          print(f"Restored: {fixed:,} cards")
+          print(f"Remaining legitimate no_market: {remaining:,}")
+          cur.close()
+          conn.close()
+          PYEOF
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
