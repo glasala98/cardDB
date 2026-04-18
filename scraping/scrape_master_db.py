@@ -846,9 +846,12 @@ def main():
                     batch.append((catalog_id, stats, result.get('image_url') or '',
                                   result.get('raw_sales') or []))
                 else:
-                    # All tiers: 0-sale cards are confirmed no-market.
-                    # Stamp them so stale-days gate skips re-scraping for 60 days.
-                    no_market_batch.append(catalog_id)
+                else:
+                    # Only stamp no_market if card has never been priced.
+                    # Cards with existing_price already have valid data — 0 sales
+                    # today just means no new sales, not that the card is worthless.
+                    if card.get('existing_price') is None:
+                        no_market_batch.append(catalog_id)
 
                 if done_count % BATCH_SIZE == 0 or done_count == total:
                     _flush_batch()
