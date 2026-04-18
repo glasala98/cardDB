@@ -846,7 +846,6 @@ def main():
                     batch.append((catalog_id, stats, result.get('image_url') or '',
                                   result.get('raw_sales') or []))
                 else:
-                else:
                     # Only stamp no_market if card has never been priced.
                     # Cards with existing_price already have valid data — 0 sales
                     # today just means no new sales, not that the card is worthless.
