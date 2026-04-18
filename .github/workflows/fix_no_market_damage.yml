@@ -22,27 +22,25 @@ jobs:
           conn = psycopg2.connect(os.environ["DATABASE_URL"])
           cur = conn.cursor()
 
-          # Find cards that were wrongly stamped no_market but have price history
-          # (market_price_history has their real prices)
+          # Restore cards that were wrongly stamped no_market but have real price history.
+          # market_price_history columns: card_catalog_id, scraped_at, fair_value,
+          #   confidence, num_sales, top_3_prices, min_price, max_price, source
           cur.execute("""
               UPDATE market_prices mp
               SET fair_value  = mph.fair_value,
-                  prev_value  = mph.prev_value,
-                  trend       = mph.trend,
                   confidence  = mph.confidence,
                   num_sales   = mph.num_sales,
+                  trend       = 'no data',
                   updated_at  = NOW()
               FROM (
                   SELECT DISTINCT ON (card_catalog_id)
                       card_catalog_id,
                       fair_value,
-                      prev_value,
-                      trend,
                       confidence,
                       num_sales
                   FROM market_price_history
                   WHERE fair_value > 0
-                  ORDER BY card_catalog_id, recorded_at DESC
+                  ORDER BY card_catalog_id, scraped_at DESC
               ) mph
               WHERE mp.card_catalog_id = mph.card_catalog_id
                 AND mp.confidence = 'no_market'
@@ -55,7 +53,7 @@ jobs:
           remaining = cur.fetchone()[0]
 
           print(f"Restored: {fixed:,} cards")
-          print(f"Remaining legitimate no_market: {remaining:,}")
+          print(f"Remaining legitimate no_market (never priced): {remaining:,}")
           cur.close()
           conn.close()
           PYEOF
