@@ -1333,7 +1333,7 @@ def build_player_card_query(card_name):
     return search_term.strip()
 
 
-def process_card(card, since_date=None):
+def process_card(card, since_date=None, max_pages=15):
     """Search eBay and compute a fair market price for a single card.
 
     Executes a 4-stage search with decreasing specificity, stopping as soon
@@ -1387,7 +1387,7 @@ def process_card(card, since_date=None):
     direct_sales = []    # stored historically (stage-1 paginated results only)
 
     # Stage 1: paginated full query — captures all pages since last run
-    _stage1 = search_ebay_sold_paginated(card, since_date=since_date)
+    _stage1 = search_ebay_sold_paginated(card, since_date=since_date, max_pages=max_pages)
     _stage1 = _apply_variant_filter(card, _stage1)
 
     if _stage1:

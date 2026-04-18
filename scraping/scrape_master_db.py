@@ -54,6 +54,7 @@ BGS_PROBE_ORDER = ['BGS 10', 'BGS 9.5', 'BGS 9']
 ALL_GRADES = PSA_PROBE_ORDER + BGS_PROBE_ORDER
 
 # Shared progress counters
+_max_pages = 15  # overridden by --max-pages arg in main()
 _lock = threading.Lock()
 _progress = {
     "done": 0, "found": 0, "not_found": 0, "errors": 0, "deltas": 0,
@@ -548,7 +549,7 @@ def scrape_one(card: dict) -> tuple:
     last_exc = None
     for attempt in range(2):
         try:
-            _, result = process_card(card_name, since_date=card.get('last_sale_date'))
+            _, result = process_card(card_name, since_date=card.get('last_sale_date'), max_pages=_max_pages)
             stats = result.get('stats', {})
             new_price = round(stats.get('fair_price', 0), 2)
             old_price = card.get('existing_price')
@@ -670,11 +671,16 @@ def main():
     parser.add_argument('--shard-count',  type=int,   default=1,    dest='shard_count',
                         help="Total number of shards. Each runner handles cc.id %% shard_count = shard_index. "
                              "Each runner gets a different GH Actions IP -> independent eBay rate limit.")
+    parser.add_argument('--max-pages',    type=int,   default=15,   dest='max_pages',
+                        help="Max eBay pages per card in Stage 1 (default 15, reduce for faster runs")
     parser.add_argument('--output-file',  type=str,   default=None, dest='output_file',
                         help="Buffer all results to memory and write a single JSON file at the end "
                              "instead of writing to the DB during scraping. "
                              "Use import_results.py to bulk-insert later.")
     args = parser.parse_args()
+
+    global _max_pages
+    _max_pages = args.max_pages
 
     if args.graded:
         grades = [g.strip() for g in args.grades.split(',')] if args.grades else ALL_GRADES
