@@ -43,14 +43,16 @@ def load_config(tier: str) -> dict:
 
 
 def build_jobs(tier: str, cfg: dict, sport_filter: str | None, limit: int,
-               backfill: bool = False) -> list[dict]:
+               backfill: bool = False, this_shard: int | None = None) -> list[dict]:
     sports      = [sport_filter.upper()] if sport_filter else cfg["sports"]
     shard_count = cfg["shard_count"]
     mode        = "backfill" if backfill else "raw"
+    # If --this-shard is set, only run that one shard index (multi-server mode).
+    shard_indexes = [this_shard] if this_shard is not None else range(shard_count)
     jobs = []
 
     for sport in sports:
-        for shard_index in range(shard_count):
+        for shard_index in shard_indexes:
             cmd = [
                 sys.executable, "-u", str(SCRAPER),
                 "--catalog-tier", tier,
@@ -200,7 +202,10 @@ def main():
     parser.add_argument("--workers", type=int, default=None,
                         help="Override workers from tier_config.json (e.g. --workers 25 on a server).")
     parser.add_argument("--shards", type=int, default=None,
-                        help="Override shard_count from tier_config.json (e.g. --shards 1 on a server).")
+                        help="Override shard_count from tier_config.json (e.g. --shards 3 for 3-server setup).")
+    parser.add_argument("--this-shard", type=int, default=None, dest="this_shard",
+                        help="Run only this shard index (0-based). Used in multi-server mode: "
+                             "each server sets --shards N --this-shard <its index>.")
     args = parser.parse_args()
 
     cfg  = load_config(args.tier)
@@ -208,7 +213,8 @@ def main():
         cfg["workers"] = args.workers
     if args.shards is not None:
         cfg["shard_count"] = args.shards
-    jobs = build_jobs(args.tier, cfg, args.sport, args.limit, backfill=args.backfill)
+    jobs = build_jobs(args.tier, cfg, args.sport, args.limit,
+                      backfill=args.backfill, this_shard=args.this_shard)
 
     sports_in_run = [args.sport.upper()] if args.sport else cfg["sports"]
     n_procs = len(jobs)
@@ -216,7 +222,10 @@ def main():
     print(f"\nTier:      {args.tier}")
     print(f"Mode:      {mode_label}")
     print(f"Sports:    {', '.join(sports_in_run)}")
-    print(f"Shards:    {cfg['shard_count']} per sport  ({n_procs} total subprocesses)")
+    if args.this_shard is not None:
+        print(f"Shards:    this server = shard {args.this_shard} of {cfg['shard_count']}")
+    else:
+        print(f"Shards:    {cfg['shard_count']} per sport  ({n_procs} total subprocesses)")
     print(f"Workers:   {cfg['workers']} per subprocess")
     if not args.backfill:
         print(f"Stale:     {cfg['stale_days']}d")

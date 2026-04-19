@@ -1,62 +1,79 @@
 #!/usr/bin/env bash
 # =============================================================================
-# CardDB Backfill Launcher — run on external Ubuntu server
+# CardDB Backfill Launcher — external Ubuntu server
 #
-# Launches one tmux window per tier. Each tier runs all its sports in parallel
-# subprocesses (one per sport × shard) with no time limit.
+# Single-server mode (default):
+#   ./server/run_backfill.sh
+#   Runs all tiers. Workers capped by eBay's single-IP rate limit (~30-50).
 #
-# DB connection budget:
-#   premium: 4 sports × 1 shard = 4 procs
-#   stars:   4 sports × 1 shard = 4 procs
-#   base:    3 sports × 1 shard = 3 procs
-#   ─────────────────────────────────────
-#   Total:   11 procs × ~2 avg DB conns  ≈ 22 server connections
-#   GH Actions (elite+staple only): ~20 connections
-#   App (Railway):                   5 connections
-#   ─────────────────────────────────────────────────────────────
-#   Peak total:  ~47 / 100 max  ✅
+# Multi-server mode (scales linearly with server count):
+#   Server 0:  ./server/run_backfill.sh --shards 3 --this-shard 0
+#   Server 1:  ./server/run_backfill.sh --shards 3 --this-shard 1
+#   Server 2:  ./server/run_backfill.sh --shards 3 --this-shard 2
+#   Each server gets a different IP → independent eBay rate limit.
+#   3 servers × 50 workers = effective 150-worker throughput.
 #
-# IMPORTANT: Before running, disable the premium/stars GH Actions workflows
-# to avoid double-scraping and connection budget overflow:
+# Why sharding matters more than workers:
+#   curl_cffi is I/O-bound — workers just = concurrent eBay requests.
+#   eBay rate-limits per IP. One IP can sustain ~30-50 concurrent requests
+#   before hitting 429s. More workers on one IP just piles up retries.
+#   More IPs (shards) = actually more throughput.
+#
+# Recommended hardware per server:
+#   2 vCPU, 4GB RAM — handles all 3 tiers at 40 workers each
+#   Hetzner CX21 ~$4/month or Digital Ocean Basic ~$18/month
+#
+# DB connection budget (per server, all tiers running):
+#   premium: 4 sports × 1 shard = 4 procs  ─┐
+#   stars:   4 sports × 1 shard = 4 procs   ├─ ~22 connections peak
+#   base:    3 sports × 1 shard = 3 procs  ─┘
+#   GH Actions (elite+staple only):           ~20 connections
+#   Railway app:                               5 connections
+#   ─────────────────────────────────────────────────────────────────
+#   Total per shard server: ~47 / 100 max  ✅
+#   3 servers: ~47 × 3 = 141 — DISABLE GH Actions workflows while running!
+#
+# IMPORTANT for multi-server: disable premium/stars GH Actions first:
 #   gh workflow disable "Premium Tier — Delta Scrape"
 #   gh workflow disable "Stars Tier — Delta Scrape"
-# Re-enable after backfill completes:
-#   gh workflow enable  "Premium Tier — Delta Scrape"
-#   gh workflow enable  "Stars Tier — Delta Scrape"
-#
-# Usage:
-#   ./server/run_backfill.sh            # all tiers
-#   ./server/run_backfill.sh premium    # single tier
-#   ./server/run_backfill.sh stars base # specific tiers
 # =============================================================================
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VENV="$REPO_ROOT/.venv"
-RUNNER="$REPO_ROOT/scraping/run_tier.py"
 SESSION="carddb"
 
-# Workers per subprocess. curl_cffi is I/O-bound so high counts are safe.
-# Tune down if you see eBay 429s in the logs.
-WORKERS=25
+# ── Defaults ──────────────────────────────────────────────────────────────────
+WORKERS=40        # workers per subprocess — eBay single-IP limit ~30-50
+SHARDS=1          # total servers in the pool (1 = single-server mode)
+THIS_SHARD=""     # which shard this server owns (empty = all shards)
+TIERS=(premium stars base)
 
-# Shards per sport. 1 is fine on a server — just use more workers instead.
-SHARDS=1
+# ── Arg parsing ───────────────────────────────────────────────────────────────
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --workers)    WORKERS="$2";    shift 2 ;;
+        --shards)     SHARDS="$2";     shift 2 ;;
+        --this-shard) THIS_SHARD="$2"; shift 2 ;;
+        --tiers)      IFS=',' read -ra TIERS <<< "$2"; shift 2 ;;
+        premium|stars|base|staple|elite) TIERS=("$1"); shift ;;
+        *) echo "Unknown arg: $1"; exit 1 ;;
+    esac
+done
 
-# Which tiers to run (default: all backfill tiers; skip elite/staple since GH Actions handles those)
-TIERS=("${@:-premium stars base}")
-if [ $# -gt 0 ]; then
-    TIERS=("$@")
+SHARD_ARGS="--shards $SHARDS"
+if [ -n "$THIS_SHARD" ]; then
+    SHARD_ARGS="--shards $SHARDS --this-shard $THIS_SHARD"
+    SHARD_LABEL="shard $THIS_SHARD of $SHARDS"
 else
-    TIERS=(premium stars base)
+    SHARD_LABEL="single server (all shards)"
 fi
 
 # ── Sanity checks ──────────────────────────────────────────────────────────────
 if [ ! -f "$VENV/bin/activate" ]; then
-    echo "ERROR: venv not found at $VENV. Run server/setup.sh first."
+    echo "ERROR: venv not found at $VENV. Run ./server/setup.sh first."
     exit 1
 fi
-
 if [ ! -f "$REPO_ROOT/.env" ]; then
     echo "ERROR: .env not found. Copy server/.env.example to .env and set DATABASE_URL."
     exit 1
@@ -64,7 +81,7 @@ fi
 
 source "$VENV/bin/activate"
 
-# Quick DB connectivity check before launching 11 processes
+echo "Checking DB connection..."
 python3 -c "
 import sys, os
 sys.path.insert(0, '$REPO_ROOT')
@@ -72,46 +89,50 @@ from dotenv import load_dotenv; load_dotenv('$REPO_ROOT/.env')
 from db import get_db
 with get_db() as conn:
     conn.cursor().execute('SELECT 1')
-print('DB connection OK')
+print('  DB OK')
 " || { echo "ERROR: DB connection failed. Check DATABASE_URL in .env"; exit 1; }
 
 # ── tmux session ───────────────────────────────────────────────────────────────
 if tmux has-session -t "$SESSION" 2>/dev/null; then
+    echo ""
     echo "tmux session '$SESSION' already exists."
-    echo "Attach with:  tmux attach -t $SESSION"
-    echo "Or kill it:   tmux kill-session -t $SESSION"
+    echo "  Attach:  tmux attach -t $SESSION"
+    echo "  Kill it: tmux kill-session -t $SESSION"
     exit 1
 fi
 
-tmux new-session -d -s "$SESSION" -n "monitor"
+echo ""
+echo "=== CardDB Backfill ==="
+echo "  Tiers:   ${TIERS[*]}"
+echo "  Workers: $WORKERS per subprocess"
+echo "  Mode:    $SHARD_LABEL"
+echo ""
 
-echo ""
-echo "Launching tiers: ${TIERS[*]}"
-echo "  Workers per subprocess : $WORKERS"
-echo "  Shards per sport       : $SHARDS"
-echo ""
+tmux new-session -d -s "$SESSION" -n "status"
 
 for TIER in "${TIERS[@]}"; do
-    echo "  Starting $TIER..."
+    echo "  Launching $TIER..."
     tmux new-window -t "$SESSION" -n "$TIER"
-    tmux send-keys -t "$SESSION:$TIER" \
-        "source $VENV/bin/activate && cd $REPO_ROOT && python scraping/run_tier.py $TIER --workers $WORKERS --shards $SHARDS" \
-        Enter
+    CMD="source $VENV/bin/activate && cd $REPO_ROOT && python scraping/run_tier.py $TIER --workers $WORKERS $SHARD_ARGS 2>&1 | tee -a scraping/logs/${TIER}_server.log"
+    tmux send-keys -t "$SESSION:$TIER" "$CMD" Enter
 done
 
-# Set up monitor window with a live tail of all logs
-tmux select-window -t "$SESSION:monitor"
-tmux send-keys -t "$SESSION:monitor" \
-    "watch -n 30 'tail -n 5 scraping/logs/*.log 2>/dev/null | grep -E \"Found|Stamped|Error|done|SUMMARY\" | tail -40'" \
+# Status window — live coverage check every 5 min
+tmux select-window -t "$SESSION:status"
+tmux send-keys -t "$SESSION:status" \
+    "watch -n 300 './server/status.sh'" \
     Enter
 
 echo ""
-echo "All tiers launched in tmux session '$SESSION'."
+echo "All tiers launched."
 echo ""
-echo "  Attach:        tmux attach -t $SESSION"
-echo "  Switch window: Ctrl-b then window name (e.g. premium, stars, base)"
-echo "  Detach:        Ctrl-b then d"
-echo "  Live logs:     tail -f scraping/logs/<tier>_<sport>_0of1_raw.log"
+echo "  tmux attach:    tmux attach -t $SESSION"
+echo "  Switch window:  Ctrl-b <window name>  (status / premium / stars / base)"
+echo "  Detach:         Ctrl-b d"
+echo "  Live log:       tail -f scraping/logs/premium_NHL_0of1_raw.log"
+echo "  Progress:       ./server/status.sh"
 echo ""
-echo "Check progress any time:"
-echo "  ./server/status.sh"
+if [ "$SHARDS" -gt 1 ]; then
+    echo "Multi-server mode: this server handles shard $THIS_SHARD of $SHARDS"
+    echo "Make sure other servers are configured with their --this-shard value."
+fi
