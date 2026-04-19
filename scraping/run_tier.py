@@ -197,9 +197,17 @@ def main():
     parser.add_argument("--stream", action="store_true",
                         help="Print subprocess output live to terminal (teed to log). "
                              "Best for single-subprocess runs; with multiple shards output interleaves.")
+    parser.add_argument("--workers", type=int, default=None,
+                        help="Override workers from tier_config.json (e.g. --workers 25 on a server).")
+    parser.add_argument("--shards", type=int, default=None,
+                        help="Override shard_count from tier_config.json (e.g. --shards 1 on a server).")
     args = parser.parse_args()
 
     cfg  = load_config(args.tier)
+    if args.workers is not None:
+        cfg["workers"] = args.workers
+    if args.shards is not None:
+        cfg["shard_count"] = args.shards
     jobs = build_jobs(args.tier, cfg, args.sport, args.limit, backfill=args.backfill)
 
     sports_in_run = [args.sport.upper()] if args.sport else cfg["sports"]
