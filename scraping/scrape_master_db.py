@@ -331,6 +331,32 @@ def save_prices_batch(results: list):
             """, [(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], 'ebay')
                   for r in hist_rows])
 
+            # SCD Type 2: maintain effective_to + is_current for all affected cards.
+            # Re-runs the window function only over the cards in this batch — fast
+            # even at high worker counts (50-100 card_ids per flush).
+            card_ids = [r[0] for r in hist_rows]
+            cur.execute("""
+                WITH ordered AS (
+                    SELECT
+                        card_catalog_id,
+                        scraped_at,
+                        LEAD(scraped_at::TIMESTAMPTZ) OVER (
+                            PARTITION BY card_catalog_id ORDER BY scraped_at
+                        ) AS next_at,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY card_catalog_id ORDER BY scraped_at DESC
+                        ) AS rn
+                    FROM market_price_history
+                    WHERE card_catalog_id = ANY(%s)
+                )
+                UPDATE market_price_history mph
+                SET effective_to = ordered.next_at,
+                    is_current   = (ordered.rn = 1)
+                FROM ordered
+                WHERE mph.card_catalog_id = ordered.card_catalog_id
+                  AND mph.scraped_at      = ordered.scraped_at
+            """, [card_ids])
+
             # Bulk raw sales: pre-filter already-seen hashes in one query to avoid
             # dead tuples from ON CONFLICT DO NOTHING on every duplicate attempt.
             all_hashes = [

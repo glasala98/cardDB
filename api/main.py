@@ -83,6 +83,7 @@ class RateLimitMiddleware:
         await self.app(scope, receive, send)
 
 from api.routers import cards, master_db, stats, auth, scan, admin, catalog, collection, search, ai, ebay
+from api.routers.report import build_report_app
 from db import get_db
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -121,6 +122,10 @@ app.include_router(collection.router,  prefix="/api/collection",  tags=["collect
 app.include_router(search.router,      prefix="/api/search",      tags=["search"])
 app.include_router(ai.router,          prefix="/api/ai",           tags=["ai"])
 app.include_router(ebay.router,        prefix="/api/ebay",          tags=["ebay"])
+
+# Reporting sub-app — open CORS, API key auth, mounted at /api/report
+# Set REPORT_API_KEY env var in Railway to enable.
+app.mount("/api/report", build_report_app())
 
 
 @app.get("/api/health")
