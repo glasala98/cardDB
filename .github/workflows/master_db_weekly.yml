@@ -34,7 +34,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Scrape NHL stats + player bios
-        run: python -u scrape_nhl_stats.py --fetch-bios
+        run: python -u scraping/scrape_nhl_stats.py --fetch-bios
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
