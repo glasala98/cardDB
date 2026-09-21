@@ -32,6 +32,7 @@ def main():
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--limit", type=int, default=0, help="only the first N cards (testing)")
     ap.add_argument("--card", type=str, default="", help="price just this one card (the ledger's ⟳ button)")
+    ap.add_argument("--debug", action="store_true", help="print what eBay actually returned for the first card")
     args = ap.parse_args()
 
     base = os.environ["CARDDB_URL"].rstrip("/")
@@ -49,6 +50,30 @@ def main():
     elif args.limit:
         cards = cards[: args.limit]
     print(f"[{time.strftime('%H:%M:%S')}] pricing {len(cards)} cards with {args.workers} workers", flush=True)
+
+    if args.debug and cards:
+        # One raw fetch, fully described, so a zero-sales run can be diagnosed
+        # from the Actions log alone: is eBay blocking this IP, or is the
+        # query just empty?
+        import re, urllib.parse
+        import scrape_card_prices as scp
+        q = scp.clean_card_name_for_search(cards[0])
+        url = ("https://www.ebay.com/sch/i.html?_nkw=" + urllib.parse.quote(q)
+               + "&_sacat=0&LH_Complete=1&LH_Sold=1&_sop=13&_ipg=60")
+        sess = scp._get_http_session()
+        try:
+            resp = sess.get(url, timeout=15)
+            html = resp.text or ""
+            title = re.search(r"<title>(.*?)</title>", html, re.S)
+            items = scp._parse_ebay_items(html, url, cards[0])
+            print("DEBUG query      :", q, flush=True)
+            print("DEBUG http status:", resp.status_code, "| html bytes:", len(html), flush=True)
+            print("DEBUG page title :", (title.group(1).strip()[:80] if title else None), flush=True)
+            print("DEBUG challenge? :", bool(re.search(r"Pardon Our Interruption|Access Denied|captcha|Checking your browser|Error Page", html, re.I)), flush=True)
+            print("DEBUG s-card/s-item counts:", html.count('class="s-card'), html.count('class="s-item'), flush=True)
+            print("DEBUG parsed     :", "None (blocked/unknown layout)" if items is None else f"{len(items)} items", flush=True)
+        except Exception as e:
+            print("DEBUG fetch failed:", type(e).__name__, str(e)[:120], flush=True)
 
     results, failed = [], 0
     with ThreadPoolExecutor(max_workers=args.workers) as ex:

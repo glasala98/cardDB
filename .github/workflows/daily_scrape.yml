@@ -27,6 +27,10 @@ on:
         description: 'Price just this one card (exact card name; used by the ledger ⟳ button)'
         required: false
         default: ''
+      debug:
+        description: 'Print what eBay returned for the first card (diagnostics)'
+        required: false
+        default: 'false'
 
 jobs:
   ledger-scrape:
@@ -44,4 +48,4 @@ jobs:
           CARDDB_URL:      ${{ secrets.CARDDB_URL }}
           CARDDB_USER:     ${{ secrets.CARDDB_USER }}
           CARDDB_PASSWORD: ${{ secrets.CARDDB_PASSWORD }}
-        run: python -u scraping/portfolio_price_push.py --workers "${{ github.event.inputs.workers || '3' }}" --limit "${{ github.event.inputs.limit || '0' }}" --card "${{ github.event.inputs.card || '' }}"
+        run: python -u scraping/portfolio_price_push.py --workers "${{ github.event.inputs.workers || '3' }}" --limit "${{ github.event.inputs.limit || '0' }}" --card "${{ github.event.inputs.card || '' }}" ${{ github.event.inputs.debug == 'true' && '--debug' || '' }}
