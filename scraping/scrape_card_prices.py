@@ -492,7 +492,15 @@ def _get_http_session():
     if not hasattr(_http_local, 'session'):
         try:
             from curl_cffi import requests as cffi_requests
-            _http_local.session = cffi_requests.Session(impersonate="chrome131")
+            # EBAY_PROXY_URL (a residential proxy, e.g. http://user:pass@host:port)
+            # routes every eBay fetch through it. eBay answers datacenter IPs -
+            # GitHub runners included - with a "Security Measure" challenge page.
+            import os as _os
+            _proxy = _os.environ.get("EBAY_PROXY_URL", "").strip()
+            _http_local.session = cffi_requests.Session(
+                impersonate="chrome131",
+                proxies={"http": _proxy, "https": _proxy} if _proxy else None,
+            )
         except Exception:
             _http_local.session = None
     return _http_local.session

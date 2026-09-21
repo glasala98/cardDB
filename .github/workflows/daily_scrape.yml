@@ -48,4 +48,5 @@ jobs:
           CARDDB_URL:      ${{ secrets.CARDDB_URL }}
           CARDDB_USER:     ${{ secrets.CARDDB_USER }}
           CARDDB_PASSWORD: ${{ secrets.CARDDB_PASSWORD }}
+          EBAY_PROXY_URL:  ${{ secrets.EBAY_PROXY_URL }}
         run: python -u scraping/portfolio_price_push.py --workers "${{ github.event.inputs.workers || '3' }}" --limit "${{ github.event.inputs.limit || '0' }}" --card "${{ github.event.inputs.card || '' }}" ${{ github.event.inputs.debug == 'true' && '--debug' || '' }}
