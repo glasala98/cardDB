@@ -1,15 +1,10 @@
 name: Ledger Scrape — Personal Portfolio (Daily)
 
-# Rescrapes every card in a user's own collection (card_results) and appends a
-# portfolio snapshot. This is the personal-ledger counterpart to the catalog tier
-# scrapes — the catalog tracks the market, this tracks what you actually own.
-#
-# History: the original daily_scrape.yml was dropped in 1169059 ("remove 19
-# redundant/obsolete workflows") during the Selenium->curl_cffi refactor, and
-# nothing replaced it — so personal card prices froze on 2026-03-28 while the
-# catalog kept updating around them. scraping/daily_scrape.py was never removed
-# and calls process_card(), which is now the curl_cffi path, so no Chrome install
-# is needed any more.
+# Prices every card in the personal collection with recent eBay sold comps and
+# pushes the results to the site over its admin API (see
+# scraping/portfolio_price_push.py for why it is done from a runner).
+# Dispatched on demand by the site's "trigger scrape" button (POST
+# /api/stats/trigger-scrape) and on a daily schedule.
 
 concurrency:
   group: ledger-scrape
@@ -17,17 +12,17 @@ concurrency:
 
 on:
   schedule:
-    - cron: '0 8 * * *'   # 8am UTC daily (3am EST / midnight PST) — as before
+    - cron: '0 8 * * *'   # 8am UTC daily (3am EST)
   workflow_dispatch:
     inputs:
-      user:
-        description: 'Username to scrape (blank = all users)'
-        required: false
-        default: 'admin'
       workers:
         description: 'Parallel scrape workers'
         required: false
         default: '3'
+      limit:
+        description: 'Only price the first N cards (0 = all)'
+        required: false
+        default: '0'
 
 jobs:
   ledger-scrape:
@@ -35,20 +30,14 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
       - name: Install Python dependencies
         run: pip install -r requirements.txt scipy
-
-      - name: Scrape personal portfolio
-        run: |
-          if [ -n "${{ github.event.inputs.user }}" ]; then
-            python -u scraping/daily_scrape.py --user "${{ github.event.inputs.user }}" --workers "${{ github.event.inputs.workers || '3' }}"
-          else
-            python -u scraping/daily_scrape.py --workers "${{ github.event.inputs.workers || '3' }}"
-          fi
+      - name: Price the portfolio and push to the site
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CARDDB_URL:      ${{ secrets.CARDDB_URL }}
+          CARDDB_USER:     ${{ secrets.CARDDB_USER }}
+          CARDDB_PASSWORD: ${{ secrets.CARDDB_PASSWORD }}
+        run: python -u scraping/portfolio_price_push.py --workers "${{ github.event.inputs.workers || '3' }}" --limit "${{ github.event.inputs.limit || '0' }}"
