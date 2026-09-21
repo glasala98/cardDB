@@ -31,6 +31,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--limit", type=int, default=0, help="only the first N cards (testing)")
+    ap.add_argument("--card", type=str, default="", help="price just this one card (the ledger's ⟳ button)")
     args = ap.parse_args()
 
     base = os.environ["CARDDB_URL"].rstrip("/")
@@ -41,7 +42,11 @@ def main():
     headers = {"Authorization": "Bearer " + r.json()["token"]}
 
     cards = requests.get(f"{base}/api/cards/price-jobs/cards", headers=headers, timeout=60).json()["cards"]
-    if args.limit:
+    if args.card:
+        if args.card not in cards:
+            print(f"card not in the ledger: {args.card!r}", flush=True); return 1
+        cards = [args.card]
+    elif args.limit:
         cards = cards[: args.limit]
     print(f"[{time.strftime('%H:%M:%S')}] pricing {len(cards)} cards with {args.workers} workers", flush=True)
 
